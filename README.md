@@ -27,6 +27,8 @@ GIF 有压缩，预览站里是 1080p 原片：
 | ![终端打字演示](assets/cream-terminal-mock-render.gif) | ![前后数据对比](assets/cream-before-after-stat-render.gif) |
 | **大数字卡** | **环形占比图** |
 | ![大数字卡](assets/big-number-card-render.gif) | ![环形占比图](assets/donut-chart-render.gif) |
+| **封面流转播** | **档案照片放大聚焦** |
+| ![封面流转播](assets/coverflow-carousel-render.gif) | ![档案照片放大聚焦](assets/file-photo-zoom-render.gif) |
 
 ## 本仓有什么
 
