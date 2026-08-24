@@ -58,7 +58,7 @@ GIF 有压缩，预览站里是 1080p 原片：
 |:---:|:---:|
 | <img src="assets/qr-wechat-group.png" width="220" alt="微信群二维码"> | <img src="assets/qr-wechat-personal.jpg" width="220" alt="个人微信二维码"> |
 | **抖音 · 更新预告** | **小红书 · 更新预告** |
-| 抖音搜「老马AI研习社」 | 小红书搜「老马AI研习社」 |
+| <img src="assets/qr-douyin.png" width="220" alt="抖音二维码"> | <img src="assets/qr-xhs.png" width="220" alt="小红书二维码"> |
 
 ## 一个模板玩 20 分钟，和一条片 3 分钟的区别
 
