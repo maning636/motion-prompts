@@ -7,6 +7,8 @@
 挑一个提示词，粘贴给任意 AI（Claude Code / Codex / 豆包 / DeepSeek……），
 AI 会输出一个自包含的动效 HTML 页面——浏览器打开即播放，录屏进剪辑软件直接用。
 
+**不需要 Claude 和 Codex。豆包、DeepSeek 也能一键出片。**
+
 **🎬 在线预览全部动效 → https://motion.maning789link.top**
 
 ## 快速开始
