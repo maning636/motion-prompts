@@ -1,4 +1,4 @@
-# 开源目录（标准版全量 88 个）
+# 开源目录（免费版全量 178 个）
 
 | # | 提示词 | 分类 | 时长 |
 |---|--------|------|------|
@@ -90,3 +90,93 @@
 | 86 | [结尾卡片](prompts/086-outro-card.md) | 标题与开场 | 4.5s |
 | 87 | [鼠标高亮](prompts/087-cursor-highlight.md) | 透明叠加 | 4s |
 | 88 | [组合网格](prompts/088-composite-grid.md) | 组合 | 6s |
+| 89 | [类比框（奶油贴纸）](prompts/089-cream-analogy-frame.md) | 奶油贴纸 | 6s |
+| 90 | [因果链（奶油贴纸）](prompts/090-cream-cause-chain.md) | 奶油贴纸 | 6s |
+| 91 | [大数字卡（奶油贴纸）](prompts/091-cream-big-number-card.md) | 奶油贴纸 | 6s |
+| 92 | [大字海报（奶油贴纸）](prompts/092-cream-big-type-hero.md) | 奶油贴纸 | 6s |
+| 93 | [反白闪屏（奶油贴纸）](prompts/093-cream-inversion-flash.md) | 奶油贴纸 | 6s |
+| 94 | [结尾卡片（奶油贴纸）](prompts/094-cream-outro-card.md) | 奶油贴纸 | 6s |
+| 95 | [重点标注（奶油贴纸）](prompts/095-cream-key-point-marker.md) | 奶油贴纸 | 6s |
+| 96 | [引用块（奶油贴纸）](prompts/096-cream-pull-quote-hero.md) | 奶油贴纸 | 6s |
+| 97 | [关键词贴纸（奶油贴纸）](prompts/097-cream-keyword-sticker.md) | 奶油贴纸 | 6s |
+| 98 | [概念卡（奶油贴纸）](prompts/098-cream-concept-card.md) | 奶油贴纸 | 6s |
+| 99 | [概念解释卡（奶油贴纸）](prompts/099-cream-concept-spotlight.md) | 奶油贴纸 | 6s |
+| 100 | [章节标记（奶油贴纸）](prompts/100-cream-chapter-marker.md) | 奶油贴纸 | 6s |
+| 101 | [数据脉冲（奶油贴纸）](prompts/101-cream-metric-pulse.md) | 奶油贴纸 | 6s |
+| 102 | [数字计数器（奶油贴纸）](prompts/102-cream-number-counter.md) | 奶油贴纸 | 6s |
+| 103 | [极值刻度（奶油贴纸）](prompts/103-cream-number-impact.md) | 奶油贴纸 | 6s |
+| 104 | [数据来源引用卡（奶油贴纸）](prompts/104-cream-source-citation-card.md) | 奶油贴纸 | 6s |
+| 105 | [字幕高亮（奶油贴纸）](prompts/105-cream-subtitle-highlight.md) | 奶油贴纸 | 6s |
+| 106 | [占位框（奶油贴纸）](prompts/106-cream-placeholder-frame.md) | 奶油贴纸 | 6s |
+| 107 | [鼠标高亮（奶油贴纸）](prompts/107-cream-cursor-highlight.md) | 奶油贴纸 | 6s |
+| 108 | [验证分析（奶油贴纸）](prompts/108-cream-scene-analytics.md) | 奶油贴纸 | 6s |
+| 109 | [协作共创（奶油贴纸）](prompts/109-cream-scene-co-create.md) | 奶油贴纸 | 6s |
+| 110 | [上线发布（奶油贴纸）](prompts/110-cream-scene-launch.md) | 奶油贴纸 | 6s |
+| 111 | [场景插画库（奶油贴纸）](prompts/111-cream-scene-library.md) | 奶油贴纸 | 6s |
+| 112 | [提示工程（奶油贴纸）](prompts/112-cream-scene-prompt.md) | 奶油贴纸 | 6s |
+| 113 | [知识检索（奶油贴纸）](prompts/113-cream-scene-retrieval.md) | 奶油贴纸 | 6s |
+| 114 | [深度思考（奶油贴纸）](prompts/114-cream-scene-thinking.md) | 奶油贴纸 | 6s |
+| 115 | [音频波形（奶油贴纸）](prompts/115-cream-audio-waveform.md) | 奶油贴纸 | 6s |
+| 116 | [简单流程图（奶油贴纸）](prompts/116-cream-simple-flow-chart.md) | 奶油贴纸 | 6s |
+| 117 | [三步流程（奶油贴纸）](prompts/117-cream-three-step-flow.md) | 奶油贴纸 | 6s |
+| 118 | [复杂流程（奶油贴纸）](prompts/118-cream-complex-flow.md) | 奶油贴纸 | 6s |
+| 119 | [循环流程（奶油贴纸）](prompts/119-cream-loop-flow.md) | 奶油贴纸 | 6s |
+| 120 | [时间线推进（奶油贴纸）](prompts/120-cream-timeline-scan.md) | 奶油贴纸 | 6s |
+| 121 | [状态机（奶油贴纸）](prompts/121-cream-state-machine.md) | 奶油贴纸 | 6s |
+| 122 | [黑盒图（奶油贴纸）](prompts/122-cream-black-box.md) | 奶油贴纸 | 6s |
+| 123 | [概念等式（奶油贴纸）](prompts/123-cream-concept-equation.md) | 奶油贴纸 | 6s |
+| 124 | [清单核对（奶油贴纸）](prompts/124-cream-checklist-pop.md) | 奶油贴纸 | 6s |
+| 125 | [并行 / 汇合流程（奶油贴纸）](prompts/125-cream-fork-join-flow.md) | 奶油贴纸 | 6s |
+| 126 | [分支流程（奶油贴纸）](prompts/126-cream-branching-flow.md) | 奶油贴纸 | 6s |
+| 127 | [Hub & Spoke（奶油贴纸）](prompts/127-cream-hub-spoke.md) | 奶油贴纸 | 6s |
+| 128 | [思维导图（奶油贴纸）](prompts/128-cream-mind-map.md) | 奶油贴纸 | 6s |
+| 129 | [节点图（奶油贴纸）](prompts/129-cream-node-graph.md) | 奶油贴纸 | 6s |
+| 130 | [树状图（奶油贴纸）](prompts/130-cream-tree-diagram.md) | 奶油贴纸 | 6s |
+| 131 | [决策树（奶油贴纸）](prompts/131-cream-decision-tree.md) | 奶油贴纸 | 6s |
+| 132 | [前后对比数字（奶油贴纸）](prompts/132-cream-before-after-stat.md) | 奶油贴纸 | 6s |
+| 133 | [横向条形对比（奶油贴纸）](prompts/133-cream-horizontal-bar-compare.md) | 奶油贴纸 | 6s |
+| 134 | [双数据对比（奶油贴纸）](prompts/134-cream-stat-duel.md) | 奶油贴纸 | 6s |
+| 135 | [状态转折（奶油贴纸）](prompts/135-cream-status-split.md) | 奶油贴纸 | 6s |
+| 136 | [误区纠正（奶油贴纸）](prompts/136-cream-myth-fact-swap.md) | 奶油贴纸 | 6s |
+| 137 | [对照（奶油贴纸）](prompts/137-cream-versus-frame.md) | 奶油贴纸 | 6s |
+| 138 | [对比表（奶油贴纸）](prompts/138-cream-compare-table.md) | 奶油贴纸 | 6s |
+| 139 | [冰山图（奶油贴纸）](prompts/139-cream-iceberg-diagram.md) | 奶油贴纸 | 6s |
+| 140 | [API 调用（奶油贴纸）](prompts/140-cream-api-call-mock.md) | 奶油贴纸 | 6s |
+| 141 | [SWOT 四宫格（奶油贴纸）](prompts/141-cream-swot-grid.md) | 奶油贴纸 | 6s |
+| 142 | [2x2 矩阵（奶油贴纸）](prompts/142-cream-matrix-2x2.md) | 奶油贴纸 | 6s |
+| 143 | [柱状图增长（奶油贴纸）](prompts/143-cream-bar-chart-grow.md) | 奶油贴纸 | 6s |
+| 144 | [堆叠柱形图（奶油贴纸）](prompts/144-cream-stacked-bar.md) | 奶油贴纸 | 6s |
+| 145 | [Top 排名卡（奶油贴纸）](prompts/145-cream-top-rank-list.md) | 奶油贴纸 | 6s |
+| 146 | [甘特图（奶油贴纸）](prompts/146-cream-gantt-chart.md) | 奶油贴纸 | 6s |
+| 147 | [折线绘制（奶油贴纸）](prompts/147-cream-line-chart-draw.md) | 奶油贴纸 | 6s |
+| 148 | [多线对比（奶油贴纸）](prompts/148-cream-multi-line-chart.md) | 奶油贴纸 | 6s |
+| 149 | [拐点趋势线（奶油贴纸）](prompts/149-cream-turning-point-line.md) | 奶油贴纸 | 6s |
+| 150 | [环形图（奶油贴纸）](prompts/150-cream-donut-chart.md) | 奶油贴纸 | 6s |
+| 151 | [仪表盘（奶油贴纸）](prompts/151-cream-gauge-meter.md) | 奶油贴纸 | 6s |
+| 152 | [热力图（奶油贴纸）](prompts/152-cream-heatmap-grid.md) | 奶油贴纸 | 6s |
+| 153 | [散点图（奶油贴纸）](prompts/153-cream-scatter-plot.md) | 奶油贴纸 | 6s |
+| 154 | [分层堆栈（奶油贴纸）](prompts/154-cream-layered-stack.md) | 奶油贴纸 | 6s |
+| 155 | [金字塔层级（奶油贴纸）](prompts/155-cream-pyramid-layers.md) | 奶油贴纸 | 6s |
+| 156 | [漏斗图（奶油贴纸）](prompts/156-cream-funnel-chart.md) | 奶油贴纸 | 6s |
+| 157 | [韦恩图（奶油贴纸）](prompts/157-cream-venn-diagram.md) | 奶油贴纸 | 6s |
+| 158 | [同心圆（奶油贴纸）](prompts/158-cream-concentric-circles.md) | 奶油贴纸 | 6s |
+| 159 | [鱼骨图（奶油贴纸）](prompts/159-cream-fishbone-chart.md) | 奶油贴纸 | 6s |
+| 160 | [Sankey 流图（奶油贴纸）](prompts/160-cream-sankey-flow.md) | 奶油贴纸 | 6s |
+| 161 | [光谱轴（奶油贴纸）](prompts/161-cream-spectrum-axis.md) | 奶油贴纸 | 6s |
+| 162 | [谱系图（奶油贴纸）](prompts/162-cream-spectrum-map.md) | 奶油贴纸 | 6s |
+| 163 | [时序图（奶油贴纸）](prompts/163-cream-sequence-diagram.md) | 奶油贴纸 | 6s |
+| 164 | [泳道图（奶油贴纸）](prompts/164-cream-swimlane-flow.md) | 奶油贴纸 | 6s |
+| 165 | [浏览器 Mock（奶油贴纸）](prompts/165-cream-browser-mock.md) | 奶油贴纸 | 6s |
+| 166 | [终端 Mock（奶油贴纸）](prompts/166-cream-terminal-mock.md) | 奶油贴纸 | 6s |
+| 167 | [代码编辑器（奶油贴纸）](prompts/167-cream-code-editor.md) | 奶油贴纸 | 6s |
+| 168 | [对话流（奶油贴纸）](prompts/168-cream-chat-thread.md) | 奶油贴纸 | 6s |
+| 169 | [仪表盘 Mock（奶油贴纸）](prompts/169-cream-dashboard-mock.md) | 奶油贴纸 | 6s |
+| 170 | [Kanban 看板（奶油贴纸）](prompts/170-cream-kanban-board.md) | 奶油贴纸 | 6s |
+| 171 | [网格地图（奶油贴纸）](prompts/171-cream-grid-map.md) | 奶油贴纸 | 6s |
+| 172 | [图标网格（奶油贴纸）](prompts/172-cream-icon-grid.md) | 奶油贴纸 | 6s |
+| 173 | [描边粗细（奶油贴纸）](prompts/173-cream-stroke-weights.md) | 奶油贴纸 | 6s |
+| 174 | [组合网格（奶油贴纸）](prompts/174-cream-composite-grid.md) | 奶油贴纸 | 6s |
+| 175 | [面积图（奶油贴纸）](prompts/175-cream-area-chart.md) | 奶油贴纸 | 6s |
+| 176 | [摄像头叠加框（奶油贴纸）](prompts/176-cream-webcam-overlay.md) | 奶油贴纸 | 6s |
+| 177 | [分组柱状图（奶油贴纸）](prompts/177-cream-broll-charts-bar.md) | 奶油贴纸 | 6s |
+| 178 | [环形图（奶油贴纸）（2）](prompts/178-cream-broll-charts-donut.md) | 奶油贴纸 | 6s |
