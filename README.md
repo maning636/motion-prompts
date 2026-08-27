@@ -1,6 +1,6 @@
 # Motion Prompts · 视频动效提示词（178 个全量开源）
 
-[![预览站](https://img.shields.io/badge/%F0%9F%8E%AC_%E5%9C%A8%E7%BA%BF%E9%A2%84%E8%A7%88-motion.maning789link.top-0F9D3F)](https://motion.maning789link.top)
+[![预览站](https://img.shields.io/badge/%F0%9F%8E%AC_%E5%9C%A8%E7%BA%BF%E9%A2%84%E8%A7%88-maning636.github.io%2Fmotion--preview-0F9D3F)](https://maning636.github.io/motion-preview/)
 [![提示词](https://img.shields.io/badge/%E6%8F%90%E7%A4%BA%E8%AF%8D-178%20%E4%B8%AA%E5%85%A8%E9%87%8F%E5%BC%80%E6%BA%90-2C2417)](#本仓有什么)
 [![许可](https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF-%E4%BA%A7%E5%87%BA%E7%89%A9%E5%8F%AF%E5%95%86%E7%94%A8-FFB020)](LICENSE)
 
@@ -9,11 +9,11 @@ AI 会输出一个自包含的动效 HTML 页面——浏览器打开即播放�
 
 **不需要 Claude 和 Codex。豆包、DeepSeek 也能一键出片。**
 
-**🎬 在线预览全部动效 → https://motion.maning789link.top**
+**🎬 在线预览全部动效 → https://maning636.github.io/motion-preview/**
 
 ## 快速开始
 
-1. 先去[预览站](https://motion.maning789link.top)看动效长什么样；
+1. 先去[预览站](https://maning636.github.io/motion-preview/)看动效长什么样；
 2. 从 [SAMPLES.md](SAMPLES.md) 挑一个，复制 `.md` 文件里分隔线以下的整段提示词；
 3. 粘贴发给你的 AI，不需要任何额外解释；
 4. AI 输出 HTML 存成文件，浏览器打开播放，录屏即成片。
