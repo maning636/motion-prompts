@@ -1,6 +1,6 @@
 # 柱状图增长
 
-> 分类：数据可视化 ｜ 时长：6s ｜ 在线预览：https://motion.maning789link.top
+> 分类：数据可视化 ｜ 时长：6s ｜ 在线预览：https://maning789link.top/station.html
 
 把下面整段提示词粘贴给任意 AI（Claude Code / Codex / 豆包 / DeepSeek……）即可生成同款动效。
 
