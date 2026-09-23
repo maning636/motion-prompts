@@ -1,7 +1,7 @@
 # Motion Prompts · 视频动效提示词（443 个全量开源）
 
 [![预览站](https://img.shields.io/badge/%F0%9F%8E%AC_%E5%9C%A8%E7%BA%BF%E9%A2%84%E8%A7%88-maning636.github.io%2Fmotion--preview-0F9D3F)](https://maning636.github.io/motion-preview/)
-[![提示词](https://img.shields.io/badge/%E6%8F%90%E7%A4%BA%E8%AF%8D-178%20%E4%B8%AA%E5%85%A8%E9%87%8F%E5%BC%80%E6%BA%90-2C2417)](#本仓有什么)
+[![提示词](https://img.shields.io/badge/%E6%8F%90%E7%A4%BA%E8%AF%8D-443%20%E4%B8%AA%E5%85%A8%E9%87%8F%E5%BC%80%E6%BA%90-2C2417)](#本仓有什么)
 [![许可](https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF-%E4%BA%A7%E5%87%BA%E7%89%A9%E5%8F%AF%E5%95%86%E7%94%A8-FFB020)](LICENSE)
 
 挑一个提示词，粘贴给任意 AI（Claude Code / Codex / 豆包 / DeepSeek……），
