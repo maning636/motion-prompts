@@ -1,0 +1,4 @@
+*.bak-*
+prompts/_staging_*/
+prompts/_backup_*/
+*.tmp

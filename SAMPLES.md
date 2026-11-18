@@ -1,7 +1,5 @@
-# 开源目录（已开源 389 个，陆续开放至 512 个 · 每周五更新一批）
+# 开源目录（已开源 600 个 · 每周五更新一批）
 
-| 编号 | 模板 | 分类 | 时长 |
-|---|---|---|---|
 | 001 | [柱状图增长](prompts/001-bar-chart-grow.md) | 数据可视化 | 6s |
 | 002 | [折线绘制](prompts/002-line-chart-draw.md) | 数据可视化 | 7s |
 | 003 | [数据脉冲](prompts/003-metric-pulse.md) | 数据可视化 | 6s |
@@ -390,4 +388,216 @@
 | 386 | [排名轨道推入](prompts/386-brik-dq-03.md) | 积木风·数据与图表 | 5.5s |
 | 387 | [角标块砸落](prompts/387-brik-lt-01.md) | 积木风·叠加组件 | 5s |
 | 388 | [底部横条推入](prompts/388-brik-lt-02.md) | 积木风·叠加组件 | 5s |
-| 389 | [块墙合拢落印](prompts/389-brik-wall-01.md) | 积木风·镜头与转场 | 6s |
+| 389 | [块墙合拢落印](prompts/389-brik-wall-01.md) | 镜头与转场 | 6s |
+| 390 | [橡皮手臂拉长去够](prompts/390-pop-arm-reach.md) | 透明贴纸·叠加组件 | 3s |
+| 391 | [挥手打招呼](prompts/391-pop-arm-wave.md) | 透明贴纸·叠加组件 | 3.2s |
+| 392 | [表情图形弹跳](prompts/392-pop-bubble-emoji.md) | 透明贴纸·叠加组件 | 2.8s |
+| 393 | [对话气泡弹出](prompts/393-pop-bubble-pop.md) | 透明贴纸·叠加组件 | 2.8s |
+| 394 | [大叫爆炸气泡](prompts/394-pop-bubble-shout.md) | 透明贴纸·叠加组件 | 2.8s |
+| 395 | [思考气泡](prompts/395-pop-bubble-thought.md) | 透明贴纸·叠加组件 | 3s |
+| 396 | [哈士奇眨眼与张望](prompts/396-pop-char-blink.md) | 透明贴纸·叠加组件 | 3.6s |
+| 397 | [哈士奇表情切换](prompts/397-pop-char-expression.md) | 透明贴纸·叠加组件 | 3.4s |
+| 398 | [哈士奇待机呼吸](prompts/398-pop-char-idle-bob.md) | 透明贴纸·叠加组件 | 3.4s |
+| 399 | [哈士奇跳跃](prompts/399-pop-char-jump.md) | 透明贴纸·叠加组件 | 3s |
+| 400 | [哈士奇弹入](prompts/400-pop-char-pop-in.md) | 透明贴纸·叠加组件 | 3.2s |
+| 401 | [哈士奇抛物线投掷](prompts/401-pop-char-throw.md) | 透明贴纸·叠加组件 | 3.6s |
+| 402 | [相机取景快门](prompts/402-pop-device-camera.md) | 透明贴纸·叠加组件 | 3s |
+| 403 | [手机模型载入](prompts/403-pop-device-phone.md) | 透明贴纸·叠加组件 | 3.2s |
+| 404 | [页面横向滑动](prompts/404-pop-device-swipe-nav.md) | 透明贴纸·叠加组件 | 3.4s |
+| 405 | [点击涟漪](prompts/405-pop-device-tap-ripple.md) | 透明贴纸·叠加组件 | 3s |
+| 406 | [彩纸粒子爆撒](prompts/406-pop-fx-confetti.md) | 透明贴纸·叠加组件 | 2.8s |
+| 407 | [双闪屏](prompts/407-pop-fx-flash.md) | 透明贴纸·叠加组件 | 2.4s |
+| 408 | [RGB 故障闪切](prompts/408-pop-fx-glitch-cut.md) | 透明贴纸·叠加组件 | 2.6s |
+| 409 | [马赛克推进](prompts/409-pop-fx-mosaic-zoom.md) | 透明贴纸·叠加组件 | 2.8s |
+| 410 | [纸片翻飞](prompts/410-pop-fx-paper-scatter.md) | 透明贴纸·叠加组件 | 2.6s |
+| 411 | [饱和度拉满爆开](prompts/411-pop-fx-saturation-burst.md) | 透明贴纸·叠加组件 | 2.6s |
+| 412 | [扫描取景](prompts/412-pop-fx-scan-frame.md) | 透明贴纸·叠加组件 | 2.8s |
+| 413 | [衰减震屏](prompts/413-pop-fx-shake.md) | 透明贴纸·叠加组件 | 2.6s |
+| 414 | [星爆闪光](prompts/414-pop-fx-spark-star.md) | 透明贴纸·叠加组件 | 2.4s |
+| 415 | [集中速度线](prompts/415-pop-fx-speedlines.md) | 透明贴纸·叠加组件 | 2.4s |
+| 416 | [手绘弧形箭头](prompts/416-pop-hand-arrow.md) | 透明贴纸·叠加组件 | 2.8s |
+| 417 | [手绘圈选](prompts/417-pop-hand-circle.md) | 透明贴纸·叠加组件 | 3s |
+| 418 | [手绘键帽掉落](prompts/418-pop-hand-keycap.md) | 透明贴纸·叠加组件 | 2.8s |
+| 419 | [手绘便签打字](prompts/419-pop-hand-note-type.md) | 透明贴纸·叠加组件 | 3s |
+| 420 | [手绘印章盖章](prompts/420-pop-hand-stamp.md) | 透明贴纸·叠加组件 | 2.8s |
+| 421 | [手绘吊牌摇摆](prompts/421-pop-hand-swing-tag.md) | 透明贴纸·叠加组件 | 3.2s |
+| 422 | [手绘胶带固定](prompts/422-pop-hand-tape.md) | 透明贴纸·叠加组件 | 2.8s |
+| 423 | [手绘下划线](prompts/423-pop-hand-underline.md) | 透明贴纸·叠加组件 | 2.6s |
+| 424 | [路径描边生长](prompts/424-pop-link-draw-on.md) | 透明贴纸·叠加组件 | 3s |
+| 425 | [沿路径运动点](prompts/425-pop-link-orbit-dot.md) | 透明贴纸·叠加组件 | 3.2s |
+| 426 | [虚线轨迹生长](prompts/426-pop-link-trail-dash.md) | 透明贴纸·叠加组件 | 3s |
+| 427 | [手绘金币弹出](prompts/427-pop-prop-coins.md) | 透明贴纸·叠加组件 | 3.2s |
+| 428 | [手绘铅笔书写](prompts/428-pop-prop-pencil.md) | 透明贴纸·叠加组件 | 3s |
+| 429 | [手绘折纸飞机](prompts/429-pop-prop-plane.md) | 透明贴纸·叠加组件 | 3s |
+| 430 | [手绘垃圾桶](prompts/430-pop-prop-trash.md) | 透明贴纸·叠加组件 | 3.2s |
+| 431 | [拟声词连发](prompts/431-pop-sfx-deck.md) | 透明贴纸·叠加组件 | 2.8s |
+| 432 | [拟声词放射爆开](prompts/432-pop-sfx-radial.md) | 透明贴纸·叠加组件 | 2.8s |
+| 433 | [斜切缎带拟声词](prompts/433-pop-sfx-ribbon.md) | 透明贴纸·叠加组件 | 2.8s |
+| 434 | [拟声词砸入](prompts/434-pop-sfx-slam.md) | 透明贴纸·叠加组件 | 2.8s |
+| 435 | [贴纸式拟声词](prompts/435-pop-sfx-sticker.md) | 透明贴纸·叠加组件 | 2.8s |
+| 436 | [打字机拟声词](prompts/436-pop-sfx-typewriter.md) | 透明贴纸·叠加组件 | 2.8s |
+| 437 | [字幕条弹入](prompts/437-pop-text-caption-bar.md) | 透明贴纸·叠加组件 | 3s |
+| 438 | [渐变流动字](prompts/438-pop-text-gradient-flow.md) | 透明贴纸·叠加组件 | 3.2s |
+| 439 | [卡拉OK高亮](prompts/439-pop-text-karaoke.md) | 透明贴纸·叠加组件 | 3.4s |
+| 440 | [横向滚动字幕](prompts/440-pop-text-marquee.md) | 透明贴纸·叠加组件 | 2.4s |
+| 441 | [抖动强调字](prompts/441-pop-text-shake-word.md) | 透明贴纸·叠加组件 | 3s |
+| 442 | [音频波形入场](prompts/442-pop-ui-audio-wave.md) | 透明贴纸·叠加组件 | 3.6s |
+| 443 | [角标盖章](prompts/443-pop-ui-badge-stamp.md) | 透明贴纸·叠加组件 | 3.2s |
+| 444 | [标签依次弹入](prompts/444-pop-ui-chip-pop.md) | 透明贴纸·叠加组件 | 3.2s |
+| 445 | [数字滚动跳变](prompts/445-pop-ui-counter-roll.md) | 透明贴纸·叠加组件 | 3.4s |
+| 446 | [旋钮调节](prompts/446-pop-ui-knob-turn.md) | 透明贴纸·叠加组件 | 3.4s |
+| 447 | [菜单级联展开](prompts/447-pop-ui-menu-cascade.md) | 透明贴纸·叠加组件 | 3s |
+| 448 | [播放头拖动](prompts/448-pop-ui-playhead-scrub.md) | 透明贴纸·叠加组件 | 3.4s |
+| 449 | [进度条推进](prompts/449-pop-ui-progress-sweep.md) | 透明贴纸·叠加组件 | 3.4s |
+| 450 | [步骤轴 · 钱花在哪，删掉才知道](prompts/450-blk-steps-cost-cut.md) | 电商带货·图解与流程 | 5s |
+| 451 | [步骤轴 · 出门干活带这几样就够](prompts/451-blk-steps-gear-kit.md) | 电商带货·图解与流程 | 5s |
+| 452 | [上下分带 · 把收入拆开看才不慌](prompts/452-blk-band-money-month.md) | 电商带货·文字与收尾 | 5s |
+| 453 | [三列看板 · 一百个人进来，剩几个留下](prompts/453-blk-kanban-sale-funnel.md) | 电商带货·图解与流程 | 5s |
+| 454 | [阶梯 · 钱花在哪，删掉才知道](prompts/454-blk-ladder-cost-cut.md) | 电商带货·图解与流程 | 5s |
+| 455 | [阶梯 · 出门干活带这几样就够](prompts/455-blk-ladder-gear-kit.md) | 电商带货·图解与流程 | 5s |
+| 456 | [四象限 · 出门干活带这几样就够](prompts/456-blk-quad-gear-kit.md) | 电商带货·数据与图表 | 5s |
+| 457 | [叠压卡片 · 钱花在哪，删掉才知道](prompts/457-blk-stack-cost-cut.md) | 电商带货·图解与流程 | 5s |
+| 458 | [叠压卡片 · 出门干活带这几样就够](prompts/458-blk-stack-gear-kit.md) | 电商带货·图解与流程 | 5s |
+| 459 | [打钩清单 · 用一整天走完一条街](prompts/459-blk-checklist-city-walk.md) | 电商带货·图解与流程 | 5s |
+| 460 | [打钩清单 · 一百个人进来，剩几个留下](prompts/460-blk-checklist-sale-funnel.md) | 电商带货·图解与流程 | 5s |
+| 461 | [华夫图 · 把收入拆开看才不慌](prompts/461-blk-mosaic-money-month.md) | 电商带货·封面与卡片 | 5s |
+| 462 | [数据海报 · 钱花在哪，删掉才知道](prompts/462-blk-poster-cost-cut.md) | 电商带货·封面与卡片 | 5s |
+| 463 | [划线价对撞 · 到手价](prompts/463-blk-brut-ec-01.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 464 | [到手价大字牌](prompts/464-blk-brut-ec-02.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 465 | [券后账三行](prompts/465-blk-brut-ec-03.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 466 | [拼单价贴纸](prompts/466-blk-brut-ec-04.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 467 | [会员价三栏](prompts/467-blk-brut-ec-05.md) | 野兽派电商卡·封面与卡片 | 6s |
+| 468 | [限时价单卡](prompts/468-blk-brut-ec-06.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 469 | [满减券卡](prompts/469-blk-brut-ec-07.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 470 | [第二件半价](prompts/470-blk-brut-ec-08.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 471 | [买即赠三格](prompts/471-blk-brut-ec-09.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 472 | [包邮四角](prompts/472-blk-brut-ec-10.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 473 | [运费险四格](prompts/473-blk-brut-ec-11.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 474 | [七天无理由](prompts/474-blk-brut-ec-12.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 475 | [整点秒杀倒计时](prompts/475-blk-brut-ec-13.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 476 | [仅剩 N 件](prompts/476-blk-brut-ec-14.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 477 | [今日截止日历卡](prompts/477-blk-brut-ec-15.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 478 | [库存告急满版条](prompts/478-blk-brut-ec-16.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 479 | [涨价倒计时](prompts/479-blk-brut-ec-17.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 480 | [预售尾款](prompts/480-blk-brut-ec-18.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 481 | [我们 vs 别家](prompts/481-blk-brut-ec-19.md) | 野兽派电商卡·封面与卡片 | 6s |
+| 482 | [升级前后对比](prompts/482-blk-brut-ec-20.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 483 | [成分对比表](prompts/483-blk-brut-ec-21.md) | 野兽派电商卡·封面与卡片 | 6s |
+| 484 | [参数对比表](prompts/484-blk-brut-ec-22.md) | 野兽派电商卡·封面与卡片 | 6s |
+| 485 | [规格选择宫格](prompts/485-blk-brut-ec-23.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 486 | [版本阶梯对比](prompts/486-blk-brut-ec-24.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 487 | [成分卖点标牌](prompts/487-blk-brut-ec-25.md) | 野兽派电商卡·封面与卡片 | 6s |
+| 488 | [工艺卖点工序轴](prompts/488-blk-brut-ec-26.md) | 野兽派电商卡·封面与卡片 | 6s |
+| 489 | [产地卖点档案](prompts/489-blk-brut-ec-27.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 490 | [数据卖点巨卡](prompts/490-blk-brut-ec-28.md) | 野兽派电商卡·封面与卡片 | 6s |
+| 491 | [权威背书方章](prompts/491-blk-brut-ec-29.md) | 野兽派电商卡·封面与卡片 | 5.5s |
+| 492 | [用户证言卡](prompts/492-blk-brut-ec-30.md) | 野兽派电商卡·封面与卡片 | 6s |
+| 493 | [聊天转账卡](prompts/493-msg-transfer-01.md) | 野兽派电商卡·信息卡片 | 5.5s |
+| 494 | [聊天打赏转账](prompts/494-msg-transfer-02.md) | 野兽派电商卡·信息卡片 | 5.5s |
+| 495 | [聊天退款转账](prompts/495-msg-transfer-03.md) | 野兽派电商卡·信息卡片 | 5.5s |
+| 496 | [聊天链接卡](prompts/496-msg-card-01.md) | 野兽派电商卡·信息卡片 | 5.5s |
+| 497 | [聊天名片卡](prompts/497-msg-card-02.md) | 野兽派电商卡·信息卡片 | 5.5s |
+| 498 | [价格砸换三凸点](prompts/498-brik-ec-01.md) | 积木风·信息卡片 | 5.5s |
+| 499 | [三卖点堆叠](prompts/499-brik-ec-02.md) | 积木风·封面与卡片 | 5.5s |
+| 500 | [雨滴扩散转场（模式特效）](prompts/500-transition-raindrop-reveal.md) | 纪录片皮影·镜头与转场 | 5s |
+| 501 | [花瓣蒙版旋转换场（模式特效）](prompts/501-petal-mask-rotate.md) | 纪录片皮影·镜头与转场 | 5s |
+| 502 | [多图雨滴连续轮换（模式特效）](prompts/502-transition-raindrop-loop.md) | 纪录片皮影·镜头与转场 | 5s |
+| 503 | [书页翻页转场（沿书脊掀起）](prompts/503-book-page-turn.md) | 书页杂志·镜头与转场 | 5s |
+| 504 | [背景回声式模糊残影](prompts/504-bed-echo-blur.md) | 转场与镜头·镜头与转场 | 6.5s |
+| 505 | [线条横扫转场](prompts/505-line-carry-transition.md) | 转场与镜头·镜头与转场 | 6s |
+| 506 | [前后景虚实对焦交换](prompts/506-rack-focus-pair.md) | 转场与镜头·镜头与转场 | 6s |
+| 507 | [静态版面接力换位](prompts/507-still-layout-relay.md) | 转场与镜头·镜头与转场 | 6s |
+| 508 | [积木拆散露题](prompts/508-brik-wall-02.md) | 积木风·镜头与转场 | 6s |
+| 509 | [3D 浮动卡片开场（3D Hero 验证）](prompts/509-hero3d-float-cards.md) | 3D 大字·文字与收尾 | 5s |
+| 510 | [3D 封面流轮转（模式特效）](prompts/510-coverflow-carousel.md) | 纪录片皮影·镜头与转场 | 5s |
+| 511 | [碟片播放器场景（模式特效）](prompts/511-vinyl-disc-player.md) | 纪录片皮影·封面与卡片 | 5s |
+| 512 | [视频填充文字开场（模式特效）](prompts/512-footage-glyph.md) | 纪录片皮影·文字与收尾 | 5s |
+| 513 | [视差滑动相册开场（模式特效）](prompts/513-parallax-album-intro.md) | 纪录片皮影·文字与收尾 | 5s |
+| 514 | [歌词上滚高亮组件（模式特效）](prompts/514-lyrics-scroll-highlight.md) | 纪录片皮影·文字与收尾 | 5s |
+| 515 | [正弦频谱柱组件（模式特效）](prompts/515-sin-spectrum-bars.md) | 纪录片皮影·数据与图表 | 5s |
+| 516 | [评论关键词 CTA 横幅（书签抽出式）](prompts/516-page-comment-cta-bookmark.md) | 书页杂志·文字与收尾 | 5s |
+| 517 | [开场钩子整页（kicker+高亮大标题+三色迷你卡）](prompts/517-page-hook-fact-trio.md) | 书页杂志·文字与收尾 | 5s |
+| 518 | [分栏数字条 · 哪一步真的拉来了人](prompts/518-blk-cols-reader-growth.md) | 短视频引流·封面与卡片 | 5s |
+| 519 | [分栏数字条 · 一条片子到底烧多少](prompts/519-blk-cols-video-shot.md) | 短视频引流·封面与卡片 | 5s |
+| 520 | [对撞对比 · 三十天能把什么拧过来](prompts/520-blk-duel-habit-30.md) | 短视频引流·图解与流程 | 5s |
+| 521 | [对撞对比 · 哪一步真的拉来了人](prompts/521-blk-duel-reader-growth.md) | 短视频引流·图解与流程 | 5s |
+| 522 | [卡片宫格 · 一条片子到底烧多少](prompts/522-blk-grid-video-shot.md) | 短视频引流·封面与卡片 | 5s |
+| 523 | [大字陈述 · 一条片子到底烧多少](prompts/523-blk-statement-video-shot.md) | 短视频引流·文字与收尾 | 5s |
+| 524 | [四象限 · 三十天能把什么拧过来](prompts/524-blk-quad-habit-30.md) | 短视频引流·数据与图表 | 5s |
+| 525 | [倒计时弧形聚合散开](prompts/525-countdown-arc-scatter.md) | 短视频引流·数据与图表 | 6s |
+| 526 | [急推镜头·金句冲击](prompts/526-crash-zoom-punch.md) | 短视频引流·镜头与转场 | 6s |
+| 527 | [六宫格聚合主视觉](prompts/527-grid-to-hero.md) | 短视频引流·文字与收尾 | 6s |
+| 528 | [信息卡拼合成版](prompts/528-info-card-assemble.md) | 短视频引流·镜头与转场 | 6s |
+| 529 | [领头词放大定格 · 句式组装](prompts/529-lead-word-zoom-assemble.md) | 短视频引流·文字与收尾 | 6s |
+| 530 | [科技感准星锁定](prompts/530-reticle-lock-on.md) | 短视频引流·文字与收尾 | 6.5s |
+| 531 | [60/40 非对称分屏叙事](prompts/531-split-60-40-story.md) | 短视频引流·文字与收尾 | 6s |
+| 532 | [标题降级为角标](prompts/532-title-demote-to-label.md) | 短视频引流·文字与收尾 | 6s |
+| 533 | [词语接力·胶片条](prompts/533-word-relay-filmstrip.md) | 短视频引流·文字与收尾 | 7s |
+| 534 | [歌词大字卡点](prompts/534-lyrics-beat-card.md) | 透明贴纸·叠加组件 | 3s |
+| 535 | [INS 帖子卡](prompts/535-ins-post-card.md) | 透明贴纸·叠加组件 | 5.1s |
+| 536 | [人像描边抠图](prompts/536-portrait-outline-cut.md) | 透明贴纸·叠加组件 | 4s |
+| 537 | [杂志背景大字](prompts/537-magazine-bg-type.md) | 透明贴纸·叠加组件 | 4s |
+| 538 | [双语手写字幕](prompts/538-bilingual-hand-caption.md) | 透明贴纸·叠加组件 | 3s |
+| 539 | [旋转照片环](prompts/539-orbit-photo-ring.md) | 透明贴纸·叠加组件 | 3s |
+| 540 | [槽位词循环](prompts/540-word-slot-cycle.md) | 短视频引流·文字与收尾 | 6s |
+| 541 | [快切素材流 · 固定层与尾卡](prompts/541-mix-fastcut.md) | 夜城混剪·镜头与转场 | 7.5s |
+| 542 | [单镜头长镜 · 开场缓推](prompts/542-mix-longtake.md) | 夜城混剪·镜头与转场 | 8s |
+| 543 | [遮罩转场 · 四种画框形状](prompts/543-mix-mask.md) | 夜城混剪·镜头与转场 | 10s |
+| 544 | [双语字幕独白 · 一句一镜](prompts/544-mix-monologue.md) | 夜城混剪·镜头与转场 | 13.1s |
+| 545 | [排版卡穿插 · 卡与实拍换气](prompts/545-mix-typecard.md) | 夜城混剪·镜头与转场 | 10.7s |
+| 546 | [地板升起 · 逐字顶出](prompts/546-opt-floor-rise.md) | 透明贴纸·叠加组件 | 3.4s |
+| 547 | [乱码锁定 · 逐字归位](prompts/547-opt-glitch-lock.md) | 透明贴纸·叠加组件 | 3.4s |
+| 548 | [字母坠落 · 带弹落地](prompts/548-opt-letter-drop.md) | 透明贴纸·叠加组件 | 3.4s |
+| 549 | [审批流程单（公文表单）](prompts/549-form-flow-chart.md) | 公文档案·图解与流程 | 5s |
+| 550 | [证据墙（档案拼贴）](prompts/550-file-evidence-wall.md) | 公文档案·文字与收尾 | 5s |
+| 551 | [盖章通过单（公文表单）](prompts/551-form-stamp-approve.md) | 公文档案·文字与收尾 | 5s |
+| 552 | [数据登记表（公文表单）](prompts/552-form-table-rows.md) | 公文档案·数据与图表 | 5s |
+| 553 | [红头通知单（公文表单）](prompts/553-form-red-notice.md) | 公文档案·文字与收尾 | 5s |
+| 554 | [审计勾选清单（公文表单）](prompts/554-form-checklist-audit.md) | 公文档案·图解与流程 | 5s |
+| 555 | [合同签署页（公文表单）](prompts/555-form-signature-paper.md) | 公文档案·文字与收尾 | 5s |
+| 556 | [档案归档标签卡（公文表单）](prompts/556-form-archive-label.md) | 公文档案·文字与收尾 | 5s |
+| 557 | [地图钉线（档案拼贴）](prompts/557-file-map-route.md) | 公文档案·图解与流程 | 5s |
+| 558 | [档案照片放大（档案拼贴）](prompts/558-file-photo-zoom.md) | 公文档案·文字与收尾 | 5s |
+| 559 | [报纸剪报（档案拼贴）](prompts/559-file-newspaper-clip.md) | 公文档案·文字与收尾 | 5s |
+| 560 | [破案墙时间线（档案拼贴）](prompts/560-file-timeline-string.md) | 公文档案·图解与流程 | 5s |
+| 561 | [文件高亮扫描件（档案拼贴）](prompts/561-file-highlight-doc.md) | 公文档案·文字与收尾 | 5s |
+| 562 | [档案袋封面（档案拼贴）](prompts/562-file-dossier-cover.md) | 公文档案·文字与收尾 | 5s |
+| 563 | [红圈事实卡（档案拼贴）](prompts/563-file-red-circle-fact.md) | 公文档案·文字与收尾 | 5s |
+| 564 | [撕纸标题卡（档案拼贴）](prompts/564-file-torn-title.md) | 公文档案·文字与收尾 | 5s |
+| 565 | [玻璃功能卡阵列（玻璃拟态）](prompts/565-glass-feature-grid.md) | 玻璃拟态·封面与卡片 | 5s |
+| 566 | [斜角展示台（3D Hero）](prompts/566-hero3d-tilt-showcase.md) | 3D 大字·镜头与转场 | 5s |
+| 567 | [漏斗 · 把一周切成格子再塞进去](prompts/567-blk-funnel-team-time.md) | 企业宣传·数据与图表 | 5s |
+| 568 | [上下分带 · 发版不是终点，是下一起点](prompts/568-blk-band-ship-log.md) | 企业宣传·文字与收尾 | 5s |
+| 569 | [三列看板 · 发版不是终点，是下一起点](prompts/569-blk-kanban-ship-log.md) | 企业宣传·图解与流程 | 5s |
+| 570 | [文档停靠左侧 + 结论交易 pill](prompts/570-doc-park-left-pill-deal.md) | 企业宣传·封面与卡片 | 6s |
+| 571 | [胶片齿孔横条传送](prompts/571-filmstrip-conveyor.md) | 企业宣传·文字与收尾 | 6s |
+| 572 | [飞入文字·汇成主句](prompts/572-flying-words.md) | 企业宣传·文字与收尾 | 6s |
+| 573 | [照片墙推镜浏览](prompts/573-gallery-wall-dolly.md) | 企业宣传·镜头与转场 | 6s |
+| 574 | [便签阵列（白板手账黄卡）](prompts/574-board-sticky-notes.md) | 白板手账·文字与收尾 | 5s |
+| 575 | [黄卡对照格（白板手账）](prompts/575-board-compare-grid.md) | 白板手账·图解与流程 | 5s |
+| 576 | [马克笔大字标题卡（白板手账）](prompts/576-board-marker-title.md) | 白板手账·文字与收尾 | 5s |
+| 577 | [便签流程链（白板手账）](prompts/577-board-flow-arrows.md) | 白板手账·图解与流程 | 5s |
+| 578 | [火柴人批注卡（白板手账）](prompts/578-board-stickman-note.md) | 白板手账·文字与收尾 | 5s |
+| 579 | [玻璃引言卡（玻璃拟态）](prompts/579-glass-quote-card.md) | 玻璃拟态·封面与卡片 | 5s |
+| 580 | [玻璃清单（玻璃拟态）](prompts/580-glass-pill-list.md) | 玻璃拟态·图解与流程 | 5s |
+| 581 | [线稿填色绘本（模式特效）](prompts/581-handdraw-story-player.md) | 纪录片皮影·封面与卡片 | 5s |
+| 582 | [固定光标时间尺（模式特效）](prompts/582-timeline-cursor-slide.md) | 纪录片皮影·图解与流程 | 5s |
+| 583 | [章节导航播放器（教学外壳）](prompts/583-chapter-nav-player.md) | 教学外壳·封面与卡片 | 5s |
+| 584 | [步骤拆解卡（教学外壳）](prompts/584-step-breakdown-card.md) | 教学外壳·图解与流程 | 5s |
+| 585 | [提示词组装清单（教学外壳）](prompts/585-prompt-assembly-list.md) | 教学外壳·图解与流程 | 5s |
+| 586 | [仿终端提示词卡（教学外壳）](prompts/586-terminal-prompt-card.md) | 教学外壳·封面与卡片 | 5s |
+| 587 | [参数调优滑杆面板（教学外壳）](prompts/587-param-slider-panel.md) | 教学外壳·封面与卡片 | 5s |
+| 588 | [口语反馈气泡+参数变更卡（教学外壳）](prompts/588-prompt-tuning-bubbles.md) | 教学外壳·封面与卡片 | 5s |
+| 589 | [玻璃仪表盘（玻璃拟态）](prompts/589-glass-dashboard.md) | 玻璃拟态·数据与图表 | 5s |
+| 590 | [玻璃大数字卡（玻璃拟态）](prompts/590-glass-stat-card.md) | 玻璃拟态·数据与图表 | 5s |
+| 591 | [玻璃环形进度（玻璃拟态）](prompts/591-glass-progress-ring.md) | 玻璃拟态·数据与图表 | 5s |
+| 592 | [玻璃柱状图（玻璃拟态）](prompts/592-glass-bar-live.md) | 玻璃拟态·数据与图表 | 5s |
+| 593 | [排名竞速条形图（模式特效）](prompts/593-bar-chart-race-smooth.md) | 纪录片皮影·数据与图表 | 5s |
+| 594 | [挤出环形爆炸饼图（模式特效）](prompts/594-exploded-donut-pie.md) | 纪录片皮影·数据与图表 | 5s |
+| 595 | [积木大数 · 项目战绩](prompts/595-blk-punch-counter.md) | 纪录片皮影·数据与图表 | 5s |
+| 596 | [积木排行 · TOP5](prompts/596-blk-rank-bricks.md) | 纪录片皮影·图解与流程 | 5s |
+| 597 | [扫描线解读](prompts/597-scanline-annotate.md) | 数据汇报·文字与收尾 | 6s |
+| 598 | [单元网格占比点亮](prompts/598-unit-grid-proportion.md) | 数据汇报·数据与图表 | 6s |
+| 599 | [华夫图 · 一年花在这些订阅上值不值](prompts/599-blk-mosaic-tool-stack.md) | 数据汇报·封面与卡片 | 5s |
+| 600 | [单数据大字卡](prompts/600-blk-brut-dq-01.md) | 野兽派电商卡·数据与图表 | 6s |
+|---|---|---|---|
