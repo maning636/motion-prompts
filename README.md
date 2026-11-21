@@ -1,5 +1,7 @@
 # Motion Prompts · 视频动效模板与提示词（1047 个模板 + 600 个提示词 · 全部免费获取）
 
+License: 见 [LICENSE](./LICENSE) — 自定义许可，非 OSI 标准。
+
 [![预览站](https://img.shields.io/badge/%F0%9F%8E%AC_%E5%9C%A8%E7%BA%BF%E9%A2%84%E7%A7%88-maning789link.top%2Fstation.html-0F9D3F)](https://maning789link.top/station.html)
 [![素材库](https://img.shields.io/badge/%E6%A8%A1%E6%9D%90%E5%BA%93-1047%E4%B8%AA%E5%B8%85%E7%89%87-2C2417)](#本仓有什么)
 [![提示词](https://img.shields.io/badge/%E6%8F%90%E7%A4%BA%E8%AF%8D-600%E4%B8%AA-2C2417)](#本仓有什么)
