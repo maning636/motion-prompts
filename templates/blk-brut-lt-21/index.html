@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"brand","name":"品牌行","type":"string","label":"品牌 mono 行（4–12 字）","default":"BLOCKBRUT SELECT"},{"id":"pname","name":"商品名","type":"string","label":"商品名（4–12 字，单行）","default":"积木社年度订阅卡"},{"id":"spec","name":"规格行","type":"string","label":"规格说明（8–18 字）","default":"12 期 · 含全部资料包"},{"id":"newtag","name":"新品角标","type":"string","label":"新品角标文字（2–6 字）","default":"NEW"},{"id":"price","name":"价格","type":"number","label":"价格数字（不含货币符号）","default":199},{"id":"currency","name":"货币","type":"string","label":"货币单位（1 字）","default":"元"},{"id":"accent","name":"强调色","type":"color","label":"强调色（新品角标 / 价格块）","default":"#FF5FA2"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","hidden":true,"default":"transparent","options":[{"value":"transparent","label":"透明底"},{"value":"mp4","label":"MP4 纯底"},{"value":"webm","label":"WebM 纯底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="新品角标：强调色 NEW 角标压住白底商品卡左上角，商品名与规格错峰装上，右侧黄色价格块数字整数跳到位后三块做错峰微位移">
+<title>新品角标 · 积木社年度订阅卡</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 透明底贴片：--paper 不出现，底色与阴影色收进变量（风格规范 §7.1 / §7.2 规则 A） */
+  :root{ --shadow:#FFFFFF; --background:transparent; }
+
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--background);color:var(--ink);font-family:var(--sans)}
+
+  /* 商品卡定高 280px，NEW 角标压在它左上角外沿（角标浮在卡外 60px，几何常量不随文字变） */
+  #pn{position:absolute;left:96px;bottom:216px;width:1200px;height:280px;
+    display:flex;flex-direction:column;justify-content:center;padding:0 40px;
+    background:var(--white);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  #brand{display:block;font-family:var(--mono);font-weight:700;font-size:24px;letter-spacing:.14em;
+    line-height:1;color:var(--ink);white-space:nowrap;overflow:hidden}
+  #pname{display:block;margin-top:14px;font-size:76px;font-weight:900;line-height:1.06;
+    letter-spacing:0;color:var(--ink);white-space:nowrap;overflow:hidden}
+  #spec{display:block;margin-top:14px;font-family:var(--mono);font-weight:700;font-size:26px;
+    letter-spacing:.04em;line-height:1;color:var(--ink);white-space:nowrap;overflow:hidden}
+
+  /* NEW 角标：pill 圆角 + 高饱和填充，是新品识别的第一眼（§3.2 徽章纪律） */
+  #nt{position:absolute;left:60px;bottom:456px;width:300px;height:96px;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--accent);border:var(--bw) solid var(--ink);border-radius:9999px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  #newtag{display:block;font-family:var(--mono);font-weight:900;font-size:44px;letter-spacing:.1em;
+    line-height:1;color:var(--ink);white-space:nowrap;overflow:hidden}
+
+  /* 价格块：与商品卡并排，几何对齐不换圆角不换形 */
+  #pr{position:absolute;left:1332px;bottom:216px;width:368px;height:280px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+    background:var(--yellow);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  .amt{display:flex;align-items:baseline;gap:10px}
+  #price{display:block;font-family:var(--mono);font-weight:900;font-size:104px;line-height:.94;
+    letter-spacing:0;color:var(--ink);font-variant-numeric:tabular-nums;
+    font-feature-settings:"tnum" 1;white-space:nowrap;overflow:hidden}
+  #currency{display:block;font-size:40px;font-weight:900;line-height:1;letter-spacing:0;color:var(--ink);
+    white-space:nowrap}
+  #pr .lb{font-family:var(--mono);font-weight:700;font-size:22px;letter-spacing:.14em;line-height:1;
+    color:var(--ink)}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="pn">
+    <span id="brand" data-fit-max="24" data-fit-min="14">BLOCKBRUT SELECT</span>
+    <span id="pname" data-fit-max="76" data-fit-min="38">积木社年度订阅卡</span>
+    <span id="spec" data-fit-max="26" data-fit-min="16">12 期 · 含全部资料包</span>
+  </div>
+  <div id="nt"><span id="newtag" data-fit-max="44" data-fit-min="24">NEW</span></div>
+  <div id="pr"><span class="lb">直播价</span><div class="amt"><span id="price" data-fit-max="104" data-fit-min="56">199</span><span id="currency" data-fit-max="40" data-fit-min="24">元</span></div></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  var isT = (v.exportMode || 'transparent') === 'transparent';
+  var r = document.documentElement.style;
+  r.setProperty('--background', isT ? 'transparent' : '#0F0F0F');
+  r.setProperty('--shadow', isT ? '#FFFFFF' : '#0F0F0F');
+  if (v.accent) r.setProperty('--accent', v.accent);
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+  ['brand', 'pname', 'spec', 'newtag', 'price', 'currency'].forEach(function (k) { set(k, v[k]); });
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：价格直接给终值，只留终态 + ≤8px 微位移淡入（规范 §13.5） */
+    gsap.set('#pn', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#nt', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#pr', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#price', { textContent: v.price });
+    gsap.set('#pname', { x: 0 });
+
+    tl.fromTo('#pn', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, 0);
+    tl.fromTo('#nt', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, .45);
+
+    B.hold(tl, 1.6, 1.2);
+    return;
+  }
+
+  var TOTAL = parseFloat(v.duration) > 0 ? parseFloat(v.duration) : 5;
+  var HOLD = 0.5;
+  var WIN = Math.max(1.6, TOTAL - HOLD);
+  var SH = isT ? '#FFFFFF' : '#0F0F0F';
+
+  /* 模 1 · 拍进来：商品卡自左 80px 拍入，落定瞬间阴影压 2 帧再弹回原档 */
+  tl.fromTo('#pn', { x: -80 },
+      { x: 0, duration: .26, ease: 'power4.out' }, 0)
+    .fromTo('#pn', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#pn', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+  tl.fromTo('#brand', { x: -24 }, { x: 0, duration: .2, ease: 'power4.out' }, .18);
+  tl.fromTo('#pname', { x: -30 }, { x: 0, duration: .22, ease: 'power4.out' }, .24);
+  tl.fromTo('#spec', { x: -24 }, { x: 0, duration: .2, ease: 'power4.out' }, .32);
+
+  /* NEW 角标自左上斜向盖章落位（0.8→1 单调缩放，面积最大落在末帧） */
+  tl.fromTo('#nt', { x: -40, y: -40, scale: .8 },
+      { x: 0, y: 0, scale: 1, duration: .24, ease: 'power3.out' }, .3)
+    .fromTo('#nt', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#nt', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+
+  /* 价格块自右拍入 */
+  tl.fromTo('#pr', { x: 80 },
+      { x: 0, duration: .26, ease: 'power4.out' }, .36)
+    .fromTo('#pr', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#pr', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+  tl.fromTo('#pr .lb', { x: 20 }, { x: 0, duration: .2, ease: 'power4.out' }, .52);
+  tl.fromTo('#currency', { x: -18 }, { x: 0, duration: .2, ease: 'power4.out' }, .6);
+
+  /* 模 4 · 整数跳数：价格 steps(9) 跳到位，展示窗口写死 1.0s，onUpdate 只写 textContent */
+  var n = { v: 0 };
+  var eP = document.getElementById('price');
+  var to = Number(v.price) || 0;
+  tl.to(n, { v: to, duration: 1.0, ease: 'steps(9)',
+      onUpdate: function () { if (eP) eP.textContent = String(Math.round(n.v)); } }, .52);
+
+  /* 模 8 · 色块闪切：NEW 角标底色按固定节奏换一次再换回，收尾停在默认色 */
+  tl.set('#nt', { backgroundColor: '#FFD429', duration: 0 }, 1.9)
+    .set('#nt', { backgroundColor: '#2FD07A', duration: 0 }, 2.6)
+    .set('#nt', { backgroundColor: '#FF5FA2', duration: 0 }, 3.3);
+
+  /* 三块错峰微位移：角标上抬、卡片下压、价格块反向，匀速往返 */
+  var T0 = 2.1;
+  var REP = Math.max(1, Math.round((WIN - T0) / .85));
+  var half = (WIN - T0) / (REP * 2);
+  tl.to('#nt', { y: -6, duration: half, ease: 'none', repeat: REP * 2 - 1, yoyo: true }, T0);
+  tl.to('#pn', { y: 5, duration: half, ease: 'none', repeat: REP * 2 - 2, yoyo: true }, T0 + half);
+  tl.to('#pr', { y: -5, duration: half, ease: 'none', repeat: REP * 2 - 2, yoyo: true }, T0 + half);
+
+  var end = tl.duration();
+  B.hold(tl, end, Math.max(HOLD, TOTAL - end));
+})();
+</script>
+</body></html>

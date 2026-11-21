@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "shots", "name": "分镜表", "type": "string", "label": "分镜表（用 | 分隔，每镜写成「旁白:图形」，图形只能取 8 个预置 id）", "default": "点开猫猫图:cat|请求到路由器:router|图片切小包裹:parcel"}, {"id": "captions", "name": "底部字幕", "type": "string", "label": "底部字幕（用 | 分隔，与分镜一一对应，每条 ≤20 字）", "default": "先点开那张猫猫图|请求发到路由器|图片被切成小包裹"}, {"id": "accent", "name": "强调色", "type": "color", "label": "强调色（只出现在手绘下划线和箭头上）", "default": "#F4A261"}, {"id": "courier", "name": "方块小信使", "type": "boolean", "label": "方块小信使出场（信使在镜与镜之间跑）", "default": true}, {"id": "jitter", "name": "手绘抖动", "type": "number", "label": "手绘抖动幅度（px，0–3，只作用于信使 / 标注箭头 / 外框）", "default": 1.2}, {"id": "duration", "name": "总时长", "type": "number", "label": "总时长（秒，0 = 按镜头数自动算）", "default": 0}, {"id": "rate", "name": "帧率", "type": "number", "label": "帧率（24/25/30，决定手绘笔尖的步进频率）", "default": 24}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<title>线稿讲解 · 分镜信使</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: #FDFBF7;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #FDFBF7; }
+  #cv { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+</style>
+</head>
+<body>
+<div id="stage" data-composition-id="main" data-start="0" data-duration="10.8"
+     data-width="1920" data-height="1080">
+  <canvas id="cv" width="1920" height="1080"></canvas>
+</div>
+<script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  /* ---------------------------------------------------------------
+     线稿讲解 · 分镜信使（sketch-story-01）
+     来源：GitHub rickyhu20/opus-code-animation 类型 13（Python + Pillow 线稿讲解）
+     与 motion 的 sketch-01/02/03 的区分：
+       ① 场景不固定 —— 主体图形由 shots 分镜表决定，8 个预置图形自由编排；
+       ② 有角色 —— 方块小信使在镜与镜之间跑（motion 完全没有角色）；
+       ③ 字幕整句淡入，不是逐字浮现；强调用手绘下划线 + 箭头，不是橙色圆角框；
+       ④ 抖动只作用在信使 / 标注箭头 / 外框，主体图形保持干净线稿；
+       ⑤ 分镜表本身画进画面底部（缩略图导轨）——「先分镜再代码」落成可见结构。
+     硬规则：画面只由时间 t 决定（纯函数），逐帧 seek 不打架。
+     --------------------------------------------------------------- */
+
+  const FALLBACK = {
+    shots: '点开猫猫图:cat|请求到路由器:router|图片切小包裹:parcel',
+    captions: '先点开那张猫猫图|请求发到路由器|图片被切成小包裹',
+    accent: '#F4A261',
+    courier: true,
+    jitter: 1.2,
+    duration: 0,
+    rate: 24
+  };
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+
+  const W = 1920, H = 1080;
+  const PAPER = '#FDFBF7';
+  const INK   = '#111111';
+  const MUTED = '#8C857A';
+  const LANEC = '#D3CCBE';
+
+  const pick = (val, fb) => (val === undefined || val === null || val === '') ? fb : val;
+  const splitPipe = (s) => String(s).split(/[|｜]/).map(x => x.trim());
+  const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+  const pad2 = (n) => (n < 10 ? '0' + n : '' + n);
+
+  /* ------------------------- 版面常量 ------------------------- */
+  const FRAME_LR = 90;      /* 外框左右内缩 */
+  const FRAME_T  = 90;      /* 外框上内缩 */
+  const FRAME_B  = 940;     /* 外框下沿：底部留 220px 手机安全区，所以下边距更大 */
+  const HEADER_X   = 200, HEADER_Y = 155;
+  const SHAPE_CX   = 960, SHAPE_CY = 360, SHAPE_SIZE = 460;
+  const NARR_X     = 200, NARR_CY = 360, NARR_MAXW = 430, NARR_SIZE = 64, NARR_LH = 88;
+  const LANE_Y     = 648;     /* 信使送信道 */
+  const LANE_X0    = 240, LANE_X1 = 1660;
+  const DELIVER_X  = 740;     /* 交付点（画面左下） */
+  const COURIER_SZ = 56;
+  const THUMB_Y    = 700, THUMB_SZ = 54;
+  const RAIL_Y     = 745, RAIL_X0 = 200, RAIL_X1 = 1720;
+  const CAP_Y      = 830, CAP_UNDER_Y = 850;
+
+  /* ------------------------- 分镜解析 ------------------------- */
+  const SHAPE_IDS = ['cat', 'router', 'server', 'parcel', 'phone', 'box', 'arrow', 'lock'];
+
+  function parseShots(shotStr, capStr) {
+    const raw = splitPipe(shotStr);
+    const caps = splitPipe(capStr);
+    const shots = [], invalid = [];
+    for (let i = 0; i < raw.length; i++) {
+      const tok = raw[i];
+      if (!tok) continue;
+      let label = '', shape = '';
+      if (SHAPE_IDS.indexOf(tok) >= 0) {
+        shape = tok;
+      } else {
+        const p = tok.indexOf(':');
+        if (p >= 0) {
+          label = tok.slice(0, p).trim();
+          shape = tok.slice(p + 1).trim().toLowerCase();
+        } else {
+          label = tok;
+        }
+      }
+      if (!shape || SHAPE_IDS.indexOf(shape) < 0) {
+        /* 非法图形 id：整镜跳过并记账（不占时长、不画图、字幕同步跳过） */
+        invalid.push({ index: i, token: tok, reason: shape ? ('unknown-shape:' + shape) : 'missing-shape' });
+        continue;
+      }
+      const cap = (caps[i] && caps[i].length) ? caps[i] : label;
+      shots.push({ label: label, shape: shape, caption: cap, srcIndex: i });
+    }
+    return { shots: shots, invalid: invalid };
+  }
+
+  let PARSED = parseShots(String(pick(v.shots, FALLBACK.shots)),
+                           String(pick(v.captions, FALLBACK.captions)));
+  let usedFallback = false;
+  if (!PARSED.shots.length) {
+    PARSED = parseShots(FALLBACK.shots, FALLBACK.captions);
+    usedFallback = true;
+  }
+  if (!PARSED.shots.length) {
+    PARSED = { shots: [{ label: '示意图', shape: 'box', caption: '示意图', srcIndex: 0 }], invalid: PARSED.invalid };
+  }
+  const SHOTS = PARSED.shots;
+  const INVALID = PARSED.invalid;
+  const N = SHOTS.length;
+
+  /* ------------------------- 时长 / 帧率 ------------------------- */
+  let DUR = parseFloat(pick(v.duration, FALLBACK.duration));
+  if (!isFinite(DUR) || DUR <= 0) DUR = 0;
+  const SHOT_DUR = DUR > 0 ? DUR / N : 3.6;
+  const TOTAL = N * SHOT_DUR;
+
+  let RATE = parseFloat(pick(v.rate, FALLBACK.rate));
+  if (!isFinite(RATE)) RATE = FALLBACK.rate;
+  RATE = clamp(Math.round(RATE), 1, 60);
+
+  let JIT = parseFloat(pick(v.jitter, FALLBACK.jitter));
+  if (!isFinite(JIT)) JIT = FALLBACK.jitter;
+  JIT = clamp(JIT, 0, 3);
+
+  const ACCENT = String(pick(v.accent, FALLBACK.accent)).trim() || FALLBACK.accent;
+
+  const COURIER = (v.courier === undefined || v.courier === null || v.courier === '')
+    ? true
+    : !(v.courier === false || v.courier === 'false' || v.courier === 0 || v.courier === '0');
+
+  /* 描边生长占满整镜（有信使时留 12% 给信使跑位，信使关掉时生长到镜尾） */
+  const GROW_END = COURIER ? 0.88 : 1.0;
+
+  /* ------------------------- canvas ------------------------- */
+  const canvas = document.getElementById('cv');
+  const ctx = canvas.getContext('2d');
+  const FONT_HEAD = '700 30px MiSans, "Microsoft YaHei", sans-serif';
+  const FONT_CAP = '400 48px MEBHeiHeiTi, "Microsoft YaHei", sans-serif';
+
+  /* ------------------------- 手绘抖动 -------------------------
+     作用对象：外框 / 标注箭头 / 信使 / 强调下划线 / 导轨线。
+     主体图形（8 个预置图形）一律干净线稿，不抖。 */
+  function wob(x, y, t, amp) {
+    if (amp <= 0) return [x, y];
+    return [
+      x + amp * (Math.sin(t * 2.13 + y * 0.0311) + 0.55 * Math.sin(t * 3.77 + x * 0.0173)),
+      y + amp * (Math.cos(t * 1.71 + x * 0.0293) + 0.55 * Math.cos(t * 2.91 + y * 0.0131))
+    ];
+  }
+  function wobPts(pts, t, amp) {
+    if (amp <= 0) return pts;
+    const out = [];
+    for (let i = 0; i < pts.length; i++) out.push(wob(pts[i][0], pts[i][1], t, amp));
+    return out;
+  }
+
+  /* ------------------------- 路径工具 ------------------------- */
+  function nline(pts) { return { t: 'l', pts: pts }; }
+  function ndot(x, y, r) { return { t: 'd', x: x, y: y, r: r }; }
+  function narc(cx, cy, r, a0, a1, n) {
+    const pts = [];
+    for (let i = 0; i <= n; i++) {
+      const a = a0 + (a1 - a0) * i / n;
+      pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
+    }
+    return nline(pts);
+  }
+  function ncubic(p0, c1, c2, p1, n) {
+    const pts = [];
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, u = 1 - t;
+      pts.push([
+        u * u * u * p0[0] + 3 * u * u * t * c1[0] + 3 * u * t * t * c2[0] + t * t * t * p1[0],
+        u * u * u * p0[1] + 3 * u * u * t * c1[1] + 3 * u * t * t * c2[1] + t * t * t * p1[1]
+      ]);
+    }
+    return nline(pts);
+  }
+  function nrrect(x0, y0, x1, y1, r, n) {
+    const pts = [];
+    const corner = (cx, cy, a0, a1) => {
+      for (let i = 0; i <= n; i++) {
+        const a = a0 + (a1 - a0) * i / n;
+        pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
+      }
+    };
+    corner(x0 + r, y0 + r, Math.PI, Math.PI * 1.5);
+    corner(x1 - r, y0 + r, Math.PI * 1.5, Math.PI * 2);
+    corner(x1 - r, y1 - r, 0, Math.PI * 0.5);
+    corner(x0 + r, y1 - r, Math.PI * 0.5, Math.PI);
+    return nline(pts);
+  }
+  function polyLen(pts) {
+    let L = 0;
+    for (let i = 1; i < pts.length; i++) {
+      L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    }
+    return L;
+  }
+  function toStage(strokes, cx, cy, size) {
+    const out = [];
+    for (let i = 0; i < strokes.length; i++) {
+      const s = strokes[i];
+      if (s.t === 'd') {
+        out.push({ t: 'd', p: [cx + (s.x - 0.5) * size, cy + (s.y - 0.5) * size], r: s.r * size });
+      } else {
+        const pts = [];
+        for (let k = 0; k < s.pts.length; k++) {
+          pts.push([cx + (s.pts[k][0] - 0.5) * size, cy + (s.pts[k][1] - 0.5) * size]);
+        }
+        out.push({ t: 'l', pts: pts });
+      }
+    }
+    return out;
+  }
+
+  /* 沿折线按弧长画一段（描边生长用） */
+  function drawPartialPts(pts, take) {
+    if (!pts.length || take <= 0) return null;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    let rem = take, front = pts[0];
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i];
+      const seg = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (rem >= seg) {
+        ctx.lineTo(b[0], b[1]);
+        rem -= seg;
+        front = b;
+      } else {
+        const k = seg > 0 ? rem / seg : 0;
+        const x = a[0] + (b[0] - a[0]) * k;
+        const y = a[1] + (b[1] - a[1]) * k;
+        ctx.lineTo(x, y);
+        front = [x, y];
+        rem = 0;
+        break;
+      }
+    }
+    ctx.stroke();
+    return front;
+  }
+
+  /* 一组笔画按总弧长分配进度地画出来（可抖） */
+  function drawStrokes(strokes, progress, color, lw, t, amp) {
+    let total = 0;
+    const lens = [];
+    for (let i = 0; i < strokes.length; i++) {
+      const L = (strokes[i].t === 'd') ? 0.0004 : polyLen(strokes[i].pts);
+      lens.push(L);
+      total += L;
+    }
+    const target = clamp(progress, 0, 1) * total;
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = lw;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    let consumed = 0, front = null;
+    for (let i = 0; i < strokes.length; i++) {
+      if (target <= consumed) break;
+      const st = strokes[i], L = lens[i];
+      if (st.t === 'd') {
+        const p = (amp > 0) ? wob(st.p[0], st.p[1], t, amp) : st.p;
+        ctx.beginPath();
+        ctx.arc(p[0], p[1], st.r, 0, Math.PI * 2);
+        ctx.fill();
+        front = p;
+        consumed += L;
+        continue;
+      }
+      const take = Math.min(L, target - consumed);
+      const pts = (amp > 0) ? wobPts(st.pts, t, amp) : st.pts;
+      const f = drawPartialPts(pts, take);
+      if (f) front = f;
+      consumed += L;
+    }
+    return front;
+  }
+
+  /* ------------------------- 8 个预置图形（干净线稿） ------------------------- */
+  const SHAPES = {
+    cat: function () {
+      return [
+        ncubic([0.30, 0.46], [0.22, 0.62], [0.26, 0.90], [0.50, 0.90], 16),
+        ncubic([0.50, 0.90], [0.74, 0.90], [0.78, 0.62], [0.70, 0.46], 16),
+        ncubic([0.682, 0.814], [0.87, 0.87], [0.97, 0.72], [0.90, 0.56], 14),
+        narc(0.50, 0.30, 0.185, 0, Math.PI * 2, 26),
+        nline([[0.348, 0.194], [0.322, 0.045], [0.437, 0.126], [0.348, 0.194]]),
+        nline([[0.652, 0.194], [0.678, 0.045], [0.563, 0.126], [0.652, 0.194]]),
+        ndot(0.42, 0.285, 0.028),
+        ndot(0.58, 0.285, 0.028),
+        nline([[0.455, 0.372], [0.50, 0.412], [0.545, 0.372]]),
+        nline([[0.30, 0.315], [0.15, 0.272]]),
+        nline([[0.30, 0.365], [0.14, 0.365]]),
+        nline([[0.70, 0.315], [0.85, 0.272]]),
+        nline([[0.70, 0.365], [0.86, 0.365]]),
+        nline([[0.40, 0.86], [0.40, 0.93]]),
+        nline([[0.60, 0.86], [0.60, 0.93]])
+      ];
+    },
+    router: function () {
+      return [
+        nrrect(0.12, 0.58, 0.88, 0.84, 0.05, 6),
+        nline([[0.28, 0.58], [0.20, 0.32]]),
+        nline([[0.72, 0.58], [0.80, 0.32]]),
+        ndot(0.20, 0.32, 0.020),
+        ndot(0.80, 0.32, 0.020),
+        narc(0.50, 0.60, 0.15, Math.PI * 1.16, Math.PI * 1.84, 16),
+        narc(0.50, 0.60, 0.27, Math.PI * 1.18, Math.PI * 1.82, 16),
+        ndot(0.24, 0.71, 0.024),
+        ndot(0.36, 0.71, 0.024),
+        ndot(0.48, 0.71, 0.024),
+        ndot(0.60, 0.71, 0.024)
+      ];
+    },
+    server: function () {
+      return [
+        nrrect(0.22, 0.08, 0.78, 0.88, 0.04, 6),
+        nline([[0.26, 0.32], [0.74, 0.32]]),
+        nline([[0.26, 0.54], [0.74, 0.54]]),
+        nline([[0.26, 0.76], [0.74, 0.76]]),
+        nline([[0.30, 0.16], [0.46, 0.16]]),
+        nline([[0.30, 0.22], [0.52, 0.22]]),
+        ndot(0.70, 0.20, 0.024),
+        ndot(0.70, 0.43, 0.024),
+        ndot(0.70, 0.65, 0.024),
+        nline([[0.30, 0.88], [0.30, 0.95]]),
+        nline([[0.70, 0.88], [0.70, 0.95]])
+      ];
+    },
+    parcel: function () {
+      return [
+        nline([[0.24, 0.44], [0.24, 0.88], [0.66, 0.88], [0.66, 0.44]]),
+        nline([[0.24, 0.44], [0.38, 0.22], [0.80, 0.22], [0.66, 0.44]]),
+        nline([[0.66, 0.44], [0.80, 0.22], [0.80, 0.66], [0.66, 0.88]]),
+        nline([[0.45, 0.44], [0.45, 0.88]]),
+        nline([[0.45, 0.44], [0.59, 0.22]]),
+        nline([[0.52, 0.58], [0.62, 0.58], [0.62, 0.70], [0.52, 0.70], [0.52, 0.58]])
+      ];
+    },
+    phone: function () {
+      return [
+        nrrect(0.35, 0.06, 0.65, 0.94, 0.07, 6),
+        nline([[0.45, 0.14], [0.55, 0.14]]),
+        nline([[0.40, 0.21], [0.60, 0.21], [0.60, 0.72], [0.40, 0.72], [0.40, 0.21]]),
+        ndot(0.50, 0.83, 0.026)
+      ];
+    },
+    box: function () {
+      return [
+        nline([[0.26, 0.46], [0.26, 0.88], [0.74, 0.88], [0.74, 0.46]]),
+        nline([[0.26, 0.46], [0.40, 0.34], [0.60, 0.34], [0.74, 0.46]]),
+        nline([[0.26, 0.46], [0.26, 0.18], [0.44, 0.30]]),
+        nline([[0.74, 0.46], [0.74, 0.18], [0.56, 0.30]]),
+        nline([[0.42, 0.60], [0.58, 0.60], [0.58, 0.72], [0.42, 0.72], [0.42, 0.60]])
+      ];
+    },
+    arrow: function () {
+      return [
+        ncubic([0.08, 0.88], [0.30, 1.00], [0.72, 0.55], [0.92, 0.16], 22),
+        nline([[0.92, 0.16], [0.60, 0.19]]),
+        nline([[0.92, 0.16], [0.88, 0.50]])
+      ];
+    },
+    lock: function () {
+      return [
+        narc(0.50, 0.46, 0.13, Math.PI, Math.PI * 2, 18),
+        nrrect(0.28, 0.46, 0.72, 0.88, 0.05, 6),
+        ndot(0.50, 0.64, 0.030),
+        nline([[0.50, 0.64], [0.50, 0.77]])
+      ];
+    }
+  };
+
+  /* 标注箭头（强调色 + 手绘抖动）：从旁白块指向主体图形，形状随旁白块宽度变 */
+  function arrowStrokes(tail, tip) {
+    const dx = tip[0] - tail[0], dy = tip[1] - tail[1];
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    const c1 = [tail[0] + dx * 0.42 - uy * len * 0.14, tail[1] + dy * 0.42 + ux * len * 0.14];
+    const c2 = [tail[0] + dx * 0.78 - uy * len * 0.05, tail[1] + dy * 0.78 + ux * len * 0.05];
+    const shaft = ncubic(tail, c1, c2, tip, 20);
+    const base = Math.atan2(uy, ux) + Math.PI;
+    const barb = function (ang) {
+      return [tip[0] + Math.cos(base + ang) * 32, tip[1] + Math.sin(base + ang) * 32];
+    };
+    return [shaft, nline([tip, barb(0.44)]), nline([tip, barb(-0.44)])];
+  }
+
+  /* ------------------------- 辅助：导轨 / 缩略图位置 ------------------------- */
+  function postX(j) {
+    if (N <= 1) return 960;
+    return 320 + j * (1280 / (N - 1));
+  }
+
+  /* ------------------------- 绘制：外框 ------------------------- */
+  function drawFrame(t) {
+    const x0 = FRAME_LR, y0 = FRAME_T, x1 = W - FRAME_LR, y1 = FRAME_B;
+    const pts = [];
+    const step = 46;
+    for (let x = x0; x < x1; x += step) pts.push([x, y0]);
+    for (let y = y0; y < y1; y += step) pts.push([x1, y]);
+    for (let x = x1; x > x0; x -= step) pts.push([x, y1]);
+    for (let y = y1; y > y0; y -= step) pts.push([x0, y]);
+    pts.push([x0, y0]);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    const wp = wobPts(pts, t, JIT);
+    ctx.beginPath();
+    ctx.moveTo(wp[0][0], wp[0][1]);
+    for (let i = 1; i < wp.length; i++) ctx.lineTo(wp[i][0], wp[i][1]);
+    ctx.stroke();
+  }
+
+  /* ------------------------- 绘制：镜头抬头 ------------------------- */
+  function drawHeader(idx) {
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
+    ctx.font = FONT_HEAD;
+    ctx.fillStyle = MUTED;
+    ctx.fillText('镜头 ' + pad2(idx + 1) + ' / ' + pad2(N), HEADER_X, HEADER_Y);
+  }
+
+  /* ------------------------- 绘制：旁白大字块（左栏） -------------------------
+     旁白 = shots 里每镜的标题。它是这一镜在讲什么，所以放成左侧的大字，
+     底下压一条手绘强调下划线；标注箭头再从它指向主体图形。 */
+  function wrapTitle(text, maxW, font) {
+    ctx.font = font;
+    const lines = [];
+    let cur = '';
+    for (const ch of String(text)) {
+      const test = cur + ch;
+      if (cur && ctx.measureText(test).width > maxW) { lines.push(cur); cur = ch; }
+      else cur = test;
+    }
+    if (cur) lines.push(cur);
+    return lines;
+  }
+  function drawNarration(idx, u) {
+    const label = SHOTS[idx].label;
+    if (!label) return null;
+    const font = '700 ' + NARR_SIZE + 'px MiSans, "Microsoft YaHei", sans-serif';
+    const lines = wrapTitle(label, NARR_MAXW, font);
+    const y0 = NARR_CY - (lines.length - 1) * NARR_LH / 2 + NARR_SIZE * 0.36;
+    ctx.font = font;
+    ctx.fillStyle = INK;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    let widest = 0;
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], NARR_X, y0 + i * NARR_LH);
+      widest = Math.max(widest, ctx.measureText(lines[i]).width);
+    }
+    /* 强调：手绘下划线（不是圆角框） */
+    const uy = y0 + (lines.length - 1) * NARR_LH + 30;
+    const seg = clamp((u - 0.22) / 0.26, 0, 1);
+    if (seg > 0) {
+      const pts = [];
+      for (let i = 0; i <= 8; i++) pts.push([NARR_X + widest * i / 8, uy]);
+      drawStrokes([nline(pts)], seg, ACCENT, 5, 0, JIT * 0.8);
+    }
+    return { right: NARR_X + widest, underY: uy };
+  }
+
+  /* ------------------------- 绘制：主体图形（描边生长） ------------------------- */
+  function drawMainShape(idx, local, t) {
+    const shot = SHOTS[idx];
+    const strokes = toStage(SHAPES[shot.shape](), SHAPE_CX, SHAPE_CY, SHAPE_SIZE);
+    const color = (shot.shape === 'arrow') ? ACCENT : INK;
+    /* 笔尖按帧率步进（rate = 输出帧率 = 手绘顿挫频率） */
+    const q = Math.floor(local * RATE + 1e-6) / RATE;
+    /* 起始就有 10% 轮廓落位 —— 首帧不是白纸，是「已经画了一半的第一笔」 */
+    const p = clamp(0.10 + 0.90 * (q / (SHOT_DUR * GROW_END)), 0, 1);
+    const front = drawStrokes(strokes, p, color, 3, t, 0);
+    /* 笔尖小方块 */
+    if (front && p < 0.999) {
+      ctx.fillStyle = color;
+      ctx.fillRect(front[0] - 4, front[1] - 4, 8, 8);
+    }
+  }
+
+  /* ------------------------- 绘制：标注箭头 ------------------------- */
+  function drawAnnotation(narr, u, t) {
+    if (!narr) return;
+    const p = clamp((u - 0.50) / 0.30, 0, 1);
+    if (p <= 0) return;
+    const tail = [narr.right + 26, narr.underY + 6];
+    const tip = [SHAPE_CX - SHAPE_SIZE / 2 - 16, SHAPE_CY - 40];
+    drawStrokes(arrowStrokes(tail, tip), p, ACCENT, 4, t, JIT * 0.8);
+  }
+
+  /* ------------------------- 绘制：方块小信使 ------------------------- */
+  function courierX(idx, u) {
+    const side = (idx % 2 === 0) ? LANE_X1 : LANE_X0;
+    if (u < 0.55) return side + (DELIVER_X - side) * (u / 0.55);
+    if (u < 0.70) return DELIVER_X;
+    const nextSide = ((idx + 1) % 2 === 0) ? LANE_X1 : LANE_X0;
+    return DELIVER_X + (nextSide - DELIVER_X) * ((u - 0.70) / 0.30);
+  }
+  function courierDir(idx, u) {
+    const side = (idx % 2 === 0) ? LANE_X1 : LANE_X0;
+    if (u < 0.55) return (DELIVER_X - side) >= 0 ? 1 : -1;
+    if (u < 0.70) return (DELIVER_X - side) >= 0 ? -1 : 1;
+    const nextSide = ((idx + 1) % 2 === 0) ? LANE_X1 : LANE_X0;
+    return (nextSide - DELIVER_X) >= 0 ? 1 : -1;
+  }
+  function drawCourier(idx, u, t) {
+    if (!COURIER) return;
+    const x = courierX(idx, u);
+    const dir = courierDir(idx, u);
+    const moving = (u < 0.55 || u >= 0.70);
+    const bob = moving ? 3.2 * Math.sin(t * 3.4) : 1.4 * Math.sin(t * 2.1);
+    const half = COURIER_SZ / 2;
+    const yTop = LANE_Y - COURIER_SZ + bob;
+    const strokes = [
+      nline([[x - half, yTop], [x + half, yTop], [x + half, LANE_Y + bob], [x - half, LANE_Y + bob], [x - half, yTop]]),
+      { t: 'd', p: [x - 11 + dir * 3, yTop + 17], r: 5.5 },
+      { t: 'd', p: [x + 11 + dir * 3, yTop + 17], r: 5.5 }
+    ];
+    drawStrokes(strokes, 1, INK, 4, t, JIT * 0.9);
+  }
+
+  /* ------------------------- 绘制：底部导轨（分镜表） ------------------------- */
+  function drawRail(idx, u, t) {
+    /* 送信道（虚线） */
+    ctx.strokeStyle = LANEC;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    let x = LANE_X0;
+    while (x < LANE_X1) {
+      const x2 = Math.min(x + 34, LANE_X1);
+      const seg = wobPts([[x, LANE_Y], [x2, LANE_Y]], t, JIT * 0.6);
+      ctx.beginPath();
+      ctx.moveTo(seg[0][0], seg[0][1]);
+      ctx.lineTo(seg[1][0], seg[1][1]);
+      ctx.stroke();
+      x = x2 + 24;
+    }
+    /* 分镜导轨（实线） */
+    const railPts = [];
+    for (let i = 0; i <= 24; i++) railPts.push([RAIL_X0 + (RAIL_X1 - RAIL_X0) * i / 24, RAIL_Y]);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    const rw = wobPts(railPts, t, JIT);
+    ctx.beginPath();
+    ctx.moveTo(rw[0][0], rw[0][1]);
+    for (let i = 1; i < rw.length; i++) ctx.lineTo(rw[i][0], rw[i][1]);
+    ctx.stroke();
+    /* 每镜一个缩略图 + 已完成/当前镜的强调线段 */
+    for (let j = 0; j < N; j++) {
+      const px = postX(j);
+      const st = toStage(SHAPES[SHOTS[j].shape](), px, THUMB_Y, THUMB_SZ);
+      const col = (SHOTS[j].shape === 'arrow') ? ACCENT : INK;
+      drawStrokes(st, 1, col, 2, t, 0);
+      let seg = 0;
+      if (j < idx) seg = 1;
+      else if (j === idx) seg = 0.4 + 0.6 * clamp(u / 0.25, 0, 1);
+      if (seg > 0) {
+        const line = [[px - 34, RAIL_Y], [px - 17, RAIL_Y], [px, RAIL_Y], [px + 17, RAIL_Y], [px + 34, RAIL_Y]];
+        drawStrokes([nline(line)], seg, ACCENT, 5, t, JIT * 0.7);
+      }
+    }
+  }
+
+  /* ------------------------- 绘制：底部字幕 ------------------------- */
+  function drawCaption(idx, u) {
+    const cap = SHOTS[idx].caption;
+    if (!cap) return;
+    let alpha = clamp((u - 0.05) / 0.30, 0, 1);
+    if (idx < N - 1) alpha *= 1 - clamp((u - 0.92) / 0.08, 0, 1);
+    if (alpha <= 0.002) return;
+    let size = 48;
+    ctx.font = '400 ' + size + 'px MEBHeiHeiTi, "Microsoft YaHei", sans-serif';
+    let w = ctx.measureText(cap).width;
+    if (w > 1500) {
+      size = Math.max(28, Math.floor(size * 1500 / w));
+      ctx.font = '400 ' + size + 'px MEBHeiHeiTi, "Microsoft YaHei", sans-serif';
+      w = ctx.measureText(cap).width;
+    }
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = INK;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(cap, W / 2, CAP_Y);
+    /* 强调：手绘下划线（不是圆角框） */
+    const seg = clamp((u - 0.78) / 0.14, 0, 1);
+    if (seg > 0) {
+      const x0 = W / 2 - w / 2 - 14, x1 = W / 2 + w / 2 + 14;
+      const pts = [];
+      for (let i = 0; i <= 10; i++) pts.push([x0 + (x1 - x0) * i / 10, CAP_UNDER_Y]);
+      drawStrokes([nline(pts)], seg, ACCENT, 4, 0, JIT * 0.8);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* ------------------------- 主渲染（纯函数） ------------------------- */
+  function render(t) {
+    t = clamp(t, 0, TOTAL);
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 1;
+
+    const idx = Math.min(N - 1, Math.floor(t / SHOT_DUR));
+    const local = t - idx * SHOT_DUR;
+    const u = clamp(local / SHOT_DUR, 0, 1);
+
+    drawFrame(t);
+    drawHeader(idx);
+    const narr = drawNarration(idx, u);
+    drawMainShape(idx, local, t);
+    drawAnnotation(narr, u, t);
+    drawCourier(idx, u, t);
+    drawRail(idx, u, t);
+    drawCaption(idx, u);
+  }
+
+  /* ------------------------- 时间轴（唯一一条补间） ------------------------- */
+  const stage = document.getElementById('stage');
+  stage.setAttribute('data-duration', String(TOTAL));
+  const st = { t: 0 };
+  const tl = gsap.timeline({ paused: true });
+  tl.fromTo(st, { t: 0 }, {
+    t: TOTAL, duration: TOTAL, ease: 'none',
+    onUpdate: function () { render(st.t); }
+  }, 0);
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 自带 __seekTo：逐帧定位的兜底（云端逐帧出片靠它） */
+  window.__seekTo = function (t) {
+    if (typeof t !== 'number' || !isFinite(t)) return;
+    const tt = clamp(t, 0, TOTAL);
+    try { tl.pause(); tl.time(0, false); tl.time(tt, false); } catch (e) { }
+    render(tt);
+  };
+  window.__sketchStory = {
+    render: render, total: TOTAL, shots: N, shotDur: SHOT_DUR,
+    shapeIds: SHOTS.map(function (s) { return s.shape; }),
+    invalid: INVALID, usedFallback: usedFallback,
+    rate: RATE, jitter: JIT, courier: COURIER, accent: ACCENT,
+    frames: Math.round(TOTAL * RATE)
+  };
+
+  const first = function () {
+    const q = /(?:^|[?&])t=([\d.]+)/.exec(location.search);
+    if (q) { render(parseFloat(q[1])); return; }
+    render(0);
+  };
+  /* 字幕首帧 alpha=0，canvas 不会去取 MEBHeiHeiTi —— 显式 load 一次，
+     否则字幕会静默掉到系统黑体（探针 fontCheck 会是 false）。 */
+  const readyFonts = (document.fonts && document.fonts.ready)
+    ? document.fonts.ready.catch(function () { }) : Promise.resolve();
+  const loadFonts = (document.fonts && document.fonts.load)
+    ? Promise.all([
+        document.fonts.load('400 48px MEBHeiHeiTi', '测试字幕'),
+        document.fonts.load('700 40px MiSans', '镜头')
+      ]).catch(function () { })
+    : Promise.resolve();
+  Promise.all([readyFonts, loadFonts]).then(first).catch(first);
+})();
+</script>
+</body>
+</html>

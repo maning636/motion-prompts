@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"filename","type":"string","label":"文件名","default":"rag.py"},{"id":"language","type":"string","label":"语言","default":"Python 3.12"},{"id":"code","type":"string","label":"代码行（\\n 分隔）","default":"def retrieve(query, index):\n    hits = index.search(query, k=5)\n    contexts = [h.text for h in hits]\n    return contexts\n\ndef generate(query, contexts):\n    prompt = build_prompt(query, contexts)\n    return llm(prompt)"},{"id":"highlightLine","type":"number","label":"高亮行号（1-based）","default":3},{"id":"duration","type":"number","label":"总时长（秒）","default":6},{"id":"accent","type":"color","label":"强调色","default":"#00FF00"},{"id":"background","type":"color","label":"背景色","default":"#12100E"},{"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+*{ box-sizing: border-box;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      html, body{ margin: 0; width: 1920px; height: 1080px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .scene{ position: absolute; inset: 0; width: 100%; height: 100%; padding: 96px 112px; overflow: hidden; display: flex; align-items: center; justify-content: center;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .editor{ width: 1400px; border: 1px solid rgba(244,239,231,0.18); border-radius: 10px; overflow: hidden; background: rgba(244,239,231,0.02);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .ed-header{ height: 52px; border-bottom: 1px solid rgba(244,239,231,0.12); display: flex; align-items: center; gap: 14px; padding: 0 22px;font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+      .ed-dot{ width: 12px; height: 12px; border-radius: 50%;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .ed-filename{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 16px; font-weight: 600; }
+      .ed-lang{ margin-left: auto; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-size: 14px; opacity: 0.45; }
+      .ed-body{ display: flex; padding: 28px 0; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-size: 24px; line-height: 1.7; }
+      .line-numbers{ width: 72px; text-align: right; padding-right: 24px; opacity: 0.35; flex-shrink: 0;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .line-num{ height: 41px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .code{ flex: 1; white-space: pre;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .line{ height: 41px; display: flex; align-items: center; padding-left: 24px; border-left: 3px solid transparent;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .line.highlight{ background: color-mix(in srgb, var(--accent) 10%, transparent); border-left-color: var(--accent);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .keyword{ color: var(--accent);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .string{ color: rgba(244,239,231,0.7);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .func{ color: #6B7280;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene clip" data-start="0" data-duration="6" data-track-index="1">
+        <div class="editor">
+          <div class="ed-header">
+            <span class="ed-dot" style="background:#FF5F57"></span>
+            <span class="ed-dot" style="background:#FEBC2E"></span>
+            <span class="ed-dot" style="background:#28C840"></span>
+            <span class="ed-filename" id="filename"></span>
+            <span class="ed-lang" id="language"></span>
+          </div>
+          <div class="ed-body">
+            <div class="line-numbers" id="lineNumbers"></div>
+            <div class="code" id="code"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <script>
+      const fallback = { filename: "rag.py", language: "Python 3.12", code: "def retrieve(query, index):\n    hits = index.search(query, k=5)\n    contexts = [h.text for h in hits]\n    return contexts\n\ndef generate(query, contexts):\n    prompt = build_prompt(query, contexts)\n    return llm(prompt)", highlightLine: 3, accent: "#00FF00", background: "#12100E", foreground: "#F4EFE7" };
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4EFE7");
+      document.documentElement.style.setProperty("--background", v.background ?? "#12100E");
+      const root = document.getElementById("root");
+      root.style.backgroundColor = v.background;
+      root.style.color = v.foreground;
+      root.style.setProperty("--accent", v.accent);
+      document.getElementById("filename").textContent = v.filename;
+      document.getElementById("language").textContent = v.language;
+      const lines = String(v.code).split("\n");
+      const highlight = Math.max(1, Math.min(lines.length, Number(v.highlightLine) || 1));
+      const lineNumbers = document.getElementById("lineNumbers");
+      const code = document.getElementById("code");
+      lines.forEach((line, i) => {
+        const num = document.createElement("div");
+        num.className = "line-num";
+        num.textContent = i + 1;
+        lineNumbers.appendChild(num);
+        const row = document.createElement("div");
+        row.className = "line" + (i + 1 === highlight ? " highlight" : "");
+        row.innerHTML = simpleHighlight(line);
+        code.appendChild(row);
+      });
+
+      function simpleHighlight(text) {
+        const keywords = ["def", "return", "for", "in", "if", "else", "import", "from", "as", "class"];
+        const str = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const re = /("[^"]*"|'[^']*')|\b(\d+)\b|\b(def|return|for|in|if|else|import|from|as|class)\b|\b(\w+)(?=\()/g;
+        const html = str.replace(re, (m, quote, num, kw, fn) => {
+          if (quote) return `<span class="string">${quote}</span>`;
+          if (num) return `<span class="string">${num}</span>`;
+          if (kw) return `<span class="keyword">${kw}</span>`;
+          return `<span class="func">${fn}</span>`;
+        });
+        return html;
+      }
+
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(".editor", { opacity: 0, y: 40, scale: 0.98 }, { opacity: 1, y: 0, scale: 1, duration: 0.7, ease: "power3.out" }, 0.2);
+      tl.fromTo(".ed-header", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 0.4);
+      tl.fromTo(".line-num", { opacity: 0 }, { opacity: 0.35, duration: 0.3, stagger: 0.05 }, 0.6);
+      tl.fromTo(".line", { opacity: 0, x: -12 }, { opacity: 1, x: 0, duration: 0.35, stagger: 0.06, ease: "power2.out" }, 0.65);
+      tl.fromTo(".line.highlight", { opacity: 0, backgroundColor: "color-mix(in srgb, var(--accent) 25%, transparent)" }, { opacity: 1, backgroundColor: "color-mix(in srgb, var(--accent) 10%, transparent)", duration: 0.6, ease: "power2.out" }, 1.5);
+      tl.to(".scene", { opacity: 0, y: -16, duration: 0.5, ease: "power2.in" }, 5.3);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

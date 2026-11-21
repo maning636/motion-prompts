@@ -1,0 +1,16 @@
+{
+ "name": "上下分带 · 把收入拆开看才不慌",
+ "description": "上半屏一条大数字带横排铺开，下半屏逐行明细，中间硬边分割",
+ "category": "数据可视化",
+ "tags": [
+  "积木社",
+  "bulb",
+  "cobalt",
+  "heavy"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "card",
+ "when": "数据卡片 / 上下分带"
+}

@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"label","name":"标签","type":"string","label":"按下后的提示","default":"已选中"},{"id":"accent","name":"强调色","type":"color","label":"涟漪色","default":"#2EC4B6"},{"id":"accent2","name":"次强调","type":"color","label":"中心点色","default":"#FFC93C"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>点击涟漪</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+
+  .p-tr-halo {
+    position: absolute; left: 100px; top: 34px; width: 280px; height: 202px;
+    background: radial-gradient(58% 62% at 50% 50%,
+      rgba(0, 0, 0, .48) 0%, rgba(0, 0, 0, .24) 56%, rgba(0, 0, 0, 0) 86%);
+  }
+  /* 触点：一个抽象的卡片，不是真实控件 */
+  .p-tr-card {
+    position: absolute; left: 120px; top: 44px; width: 240px; height: 182px;
+    border-radius: 16px;
+    background: rgba(27, 27, 36, .62);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .45), inset 0 0 0 1px rgba(255, 248, 238, .10);
+    will-change: transform, opacity;
+  }
+  /* 涟漪环：绝对定位到触点，scale 0 → 3 */
+  .p-tr-ring {
+    position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px;
+    border: 3px solid var(--ac, #2EC4B6); border-radius: 50%;
+    opacity: 0; will-change: transform, opacity;
+  }
+  .p-tr-fill {
+    position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px;
+    background: rgba(46, 196, 182, .22); border-radius: 50%;
+    opacity: 0; will-change: transform, opacity;
+  }
+  .p-tr-dot {
+    position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px;
+    background: var(--ac2, #FFC93C); border-radius: 50%;
+    opacity: 0; will-change: transform, opacity;
+  }
+  /* 十字准星，交代这是"点在哪" */
+  .p-tr-cross {
+    position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px;
+    opacity: 0; will-change: transform, opacity;
+  }
+  .p-tr-cross i {
+    position: absolute; left: 50%; top: 50%; background: rgba(255, 248, 238, .9);
+    transform-origin: 50% 50%;
+  }
+  .p-tr-cross i.p-tr-h { width: 26px; height: 1.5px; margin: -.75px 0 0 -13px; }
+  .p-tr-cross i.p-tr-v { width: 1.5px; height: 26px; margin: -13px 0 0 -.75px; }
+  .p-tr-label {
+    position: absolute; left: 120px; right: 120px; top: 236px; text-align: center;
+    font-size: 12px; line-height: 1; font-weight: 800; letter-spacing: .16em;
+    /* 标签飘在卡片**外面**（白底上），米白字等于看不见 ——
+       实测对比度 1.23:1（像素法）。改成深墨色，与白底约 17:1。
+       不能加胶囊底：GSAP 独占 transform，fit 逻辑还要量 scrollWidth 算字号。 */
+    color: #1B1B24; white-space: nowrap;
+    will-change: transform, opacity;
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"label":"已选中","accent":"#2EC4B6","accent2":"#FFC93C","duration":3};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--ac2', v.accent2 || FALLBACK.accent2);
+  const dur = parseFloat(v.duration) || 3;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  const label = (v.label == null || v.label === '' ? FALLBACK.label : v.label)
+    .toString().replace(/\s+/g, ' ').trim().slice(0, 10);
+
+  put('div', 'p-tr-halo');
+  const card = put('div', 'p-tr-card');
+  const labelEl = put('div', 'p-tr-label', null, label, stage);
+
+  /* 三个触点写死成常量（确定性，不用随机数）。
+     坐标是相对卡片左上角的偏移。 */
+  const TAPS = [[64, 46], [150, 92], [96, 138]];
+  const tapNodes = TAPS.map(function (t) {
+    const left = 120 + t[0];
+    const top = 44 + t[1];
+    const g = [];
+    g.push(put('div', 'p-tr-fill', 'left:' + left + 'px;top:' + top + 'px;', null, stage));
+    g.push(put('div', 'p-tr-ring', 'left:' + left + 'px;top:' + top + 'px;', null, stage));
+    const c = put('div', 'p-tr-cross', 'left:' + left + 'px;top:' + top + 'px;', null, stage);
+    put('i', 'p-tr-h', null, null, c);
+    put('i', 'p-tr-v', null, null, c);
+    g.push(c);
+    g.push(put('div', 'p-tr-dot', 'left:' + left + 'px;top:' + top + 'px;', null, stage));
+    return g;
+  });
+
+  /* §3.2 中文溢出防护 */
+  const MAXFS = 12, MINFS = 8, AVAIL = 240;
+  labelEl.style.whiteSpace = 'nowrap';
+  const natural = labelEl.scrollWidth;
+  if (natural > AVAIL && natural > 0) {
+    labelEl.style.fontSize = String(Math.max(MINFS, Math.floor(MAXFS * AVAIL / natural))) + 'px';
+  }
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* ① 卡片弹入 */
+  tl.fromTo(card, { y: 34, scale: .92, opacity: 0 },
+    { y: 0, scale: 1, opacity: 1, duration: .48, ease: 'back.out(2.2)' }, 0);
+
+  /* ② 三次点击：每次都是「圆环 scale 0→3 + opacity .8→0 + 中心小点」。
+        起点和间隔都由 dur 推，保证整串动作收在 dur 之内，
+        不会出现"时长填 3s、实际跑 3.6s"的溢出。 */
+  const SPAN = Math.max(1.0, dur - 1.5);   /* 三连点可用的总时间 */
+  const START = .55;
+  const GAP = Math.max(.40, (SPAN - .55) / (TAPS.length - 1));
+  tapNodes.forEach(function (g, i) {
+    const t = START + i * GAP;
+    const fill = g[0], ring = g[1], cross = g[2], dot = g[3];
+
+    tl.fromTo(fill, { scale: 0, opacity: 0 },
+      { opacity: .9, duration: .10, ease: 'power2.out' }, t);
+    tl.fromTo(fill, { scale: 0 },
+      { scale: 2.6, duration: .52, ease: 'power2.out' }, t);
+    tl.to(fill, { opacity: 0, duration: .34, ease: 'power2.in' }, t + .22);
+
+    tl.fromTo(ring, { scale: 0, opacity: 0 },
+      { opacity: .85, duration: .09, ease: 'power2.out' }, t);
+    tl.fromTo(ring, { scale: 0 },
+      { scale: 3, duration: .58, ease: 'power2.out' }, t);
+    tl.to(ring, { opacity: 0, duration: .42, ease: 'power2.in' }, t + .16);
+
+    tl.fromTo(cross, { scale: 1.5, opacity: 0, rotate: 0 },
+      { scale: 1, opacity: .9, duration: .20, ease: 'back.out(2.6)' }, t);
+    tl.to(cross, { rotate: 90, duration: .24, ease: 'power2.inOut' }, t + .20);
+    tl.to(cross, { opacity: 0, duration: .16, ease: 'power2.in' }, t + .42);
+
+    tl.fromTo(dot, { scale: 0, opacity: 0 },
+      { scale: 1, opacity: 1, duration: .20, ease: 'back.out(3.2)' }, t);
+    tl.to(dot, { scale: .6, opacity: 0, duration: .26, ease: 'power2.in' }, t + .40);
+  });
+
+  /* ③ 收尾：最后一次点击的余韵 + 标签（全部收在 dur - .3 之前） */
+  const last = START + (TAPS.length - 1) * GAP;
+  const settle = Math.min(last + .70, Math.max(.1, dur - .95));
+  tl.fromTo(labelEl, { y: 10, opacity: 0 },
+    { y: 0, opacity: 1, duration: .34, ease: 'back.out(2.6)' }, last + .34);
+  tl.to(labelEl, { y: -2, duration: .22, ease: 'sine.inOut' }, settle);
+  tl.to(labelEl, { y: 0, duration: .24, ease: 'sine.inOut' }, settle + .22);
+  tl.to(card, { scale: 1.012, duration: .12, ease: 'power2.out' }, settle);
+  tl.to(card, { scale: 1, duration: .20, ease: 'back.out(2.4)' }, settle + .12);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

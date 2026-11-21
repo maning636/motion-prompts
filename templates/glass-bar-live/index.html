@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "近六日发布量"}, {"id": "labels", "type": "string", "label": "标签（逗号分隔）", "default": "周一,周二,周三,周四,周五,周六"}, {"id": "values", "type": "string", "label": "数值（逗号分隔）", "default": "4,6,5,8,7,11"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #070B09; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #EAF4EE; }
+      .g-bg{ position: absolute; inset: 0;
+        background: radial-gradient(900px 520px at 22% 18%, rgba(0,255,140,.07), transparent 60%),
+          radial-gradient(1000px 600px at 82% 86%, rgba(64,224,208,.06), transparent 60%); }
+      .g-num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+      .g-panel{ position: absolute; left: 260px; top: 170px; width: 1400px; height: 740px;
+        border-radius: 34px; background: rgba(14,26,20,.54);
+        -webkit-backdrop-filter: blur(13px); backdrop-filter: blur(13px);
+        border: 1px solid rgba(255,255,255,.16); overflow: hidden; }
+      .g-panel::before{ content: ""; position: absolute; inset: 10px; border-radius: 28px;
+        transform: translate(3px, 3px); background: rgba(4,9,7,.55); z-index: -1;
+        box-shadow: 0 0 0 20px rgba(4,9,7,.35); }
+      .g-head{ position: absolute; left: 70px; top: 54px; display: flex; align-items: center; gap: 16px;
+        font-size: 32px; font-weight: 700; color: #A9C4B6; letter-spacing: .05em; }
+      .g-dot{ width: 16px; height: 16px; border-radius: 50%; background: #00FF00; box-shadow: 0 0 18px #00FF00; }
+      .g-chart{ position: absolute; left: 70px; right: 70px; top: 170px; bottom: 120px;
+        display: flex; align-items: flex-end; gap: 44px; }
+      .g-col{ flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+      .g-val{ text-align: center; font-size: 34px; color: #F4FBF7; margin-bottom: 14px; }
+      .g-bar{ border-radius: 14px 14px 0 0; transform-origin: bottom; transform: scaleY(0);
+        background: linear-gradient(180deg, rgba(0,255,140,.55), rgba(0,255,140,.07));
+        border: 1px solid rgba(255,255,255,.16); border-bottom: none; }
+      .g-lab{ position: absolute; left: 70px; right: 70px; bottom: 56px; display: flex; gap: 44px; }
+      .g-lab span{ flex: 1; text-align: center; font-size: 24px; color: #8FAE9E; }
+      .g-sweep{ position: absolute; top: 0; bottom: 0; left: -220px; width: 200px;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,.16), transparent);
+        mix-blend-mode: screen; filter: blur(6px); pointer-events: none; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="g-bg"></div>
+      <div class="g-panel" id="panel">
+        <div class="g-head"><span class="g-dot"></span><span id="title"></span></div>
+        <div class="g-chart" id="chart"></div>
+        <div class="g-lab" id="labels"></div>
+        <div class="g-sweep" id="sweep"></div>
+      </div>
+
+    </div>
+    <script>
+      const fallback = {"title": "近六日发布量", "labels": "周一,周二,周三,周四,周五,周六", "values": "4,6,5,8,7,11", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      $("title").textContent = V.title;
+      const labels = split(V.labels).slice(0, 6);
+      const vals = split(V.values).map((x) => Number(x) || 0).slice(0, 6);
+      const max = Math.max(...vals, 1);
+      const chart = $("chart"), lab = $("labels");
+      vals.forEach((v, i) => {
+        const col = document.createElement("div");
+        col.className = "g-col";
+        col.innerHTML = `<div class="g-val g-num">${v}</div><div class="g-bar" style="height:${Math.round(v / max * 88) + 6}%"></div>`;
+        chart.appendChild(col);
+        const sp = document.createElement("span");
+        sp.textContent = labels[i] ?? "";
+        lab.appendChild(sp);
+      });
+      tl.fromTo("#panel", { y: 46, opacity: 0 }, { y: 0, opacity: 1, duration: 0.55, ease: "power3.out" }, 0);
+      tl.fromTo(".g-head", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4 }, 0.25);
+      tl.to(".g-bar", { scaleY: 1, duration: 0.6, stagger: 0.12, ease: "back.out(1.5)" }, 0.55);
+      tl.fromTo(".g-val", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.3, stagger: 0.12 }, 0.75);
+      tl.fromTo(".g-lab span", { opacity: 0 }, { opacity: 1, duration: 0.3, stagger: 0.1 }, 0.9);
+      const tSweep = 0.55 + vals.length * 0.12 + 0.35;
+      tl.fromTo("#sweep", { left: -220 }, { left: 1420, duration: 0.9, ease: "power1.inOut" }, tSweep);
+      document.querySelectorAll(".g-bar").forEach((el, i) => {
+        const t = tSweep + 0.12 + i * 0.12;
+        tl.to(el, { filter: "brightness(1.5)", duration: 0.14, ease: "power1.in" }, t);
+        tl.to(el, { filter: "brightness(1)", duration: 0.2, ease: "power1.out" }, t + 0.14);
+      });
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

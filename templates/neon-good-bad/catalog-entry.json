@@ -1,0 +1,28 @@
+{
+  "id": "neon-good-bad",
+  "name": "霓虹正误对比条",
+  "description": "深黑底荧光绿正误对比：标题关键词绿色高亮，✓绿色描边条（实心chip+灰chip）与✗红灰条上下对照，适合口播讲正确做法vs常见错误。",
+  "category": "信息卡片",
+  "tags": [
+    "正误对比",
+    "霓虹",
+    "荧光绿",
+    "要点讲解",
+    "口播"
+  ],
+  "duration": 6,
+  "slot": "concept",
+  "when": "口播对比正确做法与常见错误回答，需要上下两条对照呈现时",
+  "assets": [],
+  "path": "templates/neon-good-bad",
+  "size": "1920×1080",
+  "formats": [
+    "mp4"
+  ],
+  "defaultFormat": "mp4",
+  "preview": "https://maning789link.top/hub/renders/neon-good-bad/sample.webm",
+  "status": "ready",
+  "tier": "free",
+  "no": null,
+  "series": "shot"
+}

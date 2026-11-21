@@ -1,0 +1,13 @@
+{
+  "id": "error-retype",
+  "name": "输入纠错重打",
+  "description": "命令行输入过程演示：先键入正确前缀，接着打错一段（红字+抖动+错误状态），退格删除，再键入正确文案，结尾光标闪烁收尾。",
+  "category": "输入叙事",
+  "tags": ["输入演示", "打字机", "纠错", "命令行", "重打"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-20T00:00:00.000Z"
+}

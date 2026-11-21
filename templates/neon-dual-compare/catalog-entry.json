@@ -1,0 +1,28 @@
+{
+  "id": "neon-dual-compare",
+  "name": "荧光双卡对比",
+  "description": "顶部英文标签+高亮标题，左右双卡竖虚线分隔对比（左绿右灰），左卡下方 chip 弹入，适合数据安全/方案对比口播。",
+  "category": "信息卡片",
+  "tags": [
+    "双卡对比",
+    "荧光绿",
+    "数据安全",
+    "左右对比",
+    "口播"
+  ],
+  "duration": 6,
+  "slot": "concept",
+  "when": "口播讲到两边对比（如本地 vs 云端、你的 vs 别人的）需要双卡并置强调差异时",
+  "assets": [],
+  "path": "templates/neon-dual-compare",
+  "size": "1920×1080",
+  "formats": [
+    "mp4"
+  ],
+  "defaultFormat": "mp4",
+  "preview": "https://maning789link.top/hub/renders/neon-dual-compare/sample.webm",
+  "status": "ready",
+  "tier": "free",
+  "no": null,
+  "series": "shot"
+}

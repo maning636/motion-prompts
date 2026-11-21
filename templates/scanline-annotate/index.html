@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"eyebrow","type":"string","label":"眉签","default":"SCAN · REPORT"},
+  {"id":"title","type":"string","label":"标题","default":"深度扫描 · 4 处待解读"},
+  {"id":"items","type":"string","label":"条目（每行：主文案 | 标注解读）","default":"数据源延迟 3.2s | 上游批处理窗口未对齐，需统一 T-1 切片\n权限矩阵缺口 3 处 | 3 个角色未纳入 RBAC，需合并最小权限模板\n告警噪声占比 41% | 静态阈值触发过多重复，需自适应降噪\n回滚耗时 8m12s | 缺一键回退编排，人工核对拉长链路"},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#0B0F14"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#EEF3FA"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #0B0F14);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #0B0F14);
+        color: var(--foreground, #EEF3FA);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity: .55;
+      }
+
+      /* 顶头细刻度尺 */
+      .ticks{
+        position:absolute; top:96px; left:96px; right:96px; height:14px;
+        display:flex; justify-content:space-between; align-items:flex-end;
+        opacity:.32; pointer-events:none;
+      }
+      .ticks i{
+        display:block; width:1px; height:8px;
+        background: color-mix(in srgb, var(--foreground,#EEF3FA) 55%, transparent);
+      }
+      .ticks i.long{ height:14px; }
+
+      /* eyebrow */
+      .eyebrow{
+        position:absolute; top:56px; left:96px;
+        display:inline-flex; align-items:center; gap:12px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:16px; letter-spacing:.28em; text-transform:uppercase;
+        color:#8A95A5;
+      }
+      .eyebrow .dot{
+        width:8px; height:8px; border-radius:50%;
+        background: var(--accent,#00FF00);
+        box-shadow:0 0 10px color-mix(in srgb, var(--accent,#00FF00) 70%, transparent);
+      }
+      .eyebrow b{ color: var(--accent,#00FF00); font-weight:700; letter-spacing:.2em; }
+
+      /* title */
+      .title{
+        position:absolute; top:126px; left:96px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight:700; letter-spacing:-.015em;
+        font-size:60px; line-height:1.08;
+        margin:0; max-width:1400px;
+        color: var(--foreground,#EEF3FA);
+      }
+
+      /* 状态 chip */
+      .status{
+        position:absolute; top:60px; right:96px;
+        display:inline-flex; align-items:center; gap:12px;
+        padding:10px 18px; border:1px solid rgba(255,255,255,.14); border-radius:999px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:14px; letter-spacing:.2em; text-transform:uppercase;
+        color: color-mix(in srgb, var(--foreground,#EEF3FA) 72%, transparent);
+      }
+      .status .pulse{
+        width:9px; height:9px; border-radius:50%;
+        background: var(--accent,#00FF00);
+        box-shadow:0 0 12px color-mix(in srgb, var(--accent,#00FF00) 80%, transparent);
+      }
+      .status b{ color: var(--accent,#00FF00); font-weight:700; letter-spacing:.16em; }
+
+      /* 主舞台：4 行 × 2 列。DOM 顺序：4 items → 4 annotations，
+         auto-flow column + 4-row template 会依次把 items 排到第 1 列、
+         annotations 排到第 2 列，每行 item 与 anno 一一对应。 */
+      .stage{
+        position:absolute; left:96px; right:96px;
+        top:260px; bottom:130px;
+        display:grid;
+        grid-template-columns: 620px 1fr;
+        grid-template-rows: repeat(4, 1fr);
+        grid-auto-flow: column;
+        column-gap:56px;
+        row-gap:18px;
+      }
+      .col-left, .col-right{ display:contents; }
+
+      /* 单条 item */
+      .item{
+        position:relative;
+        display:grid; grid-template-columns: 48px 1fr; gap:16px;
+        align-items:center;
+        padding:16px 22px 16px 18px;
+        margin-left:36px;
+        border-radius:14px;
+        background: rgba(255,255,255,.025);
+        border:1px solid rgba(255,255,255,.08);
+        opacity:.82;
+        will-change: transform;
+      }
+      .item .idx{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:14px; letter-spacing:.14em;
+        color:#6B7686;
+        border:1px solid rgba(255,255,255,.14);
+        border-radius:8px;
+        display:grid; place-items:center;
+        width:44px; height:44px;
+        font-weight:700;
+      }
+      .item .txt{
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+        font-size:23px; line-height:1.35;
+        color: color-mix(in srgb, var(--foreground,#EEF3FA) 78%, transparent);
+      }
+      .item::after{
+        content:""; position:absolute; left:-24px; top:50%;
+        transform: translateY(-50%);
+        width:9px; height:9px; border-radius:50%;
+        background: rgba(255,255,255,.12);
+      }
+
+      /* scanned */
+      .item.scanned{
+        opacity:1;
+        background: color-mix(in srgb, var(--accent,#00FF00) 10%, transparent);
+        border-color: color-mix(in srgb, var(--accent,#00FF00) 65%, transparent);
+        box-shadow: 0 0 32px color-mix(in srgb, var(--accent,#00FF00) 22%, transparent);
+      }
+      .item.scanned .idx{
+        color: var(--background,#0B0F14);
+        background: var(--accent,#00FF00);
+        border-color: var(--accent,#00FF00);
+      }
+      .item.scanned .txt{ color: var(--foreground,#EEF3FA); }
+      .item.scanned::after{
+        background: var(--accent,#00FF00);
+        box-shadow:0 0 12px color-mix(in srgb, var(--accent,#00FF00) 80%, transparent);
+      }
+
+      /* annotation */
+      .annotation{
+        position:relative;
+        padding:18px 24px;
+        margin-left:36px;
+        border-radius:14px;
+        border:1px solid rgba(255,255,255,.10);
+        background: rgba(255,255,255,.02);
+        opacity:0;
+        transform: translateX(24px);
+        will-change: transform, opacity;
+        display:flex; flex-direction:column; justify-content:center;
+      }
+      .annotation::before{
+        content:""; position:absolute; left:-14px; top:22px;
+        width:14px; height:14px; border-radius:50%;
+        background: var(--accent,#00FF00);
+        box-shadow:0 0 10px color-mix(in srgb, var(--accent,#00FF00) 75%, transparent);
+        border:2px solid var(--background,#0B0F14);
+      }
+      .annotation::after{
+        content:""; position:absolute; left:-40px; top:28px;
+        width:26px; height:2px;
+        background: color-mix(in srgb, var(--accent,#00FF00) 65%, transparent);
+      }
+      .annotation .anno-eyebrow{
+        display:inline-flex; align-items:center; gap:8px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:12px; letter-spacing:.24em; text-transform:uppercase;
+        color: color-mix(in srgb, var(--accent,#00FF00) 85%, transparent);
+        margin-bottom:6px;
+      }
+      .annotation .anno-eyebrow i{
+        display:inline-block; width:18px; height:2px;
+        background: var(--accent,#00FF00);
+      }
+      .annotation .anno-text{
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+        font-size:21px; line-height:1.42;
+        color: color-mix(in srgb, var(--foreground,#EEF3FA) 90%, transparent);
+      }
+      .annotation .anno-num{
+        position:absolute; right:20px; top:14px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:13px; letter-spacing:.14em;
+        color: color-mix(in srgb, var(--foreground,#EEF3FA) 45%, transparent);
+      }
+
+      /* 扫描线容器：与 .stage 同坐标 */
+      .scanwrap{
+        position:absolute; left:96px; right:96px;
+        top:260px; bottom:130px;
+        pointer-events:none; overflow:hidden;
+      }
+      #scanLine{
+        position:absolute; left:0; right:0;
+        top:-6px; height:6px;
+        background: linear-gradient(90deg,
+          transparent 0%,
+          color-mix(in srgb, var(--accent,#00FF00) 30%, transparent) 8%,
+          var(--accent,#00FF00) 50%,
+          color-mix(in srgb, var(--accent,#00FF00) 30%, transparent) 92%,
+          transparent 100%);
+        box-shadow: 0 0 26px color-mix(in srgb, var(--accent,#00FF00) 65%, transparent),
+                    0 0 60px color-mix(in srgb, var(--accent,#00FF00) 35%, transparent);
+        border-radius:3px;
+        will-change: top, opacity;
+      }
+      #scanLine::before{
+        content:""; position:absolute; left:0; right:0;
+        top:-28px; height:28px;
+        background: linear-gradient(180deg, transparent,
+                    color-mix(in srgb, var(--accent,#00FF00) 25%, transparent) 100%);
+        filter: blur(6px);
+        pointer-events:none;
+      }
+      #scanLine::after{
+        content:""; position:absolute; left:0; right:0;
+        top:6px; height:34px;
+        background: linear-gradient(180deg,
+                    color-mix(in srgb, var(--accent,#00FF00) 22%, transparent), transparent);
+        filter: blur(6px);
+        pointer-events:none;
+      }
+
+      /* 脚注 */
+      .footnote{
+        position:absolute; bottom:52px; left:96px; right:96px;
+        display:flex; align-items:center; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:15px; letter-spacing:.18em; text-transform:uppercase;
+        color: color-mix(in srgb, var(--foreground,#EEF3FA) 50%, transparent);
+      }
+      .footnote .pct{
+        font-size:26px; letter-spacing:.02em; text-transform:none;
+        color: var(--accent,#00FF00); font-weight:700;
+      }
+      .footnote .pct small{
+        font-size:12px; letter-spacing:.16em; font-weight:500;
+        color: color-mix(in srgb, var(--foreground,#EEF3FA) 50%, transparent);
+        margin-left:6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" data-start="0" data-duration="6" data-track-index="1"
+               style="position:relative; width:1920px; height:1080px; overflow:hidden;">
+
+        <div class="gridbg"></div>
+
+        <div class="ticks" id="ticks"></div>
+
+        <div class="eyebrow" id="eyebrowRow">
+          <span class="dot"></span>
+          <b id="eyebrowAcc">SCAN</b>
+          <span id="eyebrowRest"> · REPORT</span>
+        </div>
+
+        <h2 class="title" id="title">深度扫描 · 4 处待解读</h2>
+
+        <div class="status" id="status">
+          <span class="pulse"></span>
+          <span>SCAN&nbsp;<b id="scanState">READY</b></span>
+        </div>
+
+        <div id="items" class="stage">
+          <div class="col-left" id="colLeft">
+            <div class="item" data-index="0">
+              <span class="idx">01</span><span class="txt">数据源延迟 3.2s</span>
+            </div>
+            <div class="item" data-index="1">
+              <span class="idx">02</span><span class="txt">权限矩阵缺口 3 处</span>
+            </div>
+            <div class="item" data-index="2">
+              <span class="idx">03</span><span class="txt">告警噪声占比 41%</span>
+            </div>
+            <div class="item" data-index="3">
+              <span class="idx">04</span><span class="txt">回滚耗时 8m12s</span>
+            </div>
+          </div>
+          <div class="col-right" id="colRight">
+            <div class="annotation" data-index="0">
+              <span class="anno-num">01 / 04</span>
+              <div class="anno-eyebrow"><i></i>READING</div>
+              <div class="anno-text">上游批处理窗口未对齐，需统一 T-1 数据切片。</div>
+            </div>
+            <div class="annotation" data-index="1">
+              <span class="anno-num">02 / 04</span>
+              <div class="anno-eyebrow"><i></i>READING</div>
+              <div class="anno-text">3 个角色未纳入 RBAC，需合并最小权限模板。</div>
+            </div>
+            <div class="annotation" data-index="2">
+              <span class="anno-num">03 / 04</span>
+              <div class="anno-eyebrow"><i></i>READING</div>
+              <div class="anno-text">静态阈值触发过多重复，需引入自适应降噪。</div>
+            </div>
+            <div class="annotation" data-index="3">
+              <span class="anno-num">04 / 04</span>
+              <div class="anno-eyebrow"><i></i>READING</div>
+              <div class="anno-text">缺一键回退编排，人工核对拉长链路耗时。</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="scanwrap" id="scanwrap">
+          <div id="scanLine"></div>
+        </div>
+
+        <div class="footnote">
+          <span>SCANLINE · ANNOTATE</span>
+          <span class="pct"><span id="scanPct">0</span>%<small>PROGRESS</small></span>
+          <span>4 ITEMS · 6.0S</span>
+        </div>
+
+      </section>
+    </div>
+    <script>
+      /* ----- 变量接线 ----- */
+      const fallback = {
+        eyebrow: "SCAN · REPORT",
+        title: "深度扫描 · 4 处待解读",
+        items: "数据源延迟 3.2s | 上游批处理窗口未对齐，需统一 T-1 切片\n权限矩阵缺口 3 处 | 3 个角色未纳入 RBAC，需合并最小权限模板\n告警噪声占比 41% | 静态阈值触发过多重复，需自适应降噪\n回滚耗时 8m12s | 缺一键回退编排，人工核对拉长链路",
+        accent: "#00FF00",
+        background: "#0B0F14",
+        foreground: "#EEF3FA",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const $ = (id) => document.getElementById(id);
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || fallback.foreground);
+      html.style.setProperty("--background", v.background || fallback.background);
+      html.style.setProperty("--accent",     v.accent     || fallback.accent);
+
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      /* eyebrow 拆字 */
+      (function(){
+        const raw = String(v.eyebrow || fallback.eyebrow);
+        const parts = raw.split("·").map(s => s.trim()).filter(Boolean);
+        if (parts.length >= 2){
+          $("eyebrowAcc").textContent  = parts[0].toUpperCase();
+          $("eyebrowRest").textContent = " · " + parts.slice(1).join(" · ");
+        } else {
+          $("eyebrowAcc").textContent  = (parts[0] || "SCAN").toUpperCase();
+          $("eyebrowRest").textContent = "";
+        }
+      })();
+
+      /* title */
+      $("title").textContent = v.title || fallback.title;
+
+      /* ticks */
+      (function(){
+        const box = $("ticks");
+        if (!box) return;
+        const n = 40;
+        const parts = [];
+        for (let i = 0; i < n; i++){
+          const long = (i % 5 === 0);
+          parts.push(`<i class="${long ? "long" : ""}"></i>`);
+        }
+        box.innerHTML = parts.join("");
+      })();
+
+      /* 解析 items */
+      const parseItems = (raw) => {
+        const lines = String(raw ?? "").split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        const out = [];
+        for (let i = 0; i < Math.min(lines.length, 4); i++){
+          const seg = lines[i].split("|").map(s => s.trim());
+          out.push({ text: seg[0] || "", note: seg[1] || "" });
+        }
+        while (out.length < 4) out.push({ text: "", note: "—" });
+        return out;
+      };
+
+      const items = parseItems(v.items || fallback.items);
+      const itemsBox = $("colLeft");
+      const annosBox = $("colRight");
+      itemsBox.querySelectorAll(".item").forEach((el, i) => {
+        el.querySelector(".txt").textContent = items[i].text || "—";
+        el.querySelector(".idx").textContent = String(i + 1).padStart(2, "0");
+      });
+      annosBox.querySelectorAll(".annotation").forEach((el, i) => {
+        el.querySelector(".anno-text").textContent = items[i].note || "—";
+        el.querySelector(".anno-num").textContent = String(i + 1).padStart(2, "0") + " / 04";
+      });
+
+      /* ---- 几何 ---- */
+      const scanwrap = $("scanwrap");
+      const scanLine = $("scanLine");
+      const itemsList = itemsBox.querySelectorAll(".item");
+
+      /* ---- 时间线 ---- */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+      const tl = gsap.timeline({ paused: true });
+
+      /* 入场：顶栏 */
+      tl.fromTo("#eyebrowRow, #title, #status",
+        { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power3.out", stagger: 0.08 }, 0.05);
+      tl.fromTo("#ticks",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.5, ease: "power2.out" }, 0.25);
+
+      /* items 灰态入场 */
+      tl.fromTo(".item",
+        { opacity: 0, x: -18 },
+        { opacity: 0.82, x: 0, duration: 0.5, ease: "power3.out", stagger: 0.08 }, 0.35);
+
+      /* 扫描线先淡入 */
+      tl.fromTo("#scanLine",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.25, ease: "power2.out" }, 0.75);
+
+      /* 扫描主移动 3.6s */
+      const scanStart = 0.9;
+      const scanDur = 3.6;
+      const wrapH = scanwrap.clientHeight || 690;
+      const startY = 0;
+      const endY = wrapH - 6;
+
+      tl.set("#scanLine", { top: startY + "px" }, scanStart - 0.02);
+      tl.to("#scanLine", { top: endY + "px", duration: scanDur, ease: "none" }, scanStart);
+
+      /* 每条被扫到：点亮 + annotation 弹出 */
+      /* item 相对 scanwrap 中线 y —— 使用 getBoundingClientRect 精确取相对位置 */
+      const wrapRect = scanwrap.getBoundingClientRect();
+      const itemsMid = Array.from(itemsList).map((el) => {
+        const r = el.getBoundingClientRect();
+        return r.top - wrapRect.top + r.height / 2;
+      });
+      // 保护：即使高度未测量也生成合理时间轴
+      const minY = Math.min.apply(null, itemsMid);
+      const maxY = Math.max.apply(null, itemsMid);
+      const span = Math.max(1, maxY - minY);
+
+      /* 每条被扫到时刻：按 item 中线 y 反算 */
+      const hitTimes = itemsMid.map((midY) => {
+        const prog = Math.max(0, Math.min(1, (midY - startY) / Math.max(1, endY - startY)));
+        return scanStart + prog * scanDur;
+      });
+
+      hitTimes.forEach((t, i) => {
+        tl.add(`// hit-${i}`, t);
+        // item 微弹
+        tl.fromTo(`.item[data-index="${i}"]`,
+          { scale: 0.97 },
+          { scale: 1.0, duration: 0.42, ease: "power3.out" }, t);
+        // annotation 弹出
+        tl.fromTo(`.annotation[data-index="${i}"]`,
+          { opacity: 0, x: 24 },
+          { opacity: 1, x: 0, duration: 0.42, ease: "power3.out" }, t + 0.04);
+      });
+
+      /* 扫描线扫完，短暂停顿 + 收束 */
+      tl.to("#scanLine",
+        { opacity: 0.55, duration: 0.28, ease: "power2.out" },
+        scanStart + scanDur + 0.10);
+      tl.to("#scanLine",
+        { opacity: 0, duration: 0.35, ease: "power1.in" },
+        scanStart + scanDur + 0.55);
+
+      /* 尾段轻微上移 */
+      tl.to("#items", { opacity: 0.98, duration: 0.4, ease: "power2.out" }, 5.25);
+
+      /* 结尾时间戳（供 onUpdate 判定 DONE 态） */
+      const doneAt = scanStart + scanDur + 0.35;
+
+      /* onUpdate：pct + scanState + scanned class 派生同步
+         —— pause/seek 到任意时间都会正确反映状态 */
+      const pctVal = $("scanPct");
+      const scanState = $("scanState");
+      tl.eventCallback("onUpdate", function(){
+        const t = tl.time();
+        let pct;
+        if (t < scanStart) pct = 0;
+        else if (t > scanStart + scanDur) pct = 1;
+        else pct = (t - scanStart) / scanDur;
+        if (pctVal) pctVal.textContent = String(Math.round(pct * 100));
+        if (scanState){
+          if (t >= doneAt) scanState.textContent = "DONE";
+          else if (t >= scanStart) scanState.textContent = "SCANNING";
+          else scanState.textContent = "READY";
+        }
+        /* scanned class 按 hit time 单调点亮 */
+        for (let i = 0; i < itemsList.length; i++){
+          const el = itemsList[i];
+          if (t >= hitTimes[i]){
+            if (!el.classList.contains("scanned")) el.classList.add("scanned");
+          } else {
+            el.classList.remove("scanned");
+          }
+        }
+      });
+
+      /* 初始化 */
+      if (pctVal) pctVal.textContent = "0";
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

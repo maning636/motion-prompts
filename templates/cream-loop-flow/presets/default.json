@@ -1,0 +1,6 @@
+{
+  "title": "RLHF 迭代闭环",
+  "subtitle": "训练 → 推理 → 评估 → 反馈",
+  "steps": "训练,推理,评估,反馈",
+  "exitCondition": "奖励分数收敛"
+}

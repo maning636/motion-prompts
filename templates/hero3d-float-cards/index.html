@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "一人即团队的工作流"}, {"id": "cards", "type": "string", "label": "卡标题（逗号分隔）", "default": "脚本,素材库,剪辑,发布"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "img1", "type": "image", "label": "图片卡", "default": "./placeholder-1.png"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #0A0A0B; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #F5F5F4; }
+      .h-bg{ position: absolute; inset: 0;
+        background: radial-gradient(1100px 620px at 50% 46%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 62%),
+          radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: auto, 48px 48px; }
+      .h-stage{ position: absolute; inset: 0; perspective: 1400px; }
+      .h-world{ position: absolute; left: 50%; top: 50%; width: 0; height: 0;
+        transform-style: preserve-3d; }
+      .h-card{ position: absolute; width: 360px; height: 240px; margin: -120px 0 0 -180px;
+        border-radius: 18px; background: #151517; border: 1px solid rgba(255,255,255,.14);
+        box-shadow: 0 24px 60px rgba(0,0,0,.5); overflow: hidden; }
+      .h-card .bar{ height: 10px; background: var(--accent, #00FF00); }
+      .h-card .ct{ padding: 26px 28px; font-size: 34px; font-weight: 700; }
+      .h-card .csub{ padding: 0 28px; font-size: 22px; color: #9CA3AF; }
+      .h-card.h-photo img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+      .h-card.h-photo .ct{ position: absolute; left: 0; bottom: 0; right: 0; padding: 16px 24px;
+        font-size: 28px; background: linear-gradient(transparent, rgba(0,0,0,.75)); }
+      .h-title{ position: absolute; width: 900px; margin: -90px 0 0 -450px; text-align: center; }
+      .h-title h1{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 96px;
+        line-height: 1.15; text-shadow: 0 0 46px color-mix(in srgb, var(--accent) 35%, transparent); }
+      .h-title .chip{ display: inline-block; margin-bottom: 20px; padding: 8px 22px; font-size: 22px;
+        letter-spacing: .18em; color: var(--accent, #00FF00); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+        border-radius: 999px; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="h-bg"></div>
+      <div class="h-stage">
+        <div class="h-world" id="world">
+          <div class="h-title" id="titleCard"><span class="chip" id="chip">WORKFLOW</span><h1 id="title"></h1></div>
+          <div class="h-card" id="c0"><div class="bar"></div><div class="ct"></div><div class="csub">01 / 环节</div></div>
+          <div class="h-card h-photo" id="c1"><img id="img1" alt=""><div class="ct"></div></div>
+          <div class="h-card" id="c2"><div class="bar"></div><div class="ct"></div><div class="csub">03 / 环节</div></div>
+          <div class="h-card" id="c3"><div class="bar"></div><div class="ct"></div><div class="csub">04 / 环节</div></div>
+        </div>
+      </div>
+
+    </div>
+    <script>
+      const fallback = {"title": "一人即团队的工作流", "cards": "脚本,素材库,剪辑,发布", "accent": "#00FF00", "img1": "./placeholder-1.png", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      document.documentElement.style.setProperty("--accent", V.accent ?? "#00FF00");
+      $("title").textContent = V.title;
+      if (V.img1) $("img1").src = V.img1;
+      const cards = split(V.cards);
+      ["c0", "c1", "c2", "c3"].forEach((id, i) => {
+        $(id).querySelector(".ct").textContent = cards[i] ?? ("环节 " + (i + 1));
+      });
+      // 3D 布局：x / y / translateZ
+      const layout = [
+        { x: -430, y: -150, z: 60 },
+        { x: 430, y: -170, z: 140 },
+        { x: -390, y: 210, z: -60 },
+        { x: 410, y: 190, z: 20 }
+      ];
+      ["c0", "c1", "c2", "c3"].forEach((id, i) => {
+        gsap.set("#" + id, { x: layout[i].x, y: layout[i].y, z: layout[i].z });
+      });
+      gsap.set("#titleCard", { z: 220 });
+
+      // 运镜：wrapper 缓慢 rotateX/rotateY 后稳定
+      tl.fromTo("#world", { rotationX: 16, rotationY: -18 }, { rotationX: 5, rotationY: 6, duration: 2.6, ease: "power2.out" }, 0);
+      tl.fromTo("#titleCard", { z: 700, opacity: 0 }, { z: 220, opacity: 1, duration: 0.9, ease: "power3.out" }, 0.15);
+      ["c0", "c1", "c2", "c3"].forEach((id, i) => {
+        tl.fromTo("#" + id, { z: -520, opacity: 0 },
+          { z: layout[i].z, opacity: 1, duration: 0.85, ease: "power3.out" }, 0.45 + i * 0.16);
+      });
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "line1", "type": "string", "label": "卡片标题", "default": "本周精选模板"}, {"id": "line2", "type": "string", "label": "卡片副题", "default": "20 个镜头卡 · 持续更新"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#card{ position:absolute; left:610px; top:270px; width:700px; height:460px; border-radius:6px;
+  background:#F5F0E4; color:#262219; box-shadow:0 34px 50px rgba(0,0,0,.55); padding:64px 58px;
+  will-change:transform; }
+#card h2{ font-size:64px; font-weight:900; }
+#card p{ margin-top:22px; font-size:28px; opacity:.62; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+#card .tag{ display:inline-block; margin-top:44px; font-size:22px; letter-spacing:4px; color:#8a6d1f;
+  border:2px solid #c9a83c; border-radius:4px; padding:8px 18px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+.tape{ position:absolute; width:220px; height:64px; background:rgba(214,164,60,.55);
+  clip-path:polygon(0% 20%,4% 0%,9% 22%,14% 4%,19% 24%,24% 2%,29% 20%,34% 6%,39% 24%,44% 0%,49% 22%,54% 4%,59% 24%,64% 2%,69% 20%,74% 6%,79% 24%,84% 0%,89% 22%,94% 4%,100% 20%,100% 80%,96% 100%,91% 78%,86% 96%,81% 76%,76% 98%,71% 80%,66% 94%,61% 76%,56% 100%,51% 78%,46% 96%,41% 76%,36% 98%,31% 80%,26% 94%,21% 76%,16% 100%,11% 78%,6% 96%,0% 80%);
+  backdrop-filter:blur(1px); opacity:0; will-change:transform; z-index:3; }
+#tape1{ left:540px; top:240px; }
+#tape2{ left:1160px; top:640px; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="3.5" data-width="1920" data-height="1080">
+<div id="card"><h2 id="l1"></h2><p id="l2"></p><span class="tag">EDITORS PICK</span></div><div class="tape" id="tape1"></div><div class="tape" id="tape2"></div>
+    </div>
+    <script>
+      const FB = {"line1": "本周精选模板", "line2": "20 个镜头卡 · 持续更新", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#l1').textContent=v.line1||'';$('#l2').textContent=v.line2||'';
+const card=$('#card');
+// 轻飘入位
+tl.fromTo(card,{y:60,opacity:0},{y:0,opacity:1,duration:F(12),ease:'power2.out'},0);
+// 悬浮微晃：幅度包络×正弦（onUpdate 计算式，可回放）
+const wob={t:0,env:1};
+tl.to(wob,{t:Math.PI*9,duration:F(56),ease:'none',onUpdate:()=>{
+  card.style.transform='translateY('+(Math.sin(wob.t*1.3)*5*wob.env)+'px) rotate('+(Math.sin(wob.t)*1.5*wob.env)+'deg)';
+}},F(12));
+// 胶带 1（f40）：只把包络衰到 0.45（半死）
+tl.to(wob,{env:0.45,duration:F(2)},F(40));
+// 胶带 2（f52）：同帧按死三件套——包络归零 + 投影变薄 + 整卡下沉
+tl.to(wob,{env:0,duration:F(2)},F(52));
+tl.to(card,{boxShadow:'0 8px 18px rgba(0,0,0,.5)',duration:F(2)},F(52));
+// 胶带扑入配方：scale 1.45→1 + 旋转欠→过冲→回正 + 一帧压扁
+function slap(id,cue,baseRot){
+  tl.set(id,{opacity:1},F(cue));
+  tl.fromTo(id,{scale:1.45,rotate:baseRot-16},{scale:1,rotate:baseRot+7,duration:F(4),ease:'power2.out'},F(cue));
+  tl.to(id,{rotate:baseRot,duration:F(2),ease:'power1.inOut'},F(cue+4));
+  tl.fromTo(id,{scaleY:.72},{scaleY:1,duration:F(1)},F(cue));
+}
+slap('#tape1',40,-3);
+slap('#tape2',52,2.5);
+// 收尾真静止（补齐到 105f）
+tl.to({},{duration:F(37)},F(68));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

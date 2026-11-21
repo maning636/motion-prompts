@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（黑条上的 mono 字）","default":"PRESALE / 预售尾款"},{"id":"title","name":"主标题","type":"string","label":"主标题（中文大字，一行）","default":"尾款只在这一天付"},{"id":"deadline","name":"尾款截止","type":"string","label":"尾款截止时间","default":"11 月 20 日 24:00"},{"id":"depositLabel","name":"定金标签","type":"string","label":"定金块标签","default":"已付定金"},{"id":"balanceLabel","name":"尾款标签","type":"string","label":"尾款块标签","default":"待付尾款"},{"id":"deposit","name":"定金","type":"number","label":"已付定金（元）","default":50},{"id":"fullPrice","name":"全款","type":"number","label":"商品全款（元）","default":299},{"id":"note","name":"口径说明","type":"string","label":"口径说明（一行 mono）","default":"口径：尾款 = 全款 − 定金 · 逾期未付视为放弃订单"},{"id":"accent","name":"强调色","type":"color","label":"强调色（尾款块 / 斜纹带）","default":"#FFD429"},{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–6）","default":5.5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="水平进度轴构图：中部一整条横向定金与尾款两段进度轴，轴上两个节点方块标出已付与待付，下方左右两块金额卡并置">
+<title>预售尾款 · 尾款只在这一天付</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --accent:#FFD429;
+  }
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--paper);color:var(--ink);font-family:var(--sans);
+    display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+  .top{flex:0 0 auto;height:66px;display:flex;align-items:center;gap:22px;
+    padding:0 72px;background:var(--ink);color:var(--white)}
+  .top .tag{flex:0 0 auto;font-family:var(--mono);font-weight:700;font-size:24px;
+    letter-spacing:.12em;padding:4px 18px;background:var(--accent);color:var(--ink);
+    border-radius:9999px;white-space:nowrap}
+  .top .eb{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-family:var(--mono);font-weight:700;font-size:24px;
+    letter-spacing:.14em;color:var(--yellow)}
+
+  .hd{flex:0 0 auto;display:flex;align-items:center;gap:28px;
+    padding:32px 72px 26px;border-bottom:var(--bw) solid var(--ink)}
+  .hd .tt{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-weight:900;font-size:72px;letter-spacing:0}
+  .hd .dl{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;padding:12px 26px;background:var(--ink);color:var(--yellow);
+    border:var(--bw) solid var(--ink);border-radius:4px;box-shadow:6px 6px 0 var(--accent);
+    font-family:var(--mono);font-weight:900;font-size:32px;letter-spacing:.04em}
+
+  /* 水平两段进度轴：底槽纸色 + 斜纹，实段填色，语义靠密度区分 */
+  .axis{flex:0 0 auto;position:relative;padding:48px 72px 34px}
+  .track{position:relative;width:100%;height:40px;border:var(--bw) solid var(--ink);
+    border-radius:4px;overflow:hidden;background-color:var(--paper);
+    background-image:repeating-linear-gradient(45deg,
+      rgba(15,15,15,.13) 0 2px, transparent 2px 16px)}
+  .done{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--green);
+    border-right:var(--bw) solid var(--ink)}
+  .nodes{display:flex;justify-content:space-between;margin-top:-20px;
+    padding:0 2px}
+  .nodes .n{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:12px}
+  .nodes .n.r{align-items:flex-end}
+  .nodes .sq{width:80px;height:80px;display:flex;align-items:center;justify-content:center;
+    background:var(--green);color:var(--ink);border:var(--bw) solid var(--ink);
+    border-radius:4px;box-shadow:6px 6px 0 var(--ink);
+    font-family:var(--mono);font-weight:900;font-size:32px}
+  .nodes .n.r .sq{background:var(--accent)}
+  .nodes .k{white-space:nowrap;font-size:28px;font-weight:700;letter-spacing:0;
+    color:var(--mute);max-width:100%;overflow:hidden;text-overflow:ellipsis}
+
+  .money{flex:1 1 auto;min-height:0;display:flex;gap:34px;padding:0 72px 32px;
+    overflow:hidden}
+  .box{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:20px;
+    justify-content:center;padding:34px 44px;border:var(--bw) solid var(--ink);
+    border-radius:4px;background:var(--white);overflow:hidden}
+  .box .k{display:block;white-space:nowrap;font-family:var(--mono);font-weight:700;
+    font-size:26px;letter-spacing:.12em;color:var(--mute);max-width:100%;
+    overflow:hidden;text-overflow:ellipsis}
+  .box .p{display:flex;align-items:baseline;gap:14px}
+  .box .cur{font-family:var(--mono);font-weight:900;font-size:56px;line-height:1}
+  .box .n{display:block;white-space:nowrap;font-family:var(--mono);font-weight:900;
+    font-size:170px;line-height:.92;letter-spacing:0;
+    font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+  .box.pay{background:var(--white);box-shadow:8px 8px 0 var(--ink)}
+  .box.pay .n{color:var(--green)}
+  .box.bal{background:var(--accent);box-shadow:8px 8px 0 var(--ink)}
+  .box.bal .k{color:var(--ink)}
+
+  .foot{flex:0 0 auto;display:flex;align-items:center;gap:24px;padding:0 72px 24px}
+  .foot .sq{flex:0 0 auto;width:22px;height:22px;background:var(--accent);
+    border:var(--bw) solid var(--ink);border-radius:4px}
+  .foot .tx{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-family:var(--mono);font-weight:700;font-size:24px;
+    letter-spacing:.06em;color:var(--mute)}
+
+  .stripe{flex:0 0 auto;height:20px;border-top:var(--bw) solid var(--ink);
+    background:repeating-linear-gradient(-45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+
+  @media (prefers-reduced-motion: reduce){
+    .anim{transition-duration:.01ms !important;animation-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="top anim" id="top">
+    <span class="tag">TAIL</span>
+    <span class="eb anim" id="eyebrow" data-fit-max="24" data-fit-min="15">PRESALE / 预售尾款</span>
+  </div>
+
+  <div class="hd anim" id="hd">
+    <span class="tt anim" id="title" data-fit-max="72" data-fit-min="38">尾款只在这一天付</span>
+    <span class="dl anim" id="deadline" data-fit-max="32" data-fit-min="18">11 月 20 日 24:00</span>
+  </div>
+
+  <div class="axis anim" id="axis">
+    <div class="track anim" id="track"><div class="done" id="done"></div></div>
+    <div class="nodes">
+      <div class="n l anim" id="nodeA"><span class="sq anim" id="sqA">01</span><span class="k anim" id="kA" data-fit-max="28" data-fit-min="16">已付定金</span></div>
+      <div class="n r anim" id="nodeB"><span class="sq anim" id="sqB">02</span><span class="k anim" id="kB" data-fit-max="28" data-fit-min="16">待付尾款</span></div>
+    </div>
+  </div>
+
+  <div class="money anim" id="money">
+    <div class="box pay anim" id="boxA">
+      <span class="k anim" id="depositLabel" data-fit-max="26" data-fit-min="15">已付定金</span>
+      <span class="p"><span class="cur">¥</span><span class="n anim" id="deposit" data-fit-max="170" data-fit-min="76">50</span></span>
+    </div>
+    <div class="box bal anim" id="boxB">
+      <span class="k anim" id="balanceLabel" data-fit-max="26" data-fit-min="15">待付尾款</span>
+      <span class="p"><span class="cur">¥</span><span class="n anim" id="balance" data-fit-max="170" data-fit-min="76">249</span></span>
+    </div>
+  </div>
+
+  <div class="foot anim" id="foot">
+    <span class="sq"></span>
+    <span class="tx anim" id="note" data-fit-max="24" data-fit-min="15">口径：尾款 = 全款 − 定金 · 逾期未付视为放弃订单</span>
+  </div>
+
+  <div class="stripe anim" id="stripe"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  ['eyebrow', 'title', 'deadline', 'depositLabel', 'balanceLabel', 'kA', 'kB', 'note']
+    .forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+
+  /* 尾款与已付比例都由定金 / 全款算出，不允许同一个数填两遍 */
+  var dep = Number(v.deposit), full = Number(v.fullPrice);
+  if (!isFinite(dep)) dep = 0;
+  if (!isFinite(full)) full = 0;
+  dep = Math.max(0, Math.min(full, Math.round(dep)));
+  var bal = full - dep;
+  var ratio = full > 0 ? Math.round(dep / full * 100) : 0;
+  set('deposit', String(dep));
+  set('balance', String(bal));
+  var RATIO = ratio + '%';
+
+  B.fitAll();
+  var tl = B.tl();
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (reduce) {
+    gsap.set('.anim', { x: 0, y: 0, scale: 1, scaleX: 1, rotate: 0 });
+    gsap.set('#done', { width: RATIO });
+    tl.fromTo('#top',   { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, 0);
+    tl.fromTo('#hd',    { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, .12);
+    tl.fromTo('#axis',  { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .26);
+    tl.fromTo('#money', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .42);
+    tl.fromTo('#foot',  { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .56);
+    tl.fromTo('#stripe',{ opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, .68);
+    B.hold(tl, 1.45, 1.1);
+    return;
+  }
+
+  var INK = '#0F0F0F';
+  function slam(sel, at, dx, dy, d) {
+    tl.fromTo(sel, { x: dx, y: dy },
+      { x: 0, y: 0, duration: d, ease: 'power4.out' }, at);
+  }
+  function shadowBounce(sel, rest, at) {
+    var off = parseInt(rest, 10);
+    tl.set(sel, { boxShadow: off + 'px ' + (off + 3) + 'px 0 ' + INK, immediateRender: false }, at);
+    tl.to(sel, { boxShadow: rest, duration: 0.04, ease: 'steps(2)' }, at + 0.04);
+  }
+
+  slam('#top',      0.00,   0, -66, 0.26);
+  slam('#eyebrow',  0.14, -24, -20, 0.22);
+  slam('#title',    0.24, -28, -24, 0.26);
+  slam('#deadline', 0.34,  24, -20, 0.24);
+  slam('#axis',     0.50,   0, -28, 0.26);
+  /* width:0 的填充段必须用 grow，不能用 wipe（wipe 改了 clip-path 但条子没宽度） */
+  B.in.grow(tl, '#done', RATIO, 0.66, { d: 0.6, ease: 'power3.out' });
+  slam('#nodeA', 0.72, -28, -28, 0.24);
+  slam('#nodeB', 0.86,  28, -28, 0.24);
+  slam('#sqA',   0.92, -28, -28, 0.24);
+  slam('#sqB',  1.06,  28, -28, 0.24);
+  slam('#money',    1.18,   0,  40, 0.28);
+  slam('#deposit',  1.36,   0, -26, 0.26);
+  slam('#balance',  1.48,   0, -26, 0.26);
+  shadowBounce('#boxA', '8px 8px 0 ' + INK, 1.74);
+  shadowBounce('#boxB', '8px 8px 0 ' + INK, 1.80);
+  slam('#foot',     1.92,   0,  28, 0.26);
+  slam('#note',     2.04, -24, -20, 0.22);
+  slam('#stripe',   2.14,   0,  24, 0.24);
+  tl.fromTo('#stripe', { backgroundPositionX: '0px' },
+    { backgroundPositionX: '60px', duration: 1.2, ease: 'none' }, 2.38);
+
+  var introEnd = 3.58;
+  var total = Math.min(6, Math.max(5, Number(v.duration) || 5.5));
+  B.hold(tl, introEnd, Math.max(0.6, total - introEnd));
+})();
+</script>
+</body></html>

@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "内容分类树"}, {"id": "subtitle", "type": "string", "label": "副标题", "default": "从根主题到具体子类的层级展开"}, {"id": "root", "type": "string", "label": "根节点", "default": "自媒体内容"}, {"id": "branches", "type": "string", "label": "分支名（逗号分隔，2 个）", "default": "图文,视频"}, {"id": "leaves", "type": "string", "label": "叶子名（逗号分隔，4 个）", "default": "公众号,小红书,短视频,长视频"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      /* ===== 奶油纸面贴纸工作台 · 设计令牌（见 design-systems/sticker-workbench/DESIGN.md） ===== */
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden;
+        font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden;
+        background: var(--background, #F5F0E6); color: var(--foreground, #1D1D20); }
+      .outer-frame{ position: absolute; inset: 0; border: 10px solid #1D1D20; pointer-events: none; z-index: 40; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; font-weight: 700; }
+      .fredoka{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; }
+      .corner-tag{ position: absolute; top: 74px; left: 120px; z-index: 30;
+        background: #FFFDF7; border: 4px solid #1D1D20; border-radius: 8px;
+        box-shadow: 10px 10px 0 #2A292B; padding: 14px 22px; transform: rotate(-2deg); }
+      .corner-tag span{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; font-weight: 700;
+        font-size: 24px; letter-spacing: 0.06em; text-transform: uppercase; }
+      .corner-index{ position: absolute; top: 84px; right: 120px; z-index: 30;
+        font-size: 20px; color: #4D4A48; }
+      .scene{ position: absolute; inset: 0; }
+      .panel{ background: #FFFDF7; border: 4px solid #1D1D20; border-radius: 10px;
+        box-shadow: 10px 10px 0 #2A292B; }
+      .chip{ display: inline-block; padding: 8px 20px; border: 4px solid #1D1D20; border-radius: 8px;
+        box-shadow: 6px 6px 0 #2A292B; font-size: 26px; font-weight: 800; line-height: 1.1; }
+      .chip-blue{ background: #3E7BF2; color: #FFFDF7; }
+      .chip-pink{ background: #F13B88; color: #FFFDF7; }
+      .chip-orange{ background: #FF9F1C; color: #1D1D20; }
+      .chip-lime{ background: #B9E833; color: #1D1D20; }
+      .chip-violet{ background: #B99AF7; color: #1D1D20; }
+      .chip-paper{ background: #FFFDF7; color: #1D1D20; }
+      .ttl{ font-size: 52px; font-weight: 900; line-height: 1.2; }
+      .sub{ font-size: 30px; font-weight: 700; line-height: 1.35; color: #4D4A48; }
+      .num{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; font-weight: 700; }
+      .title-center{ position: absolute; top: 200px; left: 0; width: 100%; text-align: center; z-index: 20; }
+      .sub-center{ position: absolute; top: 286px; left: 0; width: 100%; text-align: center; z-index: 20; }
+
+      .stage{ position: absolute; left: 120px; right: 120px; top: 240px; bottom: 190px; }
+      .blinks{ position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; z-index: 1; }
+      .bnode{ position: absolute; transform: translate(-50%, -50%); z-index: 2; text-align: center;
+        padding: 22px 34px; min-width: 180px; }
+      .bnode .bl{ font-size: 30px; font-weight: 800; line-height: 1.25; }
+      .bnode .bs{ margin-top: 8px; font-size: 22px; font-weight: 700; color: #4D4A48; }
+      .bnode.hub{ border-radius: 50%; width: 260px; height: 260px; min-width: 0; padding: 0;
+        display: flex; flex-direction: column; align-items: center; justify-content: center; }
+      .bchip{ position: absolute; transform: translate(-50%, -50%); z-index: 3; white-space: nowrap; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="outer-frame" id="frame"></div>
+      <div class="corner-tag" id="cornerTag"><span>TREE DIAGRAM</span></div>
+      <div class="corner-index mono" id="cornerIndex">06 / GRAPH</div>
+      <svg width="0" height="0" style="position:absolute"><defs>
+        <marker id="arrowHead" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto">
+          <path d="M1 1 L11 6 L1 11 Z" fill="#1D1D20" />
+        </marker>
+      </defs></svg>
+      <section class="scene" id="rootScene" data-start="0" data-duration="6" data-track-index="1">
+        <h2 class="ttl title-center" id="bTitle"></h2>
+        <p class="sub sub-center" id="bSub"></p>
+        <div class="stage" id="bStage"><svg class="blinks" id="bSvg"></svg></div>
+      </section>
+    </div>
+    <script>
+      const FB = {"title": "内容分类树", "subtitle": "从根主题到具体子类的层级展开", "root": "自媒体内容", "branches": "图文,视频", "leaves": "公众号,小红书,短视频,长视频"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $ = (id) => document.getElementById(id);
+      const T = (id, val) => { const el = $(id); if (el) el.textContent = val; };
+      const SP = (s) => String(s ?? '').split(',').map(x => x.trim()).filter(Boolean);
+      const SPN = (s) => SP(s).map(Number);
+      const scene = () => $('rootScene');
+      function el(tag, cls, parent, text){ const e = document.createElement(tag);
+        if (cls) e.className = cls; if (text != null) e.textContent = text;
+        (parent || scene()).appendChild(e); return e; }
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const SPRING = "back.out(1.4)";
+      function pop(sel, at, dx){ tl.fromTo(sel, { opacity: 0, x: dx || 0, scale: 0.88 },
+        { opacity: 1, x: 0, scale: 1, duration: 0.38, ease: SPRING }, at); }
+      function fade(sel, at){ tl.fromTo(sel, { opacity: 0 }, { opacity: 1, duration: 0.24 }, at); }
+      function drawArrow(line, at){ const len = line.getAttribute('stroke-dasharray');
+        tl.set(line, { attr: { "marker-end": "url(#arrowHead)" } }, at);
+        tl.fromTo(line, { strokeDashoffset: len }, { strokeDashoffset: 0, duration: 0.4, ease: "power2.inOut" }, at); }
+      tl.fromTo("#frame", { opacity: 0 }, { opacity: 1, duration: 0.18 }, 0);
+      tl.fromTo(["#cornerTag", "#cornerIndex"], { opacity: 0 }, { opacity: 1, duration: 0.18 }, 0);
+      T("bTitle", v.title || ""); T("bSub", v.subtitle || ""); if (!v.subtitle) $("bSub").style.display = "none";
+      const stage = $("bStage"), svg = $("bSvg");
+      const W = 1680, H = 650;
+      svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+      function bnode(x, y, label, sub, cls) {
+        const n = el("div", "panel bnode " + (cls || ""), stage);
+        n.style.left = x + "px"; n.style.top = y + "px";
+        el("p", "bl", n, label); if (sub) el("p", "bs", n, sub);
+        return { n, x, y };
+      }
+      function bchip(x, y, text, cls) {
+        const c = el("span", "chip bchip " + (cls || "chip-paper"), stage, text);
+        c.style.left = x + "px"; c.style.top = y + "px"; return c;
+      }
+      function line(x1, y1, x2, y2, ink) {
+        const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        l.setAttribute("x1", x1); l.setAttribute("y1", y1);
+        l.setAttribute("x2", x2); l.setAttribute("y2", y2);
+        l.setAttribute("stroke", ink ? "#1D1D20" : "#C9C0B2");
+        l.setAttribute("stroke-width", ink ? 4 : 3);
+        if (!ink) l.setAttribute("stroke-dasharray", "8 10");
+        svg.appendChild(l); return l;
+      }
+      const order = [];
+      const root = bnode(W / 2, 70, v.root, "", ""); order.push([root.n, 0.3]);
+      const mids = SP(v.branches);
+      const leaves = SP(v.leaves);
+      const mx = mids.map((_, i) => W * (i + 1) / (mids.length + 1));
+      mids.forEach((s, i) => { const nd = bnode(mx[i], 300, s, "", ""); order.push([nd.n, 0.8 + i * 0.12]);
+        order.push([line(W / 2, 110, mx[i], 255, true), 0.65 + i * 0.12, "arrow"]); });
+      const per = Math.ceil(leaves.length / mids.length);
+      leaves.forEach((s, i) => {
+        const g = Math.min(mids.length - 1, Math.floor(i / per));
+        const cnt = Math.min(per, leaves.length - g * per);
+        const x = mx[g] + (i - g * per - (cnt - 1) / 2) * 260;
+        const nd = bnode(x, 530, s, "", ""); order.push([nd.n, 1.4 + i * 0.1]);
+        order.push([line(mx[g], 345, x, 485, true), 1.3 + i * 0.1, "arrow"]);
+      });
+      order.forEach(([elm, at, kind]) => {
+        if (kind === "arrow") { elm.setAttribute("stroke-dasharray", 400); elm.setAttribute("stroke-dashoffset", 400);
+          drawArrow(elm, at); }
+        else if (kind === "dash") { tl.fromTo(elm, { opacity: 0 }, { opacity: 1, duration: 0.24 }, at); }
+        else pop(elm, at, 0);
+      });
+      tl.to("#rootScene", { opacity: 0, duration: 0.28, ease: "power2.in" }, 5.5);
+      tl.to(["#cornerTag", "#cornerIndex"], { opacity: 0, duration: 0.28 }, 5.5);
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

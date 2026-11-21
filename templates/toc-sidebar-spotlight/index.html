@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "items", "type": "string", "label": "目录项（逗号分隔）", "default": "DESCRIBE IT,AI SCAFFOLDS,TUNE THE FEEL,SHAPE & SHIP"}, {"id": "current", "type": "number", "label": "当前序号（1 起）", "default": 3}, {"id": "title", "type": "string", "label": "大标题", "default": "JUST TALK TO IT"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #0E100F; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #EDF2EE; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      .corner{ position: absolute; width: 34px; height: 34px; border: 3px solid var(--ac, #00FF00); }
+      .c-tl{ left: -3px; top: -3px; border-right: none; border-bottom: none; }
+      .c-tr{ right: -3px; top: -3px; border-left: none; border-bottom: none; }
+      .c-bl{ left: -3px; bottom: -3px; border-right: none; border-top: none; }
+      .c-br{ right: -3px; bottom: -3px; border-left: none; border-top: none; }
+      .tc{ position: absolute; right: 90px; top: 84px; text-align: right; font-family: 'IBM Plex Mono', monospace;
+        font-size: 20px; letter-spacing: .22em; color: rgba(237,242,238,.5); line-height: 1.9; z-index: 6; }
+      .tss-side{ position: absolute; left: 0; top: 0; width: 560px; height: 1080px; background: #F8F5ED; color: #1D1D20;
+        background-image: linear-gradient(rgba(29,29,32,.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(29,29,32,.05) 1px, transparent 1px);
+        background-size: 36px 36px; box-shadow: 16px 0 50px rgba(0,0,0,.5); z-index: 6; }
+      .tss-in{ position: absolute; inset: 0; padding: 72px 64px; }
+      .tss-kicker{ font-size: 20px; letter-spacing: .3em; color: #6E685C; }
+      .tss-big{ margin-top: 18px; font-size: 68px; font-weight: 900; line-height: 1.12; }
+      .tss-rows{ position: absolute; left: 64px; right: 64px; bottom: 80px; }
+      .tss-row{ position: relative; display: flex; align-items: baseline; gap: 24px; padding: 22px 0 22px 22px;
+        border-top: 1.5px solid rgba(29,29,32,.16); opacity: .42; }
+      .tss-row .mk{ position: absolute; left: 0; top: 26px; bottom: 26px; width: 5px; background: var(--ac);
+        transform: scaleY(0); transform-origin: 50% 0; }
+      .tss-row .n{ font-size: 22px; color: #6E685C; }
+      .tss-row .t{ font-size: 31px; font-weight: 800; letter-spacing: .05em; }
+      .tss-stage{ position: absolute; left: 560px; top: 0; width: 1360px; height: 1080px; overflow: hidden; z-index: 4; }
+      .tss-ghost{ position: absolute; right: 60px; top: 120px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 420px; font-weight: 900; color: var(--ac); opacity: .1; line-height: 1; }
+      .tss-cur{ position: absolute; left: 130px; top: 420px; right: 120px; }
+      .tss-ck{ font-size: 22px; letter-spacing: .3em; color: var(--ac); }
+      .tss-ct{ margin-top: 20px; font-size: 92px; font-weight: 900; line-height: 1.15; }
+      .tss-cd{ margin-top: 24px; font-size: 26px; color: rgba(237,242,238,.55); line-height: 1.7; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="tss-stage">
+        <div class="tss-ghost" id="ghost"></div>
+        <div class="tss-cur">
+          <div class="tss-ck mono" id="ck"></div>
+          <div class="tss-ct" id="ct"></div>
+          <div class="tss-cd" id="cd">目录行随主内容切换逐行点亮，其余压回 0.42——长口播的进度感。</div>
+        </div>
+      </div>
+      <div class="tss-side" id="side"><div class="tss-in">
+        <div class="tss-kicker mono" id="kicker">CONTENTS · 目录</div>
+        <div class="tss-big" id="title"></div>
+        <div class="tss-rows" id="rows"></div>
+      </div></div>
+
+    </div>
+    <script>
+      const fallback = {"items": "DESCRIBE IT,AI SCAFFOLDS,TUNE THE FEEL,SHAPE & SHIP", "current": 3, "title": "JUST TALK TO IT", "accent": "#00FF00", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      document.documentElement.style.setProperty("--ac", V.accent ?? "#00FF00");
+      $("title").textContent = V.title;
+      const items = split(V.items);
+      const cur = Math.min(Math.max(1, Number(V.current) || 1), Math.max(items.length, 1));
+      const rowsEl = $("rows");
+      items.forEach((t, i) => {
+        const r = document.createElement("div");
+        r.className = "tss-row";
+        r.innerHTML = '<span class="mk"></span><span class="n mono">' + String(i + 1).padStart(2, "0") +
+          '</span><span class="t"></span>';
+        r.querySelector(".t").textContent = t;
+        rowsEl.appendChild(r);
+      });
+      const rows = Array.from(rowsEl.children);
+      $("ghost").textContent = String(cur).padStart(2, "0");
+      $("ck").textContent = "NOW · " + String(cur).padStart(2, "0") + " / " + String(items.length).padStart(2, "0");
+      $("ct").textContent = items[cur - 1] || "";
+      tl.fromTo("#side", { x: -560 }, { x: 0, duration: 0.62, ease: "expo.out" }, 0);
+      tl.fromTo([".tss-kicker", ".tss-big"], { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.1 }, 0.35);
+      tl.fromTo(rows, { opacity: 0 }, { opacity: 0.42, duration: 0.4, stagger: 0.07 }, 0.55);
+      // 聚灯推进：逐行 0.42→1 点亮再压回，当前行保持点亮
+      rows.forEach((r, i) => {
+        const t = 1.0 + i * 0.3;
+        tl.to(r, { opacity: 1, duration: 0.2 }, t);
+        tl.to(r.querySelector(".mk"), { scaleY: 1, duration: 0.2 }, t);
+        if (i + 1 !== cur) {
+          tl.to(r, { opacity: 0.42, duration: 0.25 }, t + 0.24);
+          tl.to(r.querySelector(".mk"), { scaleY: 0, duration: 0.2 }, t + 0.24);
+        }
+      });
+      const done = 1.0 + (cur - 1) * 0.3;
+      tl.fromTo(["#ghost"], { opacity: 0 }, { opacity: 0.1, duration: 0.5 }, done);
+      tl.fromTo(["#ck", "#ct", "#cd"], { opacity: 0, y: 22 }, { opacity: 1, y: 0, duration: 0.45, stagger: 0.09, ease: "power3.out" }, done + 0.1);
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

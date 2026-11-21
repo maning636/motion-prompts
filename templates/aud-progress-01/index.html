@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "eyebrow", "name": "眉标", "type": "string", "label": "叠加条左上角 mono 眉标（≤14 字）", "default": "CH · 章节"}, {"id": "titleA", "name": "轨道标题", "type": "string", "label": "轨道右上角 mono 标题（≤16 字）", "default": "第 03 期 · 三段论"}, {"id": "chapters", "name": "章节名", "type": "string", "label": "三个章节名，用全角竖线｜分隔（每段≤6 字，如 起手｜拆解｜收尾）", "default": "起手｜拆解｜收尾"}, {"id": "chapterIdx", "name": "当前章节", "type": "number", "label": "当前正在讲的章节序号（0/1/2），会高亮对应章节名", "default": 0}, {"id": "peaks", "name": "音频包络", "type": "string", "label": "离线 RMS 包络（JSON 数组，整数 0–1000；换音轨后用离线脚本重算）", "default": "14,1000,397,37,28,274,332,289,14,963,612,77,14,237,360,108,28,880,249,18,262,268,388,14,628,969,234,28,222,209,351,14,757,391,25,305,188,397,14,815,665,83,228,126,545,65,652,145"}, {"id": "accent", "name": "强调色", "type": "color", "label": "强调色（播放头 / 进度填充 / 当前章节名）", "default": "#FF5FA2"}, {"id": "duration", "name": "总时长", "type": "number", "label": "总时长（秒，须等于音轨长度 5.6）", "default": 5.6}, {"id": "exportMode", "name": "导出格式", "type": "enum", "label": "Format", "default": "transparent", "hidden": true, "options": [{"value": "transparent", "label": "透明底"}, {"value": "mp4", "label": "MP4"}, {"value": "webm", "label": "WebM"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>底部章节条（透明叠加）· 长口播的进度与章节</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  @media (prefers-reduced-motion: reduce){
+    /* transition-property 的初始值是 all，只压 duration 会让**所有内联样式改动**
+       都变成 0.01ms 的过渡——本族每条都有 JS 写死的内联几何（播放头 left/top、
+       峰值保持线 bottom），降级分支里会卡在 CSS 旧值不动，渲染出错误位置，
+       而 motion-qc 只看最终帧出框、不看降级分支的几何正确性，全绿也照样错。
+       补上 transition-property:none 与 animation-name:none 才是完整写法。 */
+    .anim{transition-duration:.01ms !important;animation-duration:.01ms !important;
+      transition-property:none !important;animation-name:none !important}
+  }
+
+  html,body{margin:0;padding:0;background:transparent}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:transparent;color:var(--white);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased}
+  /* 叠加原子的版式基座：一条压在画面底部的深色底板。
+     底板之外**完全不画东西**——叠在实拍口播上时，那 800px 就是原画面，
+     观众看到的只有这条轨道。 */
+  .plate{position:absolute;left:56px;right:56px;bottom:56px;
+    background:rgba(15,15,15,.90);border:var(--bw) solid var(--white);
+    border-radius:4px;padding:24px 40px;display:flex;flex-direction:column;gap:10px}
+  .railhd{display:flex;align-items:center;gap:18px}
+  .railhd .eb{font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:.14em;
+    color:var(--accent);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .railhd .ttl{margin-left:auto;flex:0 0 auto;font-family:var(--mono);font-weight:700;
+    font-size:24px;letter-spacing:.1em;color:var(--white);white-space:nowrap}
+  .tcline{display:flex;align-items:center;gap:18px}
+  .tcline .tc{font-family:var(--mono);font-weight:900;font-size:28px;letter-spacing:.08em;
+    font-variant-numeric:tabular-nums;white-space:nowrap}
+  .tcline .ticks{flex:1 1 auto;display:flex;justify-content:space-between;min-width:0}
+  .tcline .ticks i{flex:0 0 auto;font-family:var(--mono);font-weight:700;font-size:20px;letter-spacing:.06em;
+    color:var(--mute);font-style:normal;white-space:nowrap}
+
+  .mini{position:relative;height:56px;display:flex;align-items:flex-end;
+    justify-content:space-between;padding:0 4px}
+  .mini i{display:block;width:20px;height:6px;border-radius:9999px;background:rgba(255,255,255,.30)}
+  #head{position:absolute;left:0;top:0;width:5px;height:56px;background:var(--accent);z-index:6}
+  #head .cap{position:absolute;left:-8px;top:-8px;width:21px;height:21px;background:var(--white);
+    border-radius:4px}
+  .bar{position:relative;height:10px;background:rgba(255,255,255,.20);border-radius:9999px;
+    overflow:hidden}
+  .bar .fill{position:absolute;left:0;top:0;height:100%;width:0;background:var(--accent)}
+  .marks{position:relative;display:flex;gap:10px}
+  .marks span{flex:1 1 0;min-width:0;font-family:var(--mono);font-weight:700;font-size:22px;
+    letter-spacing:.06em;text-align:center;padding:6px 4px;border-radius:4px;
+    border:var(--bw) solid rgba(255,255,255,.55);color:var(--white);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .marks span.on{background:var(--accent);color:var(--ink);border-color:var(--accent)}
+  #head,.bar .fill{transition:none}
+</style>
+<style>
+/* [公开版] 原实拍视频未随仓分发，此处为占位块 */
+.pub-media-placeholder{
+  background:
+    repeating-linear-gradient(135deg, rgba(255,255,255,.05) 0 12px, rgba(255,255,255,.11) 12px 24px),
+    rgba(120,120,130,.22);
+  border:1px dashed rgba(255,255,255,.22);
+  border-radius:10px;
+  position:relative;
+}
+.pub-media-placeholder::after{
+  content:"公开版未包含实拍素材";
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  font:400 20px/1.4 'PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,sans-serif;
+  color:rgba(255,255,255,.62);
+  letter-spacing:.04em;
+}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="plate anim" id="plate">
+    <div class="railhd anim" id="railhd">
+      <span class="eb" id="eyebrow">CH · 章节</span>
+      <span class="ttl" id="titleA">第 03 期 · 三段论</span>
+    </div>
+    <div class="mini anim" id="mini"></div>
+    <div class="bar anim" id="bar"><div class="fill" id="fill"></div></div>
+    <div class="marks anim" id="marks"></div>
+    <div class="tcline anim" id="tcline">
+      <span class="tc" id="tc">00:00</span>
+      <span class="ticks"><i>0s</i><i>1s</i><i>2s</i><i>3s</i><i>4s</i><i>5s</i></span>
+      <span class="tc" id="tcend">00:05</span>
+    </div>
+  </div>
+
+  <div id="head"><span class="cap"></span></div></div>
+<!-- [公开版] 原音轨 音轨 voice-03.wav（未随仓分发） 未随仓分发（体积/授权原因）。波形与包络数据已内置，动画照常播放。 -->
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  /* ---------- 音频包络：offline RMS，烘在 peaks 变量里 ----------
+     这份数组来自 音轨 voice-03.wav（未随仓分发） 的离线解码（RMS，48 桶，归一到 0–1000），
+     由 离线包络脚本（未随仓分发） 算出，同时落一份
+     assets/voice-03.peaks.json 作溯源。
+     换音轨：换 wav → 重跑离线脚本 → 把新数组填进 peaks → 同步 duration 与
+     <audio data-duration>。这是一条显式的、算一次的步骤，不是缺陷。
+     为什么绝不接实时 AnalyserNode：无头渲染是逐帧 seek 采样，媒体在采集模式下
+     是 seek 不是 play（hyperframes runtime 的 allowLiveTimelineSeek 在
+     __HF_RENDER_CAPTURE_MODE 下为 false），探针接在暂停的元素上读到的不是
+     「此刻在放什么」；motion-qc 的探针同样是无序 seek。 */
+  var FALLBACK_PEAKS = '14,1000,397,37,28,274,332,289,14,963,612,77,14,237,360,108,28,880,249,18,262,268,388,14,628,969,234,28,222,209,351,14,757,391,25,305,188,397,14,815,665,83,228,126,545,65,652,145';
+  function parsePeaks(src) {
+    var raw = String(src == null ? '' : src).replace(/[\s\[\]]/g, '');
+    var parts = raw ? raw.split(',') : [];
+    var out = [];
+    for (var i = 0; i < parts.length; i++) {
+      var n = parseFloat(parts[i]);
+      if (isFinite(n)) out.push(Math.max(0, Math.min(1000, n)));
+    }
+    return out.length >= 8 ? out : parsePeaks(FALLBACK_PEAKS);
+  }
+  var PEAKS = parsePeaks(v.peaks);
+  function peakAt(k) {
+    return PEAKS[Math.max(0, Math.min(PEAKS.length - 1, k))];
+  }
+
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  ['eyebrow','titleA'].forEach(function (k) { set(k, v[k]); });
+  var CH = String(v.chapters == null || v.chapters === '' ? '起手｜拆解｜收尾' : v.chapters)
+    .split('｜').map(function (s) { return s.trim(); });
+  while (CH.length < 3) CH.push('第' + (CH.length + 1) + '段');
+  var CH0 = Math.max(0, Math.min(2, Math.round(Number(v.chapterIdx) || 0)));
+
+
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+
+  /* 音频窗口：时间轴总长严格等于音轨长度，尾部留 0.6s 静音 + 定格。
+     禁止用变量值推算总长（数值填大会撞 SMOKE_TOO_LONG）。 */
+  var TOTAL = Math.min(6.5, Math.max(5, Number(v.duration) || 5.6));
+  var AUDIO_LEN = 5.6;
+  var WIN = Math.max(1.2, Math.min(TOTAL - 0.6, AUDIO_LEN));
+  var N = PEAKS.length;
+
+  var BARS = 64, MAXH = 48, MINH = 6, STEPS = N, SEG = WIN / STEPS, SPREAD = N / BARS;
+
+  function heightAt(i, k) {
+    var idx = Math.floor(k + i * SPREAD) % N;
+    return Math.max(MINH, Math.round(PEAKS[idx] / 1000 * MAXH));
+  }
+  function chapterAt(k) {
+    /* 章节切换点：起点由 chapterIdx 定，三等分铺满音频窗口。
+       推导而不是让用户再填一组时间点——两个时间源迟早会对不上。 */
+    var f = (k + 0.5) / N;
+    return Math.max(0, Math.min(2, CH0 + Math.floor(f * 3 - 1e-9)));
+  }
+
+  var mini = document.getElementById('mini');
+  var bars = [];
+  for (var i = 0; i < BARS; i++) {
+    var b = document.createElement('i');
+    mini.appendChild(b); bars.push(b);
+  }
+  var marks = document.getElementById('marks'), marksEls = [];
+  for (var c = 0; c < 3; c++) {
+    var sp = document.createElement('span');
+    sp.textContent = CH[c];
+    marks.appendChild(sp); marksEls.push(sp);
+  }
+
+  B.fitAll();
+
+  var head = document.getElementById('head');
+  var wr = mini.getBoundingClientRect();
+  var sr = document.getElementById('stage').getBoundingClientRect();
+  var SPAN = Math.max(10, wr.width - 5);
+  head.style.left = (wr.left - sr.left) + 'px';
+  head.style.top = (wr.top - sr.top) + 'px';
+  head.style.height = wr.height + 'px';
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var tl = B.tl();
+
+  function slam(sel, at, dx, dy, d) {
+    tl.fromTo(sel, { x: dx, y: dy },
+      { x: 0, y: 0, duration: d || 0.26, ease: 'power4.out' }, at);
+  }
+  function press(sel, rest, at) {
+    tl.set(sel, { boxShadow: rest, immediateRender: false }, at);
+    tl.to(sel, { boxShadow: rest.replace(/(\d+)px (\d+)px/, function (_, a, b) {
+      return a + 'px ' + (parseInt(b, 10) + 3) + 'px'; }), duration: 0.04, ease: 'steps(2)' }, at + 0.04);
+    tl.to(sel, { boxShadow: rest, duration: 0.04, ease: 'steps(2)' }, at + 0.08);
+  }
+  function fadeInReduce(ids, start) {
+    for (var i = 0; i < ids.length; i++) {
+      tl.fromTo(ids[i], { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: i === ids.length - 1 ? .6 : .5, ease: 'power3.out' },
+        start + i * 0.08);
+    }
+  }
+
+  function paintChapter(c) {
+    for (var i = 0; i < 3; i++) marksEls[i].className = i === c ? 'on' : '';
+  }
+
+  if (reduce) {
+    var still = Math.round(N * 0.62);
+    gsap.set(bars, { height: (function (k) { return function (i) { return heightAt(i, k); }; })(still) });
+    paintChapter(chapterAt(still));
+    gsap.set('#fill', { width: '62%' });
+    gsap.set('#tc', { textContent: '00:03' });
+    gsap.set('#head', { x: SPAN * 0.62, y: 0, opacity: 1 });
+    fadeInReduce(['#plate', '#head'], 0);
+    B.hold(tl, 0.9, 1.15);
+    return;
+  }
+
+  slam('#plate', 0.00, 0, 36, 0.30);
+  slam('#railhd', 0.18, 0, -16, 0.22);
+  slam('#mini', 0.34, 0, -12, 0.24);
+  slam('#bar', 0.42, 0, -12, 0.22);
+  slam('#marks', 0.50, 0, -12, 0.22);
+  slam('#tcline', 0.58, 0, -12, 0.22);
+
+  for (var k = 0; k < STEPS; k++) {
+    tl.to(bars, { height: (function (kk) { return function (i) { return heightAt(i, kk); }; })(k),
+      duration: SEG, ease: 'none' }, k * SEG);
+    tl.call((function (kk) { return function () { paintChapter(chapterAt(kk)); }; })(k), null, k * SEG);
+  }
+  tl.fromTo('#head', { x: 0 }, { x: SPAN, duration: WIN, ease: 'none' }, 0);
+  tl.fromTo('#fill', { width: '0%' }, { width: '100%', duration: WIN, ease: 'none' }, 0);
+  var tcEl = document.getElementById('tc');
+  for (var s = 0; s <= Math.floor(WIN); s++) {
+    tl.set(tcEl, { textContent: '00:' + (s < 10 ? '0' + s : String(s)) }, s);
+  }
+  tl.set(tcEl, { textContent: '00:0' + Math.ceil(WIN) }, WIN);
+
+  /* 收尾：音频窗口走完后补一段静止，时间轴总长恰好等于音轨长度，
+     样片视频与音轨严丝合缝，最后一拍是「已播完」的定格画面。 */
+  var introEnd = tl.duration();
+  B.hold(tl, introEnd, Math.max(0.4, TOTAL - introEnd));
+})();
+</script>
+</body></html>

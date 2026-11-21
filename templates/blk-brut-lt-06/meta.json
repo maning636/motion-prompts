@@ -1,0 +1,16 @@
+{
+ "name": "双人对话条",
+ "description": "上下两行同宽名牌 + 台词，当前发言行整块换成强调色并挂一枚 ink 发言中标记；两行自左右对撞入位后错峰微位移",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "dialogue",
+  "speaker",
+  "yellow"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "访谈、播客、辩论类直播，需要同时挂住两位说话人并指示当前发言的是谁时"
+}

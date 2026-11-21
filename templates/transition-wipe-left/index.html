@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"bg","type":"image","label":"起始画面","default":"./placeholder-1.png"},{"id":"fg","type":"image","label":"结束画面","default":"./placeholder-2.png"},{"id":"duration","type":"number","label":"总时长","default":6}]'>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=1920, height=1080"/>
+<script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<style>*{box-sizing:border-box;margin:0;padding:0;}
+html,body{width:1920px;height:1080px;overflow:hidden;background: var(--background, #000);}
+#root{position:relative;width:1920px;height:1080px;overflow:hidden;background: var(--background, #000);font-family:'IBM Plex Mono',monospace;}
+.bg-layer,#L0{position:absolute;inset:0;overflow:hidden;}
+.fg-layer,#L1{position:absolute;inset:0;overflow:hidden;}
+.bg-layer img,#L1 img{width:100%;height:100%;object-fit:cover;display:block;}
+.tag{position:absolute;left:48px;top:40px;font-size:18px;letter-spacing:.4em;color:rgba(255,255,255,.78);z-index:20;}
+.tag-no{position:absolute;right:48px;top:40px;font-size:18px;letter-spacing:.3em;color:rgba(255,255,255,.62);z-index:20;}
+.bar{position:absolute;left:48px;bottom:40px;width:240px;height:3px;background:rgba(255,255,255,.32);z-index:20;}
+.bar-fill{position:absolute;left:0;top:0;height:100%;background:#FF3B3B;width:0;}
+.overlay{position:absolute;inset:0;pointer-events:none;z-index:5;}
+.vig{position:absolute;inset:0;pointer-events:none;z-index:6;
+  background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.35) 100%);}
+.scan{position:absolute;left:0;right:0;top:-6%;height:120px;z-index:7;pointer-events:none;opacity:0;
+  background:linear-gradient(to bottom,transparent,rgba(255,255,255,.22) 45%,rgba(255,255,255,.55) 50%,rgba(255,255,255,.22) 55%,transparent);}
+.grain{position:absolute;inset:0;opacity:.08;mix-blend-mode:overlay;z-index:8;
+  background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.3) 0 1px,transparent 1px 3px);}
+.leak{position:absolute;inset:0;pointer-events:none;z-index:9;opacity:0;mix-blend-mode:screen;
+  background:radial-gradient(ellipse 70% 45% at 50% 50%,rgba(255,200,80,.55),rgba(255,120,40,.2) 55%,transparent 75%);}
+.split-a,.split-b,.split-c{position:absolute;inset:0;z-index:10;pointer-events:none;background-color:transparent;}
+.frame-a{position:absolute;left:40px;top:40px;right:40px;bottom:40px;border:2px solid rgba(255,255,255,.35);z-index:15;pointer-events:none;}
+.label{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:16;
+  font-family:'IBM Plex Mono',monospace;font-size:16px;letter-spacing:.5em;color:rgba(255,255,255,.55);
+  padding:8px 14px;background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.2);}
+</style></head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+<div class="bg-layer" id="L0"><img src="./placeholder-1.png" alt=""></div>
+<div class="fg-layer" id="L1"><img src="./placeholder-2.png" alt=""></div>
+<div class="vig"></div>
+<div class="scan" id="scan"></div>
+<div class="grain"></div>
+<div class="leak" id="leak"></div>
+<div class="tag">TRANSITION-WIPE-LEFT</div>
+<div class="tag-no" id="tn">B30 / 15</div>
+<div class="bar"><div class="bar-fill" id="bf"></div></div>
+<div class="frame-a"></div>
+<div class="label" id="lbl">WIPE / L→R</div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const tl=gsap.timeline({paused:true});
+// apply JS-injected paths for preview
+try{const V=window.__hyperframes&&window.__hyperframes.getVariables&&window.__hyperframes.getVariables();if(V){$("L0 img").src=V.bg||V.bg_path||"./placeholder-1.png";$("L1 img").src=V.fg||V.fg_path||"./placeholder-2.png";}}catch(e){}
+window.__timelines=window.__timelines||{};
+gsap.set($("L1"),{clipPath:"inset(0 100% 0 0)"});
+tl.to($("L1"),{clipPath:"inset(0 0 0 0)",duration:2.6,ease:"power2.inOut"},0.2);
+tl.to($("L0"),{opacity:0,duration:2.6},0.2);
+tl.to($("bf"),{width:"100%",duration:6,ease:"none"});
+tl.to($("tn"),{opacity:0,duration:.3},3.0);
+tl.pause();
+window.__timelines.main=tl;
+</script>
+</body></html>

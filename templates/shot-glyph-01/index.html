@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "leftWord", "type": "string", "label": "左钉死词", "default": "全新"}, {"id": "words", "type": "string", "label": "轮换词（逗号分隔）", "default": "更快,更稳,更开放,更聪明,一体化"}, {"id": "finalWord", "type": "string", "label": "收尾咬合词", "default": "MotionKit"}, {"id": "caption", "type": "string", "label": "定格小字", "default": "为创作者而生的动效引擎"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+.cwrap{ position:absolute; left:0; right:0; top:480px; height:120px; font-size:64px; color:var(--fg); }
+.cl{ position:absolute; left:618px; top:0; white-space:nowrap; }
+.cr{ position:absolute; right:618px; top:0; white-space:nowrap; opacity:0; }
+.ccap{ position:absolute; top:640px; font-style:italic; font-size:42px; color:rgba(255,255,255,.6); opacity:0; white-space:nowrap; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+<div class="cwrap" id="wrap">
+  <span class="cl" id="lw"></span>
+  <div id="rws"></div>
+</div>
+<span class="ccap" id="cap"></span>
+    </div>
+    <script>
+      const FB = {"leftWord": "全新", "words": "更快,更稳,更开放,更聪明,一体化", "finalWord": "MotionKit", "caption": "为创作者而生的动效引擎", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#lw').textContent=v.leftWord||'';
+const words=(v.words||'').split(/[,，]/).map(s=>s.trim()).filter(Boolean);
+words.push(v.finalWord||'');
+const rwBox=$('#rws');
+const spans=words.map(w=>{const s=document.createElement('span');s.className='cr';s.textContent=w;rwBox.appendChild(s);return s;});
+// 轮换硬切，停留不均（机器节奏带人味）
+const dwell=[16,12,9,8,7,8,10,12];
+tl.set(spans[0],{opacity:1},F(6));
+let t=F(6);
+for(let i=1;i<spans.length;i++){
+  t+=F(dwell[(i-1)%dwell.length]);
+  tl.set(spans[i-1],{opacity:0},t);
+  tl.set(spans[i],{opacity:1},t);
+}
+// 末词停稳 +10f 后唯一一次合拢（36f cubic）
+t+=F(dwell[(spans.length-1)%dwell.length])+F(10);
+const lw=$('#lw'),last=spans[spans.length-1],cap=$('#cap');
+const gap=40; // 一空格咬合
+// 函数式取值：补间启动时才测量（此时字体已加载，字宽准确）
+const lwTx=()=>960-gap/2-lw.getBoundingClientRect().right;
+const rwTx=()=>960+gap/2-last.getBoundingClientRect().left;
+tl.to(lw,{x:lwTx,duration:F(36),ease:'power3.inOut'},t);
+tl.to(last,{x:rwTx,duration:F(36),ease:'power3.inOut'},t);
+// 定格 +18f 小字近乎硬切浮现，与整行同左缘
+const tSet=t+F(36)+F(18);
+cap.textContent=v.caption||'';
+tl.set(cap,{left:()=>(960-gap/2-lw.getBoundingClientRect().width)+'px'},tSet);
+tl.fromTo(cap,{opacity:0},{opacity:1,duration:F(4)},tSet);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

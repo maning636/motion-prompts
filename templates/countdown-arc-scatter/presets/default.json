@@ -1,0 +1,10 @@
+{
+  "startValue": 10,
+  "endValue": 0,
+  "ticksPerDigit": 36,
+  "digitLabel": "倒计时",
+  "caption": "时间正在流逝",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

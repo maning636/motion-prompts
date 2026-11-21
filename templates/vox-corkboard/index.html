@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "kicker", "type": "string", "label": "顶部小标签", "default": "深挖 · CASE FILES"}, {"id": "title", "type": "string", "label": "大标题", "default": "我扒了一下这件事的来龙去脉"}, {"id": "imgBg", "type": "image", "label": "软木板背景", "default": "./assets/bg.png"}, {"id": "img1", "type": "image", "label": "线索照片1", "default": "./assets/photo1.png"}, {"id": "img2", "type": "image", "label": "线索照片2", "default": "./assets/photo2.png"}, {"id": "img3", "type": "image", "label": "线索照片3", "default": "./assets/photo3.png"}, {"id": "label1", "type": "string", "label": "照片1标注", "default": "起点：一份文件"}, {"id": "label2", "type": "string", "label": "照片2标注", "default": "路径：三次转向"}, {"id": "label3", "type": "string", "label": "照片3标注", "default": "关键人"}, {"id": "stringColor", "type": "color", "label": "红线颜色", "default": "#D32F2F"}, {"id": "caption", "type": "string", "label": "底部字幕", "default": "线索都连上了"}, {"id": "duration", "type": "number", "label": "总时长（秒，动效演完定格）", "default": 7}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #241809); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden;
+  color: var(--foreground, #1D1D20); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+.bgimg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.strings{ position:absolute; inset:0; pointer-events:none; }
+.ph{ position:absolute; width:500px; will-change:transform; }
+.ph .frame{ position:relative; background:#F5F2EB; padding:14px 14px 0; box-shadow:10px 12px 0 rgba(20,12,4,.45); }
+.ph img{ width:100%; display:block; }
+.ph .pin{ position:absolute; left:50%; top:-18px; width:30px; height:30px; margin-left:-15px;
+  border-radius:50%; background:radial-gradient(circle at 35% 30%, #FF6B5E, #B71C1C 70%);
+  box-shadow:3px 4px 0 rgba(20,12,4,.5); z-index:2; }
+.ph .tape{ position:absolute; top:-14px; width:150px; height:36px; background:rgba(255,252,240,.55);
+  border-left:2px dashed rgba(0,0,0,.12); border-right:2px dashed rgba(0,0,0,.12); z-index:1; }
+.ph .note{ padding:14px 6px 16px; text-align:center; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700;
+  font-size:28px; color:#1D1D20; }
+.p1{ left:180px; top:250px; transform:rotate(-5deg); }
+.p2{ left:710px; top:300px; transform:rotate(3deg); }
+.p3{ left:1240px; top:240px; transform:rotate(-3deg); }
+.p1 .tape{ left:-40px; transform:rotate(-38deg); }
+.p2 .tape{ right:-40px; transform:rotate(38deg); }
+.p3 .tape{ left:-40px; transform:rotate(-38deg); }
+
+.kicker{ position:absolute; left:90px; top:56px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700;
+  font-size:26px; letter-spacing:.3em; color:#F5F2EB; border:3px solid #F5F2EB; padding:10px 24px; }
+.ctitle{ position:absolute; right:90px; top:52px; max-width:900px; text-align:right;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:56px; color:#F5F2EB; }
+.ccap{ position:absolute; left:50%; transform:translateX(-50%); bottom:40px; white-space:nowrap;
+  font-size:36px; letter-spacing:.12em; color:#1D1D20; background:#F5F2EB; padding:10px 28px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="7" data-width="1920" data-height="1080">
+<img class="bgimg" id="bg" alt="">
+<svg class="strings" viewBox="0 0 1920 1080">
+  <path id="s1" d="M 560 400 Q 700 320 860 430" fill="none" stroke-width="7"/>
+  <path id="s2" d="M 1100 440 Q 1250 340 1390 400" fill="none" stroke-width="7"/>
+</svg>
+<div class="ph p1" id="w1"><div class="frame"><div class="tape"></div><div class="pin"></div><img id="m1" alt=""><div class="note" id="lb1"></div></div></div>
+<div class="ph p2" id="w2"><div class="frame"><div class="tape"></div><div class="pin"></div><img id="m2" alt=""><div class="note" id="lb2"></div></div></div>
+<div class="ph p3" id="w3"><div class="frame"><div class="tape"></div><div class="pin"></div><img id="m3" alt=""><div class="note" id="lb3"></div></div></div>
+<div class="kicker" id="k"></div>
+<div class="ctitle" id="t"></div>
+<div class="ccap" id="cap"></div>
+    </div>
+    <script>
+      const FB = {"kicker": "深挖 · CASE FILES", "title": "我扒了一下这件事的来龙去脉", "imgBg": "./assets/bg.png", "img1": "./assets/photo1.png", "img2": "./assets/photo2.png", "img3": "./assets/photo3.png", "label1": "起点：一份文件", "label2": "路径：三次转向", "label3": "关键人", "stringColor": "#D32F2F", "caption": "线索都连上了", "duration": 7};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+const $=(s)=>document.querySelector(s);
+const F=(f)=>f/30;
+const DUR=+v.duration>0?+v.duration:7;
+$('[data-composition-id]').setAttribute('data-duration',String(DUR));
+
+$('#k').textContent=v.kicker||''; $('#t').textContent=v.title||''; $('#cap').textContent=v.caption||'';
+$('#lb1').textContent=v.label1||''; $('#lb2').textContent=v.label2||''; $('#lb3').textContent=v.label3||'';
+$('#bg').src=v.imgBg||''; $('#m1').src=v.img1||''; $('#m2').src=v.img2||''; $('#m3').src=v.img3||'';
+if(!v.img1)$('#w1').style.display='none';
+if(!v.img2)$('#w2').style.display='none';
+if(!v.img3)$('#w3').style.display='none';
+const sc=v.stringColor||'#D32F2F';
+for(const id of ['s1','s2']){
+  const p=document.getElementById(id);
+  p.setAttribute('stroke',sc);
+  const len=p.getTotalLength();
+  p.style.strokeDasharray=len;
+  p.style.strokeDashoffset=len;
+}
+
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+/* 照片依次拍上墙（带旋转落位） */
+tl.fromTo('#w1',{y:-360,opacity:0,rotation:-14},{y:0,opacity:1,rotation:-5,duration:F(14),ease:'back.out(1.5)'},F(4));
+tl.fromTo('#w2',{y:-360,opacity:0,rotation:12},{y:0,opacity:1,rotation:3,duration:F(14),ease:'back.out(1.5)'},F(12));
+tl.fromTo('#w3',{y:-360,opacity:0,rotation:-11},{y:0,opacity:1,rotation:-3,duration:F(14),ease:'back.out(1.5)'},F(20));
+/* 红线拉出 */
+tl.to('#s1',{strokeDashoffset:0,duration:F(16),ease:'power2.inOut'},F(30));
+tl.to('#s2',{strokeDashoffset:0,duration:F(16),ease:'power2.inOut'},F(40));
+
+/* 文字入场 */
+tl.fromTo('#k',{opacity:0,x:-24},{opacity:1,x:0,duration:F(10),ease:'power3.out'},F(2));
+tl.fromTo('#t',{opacity:0,y:24},{opacity:1,y:0,duration:F(12),ease:'power3.out'},F(6));
+tl.fromTo('#cap',{opacity:0},{opacity:1,duration:F(12),ease:'power2.out'},F(52));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

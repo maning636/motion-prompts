@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"key","name":"键帽字符","type":"string","label":"键帽上的字符","default":"K"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":2.8}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>手绘键帽掉落</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-ground { position: absolute; left: 0; top: 0; width: 480px; height: 270px; }
+  .p-shadow { position: absolute; left: 203px; top: 226px; width: 74px; height: 13px;
+    border-radius: 50%; background: rgba(36, 28, 24, .30); transform-origin: 50% 50%; }
+  .p-key { position: absolute; left: 209px; top: 158px; width: 62px; height: 62px;
+    transform-origin: 50% 100%; }
+  .p-key-skirt { position: absolute; left: -3px; top: 6px; width: 68px; height: 56px;
+    background: #E7E0CF; border: 3px solid #241C18; border-radius: 11px; }
+  .p-key-top { position: absolute; left: 0; top: 0; width: 62px; height: 54px;
+    background: #FFFDF5; border: 3px solid #241C18; border-radius: 10px;
+    box-shadow: 2px 3px 0 rgba(36, 28, 24, .85);
+    display: flex; align-items: center; justify-content: center; }
+  .p-key-t { font-size: 22px; font-weight: 800; color: #241C18; white-space: nowrap; }
+  .p-hit { position: absolute; left: 210px; height: 3px; background: #241C18;
+    border-radius: 2px; opacity: 0; transform-origin: 50% 50%; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"key":"K","accent":"#FF6B35","duration":2.8};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || FALLBACK.duration;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  function fit(el, avail, maxPx, minPx) {
+    const prev = el.style.whiteSpace;
+    el.style.whiteSpace = 'nowrap';
+    const nat = el.scrollWidth;
+    el.style.whiteSpace = prev;
+    if (nat > avail && nat > 0) {
+      el.style.fontSize = Math.max(minPx, Math.floor(maxPx * avail / nat)) + 'px';
+    }
+  }
+
+  /* ── 地面：先画出来，键帽才有落点 ───────────────────────── */
+  const ground = put('div', 'p-ground');
+  ground.innerHTML =
+    '<svg width="480" height="270" viewBox="0 0 480 270">' +
+    '<path d="M 138 224 C 176 221, 210 226, 248 223 C 288 220, 316 226, 344 223" ' +
+    'fill="none" stroke="#241C18" stroke-width="3" stroke-linecap="round" opacity=".45"/>' +
+    '</svg>';
+  const gp = ground.querySelector('path');
+  const glen = gp.getTotalLength ? gp.getTotalLength() : 210;
+  gp.style.strokeDasharray = glen + ' ' + glen;
+  gp.style.strokeDashoffset = String(glen);
+
+  const shadow = put('div', 'p-shadow');
+  const key = put('div', 'p-key');
+  put('div', 'p-key-skirt', '', null, key);
+  const top = put('div', 'p-key-top', '', null, key);
+  const kt = put('div', 'p-key-t', '', String(v.key || FALLBACK.key), top);
+  fit(kt, 44, 22, 10);
+
+  /* 三次落地各一条冲击线 */
+  const hits = [
+    put('div', 'p-hit', 'top:222px;width:56px;left:212px;'),
+    put('div', 'p-hit', 'top:221px;width:34px;left:223px;'),
+    put('div', 'p-hit', 'top:222px;width:22px;left:229px;'),
+  ];
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  tl.to(gp, { strokeDashoffset: 0, duration: .3, ease: 'power2.out' }, 0);
+
+  /* ── 掉落 + 两次回弹：位置是时间的纯函数 ───────────────────
+     给定 t 就算出键帽该在哪、阴影该多大，不做任何累加。
+     把这个纯函数按固定步长烘成一串 GSAP 关键帧，交给 tween 插值：
+     键帽和阴影采的是**同一张时间表**，所以必然同步。
+     为什么不用 tween 的 onUpdate 回调：
+     实测 GSAP 3.12.7 的 pause(t)/seek 只推进子动画比例，
+     **不触发 onUpdate 也不触发 onComplete**——渲染器来回扫时间轴时
+     靠回调驱动的元素会停在旧帧（阴影永远停在起飞时的大小）。
+     关键帧是普通 tween，扫到哪一帧都是那一帧该有的样子。 */
+  const T0 = 0.12, FALL = 0.4, B1 = 0.32, B2 = 0.26;
+  const H = 150, H1 = 48, H2 = 18;
+  const IMP = [FALL, FALL + B1, FALL + B1 + B2];
+  const AMP = [1, .58, .3];
+
+  function capY(u) {
+    if (u <= 0) return -H;
+    if (u < FALL) { const p = u / FALL; return -H * (1 - p * p); }
+    let a = u - FALL;
+    if (a < B1) { const p = a / B1; return -H1 * 4 * p * (1 - p); }
+    a -= B1;
+    if (a < B2) { const p = a / B2; return -H2 * 4 * p * (1 - p); }
+    return 0;
+  }
+  /* 落地压扁：冲击点取 1，衰减余震取 cos */
+  function capSq(u) {
+    let s = 0;
+    for (let i = 0; i < IMP.length; i++) {
+      const d = u - IMP[i];
+      if (d > 0 && d < 0.34) s += AMP[i] * Math.exp(-7.5 * d) * Math.cos(d * 9);
+    }
+    return s;
+  }
+  const MOTION_END = T0 + FALL + B1 + B2;
+  const STEP = 1 / 90;
+  const N = Math.round((MOTION_END - T0) / STEP) + 1;
+  const kfKey = [], kfShadow = [];
+  for (let i = 0; i < N; i++) {
+    const u = (MOTION_END - T0) * (i / (N - 1));
+    const y = capY(u), sq = capSq(u);
+    /* 阴影随高度缩：越高越小越淡 */
+    const f = Math.min(1, Math.max(0, -y) / H);
+    kfKey.push({ y: y, scaleY: 1 - sq * .26, scaleX: 1 + sq * .18 });
+    kfShadow.push({ scaleX: 1 - f * .62, scaleY: 1 - f * .5, opacity: .30 - f * .20 });
+  }
+  tl.to(key, { keyframes: kfKey, duration: MOTION_END - T0, ease: 'none' }, T0);
+  tl.to(shadow, { keyframes: kfShadow, duration: MOTION_END - T0, ease: 'none' }, T0);
+
+  IMP.forEach(function (t0, i) {
+    const at = T0 + t0;
+    tl.fromTo(hits[i], { opacity: .85, scaleX: .3 },
+      { opacity: 0, scaleX: 1.5, duration: .34, ease: 'power2.out' }, at);
+  });
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

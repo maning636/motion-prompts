@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"title","type":"string","label":"标题","default":"并行检索"},{"id":"subtitle","type":"string","label":"副标题","default":"Coordinator 同时下发多个 Worker，完成后汇合结果"},{"id":"coordinator","type":"string","label":"协调器名","default":"Coordinator"},{"id":"workers","type":"string","label":"Worker 名（逗号分隔）","default":"Web,Doc,Code"},{"id":"mergeLabel","type":"string","label":"汇合节点名","default":"Merge Results"},{"id":"accent","type":"color","label":"强调色","default":"#00FF00"},{"id":"background","type":"color","label":"背景色","default":"#12100E"},{"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+*{ box-sizing: border-box;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      html, body{ margin: 0; width: 1920px; height: 1080px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .scene{ position: absolute; inset: 0; width: 100%; height: 100%; padding: 96px 112px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .header{ margin-bottom: 40px;font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+      .title{ margin: 0; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 64px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; }
+      .subtitle{ margin: 12px 0 0; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-size: 24px; font-weight: 400; opacity: 0.55; }
+      .chart-area{ position: relative; width: 100%; height: 680px; display: flex; align-items: center; justify-content: center;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .chart-svg{ width: 100%; height: 100%; overflow: visible;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .node-box{ fill: rgba(244,239,231,0.04); stroke: rgba(244,239,231,0.18); stroke-width: 2;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .node-box.accent{ stroke: var(--accent); fill: color-mix(in srgb, var(--accent) 8%, transparent);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .node-text{ fill: #f4efe7; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-size: 22px; font-weight: 600; text-anchor: middle; }
+      .node-text.accent{ fill: var(--accent);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .link{ fill: none; stroke: rgba(244,239,231,0.14); stroke-width: 3; stroke-linecap: round;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .link.accent{ stroke: var(--accent);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene clip" data-start="0" data-duration="6" data-track-index="1">
+        <div class="header">
+          <h1 class="title" id="title"></h1>
+          <p class="subtitle" id="subtitle"></p>
+        </div>
+        <div class="chart-area">
+          <svg class="chart-svg" id="chart-svg" viewBox="0 0 1696 680" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+      </section>
+    </div>
+    <script>
+      const fallback = { title: "并行检索", subtitle: "Coordinator 同时下发多个 Worker，完成后汇合结果", coordinator: "Coordinator", workers: "Web,Doc,Code", mergeLabel: "Merge Results", accent: "#00FF00", background: "#12100E", foreground: "#F4EFE7" };
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4EFE7");
+      document.documentElement.style.setProperty("--background", v.background ?? "#12100E");
+      document.documentElement.style.setProperty("--accent", v.accent);
+      const root = document.getElementById("root");
+      root.style.backgroundColor = v.background;
+      root.style.color = v.foreground;
+      document.getElementById("title").textContent = v.title;
+      document.getElementById("subtitle").textContent = v.subtitle;
+      const workers = String(v.workers).split(",").map(s => s.trim()).filter(Boolean);
+      const svg = document.getElementById("chart-svg");
+      const W = 1696, topY = 80, workerY = 320, bottomY = 560;
+      const gap = W / (workers.length + 1);
+      const workerXs = workers.map((_, i) => gap * (i + 1));
+      const cx = W / 2;
+
+      function addRect(x, y, w, h, label, accent) {
+        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("x", x - w / 2); rect.setAttribute("y", y - h / 2);
+        rect.setAttribute("width", w); rect.setAttribute("height", h); rect.setAttribute("rx", 8);
+        rect.setAttribute("class", "node-box" + (accent ? " accent" : ""));
+        svg.appendChild(rect);
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", x); text.setAttribute("y", y + 7);
+        text.setAttribute("class", "node-text" + (accent ? " accent" : ""));
+        text.textContent = label;
+        svg.appendChild(text);
+      }
+
+      function addLine(x1, y1, x2, y2, accent) {
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        line.setAttribute("d", `M ${x1} ${y1} L ${x2} ${y2}`);
+        line.setAttribute("class", "link" + (accent ? " accent" : ""));
+        svg.appendChild(line);
+      }
+
+      addRect(cx, topY, 240, 72, v.coordinator, true);
+      workers.forEach((w, i) => addRect(workerXs[i], workerY, 200, 72, w, false));
+      addRect(cx, bottomY, 280, 72, v.mergeLabel, true);
+
+      workerXs.forEach(wx => {
+        addLine(cx, topY + 36, wx, workerY - 36, false);
+        addLine(wx, workerY + 36, cx, bottomY - 36, false);
+      });
+
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(".title", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.1);
+      tl.fromTo(".subtitle", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.25);
+      tl.fromTo(".node-box", { opacity: 0, scale: 0.92 }, { opacity: 1, scale: 1, duration: 0.5, stagger: 0.1, ease: "back.out(1.4)" }, 0.5);
+      tl.fromTo(".node-text", { opacity: 0 }, { opacity: 1, duration: 0.4, stagger: 0.1 }, 0.6);
+      document.querySelectorAll(".link").forEach((link, i) => {
+        const len = link.getTotalLength ? link.getTotalLength() : 200;
+        link.style.strokeDasharray = len; link.style.strokeDashoffset = len;
+        tl.to(link, { strokeDashoffset: 0, duration: 0.5, ease: "power2.out" }, 0.9 + i * 0.08);
+      });
+      tl.to(".scene", { opacity: 0, y: -16, duration: 0.5, ease: "power2.in" }, 5.3);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

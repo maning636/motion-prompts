@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"title","name":"卡片标题","type":"string","label":"贴在卡片上的标题","default":"第 3 版"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#2EC4B6"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":2.8}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>手绘胶带固定</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-card { position: absolute; left: 152px; top: 78px; width: 176px; height: 134px;
+    background: #FFFDF5; box-shadow: 3px 4px 0 rgba(36, 28, 24, .85); }
+  .p-shot { position: absolute; left: 14px; top: 16px; width: 148px; height: 78px;
+    background: #E4F2EF; border: 2.5px solid #241C18; border-radius: 3px; }
+  .p-sun { position: absolute; left: 20px; top: 22px; width: 18px; height: 18px;
+    border-radius: 50%; background: #FFC93C; border: 2.5px solid #241C18; }
+  .p-hill { position: absolute; left: 58px; top: 44px; width: 76px; height: 44px;
+    background: var(--ac); border: 2.5px solid #241C18;
+    border-radius: 44px 44px 0 0; }
+  .p-card-txt { position: absolute; left: 14px; right: 14px; top: 102px; text-align: center;
+    font-size: 15px; font-weight: 700; color: #241C18; }
+  /* 胶带本体：两端撕口用 clip-path 锯齿多边形。压在卡片上沿，不是浮在上面 */
+  .p-tape { position: absolute; left: 186px; top: 70px; width: 108px; height: 28px;
+    background: rgba(255, 201, 60, .82);
+    background-image: repeating-linear-gradient(112deg,
+      rgba(255,255,255,.34) 0 3px, rgba(255,255,255,0) 3px 10px);
+    clip-path: polygon(0% 8%, 3% 0%, 96% 4%, 100% 10%, 99% 50%, 100% 90%,
+      95% 100%, 4% 96%, 0% 92%, 2% 50%);
+    transform-origin: 0% 50%; }
+  .p-tape-shine { position: absolute; left: -20px; top: 2px; width: 22px; height: 24px;
+    background: rgba(255,255,255,.55); transform: skewX(-18deg); opacity: 0; }
+  .p-tail { position: absolute; left: -16px; top: 1px; width: 18px; height: 26px;
+    background: rgba(255, 201, 60, .82);
+    clip-path: polygon(100% 0, 100% 100%, 0 62%);
+    transform-origin: 100% 50%; opacity: 0; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"title":"第 3 版","accent":"#2EC4B6","duration":2.8};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || FALLBACK.duration;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  function fit(el, avail, maxPx, minPx) {
+    const prev = el.style.whiteSpace;
+    el.style.whiteSpace = 'nowrap';
+    const nat = el.scrollWidth;
+    el.style.whiteSpace = prev;
+    if (nat > avail && nat > 0) {
+      el.style.fontSize = Math.max(minPx, Math.floor(maxPx * avail / nat)) + 'px';
+    }
+  }
+
+  /* ── 被固定的卡片 ───────────────────────────────────────── */
+  const card = put('div', 'p-card', 'transform: rotate(1.6deg)');
+  const shot = put('div', 'p-shot', '', null, card);
+  put('div', 'p-sun', '', null, shot);
+  put('div', 'p-hill', '', null, shot);
+  const ct = put('div', 'p-card-txt', '', String(v.title || FALLBACK.title), card);
+  ct.style.whiteSpace = 'nowrap';
+  fit(ct, 148, 15, 8);
+
+  /* ── 胶带：撕下来一段，长出来贴上去 ─────────────────────── */
+  const tape = put('div', 'p-tape');
+  const shine = put('div', 'p-tape-shine', '', null, tape);
+  const tail = put('div', 'p-tail', '', null, tape);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 卡片先落位 */
+  tl.fromTo(card, { scale: .84, opacity: 0, rotate: 6, y: 18 },
+    { scale: 1, opacity: 1, rotate: 1.6, y: 0, duration: .42, ease: 'back.out(1.8)' }, 0);
+
+  /* 胶带撕拉：沿 X 生长 + 落位角度修正 */
+  tl.fromTo(tape, { scaleX: .04, rotate: -18, opacity: 0 },
+    { scaleX: 1, rotate: -3.2, opacity: 1, duration: .44, ease: 'power3.out' }, .28);
+  /* 撕口尾巴甩两下才停 */
+  tl.fromTo(tail, { opacity: 0, rotate: -26 },
+    { opacity: 1, rotate: 7, duration: .13, ease: 'power2.out', yoyo: true, repeat: 3 }, .56);
+  tl.to(tail, { rotate: 0, duration: .14, ease: 'power2.out' }, 1.06);
+  /* 高光扫过 */
+  tl.fromTo(shine, { x: -20, opacity: 0 }, { x: 132, opacity: .8, duration: .34, ease: 'power1.inOut' }, .58);
+  tl.to(shine, { opacity: 0, duration: .16, ease: 'power2.in' }, .92);
+
+  /* 贴实的一瞬间，卡片被压下去一点再弹回来 —— 透明胶带压纸的手感 */
+  tl.fromTo(card, { y: 0, scaleY: 1 }, { y: 4, scaleY: .982, duration: .1, ease: 'power3.out' }, .7);
+  tl.to(card, { y: -1, scaleY: 1.006, duration: .12, ease: 'power2.out' }, .8);
+  tl.to(card, { y: 0, scaleY: 1, duration: .2, ease: 'back.out(2.2)' }, .92);
+  tl.fromTo(tape, { y: 0 }, { y: 2.5, duration: .1, ease: 'power3.out' }, .7);
+  tl.to(tape, { y: 0, duration: .22, ease: 'back.out(2.6)' }, .8);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

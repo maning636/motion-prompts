@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "imgBg", "type": "image", "label": "背景图（空则深黑底+暗角）", "default": ""}, {"id": "numTo", "type": "number", "label": "目标数字（从0递增到此值）", "default": 90}, {"id": "numSuffix", "type": "string", "label": "数字后缀", "default": "%"}, {"id": "label", "type": "string", "label": "数字下方标签", "default": "的 AI 用户"}, {"id": "duration", "type": "number", "label": "总时长（秒，演完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12);
+  color: var(--foreground, #F5F5F3); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+/* 背景：有图铺满 + 55% 压暗；空槽深黑底 + 暗角 */
+.bgimg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; }
+.bgdim{ position:absolute; inset:0; background:rgba(0,0,0,.55); display:none; }
+.vignette{ position:absolute; inset:0;
+  background:radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0) 42%, rgba(0,0,0,.55) 100%); }
+
+/* 中央超大数字（MEBHeiHeiTi，白色带绿色发光） */
+.stat-num{ position:absolute; left:0; right:0; top:330px; text-align:center;
+  font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-weight:700; font-size:280px; line-height:1.1;
+  color:#FFFFFF; white-space:nowrap;
+  text-shadow:0 0 22px rgba(52,211,153,.6), 0 0 56px rgba(16,185,129,.4), 0 0 110px rgba(16,185,129,.22); }
+
+/* 白字标签 */
+.stat-label{ position:absolute; left:0; right:0; top:686px; text-align:center;
+  font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-weight:700; font-size:46px; color:#FFFFFF;
+  letter-spacing:2px; overflow-wrap:break-word; padding:0 260px; }
+
+/* 绿色进度横条（track + fill scaleX 展开） */
+.stat-bar{ position:absolute; left:50%; top:786px; width:560px; height:14px; margin-left:-280px;
+  border-radius:7px; background:rgba(16,185,129,.16); overflow:hidden; }
+.stat-bar .fill{ position:absolute; inset:0; border-radius:7px; background:#10B981;
+  box-shadow:0 0 16px rgba(16,185,129,.75), 0 0 40px rgba(16,185,129,.3);
+  transform:scaleX(0); transform-origin:0 50%; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <img class="bgimg" id="bg" alt="">
+      <div class="bgdim" id="dim"></div>
+      <div class="vignette"></div>
+
+      <div class="stat-num" id="num">0%</div>
+      <div class="stat-label" id="lbl"></div>
+      <div class="stat-bar" id="bar"><div class="fill" id="fill"></div></div>
+    </div>
+    <script>
+      const FB = {"imgBg": "", "numTo": 90, "numSuffix": "%", "label": "的 AI 用户", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $=(s)=>document.querySelector(s);
+      const DUR=+v.duration>0?+v.duration:6;
+      $('[data-composition-id]').setAttribute('data-duration',String(DUR));
+
+      /* 背景槽：有图铺满+55%压暗，空则深黑底+暗角 */
+      if(v.imgBg){ $('#bg').src=v.imgBg; $('#bg').style.display='block'; $('#dim').style.display='block'; }
+
+      const NUM_TO=Math.max(0, +v.numTo||0);
+      const SUFFIX=String(v.numSuffix??'');
+      const numEl=$('#num');
+      const writeNum=(n)=>{ numEl.textContent=String(Math.round(n))+SUFFIX; };
+      writeNum(0);
+      $('#lbl').textContent=v.label||'';
+
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+
+      /* 1. 0.4s 起数字 1.2s 从 0 递增至 numTo（同步时间线内，确定性） */
+      const cnt={n:0};
+      tl.to(cnt,{n:NUM_TO,duration:1.2,ease:'power1.out',
+        onUpdate:()=>writeNum(cnt.n), onComplete:()=>writeNum(NUM_TO)},0.4);
+      /* 2. 标签淡入 */
+      tl.fromTo('#lbl',{opacity:0,y:18},{opacity:1,y:0,duration:0.4,ease:'power2.out'},1.7);
+      /* 3. 进度横条 scaleX 展开 */
+      tl.to('#fill',{scaleX:1,duration:0.7,ease:'power2.inOut'},2.0);
+      /* 时间线末端补 set 占满 data-duration，演完定格防黑帧 */
+      tl.set('#fill',{scaleX:1},Math.max(DUR-0.001,2.7));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

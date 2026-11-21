@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "图表标题", "default": "2024 年度业绩"}, {"id": "subtitle", "type": "string", "label": "副标题", "default": "各部门季度销售额对比"}, {"id": "labels", "type": "string", "label": "类别（逗号分隔）", "default": "搜索,推荐,广告,其他"}, {"id": "values", "type": "string", "label": "数值（逗号分隔数字）", "default": "45,30,18,7"}, {"id": "center_label", "type": "string", "label": "中心标签", "default": "总收入"}, {"id": "center_value", "type": "string", "label": "中心数值", "default": "100"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#12100E"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4EFE7"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--background, #F5F0E6); color: var(--foreground, #1D1D20); }
+      .scene{ position: absolute; inset: 0; padding: 200px 120px 110px; overflow: hidden; font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; }
+      /* 奶油系列加了 corner-tag, 需加高 padding-top 避免与标题重叠 */
+      .cream .scene, body.cream .scene, .scene.cream{ padding-top: 200px; }
+      .outer-frame{ position: absolute; inset: 0; border: 10px solid #1D1D20; pointer-events: none; z-index: 40; }
+      .corner-tag{ position: absolute; top: 80px; left: 130px; z-index: 30; background: #FFFDF7; border: 4px solid #1D1D20; border-radius: 8px; box-shadow: 10px 10px 0 #2A292B; padding: 14px 22px; transform: rotate(-2deg); }
+      .corner-tag span{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; font-weight: 700; font-size: 24px; letter-spacing: 0.06em; text-transform: uppercase; }
+      .title-area{ position: relative; z-index: 2; margin-bottom: 36px; padding: 0 30px; }
+      .title{ margin: 0 0 12px; font-size: 64px; font-weight: 900; line-height: 1.15; letter-spacing: -0.02em; }
+      .subtitle{ margin: 0; font-size: 28px; color: #4D4A48; line-height: 1.4; }
+      .chart-area{ position: relative; width: 100%; height: 700px; background: #FFFDF7; border: 4px solid #1D1D20; border-radius: 16px; box-shadow: 14px 14px 0 #2A292B; padding: 30px; box-sizing: border-box; }
+      .grid-line{ stroke: #2A292B; stroke-width: 1; opacity: 0.25; }
+      .axis-text{ fill: #1D1D20; font-size: 18px; font-family: 'Noto Sans SC', sans-serif; font-weight: 600; text-anchor: middle; }
+      .axis-text-y{ text-anchor: end; dominant-baseline: middle; }
+      .bar-rect{ transform-box: fill-box; transform-origin: bottom center; }
+      .bar-value{ fill: #1D1D20; font-size: 22px; font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; font-weight: 700; text-anchor: middle; opacity: 0; }
+      .bar-label{ fill: #1D1D20; font-size: 20px; font-family: 'Noto Sans SC', sans-serif; font-weight: 600; text-anchor: middle; dominant-baseline: hanging; opacity: 0; }
+      .baseline{ stroke: #1D1D20; stroke-width: 2.5; }
+      .donut-segment{ stroke: #1D1D20; stroke-width: 3; }
+      .donut-center{ fill: #1D1D20; font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; font-weight: 700; text-anchor: middle; }
+      .donut-center-label{ fill: #1D1D20; font-size: 22px; font-family: 'Noto Sans SC', sans-serif; font-weight: 700; text-anchor: middle; }
+      .donut-legend-text{ fill: #1D1D20; font-size: 22px; font-family: 'Noto Sans SC', sans-serif; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="outer-frame"></div>
+      <div class="corner-tag"><span>CHART</span></div>
+      <section class="scene clip" data-start="0" data-duration="6" data-track-index="1">
+        <div class="title-area">
+          <h1 class="title" id="title"></h1>
+          <p class="subtitle" id="subtitle"></p>
+        </div>
+        <div class="chart-area">
+          <svg id="chart-svg" viewBox="0 0 1696 700" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>      </section>
+    </div>
+    <script>
+      const FB = {"title": "2024 年度业绩", "subtitle": "各部门季度销售额对比", "labels": "搜索,推荐,广告,其他", "values": "45,30,18,7", "center_label": "总收入", "center_value": "100", "accent": "#00FF00", "background": "#12100E", "foreground": "#F4EFE7"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4EFE7");
+      document.documentElement.style.setProperty("--background", v.background ?? "#12100E");
+      document.documentElement.style.setProperty('--bg', v.background);
+      document.documentElement.style.setProperty('--fg', v.foreground);
+      document.documentElement.style.setProperty('--accent', v.accent);
+      // title/subtitle 为可选,存在时才设
+      const titleEl = document.getElementById("title");
+      if (titleEl) titleEl.textContent = v.title || "";
+      const subtitleEl = document.getElementById("subtitle");
+      if (subtitleEl) subtitleEl.textContent = v.subtitle || "";
+      const SVGNS = "http://www.w3.org/2000/svg";
+      const labels = v.labels.split(",").map(s => s.trim());
+      const values = v.values.split(",").map(Number);
+      const total = values.reduce((a, b) => a + b, 0) || 1;
+      const svg = document.getElementById("chart-svg");
+      const cx = 700, cy = 360, rOut = 280, rIn = 180;
+      const palette = [v.accent, v.accent + "CC", v.accent + "88", v.accent + "55", v.accent + "33", v.accent + "22"];
+
+      let startAngle = -Math.PI / 2;
+      labels.forEach((lab, i) => {
+        const frac = values[i] / total;
+        const endAngle = startAngle + frac * Math.PI * 2;
+        const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
+        const x1 = cx + rOut * Math.cos(startAngle);
+        const y1 = cy + rOut * Math.sin(startAngle);
+        const x2 = cx + rOut * Math.cos(endAngle);
+        const y2 = cy + rOut * Math.sin(endAngle);
+        const x3 = cx + rIn * Math.cos(endAngle);
+        const y3 = cy + rIn * Math.sin(endAngle);
+        const x4 = cx + rIn * Math.cos(startAngle);
+        const y4 = cy + rIn * Math.sin(startAngle);
+        const d = `M ${x1} ${y1} A ${rOut} ${rOut} 0 ${largeArc} 1 ${x2} ${y2} L ${x3} ${y3} A ${rIn} ${rIn} 0 ${largeArc} 0 ${x4} ${y4} Z`;
+        const path = document.createElementNS(SVGNS, "path");
+        path.setAttribute("d", d);
+        path.setAttribute("fill", palette[i % palette.length]);
+        path.setAttribute("class", "donut-segment donut-seg-elem");
+        svg.appendChild(path);
+        // Legend text
+        const midAngle = (startAngle + endAngle) / 2;
+        const tx = cx + (rOut + rIn) / 2 * Math.cos(midAngle);
+        const ty = cy + (rOut + rIn) / 2 * Math.sin(midAngle);
+        const t = document.createElementNS(SVGNS, "text");
+        t.setAttribute("x", tx); t.setAttribute("y", ty);
+        t.setAttribute("class", "donut-text donut-text-elem");
+        t.setAttribute("dominant-baseline", "middle");
+        t.textContent = `${(frac * 100).toFixed(0)}%`;
+        svg.appendChild(t);
+        startAngle = endAngle;
+      });
+
+      // Center
+      const cl = document.createElementNS(SVGNS, "text");
+      cl.setAttribute("x", cx); cl.setAttribute("y", cy - 10); cl.setAttribute("class", "donut-center-label center-elem"); cl.textContent = v.center_label; svg.appendChild(cl);
+      const cv = document.createElementNS(SVGNS, "text");
+      cv.setAttribute("x", cx); cv.setAttribute("y", cy + 50); cv.setAttribute("class", "donut-center center-elem");
+      cv.setAttribute("font-size", "72"); cv.textContent = v.center_value; svg.appendChild(cv);
+
+      // Legend (right side)
+      const legX = 1180, legY = 100, legGap = 80;
+      labels.forEach((lab, i) => {
+        const sq = document.createElementNS(SVGNS, "rect");
+        sq.setAttribute("x", legX); sq.setAttribute("y", legY + i * legGap);
+        sq.setAttribute("width", 32); sq.setAttribute("height", 32);
+        sq.setAttribute("fill", palette[i % palette.length]); sq.setAttribute("class", "donut-segment");
+        svg.appendChild(sq);
+        const tx = document.createElementNS(SVGNS, "text");
+        tx.setAttribute("x", legX + 50); tx.setAttribute("y", legY + i * legGap + 24);
+        tx.setAttribute("class", "donut-text donut-legend-text legend-elem");
+        tx.textContent = `${lab} · ${values[i]}`; svg.appendChild(tx);
+      });
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(".title", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }, 0.1);
+      tl.fromTo(".subtitle", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.3);
+      tl.fromTo(".donut-seg-elem", { attr: { "stroke-dasharray": "1000", "stroke-dashoffset": "1000" } },
+        { attr: { "stroke-dashoffset": "0" }, duration: 0.7, stagger: 0.1, ease: "power2.out" }, 0.5);
+      tl.fromTo(".donut-text-elem", { opacity: 0 }, { opacity: 1, duration: 0.4, stagger: 0.08, ease: "power2.out" }, 1.0);
+      tl.fromTo(".center-elem", { opacity: 0, scale: 0.5, transformOrigin: "50% 50%" },
+        { opacity: 1, scale: 1, duration: 0.5, stagger: 0.1, ease: "back.out(1.5)" }, 1.2);
+      tl.fromTo(".legend-elem", { opacity: 0, x: 30 }, { opacity: 1, x: 0, duration: 0.4, stagger: 0.08, ease: "power2.out" }, 1.4);
+      tl.to(".scene", { opacity: 0, scale: 1.01, duration: 0.5, ease: "power2.in" }, 5.3);
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

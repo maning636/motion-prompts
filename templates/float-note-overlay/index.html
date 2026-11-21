@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "bgVideo", "type": "string", "label": "背景视频路径（全屏 cover 循环静音）", "default": "视频 placeholder.mp4（未随仓分发）"}, {"id": "kicker", "type": "string", "label": "角标小字", "default": "录播精讲"}, {"id": "title", "type": "string", "label": "主标题", "default": "这一节讲什么"}, {"id": "body", "type": "string", "label": "正文（\\n 换行，最多两行）", "default": "背景放录播或露脸画面\\n解说结论浮在卡片上"}, {"id": "position", "type": "string", "label": "解说卡位置 left/right", "default": "left"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#22c55e"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--background, #040604); }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      #root{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+      #bg{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      /* 浮动解说卡：深色半透明毛玻璃 + 强调色竖条 */
+      .fn-card{ position: absolute; top: 50%; transform: translateY(-50%); z-index: 10;
+        width: 620px; max-height: 720px; padding: 36px 40px 36px 37px;
+        background: rgba(10,14,12,.58); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+        border-radius: 20px; border-left: 4px solid #22c55e; opacity: 0;
+        box-shadow: 0 12px 48px rgba(0,0,0,.4); }
+      .fn-card.left{ left: 96px; }
+      .fn-card.right{ right: 96px; }
+      .fn-kicker{ font-size: clamp(20px, 1.3vw, 26px); color: #22c55e; letter-spacing: .22em;
+        margin-bottom: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .fn-title{ font-size: clamp(40px, 3vw, 58px); line-height: 1.25; color: #fff; margin-bottom: 20px;
+        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+      .fn-body{ font-size: clamp(24px, 1.6vw, 32px); line-height: 1.6; color: rgba(255,255,255,.78);
+        display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+      /* 底部进度条：随 duration 走完 */
+      .fn-progress{ position: absolute; left: 0; right: 0; bottom: 0; height: 4px; z-index: 11;
+        background: rgba(255,255,255,.12); }
+      .fn-progress .bar{ height: 100%; width: 100%; background: #22c55e;
+        transform-origin: left center; transform: scaleX(0); }
+    </style>
+  <style>
+/* [公开版] 原实拍视频未随仓分发，此处为占位块 */
+.pub-media-placeholder{
+  background:
+    repeating-linear-gradient(135deg, rgba(255,255,255,.05) 0 12px, rgba(255,255,255,.11) 12px 24px),
+    rgba(120,120,130,.22);
+  border:1px dashed rgba(255,255,255,.22);
+  border-radius:10px;
+  position:relative;
+}
+.pub-media-placeholder::after{
+  content:"公开版未包含实拍素材";
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  font:400 20px/1.4 'PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,sans-serif;
+  color:rgba(255,255,255,.62);
+  letter-spacing:.04em;
+}
+</style>
+</head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <!-- [公开版] 原视频 视频 placeholder.mp4（未随仓分发） 未随仓分发（实拍素材，体积原因）。此位置改为占位块。 -->
+<div id="bg"></div>
+      <div class="fn-card left" id="card">
+        <div class="fn-kicker" id="kicker"></div>
+        <div class="fn-title" id="title"></div>
+        <div class="fn-body" id="body"></div>
+      </div>
+      <div class="fn-progress"><div class="bar" id="bar"></div></div>
+    </div>
+    <script>
+      const fallback = {"bgVideo": "视频 placeholder.mp4（未随仓分发）", "kicker": "录播精讲", "title": "这一节讲什么", "body": "背景放录播或露脸画面\n解说结论浮在卡片上", "position": "left", "accent": "#22c55e", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const dur = Math.max(1, Number(V.duration) || 6);
+      const accent = String(V.accent || "#22c55e");
+      $("card").style.borderLeftColor = accent;
+      $("kicker").style.color = accent;
+      $("bar").style.background = accent;
+      if (V.bgVideo) $("bg").src = V.bgVideo;
+      const pos = String(V.position ?? "left").toLowerCase() === "right" ? "right" : "left";
+      $("card").classList.remove("left", "right");
+      $("card").classList.add(pos);
+      const kicker = String(V.kicker ?? "").trim();
+      const title = String(V.title ?? "").trim();
+      // body 支持字面 \n（JSON 里写 \\n）或真实换行，逐行成段
+      const bodyLines = String(V.body ?? "").split(/\\n|\n/).map((s) => s.trim()).filter(Boolean);
+      $("kicker").textContent = kicker;
+      $("kicker").style.display = kicker ? "block" : "none";
+      $("title").textContent = title;
+      $("title").style.display = title ? "block" : "none";
+      $("body").innerHTML = bodyLines.map((s) => `<div>${s.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</div>`).join("");
+      $("body").style.display = bodyLines.length ? "block" : "none";
+      // 入场：fade + slide（左卡从左侧滑入，右卡从右）；结尾前 0.4s 淡出
+      const slideX = pos === "right" ? 48 : -48;
+      tl.fromTo("#card", { opacity: 0, x: slideX }, { opacity: 1, x: 0, duration: 0.7, ease: "power2.out" }, 0.2);
+      tl.to("#card", { opacity: 0, y: -16, duration: 0.4, ease: "power2.in" }, Math.max(0.9, dur - 0.4));
+      // 进度条随总时长线性走完
+      tl.fromTo("#bar", { scaleX: 0 }, { scaleX: 1, duration: dur, ease: "none" }, 0);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

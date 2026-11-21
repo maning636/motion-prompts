@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "vol", "type": "string", "label": "页眉左（卷/栏目）", "default": "REVIEW · 项目测评"}, {"id": "pageno", "type": "string", "label": "页眉右（页码）", "default": "P.012 / 400"}, {"id": "kicker", "type": "string", "label": "眉题", "default": "PROJECT REVIEW · 分页测评"}, {"id": "title", "type": "string", "label": "大标题", "default": "这个工具值不值得用"}, {"id": "titleHl", "type": "string", "label": "高亮关键词", "default": "值不值得"}, {"id": "meta", "type": "string", "label": "meta 行（·分隔）", "default": "测评对象 · 3 个维度 · 1 个结论"}, {"id": "items", "type": "string", "label": "条目（标题|说明，分号分隔）", "default": "上手成本|十分钟跑通第一个模板，文档即教程;出片质量|1080p 逐帧渲染，动效曲线可逐格钉;生态配套|模板库 + 提示词 + 工作台，一条龙"}, {"id": "img1", "type": "image", "label": "配图页（竖版 3:4）", "default": "./assets/shot.png"}, {"id": "verdict", "type": "string", "label": "结论条文字", "default": "结论：值得用，但先把免费模板跑熟再买全套"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 7}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #F6F5EF; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #141414;
+        background-image: linear-gradient(rgba(20,20,20,.045) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(20,20,20,.045) 1px, transparent 1px);
+        background-size: 36px 36px; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      .prs-head{ position: absolute; left: 90px; right: 90px; top: 48px; height: 44px; z-index: 6; }
+      .prs-head .rule{ position: absolute; left: 0; right: 0; top: 0; height: 2px; background: #141414; }
+      .prs-head .l{ position: absolute; left: 0; top: 12px; font-size: 19px; letter-spacing: .22em; }
+      .prs-head .r{ position: absolute; right: 0; top: 12px; font-size: 19px; letter-spacing: .22em; color: #9A9A92; }
+      /* 左栏 */
+      .prs-main{ position: absolute; left: 110px; top: 150px; width: 980px; z-index: 5; }
+      .prs-kicker{ font-size: 21px; letter-spacing: .3em; color: #55554E; }
+      .prs-title{ margin-top: 22px; font-size: 88px; font-weight: 900; line-height: 1.2; }
+      .prs-title .hl{ position: relative; display: inline-block; padding: 0 12px; }
+      .prs-title .hl i{ position: absolute; left: 0; right: 0; top: 6px; bottom: 6px; background: var(--ac, #00FF00);
+        z-index: -1; transform: scaleX(0); transform-origin: 0 50%; }
+      .prs-meta{ margin-top: 24px; font-size: 20px; letter-spacing: .2em; color: #9A9A92; }
+      .prs-items{ margin-top: 44px; border-top: 2px solid #141414; }
+      .prs-row{ position: relative; display: flex; gap: 26px; padding: 26px 0 26px 24px;
+        border-bottom: 1.5px solid rgba(20,20,20,.18); opacity: .35; }
+      .prs-row .mk{ position: absolute; left: 0; top: 30px; bottom: 30px; width: 6px; background: var(--ac, #00FF00);
+        transform: scaleY(0); transform-origin: 50% 0; }
+      .prs-row .n{ font-size: 22px; color: #9A9A92; padding-top: 6px; }
+      .prs-row .bd .t{ font-size: 36px; font-weight: 900; letter-spacing: .02em; }
+      .prs-row .bd .d{ margin-top: 8px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 23px; line-height: 1.6; color: #55554E; }
+      /* 右栏配图页 */
+      .prs-fig{ position: absolute; right: 130px; top: 170px; width: 520px; height: 693px; z-index: 4; }
+      .prs-fig .sh{ position: absolute; left: 14px; top: 14px; width: 520px; height: 693px; background: #141414; }
+      .prs-fig .pg{ position: absolute; left: 0; top: 0; width: 520px; height: 693px; background: #fff;
+        border: 3px solid #141414; overflow: hidden; }
+      .prs-fig img{ width: 100%; height: 100%; object-fit: cover; }
+      .prs-fig .cap{ position: absolute; left: 0; right: 0; bottom: -46px; font-size: 18px; letter-spacing: .2em;
+        color: #9A9A92; text-align: right; }
+      /* 结论条（盖章砸入） */
+      .prs-verdict{ position: absolute; left: 110px; bottom: 96px; width: 980px; z-index: 6;
+        background: #fff; border: 3px solid #141414; box-shadow: 10px 10px 0 #141414;
+        display: flex; align-items: center; gap: 24px; padding: 22px 30px; }
+      .prs-verdict .tag{ background: var(--ac, #00FF00); border: 2px solid #141414; padding: 8px 18px;
+        font-size: 22px; font-weight: 900; letter-spacing: .14em; flex: none; }
+      .prs-verdict .tx{ font-size: 30px; font-weight: 900; line-height: 1.4; }
+      .prs-foot{ position: absolute; left: 0; right: 0; bottom: 0; height: 56px; background: var(--ac, #00FF00);
+        z-index: 6; display: flex; align-items: center; justify-content: space-between; padding: 0 90px; }
+      .prs-foot .f1{ font-size: 20px; font-weight: 900; letter-spacing: .12em; }
+      .prs-foot .f2{ font-size: 16px; letter-spacing: .26em; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="7" data-width="1920" data-height="1080">
+      <div class="prs-head">
+        <div class="rule" id="rule"></div>
+        <div class="l mono" id="vol"></div>
+        <div class="r mono" id="pageno"></div>
+      </div>
+      <div class="prs-main">
+        <div class="prs-kicker mono" id="kicker"></div>
+        <div class="prs-title" id="titleWrap"></div>
+        <div class="prs-meta mono" id="meta"></div>
+        <div class="prs-items" id="items"></div>
+      </div>
+      <div class="prs-fig" id="fig">
+        <div class="sh"></div>
+        <div class="pg"><img id="pg1" src="./assets/shot.png" alt="" /></div>
+        <div class="cap mono">FIG.01 · 实拍页</div>
+      </div>
+      <div class="prs-verdict" id="verdict">
+        <div class="tag">结论</div>
+        <div class="tx" id="verdictTx"></div>
+      </div>
+      <div class="prs-foot" id="foot">
+        <div class="f1">@老马AI研习社</div>
+        <div class="f2 mono">MOTION LIBRARY · PAGED REVIEW</div>
+      </div>
+    </div>
+    <script>
+      const fallback = {"vol": "REVIEW · 项目测评", "pageno": "P.012 / 400", "kicker": "PROJECT REVIEW · 分页测评", "title": "这个工具值不值得用", "titleHl": "值不值得", "meta": "测评对象 · 3 个维度 · 1 个结论", "items": "上手成本|十分钟跑通第一个模板，文档即教程;出片质量|1080p 逐帧渲染，动效曲线可逐格钉;生态配套|模板库 + 提示词 + 工作台，一条龙", "img1": "./assets/shot.png", "verdict": "值得用，但先把免费模板跑熟再买全套", "accent": "#00FF00", "duration": 7};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      document.documentElement.style.setProperty("--ac", V.accent ?? "#00FF00");
+      $("vol").textContent = V.vol;
+      $("pageno").textContent = V.pageno;
+      $("kicker").textContent = V.kicker;
+      $("meta").textContent = V.meta;
+      $("verdictTx").textContent = V.verdict;
+      if (V.img1) $("pg1").src = V.img1;
+      // 标题：高亮词包荧光绿块
+      const title = String(V.title), hl = String(V.titleHl || "");
+      const tw = $("titleWrap");
+      if (hl && title.includes(hl)) {
+        const [a, b] = title.split(hl);
+        tw.innerHTML = "";
+        const s1 = document.createElement("span"); s1.textContent = a; s1.style.display = "inline-block";
+        const h = document.createElement("span"); h.className = "hl";
+        h.innerHTML = "<i id='hlbg'></i><em style='font-style:normal'></em>";
+        h.querySelector("em").textContent = hl;
+        const s2 = document.createElement("span"); s2.textContent = b; s2.style.display = "inline-block";
+        tw.append(s1, h, s2);
+      } else { tw.textContent = title; }
+      // 条目
+      const rows = String(V.items).split(/[;；]/).map((x) => x.trim()).filter(Boolean);
+      const itemsEl = $("items");
+      rows.forEach((row, i) => {
+        const [t, d] = row.split("|").map((x) => (x || "").trim());
+        const el = document.createElement("div");
+        el.className = "prs-row";
+        el.innerHTML = '<span class="mk"></span><span class="n mono">' + String(i + 1).padStart(2, "0") +
+          '</span><span class="bd"><div class="t"></div><div class="d"></div></span>';
+        el.querySelector(".t").textContent = t;
+        el.querySelector(".d").textContent = d;
+        itemsEl.appendChild(el);
+      });
+      const rowEls = Array.from(itemsEl.children);
+      // 页眉
+      tl.fromTo("#rule", { scaleX: 0 }, { scaleX: 1, duration: 0.45, ease: "power3.out" }, 0);
+      tl.fromTo(["#vol", "#pageno"], { opacity: 0 }, { opacity: 1, duration: 0.35, stagger: 0.07 }, 0.2);
+      // 标题区
+      tl.fromTo("#kicker", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.4 }, 0.25);
+      tl.fromTo("#titleWrap", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 0.4);
+      tl.fromTo("#meta", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 0.85);
+      if ($("hlbg")) tl.to("#hlbg", { scaleX: 1, duration: 0.36, ease: "power2.inOut" }, 1.0);
+      // 配图页落位
+      tl.fromTo("#fig", { y: 100, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7, ease: "expo.out" }, 0.6);
+      // 条目逐条翻亮
+      tl.fromTo(rowEls, { opacity: 0 }, { opacity: 0.35, duration: 0.35, stagger: 0.06 }, 1.2);
+      rowEls.forEach((r, i) => {
+        const t = 1.7 + i * 0.55;
+        tl.to(r, { opacity: 1, duration: 0.22 }, t);
+        tl.to(r.querySelector(".mk"), { scaleY: 1, duration: 0.22 }, t);
+      });
+      // 结论条盖章砸入
+      const stampAt = 1.9 + rowEls.length * 0.55;
+      tl.fromTo("#verdict", { opacity: 0, scale: 1.22, rotate: -3.5 },
+        { opacity: 1, scale: 1, rotate: 0, duration: 0.42, ease: "back.out(1.5)" }, stampAt);
+      // 底部条
+      tl.fromTo("#foot", { y: 56 }, { y: 0, duration: 0.4, ease: "expo.out" }, stampAt + 0.25);
+      // 呼吸定格
+      tl.to("#fig", { y: -6, duration: 1.2, ease: "sine.inOut", yoyo: true, repeat: 1 }, stampAt + 0.8);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

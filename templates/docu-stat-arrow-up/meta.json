@@ -1,0 +1,12 @@
+{
+  "id": "docu-stat-arrow-up",
+  "name": "同比箭头·皮影档案",
+  "description": "TOP 5 排行榜，YoY 同比箭头高亮，条形错峰扫入（B 族皮影·纪录片档案风，2026-08-31）",
+  "category": "口播工厂",
+  "series": "docu",
+  "slot": "docu-puppet",
+  "tags": ["口播工厂","皮影档案","纪录片","docu-stat-arrow-up"],
+  "duration": 6,
+  "size": "1920×1080",
+  "status": "ready"
+}

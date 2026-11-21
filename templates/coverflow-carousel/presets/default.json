@@ -1,0 +1,12 @@
+{
+  "title": "每日一影 · 片头轮转",
+  "img1": "./placeholder-1.png",
+  "img2": "./placeholder-2.png",
+  "img3": "./placeholder-3.png",
+  "img4": "./placeholder-4.png",
+  "img5": "./placeholder-5.png",
+  "img6": "./placeholder-6.png",
+  "focusIndex": 7,
+  "glowColor": "#FFC83D",
+  "duration": 6
+}

@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"title","type":"string","label":"主标题","default":"从一个想法到一套系统"},
+  {"id":"eyebrow","type":"string","label":"顶部小标签","default":"PATH · 历程"},
+  {"id":"time1","type":"string","label":"节点一编号","default":"01"},
+  {"id":"label1","type":"string","label":"节点一标签","default":"做一次"},
+  {"id":"caption1","type":"string","label":"节点一说明","default":"先用脚本跑通一个最小闭环"},
+  {"id":"time2","type":"string","label":"节点二编号","default":"02"},
+  {"id":"label2","type":"string","label":"节点二标签","default":"存模板"},
+  {"id":"caption2","type":"string","label":"节点二说明","default":"把成功的版本沉淀为可复用资产"},
+  {"id":"time3","type":"string","label":"节点三编号","default":"03"},
+  {"id":"label3","type":"string","label":"节点三标签","default":"反复生成"},
+  {"id":"caption3","type":"string","label":"节点三说明","default":"每次微调参数，让产物持续变好"},
+  {"id":"time4","type":"string","label":"节点四编号","default":"04"},
+  {"id":"label4","type":"string","label":"节点四标签","default":"形成系统"},
+  {"id":"caption4","type":"string","label":"节点四说明","default":"资产 × 流程 × 节奏，跑成长期资产"},
+  {"id":"time5","type":"string","label":"节点五编号","default":"05"},
+  {"id":"label5","type":"string","label":"节点五标签","default":"规模复制"},
+  {"id":"caption5","type":"string","label":"节点五说明","default":"从单点实验到可复用的生产管线"},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"duration","type":"number","label":"时长（秒）","default":6},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+      .scene{ position:absolute; inset:0; }
+
+      /* 点阵底纹 */
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity: .55;
+      }
+
+      /* —— 顶部 eyebrow + 主标题 —— */
+      .eyebrow{
+        position:absolute; top:64px; left:96px;
+        display:inline-flex; align-items:center; gap:14px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:18px; letter-spacing:.22em; text-transform:uppercase;
+        color: #8A8A85;
+      }
+      .eyebrow .dot{
+        width:10px; height:10px; border-radius:50%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 14px color-mix(in srgb, var(--accent, #00FF00) 65%, transparent);
+      }
+      .eyebrow .acc{ color: var(--accent, #00FF00); font-weight:700; letter-spacing:.18em; }
+      .eyebrow .sep{ opacity:.4; }
+
+      .title{
+        position:absolute; top:120px; left:96px; right:96px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight:700; letter-spacing:-.02em;
+        font-size:64px; line-height:1.08; margin:0;
+      }
+      .subtitle{
+        position:absolute; top:200px; left:96px; right:96px;
+        font-size:24px; color: #9CA3AF;
+        margin:0; letter-spacing:.02em;
+      }
+
+      /* —— 主舞台：横向节点条 —— */
+      .stage{
+        position:absolute;
+        left:96px; right:96px; top:330px; bottom:96px;
+      }
+
+      /* 时间轴轨道（横线 + 进度填充 + 当前节点光圈） */
+      .track{
+        position:absolute;
+        left:0; right:0;
+        top:38px;
+        height:3px;
+        background:#2A2A2E;
+        border-radius:2px;
+      }
+      .track-fill{
+        position:absolute;
+        left:0; top:0;
+        height:100%; width:0%;
+        background: var(--accent, #00FF00);
+        border-radius:2px;
+        box-shadow: 0 0 18px color-mix(in srgb, var(--accent, #00FF00) 55%, transparent);
+      }
+
+      /* 节点行：横向均分 5 个 */
+      .nodes{
+        position:absolute;
+        left:0; right:0; top:0; bottom:0;
+        display:flex; gap:36px;
+        align-items:flex-start;
+      }
+      .col{
+        position:relative;
+        flex:1; min-width:0;
+        display:flex; flex-direction:column; align-items:center;
+        height:100%;
+      }
+
+      /* 节点圆点（与 track 重合在 top:38） */
+      .nodot{
+        position:absolute;
+        top:26px; left:50%;
+        transform: translate(-50%, 0);
+        width:30px; height:30px;
+        border-radius:50%;
+        background: var(--background, #12100E);
+        border:2px solid #4A4A4A;
+        z-index:3;
+        transition: none;
+      }
+      .nodot::after{
+        content:""; position:absolute;
+        top:50%; left:50%;
+        width:10px; height:10px;
+        border-radius:50%;
+        background: #4A4A4A;
+        transform: translate(-50%, -50%);
+      }
+      .col.done .nodot{
+        border-color: color-mix(in srgb, var(--foreground, #F4EFE7) 28%, transparent);
+      }
+      .col.done .nodot::after{
+        background: color-mix(in srgb, var(--foreground, #F4EFE7) 36%, transparent);
+      }
+      .col.current .nodot{
+        border-color: var(--accent, #00FF00);
+        box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent, #00FF00) 18%, transparent),
+                    0 0 28px color-mix(in srgb, var(--accent, #00FF00) 55%, transparent);
+      }
+      .col.current .nodot::after{
+        background: var(--accent, #00FF00);
+      }
+
+      /* 照片卡 */
+      .photo{
+        position:relative;
+        margin-top:80px;
+        width:100%;
+        aspect-ratio: 3 / 4;
+        border-radius:14px;
+        overflow:hidden;
+        background: linear-gradient(160deg, #1F1B18 0%, #15110E 100%);
+        border:1px solid #2A2A2E;
+        box-shadow: 0 8px 26px rgba(0,0,0,.45);
+        transform-origin: center 60%;
+        will-change: transform, filter, opacity;
+      }
+      /* 卡内"照片"——纯 CSS 抽象渐变 + 数字编号，避免任何外部素材依赖 */
+      .photo .frame{
+        position:absolute; inset:0;
+        background:
+          radial-gradient(120% 80% at 30% 18%, rgba(255,255,255,.10), transparent 55%),
+          radial-gradient(140% 90% at 80% 90%, color-mix(in srgb, var(--accent, #00FF00) 8%, transparent), transparent 60%);
+      }
+      .photo .frame::before{
+        content:""; position:absolute; inset:0;
+        background-image:
+          linear-gradient(115deg, rgba(255,255,255,.04) 0%, rgba(255,255,255,0) 35%, rgba(255,255,255,.04) 70%, rgba(255,255,255,0) 100%);
+      }
+      .photo .stamp{
+        position:absolute;
+        top:18px; left:18px;
+        padding:6px 12px;
+        border:1px solid #3A3A3E;
+        border-radius:6px;
+        background: rgba(0,0,0,.35);
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:16px; letter-spacing:.18em;
+        color: #B7B4AE;
+      }
+      .photo .glyph{
+        position:absolute;
+        left:0; right:0; bottom:18px;
+        text-align:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:14px; letter-spacing:.42em; text-transform:uppercase;
+        color: rgba(255,255,255,.28);
+      }
+      /* 已过 = 灰 + 暗；当前 = 强调色边框 + 微亮；未到 = 暗 + 低饱 */
+      .col.done .photo{
+        filter: grayscale(1) brightness(.62);
+        opacity:.85;
+      }
+      .col.future .photo{
+        filter: grayscale(.85) brightness(.55);
+        opacity:.55;
+      }
+      .col.current .photo{
+        filter: none;
+        opacity:1;
+        border-color: color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+        box-shadow:
+          0 12px 34px rgba(0,0,0,.55),
+          0 0 0 1px color-mix(in srgb, var(--accent, #00FF00) 22%, transparent) inset,
+          0 0 38px color-mix(in srgb, var(--accent, #00FF00) 18%, transparent);
+      }
+      .col.current .photo .stamp{
+        color: var(--accent, #00FF00);
+        border-color: color-mix(in srgb, var(--accent, #00FF00) 55%, transparent);
+        background: color-mix(in srgb, var(--accent, #00FF00) 10%, rgba(0,0,0,.35));
+      }
+      .col.current .photo .glyph{
+        color: color-mix(in srgb, var(--accent, #00FF00) 80%, transparent);
+      }
+
+      /* 节点下方：编号 + 标签 + 说明 */
+      .meta{
+        margin-top:22px;
+        width:100%;
+        text-align:center;
+        opacity:0;
+      }
+      .meta .num{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:18px; letter-spacing:.32em;
+        color: #6B6B66;
+      }
+      .meta .lab{
+        margin-top:8px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:30px; font-weight:700; letter-spacing:-.01em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 75%, transparent);
+      }
+      .meta .cap{
+        margin-top:8px;
+        font-size:17px; line-height:1.45;
+        color: #6B6B66;
+      }
+      .col.done .meta .lab{
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 45%, transparent);
+      }
+      .col.current .meta .lab{
+        color: var(--foreground, #F4EFE7);
+      }
+      .col.current .meta .num{
+        color: var(--accent, #00FF00);
+      }
+
+      /* 进度脚注 */
+      .footnote{
+        position:absolute;
+        bottom:96px; left:96px; right:96px;
+        display:flex; align-items:center; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:18px; letter-spacing:.06em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+      }
+      .footnote .pct{
+        font-size:34px; font-weight:700;
+        color: var(--accent, #00FF00);
+        letter-spacing:-.01em;
+      }
+      .footnote .pct small{
+        font-size:14px; font-weight:500;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+        margin-left:6px;
+      }
+      .footnote .step{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:18px; letter-spacing:.18em;
+      }
+      .footnote .step b{ color: var(--accent, #00FF00); font-weight:700; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+
+        <div class="eyebrow" id="eyebrow">
+          <span class="dot"></span>
+          <span><span class="acc">PATH</span><span class="sep"> · </span><span id="eyebrowTail">历程</span></span>
+        </div>
+
+        <h1 class="title" id="title">从一个想法到一套系统</h1>
+        <p class="subtitle" id="subtitle">走过的每一步，都让下一个动作更轻</p>
+
+        <div class="stage" id="stage">
+          <div class="track"><div class="track-fill" id="trackFill"></div></div>
+          <div class="nodes" id="nodes"></div>
+        </div>
+
+        <div class="footnote">
+          <span id="footLeft">从 0 到 1</span>
+          <span class="pct"><span id="pctVal">0</span><small>%</small></span>
+          <span class="step">STEP&nbsp;<b id="stepVal">01</b>&nbsp;/&nbsp;<span id="stepTotal">05</span></span>
+        </div>
+
+      </section>
+    </div>
+    <script>
+      /* —— 变量接线 —— */
+      const fallback = {
+        title: "从一个想法到一套系统",
+        eyebrow: "PATH · 历程",
+        time1: "01", label1: "做一次",    caption1: "先用脚本跑通一个最小闭环",
+        time2: "02", label2: "存模板",    caption2: "把成功的版本沉淀为可复用资产",
+        time3: "03", label3: "反复生成",  caption3: "每次微调参数，让产物持续变好",
+        time4: "04", label4: "形成系统",  caption4: "资产 × 流程 × 节奏，跑成长期资产",
+        time5: "05", label5: "规模复制",  caption5: "从单点实验到可复用的生产管线",
+        accent: "#00FF00", background: "#12100E", foreground: "#F4EFE7",
+        exportMode: "transparent",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables() : fallback;
+
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      const $ = (id) => document.getElementById(id);
+
+      /* —— 文案回填 —— */
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      $("title").textContent = v.title || fallback.title;
+      $("subtitle").textContent = "走过的每一步，都让下一个动作更轻";
+      const eyebrowRaw = String(v.eyebrow || fallback.eyebrow);
+      const ebParts = eyebrowRaw.split(/\s*[·\-|]\s*/).filter(Boolean);
+      const ebAcc = ebParts[0] || "PATH";
+      const ebTail = ebParts.slice(1).join(" · ") || "历程";
+      document.querySelector("#eyebrow .acc").textContent = ebAcc.toUpperCase();
+      $("eyebrowTail").textContent = ebTail;
+
+      /* —— 构造 5 个节点列 —— */
+      const items = [
+        [v.time1, v.label1, v.caption1],
+        [v.time2, v.label2, v.caption2],
+        [v.time3, v.label3, v.caption3],
+        [v.time4, v.label4, v.caption4],
+        [v.time5, v.label5, v.caption5],
+      ].map(([t,l,c]) => ({
+        time: String(t || "").trim(),
+        label: String(l || "").trim(),
+        caption: String(c || "").trim(),
+      })).filter(x => x.label);
+
+      const N = items.length;
+      const nodes = $("nodes");
+      const cols = items.map((it, i) => {
+        const col = document.createElement("div");
+        col.className = "col future";
+        col.dataset.idx = String(i);
+        col.innerHTML = `
+          <div class="nodot"></div>
+          <div class="photo">
+            <div class="frame"></div>
+            <div class="stamp">${escapeHtml(it.time || String(i+1).padStart(2,"0"))}</div>
+            <div class="glyph">FRAMED</div>
+          </div>
+          <div class="meta">
+            <div class="num">${escapeHtml(it.time || String(i+1).padStart(2,"0"))}</div>
+            <div class="lab">${escapeHtml(it.label)}</div>
+            <div class="cap">${escapeHtml(it.caption)}</div>
+          </div>
+        `;
+        nodes.appendChild(col);
+        return col;
+      });
+
+      $("stepTotal").textContent = String(N).padStart(2,"0");
+
+      /* —— 时间线 —— */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+      const tl = gsap.timeline({ paused: true });
+
+      /* 顶头入场 */
+      tl.fromTo("#eyebrow",
+        { opacity:0, y:14 },
+        { opacity:1, y:0, duration:0.45, ease:"power2.out" }, 0.05);
+      tl.fromTo("#title",
+        { opacity:0, clipPath:"inset(0 100% 0 0)" },
+        { opacity:1, clipPath:"inset(0 0% 0 0)", duration:0.7, ease:"power3.out" }, 0.15);
+      tl.fromTo("#subtitle",
+        { opacity:0, y:10 },
+        { opacity:1, y:0, duration:0.45, ease:"power2.out" }, 0.55);
+
+      /* 主舞台入场：track + nodes 整体淡入 */
+      tl.fromTo("#stage",
+        { opacity:0, y:18 },
+        { opacity:1, y:0, duration:0.55, ease:"power3.out" }, 0.7);
+
+      /* 每个 col 的卡片 + meta 错峰入场（在 stage 入场后开始） */
+      cols.forEach((col, i) => {
+        const photo = col.querySelector(".photo");
+        const meta = col.querySelector(".meta");
+        const fromY = i % 2 === 0 ? 28 : 20;
+        tl.fromTo(photo,
+          { opacity:0, y: fromY, scale:.94 },
+          { opacity:1, y:0, scale:1, duration:0.55, ease:"power3.out" },
+          1.0 + i * 0.12);
+        tl.fromTo(meta,
+          { opacity:0, y:10 },
+          { opacity:1, y:0, duration:0.4, ease:"power2.out" },
+          1.15 + i * 0.12);
+      });
+
+      /* 主推进：track-fill 增长 + 当前节点顺次前移 + 上一节点变 done */
+      const startAt = 1.9;
+      const driveDur = 3.4;
+      const stepEase = (t) => 0.5 - 0.5 * Math.cos(Math.PI * t);
+
+      tl.to({}, {
+        duration: driveDur,
+        ease: "none",
+        onUpdate: () => {
+          const u = tl.time() - startAt;
+          if (u <= 0) {
+            applyState(0);
+            return;
+          }
+          if (u >= driveDur) {
+            applyState(1);
+            return;
+          }
+          applyState(u / driveDur);
+        },
+      }, startAt);
+
+      function applyState(u) {
+        /* 当前节点索引：0..N-1；
+           推进进度 [0..1] 在 N 个节点上均分：
+             i < k：done（暗灰）
+             i == k：current（放大）
+             i > k：future
+           同一节点内按子进度做平滑切换 */
+        const seg = N > 1 ? 1 / N : 1;
+        const raw = u / seg;             // 0..N
+        const k = Math.min(N - 1, Math.floor(raw));
+        const local = raw - k;            // 0..1 within segment
+
+        cols.forEach((col, i) => {
+          col.classList.remove("done","current","future");
+          if (i < k) {
+            col.classList.add("done");
+          } else if (i > k) {
+            col.classList.add("future");
+          } else {
+            col.classList.add("current");
+          }
+        });
+
+        /* 进度条：从第 k 个中心到第 k+1 个中心的横移比例 */
+        const pct = (k + local) / N;
+        $("trackFill").style.width = (pct * 100).toFixed(2) + "%";
+        $("pctVal").textContent = String(Math.round(pct * 100));
+
+        const curIdx = k;
+        const curCol = cols[curIdx];
+        const curPhoto = curCol ? curCol.querySelector(".photo") : null;
+        const curMeta  = curCol ? curCol.querySelector(".meta .num") : null;
+        $("stepVal").textContent = String(curIdx + 1).padStart(2,"0");
+        $("footLeft").textContent = curCol
+          ? (items[curIdx].label || ("STEP " + (curIdx+1)))
+          : "完成";
+
+        /* 当前节点微放大：1.0 → 1.08，子进度 0→1；离开时缩回 1.0 */
+        const scaleNow = 1 + 0.08 * (1 - Math.abs(local - 0.5) * 2);
+        const safeScale = Math.max(1, Math.min(1.08, scaleNow));
+        if (curPhoto) gsap.set(curPhoto, { scale: safeScale });
+
+        /* 已被超越的卡片轻微下沉 + 灰化（一次性 GSAP 状态） */
+        cols.forEach((col, i) => {
+          if (i < k) {
+            const p = col.querySelector(".photo");
+            if (p && !p.dataset.doneOnce) {
+              gsap.set(p, { scale: 0.96 });
+              p.dataset.doneOnce = "1";
+            }
+          }
+        });
+      }
+
+      /* 当前节点呼吸（贯穿整段推进，强化"现在"）*/
+      tl.to({}, {
+        duration: driveDur,
+        ease: "none",
+        onUpdate: () => {
+          const u = tl.time() - startAt;
+          if (u < 0 || u > driveDur) return;
+          /* 在当前节点的子进度 0..1 上做小幅脉动，幅度小于主体放大 */
+          const seg = N > 1 ? 1 / N : 1;
+          const raw = u / seg;
+          const k = Math.min(N - 1, Math.floor(raw));
+          const local = raw - k;
+          /* 在 local=0.5 附近小幅 +0.02，让"现在"更突出 */
+          const bump = Math.sin(local * Math.PI) * 0.02;
+          const col = cols[k];
+          if (!col) return;
+          const p = col.querySelector(".photo");
+          const baseScale = 1 + 0.08 * (1 - Math.abs(local - 0.5) * 2);
+          gsap.set(p, { scale: Math.max(1, Math.min(1.10, baseScale + bump)) });
+        }
+      }, startAt);
+
+      /* 结尾：最后一个节点保持 current + 进度条撑满，停留 ~0.9s */
+      tl.to({}, { duration: 0.9, onComplete: () => {
+        /* 让最后一个节点定格为 done+轻微高光 + 进度条 100% */
+        applyState(0.9999);
+        const last = cols[cols.length - 1];
+        if (last) {
+          last.classList.remove("current","done","future");
+          last.classList.add("current");
+          const p = last.querySelector(".photo");
+          if (p) gsap.set(p, { scale: 1.06 });
+        }
+      }}, startAt + driveDur + 0.001);
+
+      /* 淡出（最后 0.4s） */
+      tl.to("#scene", { opacity: 0, duration: 0.45, ease: "power2.in" }, DUR - 0.5);
+
+      /* 初始化一次，避免动画开跑前画面空白 */
+      applyState(0);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

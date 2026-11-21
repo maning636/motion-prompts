@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"word","name":"拟声字","type":"string","label":"快门拟声字","default":"咔嚓"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"accent2","name":"次强调","type":"color","label":"次强调色","default":"#2EC4B6"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>相机取景快门</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+
+  .p-cm-halo {
+    position: absolute; left: 66px; top: 26px; width: 348px; height: 218px;
+    background: radial-gradient(60% 66% at 50% 50%,
+      rgba(0, 0, 0, .50) 0%, rgba(0, 0, 0, .25) 56%, rgba(0, 0, 0, 0) 86%);
+  }
+  /* 取景框：四组 L 形角标 */
+  .p-cm-box {
+    position: absolute; left: 96px; top: 40px; width: 288px; height: 190px;
+    will-change: transform, opacity;
+  }
+  .p-cm-cnr {
+    position: absolute; width: 26px; height: 26px;
+    border: 0 solid var(--ac, #FF6B35);
+    opacity: 0; will-change: transform, opacity;
+  }
+  .p-cm-cnr.tl { left: 0; top: 0; border-top-width: 4px; border-left-width: 4px; transform-origin: 0 0; }
+  .p-cm-cnr.tr { right: 0; top: 0; border-top-width: 4px; border-right-width: 4px; transform-origin: 100% 0; }
+  .p-cm-cnr.bl { left: 0; bottom: 0; border-bottom-width: 4px; border-left-width: 4px; transform-origin: 0 100%; }
+  .p-cm-cnr.br { right: 0; bottom: 0; border-bottom-width: 4px; border-right-width: 4px; transform-origin: 100% 100%; }
+  /* 中心对焦框 */
+  .p-cm-focus {
+    position: absolute; left: 50%; top: 50%; width: 58px; height: 58px;
+    margin: -29px 0 0 -29px; border: 2px solid var(--ac2, #2EC4B6);
+    opacity: 0; will-change: transform, opacity;
+  }
+  .p-cm-focus::before, .p-cm-focus::after {
+    content: ""; position: absolute; left: 50%; top: 50%;
+    background: var(--ac2, #2EC4B6);
+  }
+  .p-cm-focus::before { width: 14px; height: 2px; margin: -1px 0 0 -7px; }
+  .p-cm-focus::after { width: 2px; height: 14px; margin: -7px 0 0 -1px; }
+
+  /* 扫描线 */
+  .p-cm-scan {
+    position: absolute; left: 96px; right: 96px; top: 40px; height: 3px;
+    background: var(--ac2, #2EC4B6); opacity: 0;
+    box-shadow: 0 0 10px rgba(46, 196, 182, .9);
+    will-change: transform, opacity;
+  }
+  /* 快门闪白：整层半透明白，opacity 快速两跳 */
+  .p-cm-flash {
+    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+    background: rgba(255, 255, 255, .92); opacity: 0; pointer-events: none;
+    will-change: opacity;
+  }
+  /* 拍完的红色角标闪一下 */
+  .p-cm-rec {
+    position: absolute; left: 108px; top: 48px; width: 9px; height: 9px;
+    border-radius: 50%; background: var(--ac, #FF6B35); opacity: 0;
+    will-change: opacity;
+  }
+  /* 「咔嚓」：手绘感硬边字 */
+  .p-cm-word {
+    position: absolute; left: 0; right: 0; top: 92px; text-align: center;
+    font-size: 46px; line-height: 1; font-weight: 900; letter-spacing: .06em;
+    color: #FFF8EE; white-space: nowrap;
+    -webkit-text-stroke: 6px var(--ink, #1B1B24);
+    paint-order: stroke fill;
+    text-shadow: 5px 5px 0 rgba(0, 0, 0, .8);
+    opacity: 0; will-change: transform, opacity;
+  }
+  .p-cm-ring {
+    position: absolute; left: 50%; top: 115px; width: 100px; height: 100px;
+    margin: -50px 0 0 -50px; border: 3px solid #FFF8EE; border-radius: 50%;
+    opacity: 0; will-change: transform, opacity;
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"word":"咔嚓","accent":"#FF6B35","accent2":"#2EC4B6","duration":3};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--ac2', v.accent2 || FALLBACK.accent2);
+  root.style.setProperty('--ink', '#1B1B24');
+  const dur = parseFloat(v.duration) || 3;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  const word = (v.word == null || v.word === '' ? FALLBACK.word : v.word)
+    .toString().replace(/\s+/g, '').trim().slice(0, 3);
+
+  put('div', 'p-cm-halo');
+  const box = put('div', 'p-cm-box');
+  const cnrs = ['tl', 'tr', 'bl', 'br'].map(function (c) {
+    return put('div', 'p-cm-cnr ' + c, null, null, box);
+  });
+  const focus = put('div', 'p-cm-focus', null, null, box);
+  const scan = put('div', 'p-cm-scan');
+  const rec = put('div', 'p-cm-rec');
+  const flash = put('div', 'p-cm-flash');
+  const ring = put('div', 'p-cm-ring');
+  const wordEl = put('div', 'p-cm-word', null, word, stage);
+
+  /* §3.2 中文溢出防护 */
+  const MAXFS = 46, MINFS = 20, AVAIL = 320;
+  wordEl.style.whiteSpace = 'nowrap';
+  const natural = wordEl.scrollWidth;
+  if (natural > AVAIL && natural > 0) {
+    wordEl.style.fontSize = String(Math.max(MINFS, Math.floor(MAXFS * AVAIL / natural))) + 'px';
+  }
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  const SHUT = 1.55;
+
+  /* ① 取景框四角张开 */
+  tl.fromTo(box, { scale: .92, opacity: 0 },
+    { scale: 1, opacity: 1, duration: .34, ease: 'back.out(2.2)' }, 0);
+  cnrs.forEach(function (c, i) {
+    tl.fromTo(c, { scale: .2, opacity: 0 },
+      { scale: 1, opacity: 1, duration: .26, ease: 'back.out(3)', stagger: .05 }, .06);
+  });
+
+  /* ② 对焦框出现 + 收一下 */
+  tl.fromTo(focus, { scale: 1.7, opacity: 0 },
+    { scale: 1, opacity: .95, duration: .28, ease: 'power3.out' }, .42);
+  tl.to(focus, { scale: .86, duration: .16, ease: 'back.out(2.4)' }, .86);
+  tl.to(focus, { scale: 1, duration: .18, ease: 'back.out(2.4)' }, 1.06);
+
+  /* ③ 录制红点 */
+  tl.fromTo(rec, { opacity: 0, scale: .4 },
+    { opacity: 1, scale: 1, duration: .16, ease: 'back.out(3)' }, .30);
+  tl.to(rec, { opacity: .25, duration: .28, ease: 'sine.inOut', yoyo: true, repeat: 1 }, .50);
+
+  /* ④ 扫描线从取景框顶扫到底（y 走 0 → 187，框高 190） */
+  tl.fromTo(scan, { y: 0, opacity: 0 },
+    { opacity: 1, duration: .14, ease: 'power2.out' }, .60);
+  tl.to(scan, { y: 187, duration: .78, ease: 'none' }, .68);
+  tl.to(scan, { opacity: 0, duration: .20, ease: 'power2.in' }, SHUT - .14);
+
+  /* ⑤ 快门：闪白两跳（快 → 暗 → 再快一下） */
+  tl.to(flash, { opacity: .92, duration: .05, ease: 'power2.out' }, SHUT);
+  tl.to(flash, { opacity: .06, duration: .07, ease: 'power2.in' }, SHUT + .05);
+  tl.to(flash, { opacity: .55, duration: .04, ease: 'power2.out' }, SHUT + .12);
+  tl.to(flash, { opacity: 0, duration: .18, ease: 'power2.out' }, SHUT + .16);
+
+  /* ⑥ 取景框被闪光顶一下再收回 */
+  tl.to(box, { scale: 1.035, duration: .07, ease: 'power2.out' }, SHUT);
+  tl.to(box, { scale: 1, duration: .22, ease: 'back.out(2.4)' }, SHUT + .07);
+  tl.to(focus, { opacity: 0, duration: .16, ease: 'power2.in' }, SHUT);
+  tl.to(rec, { opacity: 0, duration: .16, ease: 'power2.in' }, SHUT);
+
+  /* ⑦ 「咔嚓」砸入 */
+  tl.fromTo(ring, { scale: .35, opacity: 0 },
+    { scale: 2.3, opacity: .7, duration: .10, ease: 'power2.out' }, SHUT + .02);
+  tl.to(ring, { scale: 2.7, opacity: 0, duration: .46, ease: 'power2.out' }, SHUT + .12);
+  tl.fromTo(wordEl, { scale: .45, opacity: 0, rotate: -16 },
+    { scale: 1.2, opacity: 1, rotate: 5, duration: .15, ease: 'power4.out' }, SHUT + .04);
+  tl.to(wordEl, { scale: 1, rotate: -2, duration: .24, ease: 'back.out(3.2)' }, SHUT + .19);
+  tl.to(wordEl, { x: 4, duration: .05, repeat: 3, yoyo: true, ease: 'none' }, SHUT + .19);
+  tl.to(wordEl, { y: -3, duration: .05, repeat: 3, yoyo: true, ease: 'none' }, SHUT + .19);
+
+  /* ⑧ 收尾淡出 */
+  const tail = Math.max(SHUT + 1.0, dur - .45);
+  tl.to(wordEl, { opacity: 0, y: -8, duration: .26, ease: 'power2.in' }, tail);
+  tl.to(cnrs, { opacity: 0, duration: .22, ease: 'power2.in' }, tail + .04);
+  tl.to(box, { opacity: 0, scale: .96, duration: .26, ease: 'power2.in' }, tail);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

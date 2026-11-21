@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "kicker", "type": "string", "label": "眉题", "default": "OUTLINE FILL · 描边充填"}, {"id": "word", "type": "string", "label": "巨字（短词最佳）", "default": "确定性"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 5}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #F6F5EF; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #141414;
+        background-image: linear-gradient(rgba(20,20,20,.045) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(20,20,20,.045) 1px, transparent 1px);
+        background-size: 36px 36px; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      /* 顶部细线页眉 */
+      .owf-head{ position: absolute; left: 90px; right: 90px; top: 48px; height: 44px; z-index: 6; }
+      .owf-head .rule{ position: absolute; left: 0; right: 0; top: 0; height: 2px; background: #141414;
+        transform: scaleX(0); transform-origin: 0 50%; }
+      .owf-head .l{ position: absolute; left: 0; top: 12px; font-size: 19px; letter-spacing: .22em; color: #141414; }
+      .owf-head .r{ position: absolute; right: 0; top: 12px; font-size: 19px; letter-spacing: .22em; color: #9A9A92; }
+      /* 中央舞台 */
+      .owf-stage{ position: absolute; left: 0; right: 0; top: 0; bottom: 64px; display: flex;
+        flex-direction: column; align-items: center; justify-content: center; z-index: 4; }
+      .owf-kicker{ font-size: 24px; letter-spacing: .34em; color: #9A9A92; margin-bottom: 48px; }
+      .owf-kicker b{ color: #141414; font-weight: 400; }
+      .owf-word{ font-size: 300px; font-weight: 900; line-height: 1.1; letter-spacing: .02em;
+        white-space: nowrap; }
+      .owf-word .ch{ position: relative; display: inline-block; }
+      .owf-word .stroke{ position: relative; color: transparent;
+        -webkit-text-stroke: 4px #141414; }
+      .owf-word .fill{ position: absolute; left: 0; top: 0; z-index: 2; color: var(--ac, #00FF00);
+        -webkit-text-stroke: 4px #141414;
+        clip-path: inset(102% -2% -2% -2%); }
+      .owf-sub{ margin-top: 52px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 26px;
+        letter-spacing: .12em; color: #55554E; }
+      /* 底部绿色署名条 */
+      .owf-foot{ position: absolute; left: 0; right: 0; bottom: 0; height: 64px; background: var(--ac, #00FF00);
+        z-index: 6; display: flex; align-items: center; justify-content: space-between; padding: 0 90px;
+        transform: translateY(64px); }
+      .owf-foot .f1{ font-size: 22px; font-weight: 900; letter-spacing: .12em; color: #141414; }
+      .owf-foot .f2{ font-size: 18px; letter-spacing: .26em; color: #141414; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+      <div class="owf-head">
+        <div class="rule" id="rule"></div>
+        <div class="l mono" id="vol">VOL.15 · 视觉动效库</div>
+        <div class="r mono" id="pageno">P.393 / 400</div>
+      </div>
+      <div class="owf-stage">
+        <div class="owf-kicker mono" id="kicker"></div>
+        <div class="owf-word" id="word"></div>
+        <div class="owf-sub" id="sub">荧光绿液面 · 自底向上逐字充填</div>
+      </div>
+      <div class="owf-foot" id="foot">
+        <div class="f1">@老马AI研习社</div>
+        <div class="f2 mono">MOTION LIBRARY · OUTLINE FILL</div>
+      </div>
+    </div>
+    <script>
+      const fallback = {"kicker": "OUTLINE FILL · 描边充填", "word": "确定性", "accent": "#00FF00", "duration": 5};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      document.documentElement.style.setProperty("--ac", V.accent ?? "#00FF00");
+      // 眉题：· 后半段墨色
+      $("kicker").textContent = "";
+      const kc = String(V.kicker).split("·");
+      $("kicker").textContent = kc[0].trim();
+      if (kc[1]) { const b = document.createElement("b"); b.textContent = " · " + kc.slice(1).join("·").trim(); $("kicker").appendChild(b); }
+      // 逐字搭双层：描边壳 + 绿色充填层（clip-path 从底部收起）
+      const wordEl = $("word");
+      wordEl.textContent = "";
+      const fills = [];
+      for (const ch of String(V.word)) {
+        const wrap = document.createElement("span");
+        wrap.className = "ch";
+        const stroke = document.createElement("span");
+        stroke.className = "stroke"; stroke.textContent = ch;
+        const fill = document.createElement("span");
+        fill.className = "fill"; fill.textContent = ch; fill.setAttribute("aria-hidden", "true");
+        wrap.appendChild(fill); wrap.appendChild(stroke);
+        wordEl.appendChild(wrap);
+        fills.push(fill);
+      }
+      // 页眉细线 + 文字
+      tl.to("#rule", { scaleX: 1, duration: 0.5, ease: "power3.out" }, 0);
+      tl.fromTo(["#vol", "#pageno"], { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.4, stagger: 0.08 }, 0.25);
+      // 眉题
+      tl.fromTo("#kicker", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.45 }, 0.35);
+      // 空心巨字急缓收缩落位，立住一拍
+      tl.fromTo("#word", { scale: 1.35, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.65, ease: "expo.out" }, 0.4);
+      // 荧光绿液面自底向上逐字充填
+      tl.to(fills, { clipPath: "inset(-2% -2% -2% -2%)", duration: 0.55, ease: "power2.inOut", stagger: 0.22 }, 1.5);
+      // 充满后整体轻微一顿（定格确认感）
+      tl.fromTo("#word", { scale: 1 }, { scale: 1.03, duration: 0.16, ease: "power2.out", yoyo: true, repeat: 1 }, 1.5 + 0.55 + 0.22 * (fills.length - 1));
+      // 说明行
+      tl.fromTo("#sub", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.4 }, 3.3);
+      // 底部署名条
+      tl.to("#foot", { y: 0, duration: 0.5, ease: "expo.out" }, 3.6);
+      tl.fromTo([".owf-foot .f1", ".owf-foot .f2"], { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.35, stagger: 0.08 }, 3.85);
+      // 呼吸浮动（定格前保持活着，无收尾 fade-out）
+      tl.to("#word", { y: -8, duration: 1.2, ease: "sine.inOut", yoyo: true, repeat: 1 }, 4.2);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

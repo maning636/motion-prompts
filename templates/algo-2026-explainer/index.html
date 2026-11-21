@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#0E0E0E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"}]}
+]' data-duration="560" data-width="1920" data-height="1080" data-composition-id="main">
+<head>
+<meta charset="utf-8"><title>抖音算法 2026 · v3</title>
+<script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<style>
+:root{--acc:#00FF00;--fg:#F4EFE7;--bg:#0E0E0E;--mut:#8A8A85;--dim:#3A3A38;--panel:#161614;--blue:#1B4FD8;--yellow:#FFD400}
+html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:var(--bg);color:var(--fg);
+  font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+#root{position:relative;width:1920px;height:1080px;overflow:hidden;background:var(--bg)}
+.scene{position:absolute;inset:0;display:none;background:var(--bg)}
+.scene.on{display:block}
+.vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.veil{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.5),rgba(0,0,0,.3) 45%,rgba(0,0,0,.72))}
+
+/* ---------- 底部字幕条：字大 ---------- */
+#cap{position:absolute;left:50%;transform:translateX(-50%);bottom:48px;width:1560px;z-index:40;
+  background:rgba(10,10,10,.8);border:1px solid rgba(244,239,231,.15);border-radius:16px;
+  padding:24px 40px;backdrop-filter:blur(8px)}
+#capMain{font-size:42px;font-weight:700;line-height:1.42}
+#capMain .hl{color:var(--acc)}
+#capNote{margin-top:10px;font-size:23px;color:var(--mut);line-height:1.5}
+#capTag{position:absolute;left:120px;top:64px;z-index:40;font-family:"Kingsoft Tech",monospace;font-size:16px;letter-spacing:.3em;color:var(--acc);
+  background:rgba(10,10,10,.55);padding:8px 16px;border-radius:8px;border:1px solid rgba(0,255,0,.25)}
+#pfillWrap{position:absolute;left:120px;right:120px;bottom:20px;height:3px;background:rgba(244,239,231,.12);border-radius:2px;z-index:40}
+#pfill{height:100%;width:0;background:var(--acc);border-radius:2px}
+#brandTag{position:absolute;right:120px;top:64px;z-index:40;font-family:"Kingsoft Tech",monospace;font-size:14px;color:var(--mut);letter-spacing:.25em}
+
+/* ---------- S0 开场：视频垫底 + 黄字卡浮层（填满） ---------- */
+#hookVidA{position:absolute;inset:0}
+.posterCard{position:absolute;left:120px;right:120px;top:110px;bottom:190px;background:var(--yellow);color:#111;
+  border-radius:26px;display:none;flex-direction:column;justify-content:center;padding:0 90px;box-sizing:border-box;
+  box-shadow:0 40px 120px -30px rgba(0,0,0,.7)}
+.posterCard.on{display:flex}
+.posterCard .kicker{font-size:30px;font-weight:800;letter-spacing:.22em;margin-bottom:26px}
+.posterCard .mega{font-size:128px;font-weight:900;line-height:1.06;letter-spacing:-.02em}
+.posterCard .mega em{font-style:normal;background:#111;color:var(--yellow);padding:0 26px;border-radius:16px}
+.posterCard .pills{display:flex;gap:16px;margin-top:34px}
+.posterCard .pp{background:#111;color:var(--yellow);font-size:26px;font-weight:700;padding:10px 26px;border-radius:999px}
+.posterCard .sub2{margin-top:30px;font-size:38px;font-weight:700}
+.posterCard .giantIcon{position:absolute;right:70px;top:56px;font-size:170px;line-height:1;opacity:.22;font-weight:900}
+
+/* ---------- S1 规则段：双视频轮换 ---------- */
+#rvA,#rvB,#rvC{position:absolute;inset:0;opacity:0}
+.popNote{position:absolute;z-index:30;opacity:0}
+.popNote .circle{width:150px;height:150px;border:3px solid var(--acc);border-radius:50%}
+.popNote .lab{margin-top:10px;font-size:20px;font-weight:700;color:var(--acc);background:rgba(0,0,0,.7);padding:5px 14px;border-radius:8px;white-space:nowrap}
+
+/* ---------- S2 白底编辑页 ---------- */
+.editorial{background:#FAFAF7;color:#141414}
+.editorial .eEyebrow{position:absolute;left:110px;top:96px;font-size:17px;letter-spacing:.3em;color:var(--blue);font-weight:700}
+.editorial .eBrand{position:absolute;right:110px;top:96px;font-family:"Kingsoft Tech",monospace;font-size:14px;color:#9A9A95;letter-spacing:.2em}
+.editorial .eRule{position:absolute;left:110px;right:110px;top:140px;height:1px;background:#E2E2DC}
+.editorial .eTitle{position:absolute;left:110px;top:190px;font-size:88px;font-weight:800;line-height:1.18;letter-spacing:-.01em}
+.editorial .eTitle em{font-style:normal;color:var(--blue)}
+.compare{position:absolute;left:110px;right:110px;top:510px;display:flex;gap:28px}
+.cmp{flex:1;border-radius:16px;padding:38px 42px;box-sizing:border-box;min-height:290px}
+.cmp.old{background:#EFEFEA}
+.cmp.new{background:var(--blue);color:#fff}
+.cmp .cTag{font-family:"Kingsoft Tech",monospace;font-size:15px;letter-spacing:.25em;opacity:.75}
+.cmp .cBig{font-size:46px;font-weight:800;margin:20px 0 14px}
+.cmp .cDesc{font-size:21px;line-height:1.65;opacity:.92}
+.chips{position:absolute;left:110px;bottom:225px;display:flex;gap:14px}
+.chip{border:1.5px solid #D8D8D2;border-radius:10px;padding:10px 22px;font-size:19px;font-weight:600;color:#141414;background:#FAFAF7}
+.chip.lit{background:var(--blue);border-color:var(--blue);color:#fff}
+.eFoot{position:absolute;left:110px;right:110px;bottom:96px;display:flex;justify-content:space-between;font-family:"Kingsoft Tech",monospace;font-size:14px;color:#9A9A95;letter-spacing:.15em}
+
+/* ---------- S3 五类单卡（全部带视频窗） ---------- */
+.whoVid{position:absolute;right:120px;top:140px;width:600px;aspect-ratio:16/9;border-radius:16px;overflow:hidden;
+  border:1px solid rgba(244,239,231,.22);box-shadow:0 24px 70px -20px rgba(0,0,0,.8);display:none}
+.whoVid.on{display:block}
+.whoVid .vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.whoBig{position:absolute;left:120px;top:170px;width:1000px;bottom:250px;display:flex;gap:56px;align-items:flex-start}
+.whoIdx{font-size:190px;font-weight:900;line-height:.95;color:transparent;-webkit-text-stroke:3px var(--acc)}
+.whoMid .whoNm{font-size:92px;font-weight:800;line-height:1.08}
+.whoMid .whoVt{margin-top:18px;display:inline-block;font-size:30px;font-weight:700;color:#111;background:var(--acc);padding:8px 24px;border-radius:999px}
+.whoAdv{position:absolute;left:120px;top:600px;width:1000px;display:flex;flex-direction:column;gap:22px}
+.advRow{display:flex;gap:18px;align-items:flex-start;font-size:32px;line-height:1.45;font-weight:600}
+.advRow .dot{flex:none;width:15px;height:15px;border-radius:50%;background:var(--acc);margin-top:15px}
+.advRow b{color:var(--acc)}
+
+/* ---------- S4 层级表 ---------- */
+.ladderWrap{position:absolute;left:220px;right:160px;top:200px}
+.ruler{position:absolute;left:150px;top:200px;bottom:250px;width:2px;background:rgba(244,239,231,.15)}
+.ruler .tick{position:absolute;left:-5px;width:12px;height:2px;background:rgba(244,239,231,.3)}
+.ladRow{display:flex;align-items:baseline;gap:40px;padding:30px 0;border-bottom:1px dashed rgba(244,239,231,.14);opacity:0;transform:translateX(-30px)}
+.ladRow .k{font-family:"Kingsoft Tech",monospace;font-size:17px;color:var(--mut);width:130px;letter-spacing:.2em}
+.ladRow .v{font-size:46px;font-weight:800}
+.ladRow .v em{font-style:normal;color:var(--acc)}
+.ladRow .arr{font-size:32px;color:var(--mut)}
+
+/* ---------- S5 白底编号网格 ---------- */
+.grid2x2{position:absolute;left:110px;right:110px;top:430px;display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.gCell{background:#EFEFEA;border-radius:14px;padding:34px 40px;opacity:.45;transition:all .5s;border:2px solid transparent}
+.gCell.lit{opacity:1;background:#fff;border-color:var(--blue);box-shadow:0 10px 40px -18px rgba(27,79,216,.5)}
+.gCell .gn{font-family:"Kingsoft Tech",monospace;font-size:16px;color:var(--blue);letter-spacing:.25em}
+.gCell .gt{font-size:34px;font-weight:800;margin:12px 0 8px}
+.gCell .gd{font-size:19px;color:#55554F;line-height:1.6}
+
+/* ---------- S6 收尾 ---------- */
+.outroYellow{position:absolute;inset:0;background:var(--yellow);color:#111;display:none;flex-direction:column;justify-content:center;padding:0 140px;box-sizing:border-box}
+.outroYellow.on{display:flex}
+.outroYellow .oLine{font-size:96px;font-weight:900;line-height:1.3}
+.outroYellow .oLine em{font-style:normal;background:#111;color:var(--yellow);padding:0 20px;border-radius:12px}
+.outroBlack{position:absolute;inset:0;background:#0B0B0B;display:none;flex-direction:column;justify-content:center;padding:0 160px;box-sizing:border-box}
+.outroBlack.on{display:flex}
+.outroBlack .q{font-size:58px;font-weight:800;line-height:1.4}
+.outroBlack .next{margin-top:56px;font-size:32px;color:var(--mut)}
+.outroBlack .next b{color:var(--acc)}
+.outroBlack .me{margin-top:40px;font-family:"Kingsoft Tech",monospace;font-size:17px;letter-spacing:.3em;color:var(--mut)}
+#flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;mix-blend-mode:screen;z-index:60}
+</style>
+<style>
+/* [公开版] 原实拍视频未随仓分发，此处为占位块 */
+.pub-media-placeholder{
+  background:
+    repeating-linear-gradient(135deg, rgba(255,255,255,.05) 0 12px, rgba(255,255,255,.11) 12px 24px),
+    rgba(120,120,130,.22);
+  border:1px dashed rgba(255,255,255,.22);
+  border-radius:10px;
+  position:relative;
+}
+.pub-media-placeholder::after{
+  content:"公开版未包含实拍素材";
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  font:400 20px/1.4 'PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,sans-serif;
+  color:rgba(255,255,255,.62);
+  letter-spacing:.04em;
+}
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="main">
+
+  <!-- S0 开场：视频垫底 + 黄字卡 -->
+  <section class="scene on" id="sc-hook">
+    <!-- [公开版] 原视频 视频 26517.mp4（未随仓分发） 未随仓分发（实拍素材，体积原因）。此位置改为占位块。 -->
+<div class="vid pub-media-placeholder" id="hookVidA"></div>
+    <div class="veil" style="opacity:.55"></div>
+    <div class="posterCard on" id="p1">
+      <div class="giantIcon">▶</div>
+      <div class="kicker">DOUYIN 2026 创作者大会 · AI 做片人必读</div>
+      <div class="mega">卡在 <em>500</em><br>播放？</div>
+      <div class="pills"><div class="pp">投流没用</div><div class="pp">换时间没用</div><div class="pp">像撞墙</div></div>
+      <div class="sub2">你不是一个人——这是规则的问题</div>
+    </div>
+    <div class="posterCard" id="p2">
+      <div class="giantIcon">✦</div>
+      <div class="kicker">先别怀疑自己的内容</div>
+      <div class="mega">不是你不<br><em>行</em></div>
+      <div class="pills"><div class="pp">9 月 19 日</div><div class="pp">抖音开大会</div><div class="pp">规则全换了</div></div>
+      <div class="sub2">做 AI 内容的，这条跟你关系最大</div>
+    </div>
+    <div class="posterCard" id="p3">
+      <div class="giantIcon">◉</div>
+      <div class="kicker">地图换了 · 跟 AI 有什么关系？</div>
+      <div class="mega">关系<em>大了</em></div>
+      <div class="pills"><div class="pp">AI 原生创作</div><div class="pp">官方钦点赛道</div><div class="pp">流量开闸</div></div>
+      <div class="sub2">9 分钟讲透 · 五类 AI 博主对号入座</div>
+    </div>
+  </section>
+
+  <!-- S1 规则段：双视频轮换 -->
+  <section class="scene" id="sc-video">
+    <!-- [公开版] 原视频 视频 4908.mp4（未随仓分发） 未随仓分发（实拍素材，体积原因）。此位置改为占位块。 -->
+<div class="vid pub-media-placeholder" id="rvA"></div>
+    <!-- [公开版] 原视频 视频 4154.mp4（未随仓分发） 未随仓分发（实拍素材，体积原因）。此位置改为占位块。 -->
+<div class="vid pub-media-placeholder" id="rvB"></div>
+    <!-- [公开版] 原视频 视频 23318.mp4（未随仓分发） 未随仓分发（实拍素材，体积原因）。此位置改为占位块。 -->
+<div class="vid pub-media-placeholder" id="rvC"></div>
+    <div class="veil"></div>
+    <div class="popNote" id="pop1" style="left:1050px;top:170px"><div class="circle"></div><div class="lab">刚搜过鱼竿的人</div></div>
+    <div class="popNote" id="pop2" style="left:340px;top:620px"><div class="circle" style="width:110px;height:110px"></div><div class="lab">看完 · 收藏 · 追更</div></div>
+  </section>
+
+  <!-- S2 白底编辑页 -->
+  <section class="scene editorial" id="sc-editorial">
+    <div class="eEyebrow">PART 1 · 新规则翻译成人话</div><div class="eBrand">LAOMA · AI VIDEO</div>
+    <div class="eRule"></div>
+    <div class="eTitle">不是推给更多人，<br>是推给<em>更需要的人</em></div>
+    <div class="compare">
+      <div class="cmp old" id="cmpOld"><div class="cTag">OLD · 赌基数</div><div class="cBig">100 人看到 → 30 人真看</div>
+        <div class="cDesc">钓到泛流量就放大，钓不到就沉底。基数游戏。</div></div>
+      <div class="cmp new" id="cmpNew"><div class="cTag">NEW · 赌匹配</div><div class="cBig">10 个需要的人 → 几乎全看完</div>
+        <div class="cDesc">先小范围验证「人对、货硬」，确认后再放大。匹配游戏。</div></div>
+    </div>
+    <div class="chips"><div class="chip" id="chip1">收藏</div><div class="chip" id="chip2">追更</div><div class="chip" id="chip3">完播</div><div class="chip">&gt; 点赞评论</div></div>
+    <div class="eFoot"><span>深度互动 &gt; 点赞评论</span><span>01 / 06</span></div>
+  </section>
+
+  <!-- S3 五类单卡（全部带视频） -->
+  <section class="scene" id="sc-who">
+    <div class="whoVid" id="whoVid0"><!-- [公开版] 原视频 视频 41277.mp4（未随仓分发） 未随仓分发（实拍素材，体积原因）。此位置改为占位块。 -->
+<div class="vid pub-media-placeholder"></div></div>
+    <div class="whoVid" id="whoVid1"><!-- [公开版] 原视频 视频 41654.mp4（未随仓分发） 未随仓分发（实拍素材，体积原因）。此位置改为占位块。 -->
+<div class="vid pub-media-placeholder"></div></div>
+    <div class="whoVid" id="whoVid2"><!-- [公开版] 原视频 视频 23292.mp4（未随仓分发） 未随仓分发（实拍素材，体积原因）。此位置改为占位块。 -->
+<div class="vid pub-media-placeholder"></div></div>
+    <div class="whoVid" id="whoVid3"><!-- [公开版] 原视频 视频 46159.mp4（未随仓分发） 未随仓分发（实拍素材，体积原因）。此位置改为占位块。 -->
+<div class="vid pub-media-placeholder"></div></div>
+    <div class="whoVid" id="whoVid4"><!-- [公开版] 原视频 视频 49658.mp4（未随仓分发） 未随仓分发（实拍素材，体积原因）。此位置改为占位块。 -->
+<div class="vid pub-media-placeholder"></div></div>
+    <div class="whoBig">
+      <div class="whoIdx" id="whoIdx">01</div>
+      <div class="whoMid"><div class="whoNm" id="whoNm">讲实操</div><div class="whoVt" id="whoVt">亲儿子 · 有坑</div></div>
+    </div>
+    <div class="whoAdv" id="whoAdv"></div>
+  </section>
+
+  <!-- S4 层级表 -->
+  <section class="scene" id="sc-ladder">
+    <div style="position:absolute;left:220px;top:118px;font-family:'Kingsoft Tech',monospace;font-size:16px;letter-spacing:.35em;color:var(--acc)">PART 2+ · 命运层级</div>
+    <div class="ruler" id="ruler"></div>
+    <div class="ladderWrap" id="ladderWrap">
+      <div class="ladRow"><div class="k">实操</div><div class="v">封王 · 收藏硬通货</div><div class="arr">→</div><div class="v"><em>做系列</em></div></div>
+      <div class="ladRow"><div class="k">技术</div><div class="v">闷声 · 密度即壁垒</div><div class="arr">→</div><div class="v"><em>讲透一题</em></div></div>
+      <div class="ladRow"><div class="k">新闻</div><div class="v">塌方 · 窗口太短</div><div class="arr">→</div><div class="v"><em>当翻译官</em></div></div>
+      <div class="ladRow"><div class="k">情绪</div><div class="v">裸泳 · 收藏为零</div><div class="arr">→</div><div class="v"><em>只当药引</em></div></div>
+      <div class="ladRow"><div class="k">开源</div><div class="v">分化 · 看当什么人</div><div class="arr">→</div><div class="v"><em>实测出片</em></div></div>
+    </div>
+  </section>
+
+  <!-- S5 白底编号网格 -->
+  <section class="scene editorial" id="sc-tactics">
+    <div class="eEyebrow">PART 3 · 三条打法</div><div class="eBrand">LAOMA · AI VIDEO</div>
+    <div class="eRule"></div>
+    <div class="eTitle" style="font-size:72px;top:180px">五类对完号，<br>打法收敛成<em>三条</em></div>
+    <div class="grid2x2">
+      <div class="gCell" id="g1"><div class="gn">NO.1</div><div class="gt">账号 → 生产线</div><div class="gd">固定栏目 · 固定节奏 · 连续剧式连续性。系列永远比单条爆款重要。</div></div>
+      <div class="gCell" id="g2"><div class="gn">NO.2</div><div class="gt">答透一个真问题</div><div class="gd">判断标准：观众看完能不能照做？收藏最高的案例：14 分钟教程，592 万收藏。</div></div>
+      <div class="gCell" id="g3"><div class="gn">NO.3</div><div class="gt">产能交给工具</div><div class="gd">机器做皮，人做魂。系列化最大的敌人是产能，不是创意。</div></div>
+      <div class="gCell" id="g4"><div class="gn">RULE</div><div class="gt">精准是平台的事 · 扩量是你的事</div><div class="gd">别再研究怎么让系统懂你，全部注意力只放在扩量上。</div></div>
+    </div>
+    <div class="eFoot"><span>精准 · 平台解决 / 扩量 · 你的任务</span><span>05 / 06</span></div>
+  </section>
+
+  <!-- S6 收尾 -->
+  <section class="scene" id="sc-outro" style="background:#0B0B0B">
+    <!-- [公开版] 原视频 视频 1773.mp4（未随仓分发） 未随仓分发（实拍素材，体积原因）。此位置改为占位块。 -->
+<div class="vid pub-media-placeholder" id="outroVid"></div>
+    <div class="veil" style="opacity:.6"></div>
+    <div class="outroYellow" id="oy1">
+      <div style="font-size:24px;font-weight:800;letter-spacing:.3em;margin-bottom:40px">SUMMARY · 带走三句</div>
+      <div class="oLine">规则：<em>更需要的人</em></div>
+      <div class="oLine">五类：<em>各有活法</em></div>
+      <div class="oLine">你：<em>只管扩量</em></div>
+    </div>
+    <div class="outroBlack" id="ob1">
+      <div class="q">作业：评论区报上你的「行业」<br>说说你想用 AI 解决什么问题——挑三个真实行业，下场拆。</div>
+      <div class="next">下集：<b>《系列化生产线怎么搭》</b> —— 从定位、栏目设计到产能工具，完整一版</div>
+      <div class="me">老马 · AI 做片的真实打法 · 每周一条</div>
+    </div>
+  </section>
+
+  <div id="capTag">SECTION 00 / HOOK</div>
+  <div id="brandTag">LAOMA.AI</div>
+  <div id="cap"><div id="capMain"></div><div id="capNote"></div></div>
+  <div id="pfillWrap"><div id="pfill"></div></div>
+  <div id="flash"></div>
+</div>
+
+<script>
+const fallback = {"accent":"#00FF00","background":"#0E0E0E","foreground":"#F4EFE7","exportMode":"mp4"};
+const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+document.documentElement.style.setProperty("--acc", v.accent ?? "#00FF00");
+document.documentElement.style.setProperty("--fg", v.foreground ?? "#F4EFE7");
+document.documentElement.style.setProperty("--bg", v.background ?? "#0E0E0E");
+const $ = id => document.getElementById(id);
+window.__timelines = window.__timelines || {};
+
+const BEATS = [
+[0,"你的视频，是不是常年卡在 500 播放？","投流没用，换时间也没用——像撞了一堵墙。"],
+[7,"以前都说是内容不行。","但真相可能更扎心。"],
+[14,"9 月 19 日，抖音 2026 创作者大会。","我整场听完，一句话总结——"],
+[21,"算法，彻底变了。","我们做 AI 视频工具链的，这条 9 分钟给你讲透：哪类创作者能用 AI 吃到这波红利。"],
+[30,"做 AI 内容的五类博主：","讲实操 · 讲技术 · 讲新闻 · 纯情绪 · 纯开源项目。"],
+[37,"看到你自己那一类的时候，","你就知道接下来一年该怎么打了。"],
+[44,"PART 1 · 新规则","官方原话：从「推给更多的人」，变成「推给懂的人和需要的人」。"],
+[52,"翻译成人话。","以前你发一条钓鱼视频——"],
+[60,"系统推给 100 个「可能」爱看的人，","30 个真看完，就放大。赌的是基数。"],
+[68,"现在，系统先推给 10 个","刚搜过鱼竿、收藏过调漂教程的人。"],
+[76,"这 10 个几乎全看完、收藏、追更。","确认「人对、货硬」，才放大。"],
+[84,"区别就一句话：","以前拼多少人看到，现在拼看到的人有多需要你。"],
+[92,"深度互动——收藏、追更、完播——","全面压过点赞评论。"],
+[100,"还有一条别忽略：","优质内容推荐周期，从 7 天拉长到半年、甚至一两年。"],
+[108,"内容不再是消耗品，是资产。","这是新规则里最大的红利。"],
+[116,"PART 2 · 五类博主对号入座","同一套规则，五张不同的考卷。"],
+[124,"第一类：讲实操的。","新规则的亲儿子——但有一个坑。"],
+[132,"教程类是收藏指标的天然王者。","而收藏，现在是硬通货。"],
+[140,"精准推荐下，「正需要这个教程的人」","被你稳稳接住。"],
+[148,"但坑在哪？别做「AI 教程」这种大词。","卡细分人群——"],
+[156,"「给行政的 AI 课」和「给程序员的」，","在系统眼里是两个完全不同的账号。"],
+[165,"越小众越精准，越精准越被放大。","做系列：入门→进阶→翻车篇，期期预告下期。"],
+[174,"第二类：讲技术的。","闷声发财型。"],
+[182,"原理、底层逻辑，受众本来就窄而深。","旧算法里这是劣势——泛流量冲进来秒划走。"],
+[190,"新算法反过来了：","内容直达「真看得懂、真需要」的人。"],
+[198,"你的深度互动率会高得吓人。","打法：不追量，追密度。"],
+[206,"每条讲透一个点。","三个月，做到想懂这个话题的人绕不开你。"],
+[214,"还有：同行讨论、长评论的权重在涨。","技术区的评论区，就是你的护城河。"],
+[222,"第三类：讲新闻的。","受冲击最大的，没有之一。"],
+[230,"推荐窗口短、收藏天然低、用户看过即走。","更要命的是信息平权——"],
+[238,"你报的消息，用户在哪儿都能看。","系统凭什么持续推你？"],
+[246,"但新闻不是不能做，是不能只当播报员。","报「发生了什么」，死。"],
+[254,"报「这对你意味着什么」，活。","把新闻嵌进固定栏目当板块，而不是账号的全部。"],
+[262,"第四类：纯讲情绪的。","正在裸泳。"],
+[270,"鸡血、焦虑、感动故事——旧算法的完播率宠儿。","新规则下三个死穴："],
+[278,"收藏约等于零；","没有明确的「需要人群」，系统想精准都无从下手；"],
+[286,"平台明牌在压「低质情绪」。","但情绪不是毒药，是药引子。"],
+[294,"只放开头 10 秒当钩子，主体落回干货。","或者把情绪绑给明确人群——"],
+[302,"「35 岁转型者的一天」，","比「努力就会成功」精准一万倍。人群即精准。"],
+[310,"第五类：纯讲开源项目的。","一半危，一半机——看你当哪种人。"],
+[318,"只报「某某项目发布了」？","那是播报员的变种，死法同上。"],
+[326,"「这个项目我用它解决了什么真问题」？","那是实操，收藏拉满。"],
+[334,"从播报员变翻译官：","别讲项目多厉害，讲它替谁省了什么麻烦。"],
+[342,"最好亲自下场：录屏、翻车、再跑通。","「真实」和「现场感」，是大会点名的知识区六要素。"],
+[350,"做成「周更工具实测」系列——","追更和收藏，你全都要。"],
+[358,"同一套新规则，五张不同的考卷。","实操封王 · 技术闷声 · 新闻塌方 · 情绪裸泳 · 开源分化"],
+[366,"PART 3 · 三条打法","五类对完号，打法收敛成三条。"],
+[374,"第一条：把账号从栏目表，改成生产线。","固定栏目、固定节奏、连续剧式连续性。"],
+[383,"大会原话：系列永远比单条爆款更重要。","追更，现在是核心指标。"],
+[392,"10 万泛粉，不如 5000 个期期都追的人。","账号价值，从流量变成了关系。"],
+[401,"第二条：每条内容，答透一个真问题。","判断标准只有一个——"],
+[409,"观众看完，能不能照做？","能，他就会收藏。"],
+[417,"大会上收藏最高的案例：一条 14 分钟的教程，592 万收藏。","用户不嫌长，用户嫌没用。"],
+[426,"第三条：产能交给工具，精力留给「讲明白」。","系列化最大的敌人是产能，不是创意。"],
+[435,"做一条片从一天压到一小时，","你的魂才能花在内容设计上。"],
+[444,"最后一条铁律：","精准，是平台的事；扩量，是你的事。"],
+[452,"算法已经精准到——","「你喜欢微醺盐系穿搭，就推擅长这个的博主」。"],
+[461,"别再研究怎么让系统懂你。","你的全部注意力，只放在扩量上。"],
+[470,"带走这三句。","规则 · 五类 · 你"],
+[478,"规则：","从「推更多人」，到「推更需要的人」。"],
+[487,"五类：","实操做系列 · 技术做密度 · 新闻当翻译 · 情绪当钩子 · 开源做实测。"],
+[497,"你：","任务是扩量，精准交给平台。"],
+[507,"作业：评论区报「你的行业」。","说说你想用 AI 解决什么问题——挑三个真实行业，下场拆。"],
+[517,"下集：《系列化生产线怎么搭》","从定位、栏目设计到产能工具，完整一版。"],
+[527,"每周一条，专讲 AI 做片的真实打法。","我是老马，下条见。"],
+[537,"（本片全部画面由 HyperFrames 逐帧生成）","实拍素材：Mixkit CC0 · 动效与代码：自研"]
+];
+window.__BEATS = BEATS;
+const TOTAL = 560;
+const sceneAt = t => t<44 ? ["sc-hook","SECTION 00 / HOOK"] : t<116 ? ["sc-video","SECTION 01 / 新规则"] :
+  t<124 ? ["sc-editorial","SECTION 01+ / 规则解读"] : t<358 ? ["sc-who","SECTION 02 / 五类博主"] :
+  t<366 ? ["sc-ladder","SECTION 02+ / 命运层级"] : t<470 ? ["sc-tactics","SECTION 03 / 三条打法"] :
+  ["sc-outro","SUMMARY / 总结"];
+
+/* 字幕生成 + 高亮 */
+const HL_WORDS = ["收藏","追更","完播","系列","系列化","精准","扩量","翻译官","钩子","实测","密度","护城河","资产","药引","封王","闷声","塌方","裸泳","分化","懂的人和需要的人","更需要的人","深度互动","生产线","讲明白","现场感","细分人群","人群即精准","当翻译","做系列","做密度","当钩子","做实测","592 万","AI 原生创作","钦点赛道"];
+const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const HL_RE = new RegExp("(" + HL_WORDS.sort((a,b)=>b.length-a.length).map(escRe).join("|") + ")", "g");
+const hl = x => x.replace(HL_RE, '<span class="hl">$1</span>');
+BEATS.forEach(b => {
+  const m = document.createElement("div"); m.innerHTML = hl(b[1]); $("capMain").append(m);
+  const n = document.createElement("div"); n.innerHTML = hl(b[2]); $("capNote").append(n);
+});
+
+/* 五类数据：全部配专属视频 */
+const WHOS = [
+  { idx:"01", nm:"讲实操", vt:"亲儿子 · 有坑", vid:"视频 49658.mp4（未随仓分发）",
+    adv:["<b>做系列</b>：入门 → 进阶 → 翻车篇","<b>卡细分</b>：「给行政的 AI 课」≠「给程序员的」","收藏=硬通货，教程是天然王者"] },
+  { idx:"02", nm:"讲技术", vt:"闷声发财", vid:"视频 52020.mp4（未随仓分发）",
+    adv:["<b>不追量，追密度</b>：一题讲透","三个月做到「绕不开你」","<b>评论区=护城河</b>，长评论权重在涨"] },
+  { idx:"03", nm:"讲新闻", vt:"冲击最大", vid:"视频 41171.mp4（未随仓分发）",
+    adv:["<b>播报员死，翻译官活</b>","别报「发生了什么」","报「<b>对你意味着什么</b>」，嵌进固定栏目"] },
+  { idx:"04", nm:"纯情绪", vt:"正在裸泳", vid:"视频 46159.mp4（未随仓分发）",
+    adv:["收藏≈0、无精准人群、平台明牌打压","情绪只当<b>开头 10 秒钩子</b>","或绑人群：「35 岁转型者的一天」"] },
+  { idx:"05", nm:"讲开源", vt:"危与机各半", vid:"视频 4245.mp4（未随仓分发）",
+    adv:["「项目发布了」=播报员，死法同上","「它替谁省了麻烦」=<b>实操，收藏拉满</b>","亲自录屏实测，做周更系列"] }
+];
+const WHO_RANGE = [[124,0],[174,1],[222,2],[262,3],[310,4]];
+function setWho(i){
+  const w = WHOS[i];
+  $("whoIdx").textContent = w.idx;
+  $("whoNm").textContent = w.nm;
+  $("whoVt").textContent = w.vt;
+  $("whoAdv").innerHTML = w.adv.map(a => `<div class="advRow"><span class="dot"></span><span>${a}</span></div>`).join("");
+  for (let k = 0; k < 5; k++) {
+    const box = $("whoVid" + k), on = k === i;
+    box.classList.toggle("on", on);
+    const vv = box.querySelector("video");
+    if (on) { vv.play?.(); } else { vv.pause?.(); }
+  }
+  gsap.fromTo("#sc-who .whoBig > *, #whoAdv .advRow", {opacity:0, y:36}, {opacity:1, y:0, duration:.65, stagger:.09, ease:"power3.out"});
+}
+
+/* 时间线 */
+const tl = gsap.timeline({ paused:true, defaults:{ease:"power2.out"} });
+let curScene = null;
+BEATS.forEach((b, i) => {
+  const t = b[0];
+  tl.call(() => {
+    $("capMain").querySelectorAll("div").forEach((el,j) => el.style.display = j===i ? "block" : "none");
+    $("capNote").querySelectorAll("div").forEach((el,j) => el.style.display = j===i ? "block" : "none");
+    const c = $("capMain").children[i], n = $("capNote").children[i];
+    [c,n].forEach((el,k) => { el.style.animation = "none"; void el.offsetWidth;
+      el.style.animation = `capIn .45s ${k*.06}s cubic-bezier(.22,.9,.3,1) both`; });
+    $("pfill").style.width = (t/TOTAL*100).toFixed(2)+"%";
+    const [sc, tag] = sceneAt(t);
+    $("capTag").textContent = tag;
+    $("capTag").style.display = (sc === "sc-editorial" || sc === "sc-tactics") ? "none" : "block";
+    if (sc !== curScene) {
+      document.querySelectorAll(".scene").forEach(s => s.classList.remove("on"));
+      $(sc).classList.add("on");
+      gsap.fromTo("#flash",{opacity:.5},{opacity:0,duration:.45});
+      curScene = sc;
+    }
+    WHO_RANGE.forEach(([at, wi]) => { if (t >= at) setWho(wi); });
+  }, [], t);
+});
+const capInKey = document.createElement("style");
+capInKey.textContent = "@keyframes capIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}";
+document.head.append(capInKey);
+
+/* S0：开场视频 + 三张黄卡弹跳切换 */
+tl.call(() => { $("hookVidA").play?.(); }, [], 0.2)
+  .fromTo("#p1 .mega",{scale:.55,opacity:0},{scale:1,opacity:1,duration:.7,ease:"back.out(2.2)"},0.3)
+  .fromTo("#p1 .kicker,#p1 .pills,#p1 .sub2",{y:40,opacity:0},{y:0,opacity:1,duration:.55,stagger:.12,ease:"power3.out"},0.5)
+  .to("#p1",{y:-70,opacity:0,duration:.45,ease:"power3.in"},7.5)
+  .call(() => { ["p1","p2","p3"].forEach((id,j) => $(id).classList.toggle("on", j===1)); }, [], 8)
+  .fromTo("#p2",{y:90,opacity:0},{y:0,opacity:1,duration:.6,ease:"back.out(1.8)"},8.05)
+  .fromTo("#p2 .mega",{scale:.55,opacity:0},{scale:1,opacity:1,duration:.7,ease:"back.out(2.2)"},8.3)
+  .fromTo("#p2 .kicker,#p2 .pills,#p2 .sub2",{y:40,opacity:0},{y:0,opacity:1,duration:.55,stagger:.12,ease:"power3.out"},8.4)
+  .to("#p2",{y:-70,opacity:0,duration:.45,ease:"power3.in"},21.5)
+  .call(() => { ["p1","p2","p3"].forEach((id,j) => $(id).classList.toggle("on", j===2)); }, [], 22)
+  .fromTo("#p3",{y:90,opacity:0},{y:0,opacity:1,duration:.6,ease:"back.out(1.8)"},22.05)
+  .fromTo("#p3 .mega",{scale:.55,opacity:0},{scale:1.06,opacity:1,duration:.6,ease:"back.out(2.4)"},22.3)
+  .to("#p3 .mega",{scale:1,duration:.25,ease:"power2.out"},22.95)
+  .fromTo("#p3 .kicker,#p3 .pills,#p3 .sub2",{y:40,opacity:0},{y:0,opacity:1,duration:.55,stagger:.12,ease:"power3.out"},22.4);
+
+/* S1：双视频轮换（不重复 loop） */
+tl.call(() => { $("rvA").play?.(); gsap.set("#rvA",{opacity:1}); gsap.set("#rvB",{opacity:0}); gsap.set("#rvC",{opacity:0}); }, [], 44.2)
+  .to("#rvA",{opacity:0,duration:1},58)
+  .to("#rvB",{opacity:1,duration:1},58)
+  .call(() => { $("rvB").play?.(); }, [], 58.2)
+  .to("#rvB",{opacity:0,duration:1},76)
+  .to("#rvC",{opacity:1,duration:1},76)
+  .call(() => { $("rvC").play?.(); }, [], 76.2)
+  .to("#rvC",{opacity:0,duration:1},98)
+  .to("#rvA",{opacity:1,duration:1},98)
+  .call(() => { $("rvA").play?.(); }, [], 98.2)
+  .fromTo("#pop1",{opacity:0,scale:.5},{opacity:1,scale:1,duration:.55,ease:"back.out(1.8)"},68)
+  .fromTo("#pop2",{opacity:0,scale:.5},{opacity:1,scale:1,duration:.55,ease:"back.out(1.8)"},84)
+  .to("#pop1,#pop2",{opacity:0,duration:.35},104);
+
+/* S2 编辑页 */
+tl.fromTo("#cmpOld",{y:40,opacity:0},{y:0,opacity:1,duration:.7},120)
+  .fromTo("#cmpNew",{y:40,opacity:0},{y:0,opacity:1,duration:.7},124)
+  .fromTo(".chip",{y:20,opacity:0},{y:0,opacity:1,duration:.4,stagger:.12},130)
+  .call(() => { $("chip1").classList.add("lit"); }, [], 92)
+  .call(() => { $("chip2").classList.add("lit"); }, [], 100)
+  .call(() => { $("chip3").classList.add("lit"); }, [], 108);
+
+/* S3 who 视频播放 */
+WHO_RANGE.forEach(([at, wi]) => {
+  tl.call(() => { if (curScene === "sc-who") { const vv = document.querySelector("#whoVid" + wi + " video"); vv && vv.play?.(); } }, [], at + 0.3);
+});
+
+/* S4 层级行 */
+tl.to("#ladderWrap .ladRow",{opacity:1,x:0,duration:.6,stagger:1.6,ease:"power2.out"},360);
+
+/* S5 打法格 */
+[[374,"g1"],[401,"g2"],[426,"g3"],[444,"g4"]].forEach(([t,id]) => {
+  tl.call(() => {
+    document.querySelectorAll(".gCell").forEach(c => c.classList.remove("lit"));
+    $(id).classList.add("lit");
+  }, [], t);
+});
+
+/* S6 收尾 */
+tl.call(() => { $("outroVid").play?.(); $("oy1").classList.add("on"); $("ob1").classList.remove("on"); }, [], 470)
+  .fromTo("#oy1 .oLine",{y:60,opacity:0},{y:0,opacity:1,duration:.8,stagger:1.8,ease:"power3.out"},472)
+  .call(() => { $("ob1").classList.add("on"); $("oy1").classList.remove("on"); }, [], 507)
+  .fromTo("#ob1 > *",{y:30,opacity:0},{y:0,opacity:1,duration:.7,stagger:.9,ease:"power3.out"},508);
+
+for (let i=0;i<5;i++){ const tk=document.createElement("div"); tk.className="tick"; tk.style.top=(i*118+30)+"px"; $("ruler").append(tk); }
+
+window.__timelines.main = tl;
+</script>
+</body>
+</html>

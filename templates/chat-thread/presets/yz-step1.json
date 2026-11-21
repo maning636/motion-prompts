@@ -1,0 +1,8 @@
+{
+  "title": "第一步 · 领技能包",
+  "subtitle": "打开豆包 / WorkBuddy · 粘贴发送",
+  "messages": "user: 【技能包全文】已粘贴 发给你了\nassistant: 技能包已就绪 ✓\nassistant: 菜谱装进脑子里了 把文案发来吧",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

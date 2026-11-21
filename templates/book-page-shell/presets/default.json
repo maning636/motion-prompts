@@ -1,0 +1,12 @@
+{
+  "vol": "VOL.15 · 视觉动效库",
+  "pageno": "P.075 / 400",
+  "kicker": "PAGE SHELL · 书页壳",
+  "line1": "把任何一页",
+  "line2": "放进书页里",
+  "desc": "图片或已渲染的视频片段，统一套进纸感书页壳。",
+  "img1": "./assets/page.png",
+  "video1": "",
+  "accent": "#00FF00",
+  "duration": 6
+}

@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"pack","name":"规格包","type":"enum","label":"规格包（配色 / 字体 / 曲线）","options":[{"label":"暗色科技","value":"dark"},{"label":"奶油贴纸","value":"cream"},{"label":"单色克制","value":"mono"},{"label":"夜航","value":"night"}],"default":"night"},{"id":"eyebrow","name":"眉标","type":"string","label":"顶部眉标","default":"THE CYCLE"},{"id":"title","name":"标题","type":"string","label":"标题","default":"能转起来的只有这四步"},{"id":"s1n","name":"步骤一","type":"string","label":"第一步名称","default":"定目标"},{"id":"s1d","name":"步骤一说明","type":"string","label":"第一步说明","default":"一个能验收的数字"},{"id":"s2n","name":"步骤二","type":"string","label":"第二步名称","default":"执行"},{"id":"s2d","name":"步骤二说明","type":"string","label":"第二步说明","default":"只做这一件事"},{"id":"s3n","name":"步骤三","type":"string","label":"第三步名称","default":"复盘"},{"id":"s3d","name":"步骤三说明","type":"string","label":"第三步说明","default":"对数字，不对感受"},{"id":"s4n","name":"步骤四","type":"string","label":"第四步名称","default":"调整"},{"id":"s4d","name":"步骤四说明","type":"string","label":"第四步说明","default":"改一个变量，不是全部"},{"id":"foot","name":"收口","type":"string","label":"底部收口一句","default":"闭环的关键在第四步回到第一步。只做前三步的，不是没努力，是每次都在重新开始。"}]'>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="四个步骤一条线排开，最后一条虚线弧从第四步折回第一步。闭环的关键在第四步回到第一步——只做前三步的，不是没努力，是每次都在重新开始。">
+<title>周期页 · 能转起来的四步</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<link rel="stylesheet" href="../_lib/packs.css">
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script>
+<!-- packs.js 必须排在 blocks.js **之后**：blocks.js 结尾是 global.BBlocks = BB，
+     会把它整个替换掉。谁先加载谁的东西就没了，表现是 B.pack is not a function。 -->
+<script src="../_lib/packs.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<style>
+  /* 底色和字色**必须来自规格包**，不能写死。
+     写死 #000 + #F4F1EA 的时候，四个包里只有 dark / night 正常：
+     cream 的 --pk-fg 是 #2A2118、mono 是 #14140F，两个都是**深字**，
+     压在这个写死的黑底上 → 标题、标签、说明全糊掉。
+     而写死字面量色的元素（比如 rgba(244,241,234,.82)）反而还看得见，
+     画面上就成了一半能看一半不能看——比全黑更难认。
+     一共 33 条模板中招（混剪 5 + 认知 22 + 节拍 6）。
+
+     注意区分两层契约（packs.css 顶部注释里写过）：
+       --pk-bg / --pk-fg      = 包自带底板，舞台自己用它
+       --pk-*-media           = 压在用户素材上的那一层
+     这里改的是前者。 */
+  html,body{margin:0;padding:0;background:var(--pk-bg,#000)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--pk-bg,#000);
+        color:var(--pk-fg,#F4F1EA);font-family:"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+        -webkit-font-smoothing:antialiased}
+  /* 统一安全区：混剪里所有贴边元素都从 72/88 起，不贴 0 */
+  
+  /* ── 通用 ── */
+  .eyebrow{position:absolute;left:120px;top:104px;opacity:0;
+      font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:700;
+      letter-spacing:.34em;color:var(--pk-accent);text-indent:.34em}
+  .h1{position:absolute;left:120px;top:148px;width:1680px;opacity:0;
+      font-size:76px;font-weight:900;line-height:1.16;color:var(--pk-fg);letter-spacing:.01em}
+  .foot{position:absolute;left:120px;top:922px;width:1680px;opacity:0;
+      font-size:34px;line-height:1.5;color:var(--pk-muted)}
+  .foot b{color:var(--pk-accent);font-weight:700}
+  /* 底部一条极细的分隔，给满屏一个「结束感」 */
+  .footline{position:absolute;left:120px;top:884px;width:0;height:2px;background:var(--pk-accent)}
+
+  /* ── 因果链 ── */
+  .spine{position:absolute;left:120px;top:0;width:4px;height:0;background:var(--pk-accent);opacity:.9}
+  .node{position:absolute;left:120px;width:64px;height:64px;margin:-32px 0 0 -32px;
+      border-radius:50%;border:3px solid var(--pk-accent);background:var(--pk-bg);opacity:0;
+      display:flex;align-items:center;justify-content:center;
+      font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:800;color:var(--pk-accent)}
+  .clabel{position:absolute;opacity:0;font-family:ui-monospace,Consolas,monospace;
+      font-size:30px;font-weight:800;letter-spacing:.20em;color:var(--pk-accent)}
+  .ctext{position:absolute;opacity:0;font-size:52px;font-weight:700;line-height:1.30;color:var(--pk-fg)}
+  .cnote{position:absolute;opacity:0;font-size:27px;line-height:1.5;
+      color:var(--pk-muted)}
+
+  /* ── 公式页 ── */
+  .eqbox{position:absolute;left:120px;top:352px;width:1680px;height:210px;opacity:0;
+      display:flex;align-items:center;justify-content:center;gap:0;
+      border-top:2px solid rgba(244,241,234,.14);border-bottom:2px solid rgba(244,241,234,.14)}
+  .eqbox .t{font-size:150px;font-weight:900;color:var(--pk-fg);font-variant-numeric:tabular-nums}
+  .eqbox .o{font-size:110px;font-weight:300;color:var(--pk-muted);padding:0 26px}
+  .eqbox .r{font-size:150px;font-weight:900;color:var(--pk-accent);font-variant-numeric:tabular-nums}
+  .vcard{position:absolute;top:650px;width:520px;opacity:0;
+      border-left:4px solid rgba(244,241,234,.18);padding-left:28px}
+  .vcard .vn{font-size:40px;font-weight:900;color:var(--pk-fg)}
+  .vcard .vd{font-size:26px;line-height:1.5;color:var(--pk-muted);margin-top:14px}
+  .vcard .vv{font-size:30px;font-weight:800;color:var(--pk-accent);margin-top:14px;
+      font-family:ui-monospace,Consolas,monospace}
+
+  /* ── 引述页 ── */
+  .qm{position:absolute;left:120px;top:236px;opacity:0;
+      font-family:Georgia,'Times New Roman',serif;font-size:220px;line-height:.7;
+      color:var(--pk-accent);opacity:0}
+  .qtext{position:absolute;left:120px;top:376px;width:1560px;opacity:0;
+      font-size:96px;font-weight:800;line-height:1.42;color:var(--pk-fg);letter-spacing:.01em}
+  .qwho{position:absolute;left:120px;opacity:0;
+      font-family:ui-monospace,Consolas,monospace;font-size:28px;font-weight:700;
+      letter-spacing:.16em;color:var(--pk-muted)}
+  .qrule{position:absolute;left:120px;width:0;height:2px;background:rgba(244,241,234,.28)}
+  .qlab{position:absolute;opacity:0;font-family:ui-monospace,Consolas,monospace;
+      font-size:26px;font-weight:800;letter-spacing:.22em;color:var(--pk-accent)}
+  .qtake{position:absolute;opacity:0;font-size:36px;line-height:1.52;
+      color:var(--pk-fg)}
+
+  /* ── 曲线页 ── */
+  .chart{position:absolute;left:120px;top:400px;width:1680px;height:400px}
+  .svgbox{position:absolute;left:0;top:0;width:100%;height:100%}
+  .grid{position:absolute;left:0;right:0;height:1px;background:rgba(244,241,234,.10)}
+  .pivot{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;
+      background:var(--pk-accent);opacity:0;box-shadow:0 0 0 8px rgba(232,160,72,.18)}
+  .pvline{position:absolute;width:2px;background:rgba(232,160,72,.55);opacity:0}
+  .pvlab{position:absolute;opacity:0;font-size:30px;font-weight:800;color:var(--pk-accent)}
+  .phase{position:absolute;top:0;opacity:0}
+  .phase .pn{font-family:ui-monospace,Consolas,monospace;font-size:24px;font-weight:800;
+      letter-spacing:.18em;color:var(--pk-accent)}
+  .phase .pt{font-size:32px;font-weight:700;color:var(--pk-fg);margin-top:12px}
+  .phase .pd{font-size:25px;color:var(--pk-muted);margin-top:10px;line-height:1.45}
+
+  /* ── 代价账 ── */
+  .lg{position:absolute;left:120px;width:1680px;height:118px;opacity:0}
+  .lg .nm{position:absolute;left:0;top:0;font-size:40px;font-weight:800;color:var(--pk-fg)}
+  .lg .amt{position:absolute;right:0;top:4px;font-size:40px;font-weight:800;
+      color:var(--pk-accent);font-family:ui-monospace,Consolas,monospace}
+  .lg .track{position:absolute;left:0;right:0;top:60px;height:10px;border-radius:5px;
+      background:rgba(244,241,234,.10);overflow:hidden}
+  .lg .fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:5px;
+      background:var(--pk-accent)}
+  .lg .fill.dim{background:rgba(244,241,234,.38)}
+  .lg .why{position:absolute;left:0;top:82px;font-size:25px;color:var(--pk-muted)}
+  .total{position:absolute;left:120px;top:770px;width:1680px;opacity:0;
+      display:flex;align-items:baseline;gap:28px}
+  .total .tl{font-family:ui-monospace,Consolas,monospace;font-size:28px;font-weight:800;
+      letter-spacing:.20em;color:var(--pk-accent)}
+  .total .tv{font-size:96px;font-weight:900;color:var(--pk-fg);
+      font-variant-numeric:tabular-nums}
+
+  /* ── 周期页 ── */
+  .stg{position:absolute;width:150px;height:150px;margin:-75px 0 0 -75px;border-radius:50%;
+      border:3px solid var(--pk-accent);background:var(--pk-bg);opacity:0;
+      display:flex;align-items:center;justify-content:center;
+      font-size:32px;font-weight:900;color:var(--pk-accent)}
+  .stg.on{border-color:var(--pk-fg);color:var(--pk-fg)}
+  .stg .ring{position:absolute;left:0;top:0;width:0;height:0;opacity:0;
+      border-left:3px solid transparent;border-right:3px solid transparent;
+      border-bottom:7px solid var(--pk-accent)}
+  .sl{position:absolute;width:300px;margin-left:-150px;opacity:0;text-align:center}
+  .sl .st{font-size:32px;font-weight:800;color:var(--pk-fg)}
+  .sl .sd{font-size:24px;line-height:1.5;margin-top:12px;color:var(--pk-muted)}
+  .cyc-line{position:absolute;height:3px;background:rgba(244,241,234,.16)}
+
+  /* ── 信号页 ── */
+  .hero{position:absolute;left:120px;top:340px;width:1680px;height:170px;opacity:0;
+      border-left:6px solid var(--pk-accent);background:rgba(244,241,234,.045);
+      display:flex;align-items:center;padding:0 40px}
+  .hero .ht{font-size:56px;font-weight:800;line-height:1.4;color:var(--pk-fg)}
+  .col2{position:absolute;top:600px;width:780px;opacity:0}
+  .col2 .ch{font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:800;
+      letter-spacing:.20em;color:var(--pk-accent);padding-bottom:18px;
+      border-bottom:2px solid rgba(244,241,234,.14)}
+  .col2 li{list-style:none;font-size:30px;line-height:1.5;margin-top:24px;
+      color:var(--pk-fg);padding-left:30px;position:relative}
+  .col2 li::before{content:'';position:absolute;left:0;top:15px;width:10px;height:10px;
+      border-radius:50%;background:var(--pk-accent)}
+
+  /* ── 换算页 ── */
+  .cv2{position:absolute;top:360px;width:700px;height:300px;opacity:0;
+      border:1px solid rgba(244,241,234,.14);border-radius:18px;
+      background:rgba(244,241,234,.03);padding:40px 44px;display:flex;
+      flex-direction:column;justify-content:center}
+  .cv2 .k{font-family:ui-monospace,Consolas,monospace;font-size:24px;font-weight:800;
+      letter-spacing:.20em;color:var(--pk-muted)}
+  .cv2 .v{margin-top:24px;font-size:64px;font-weight:900;line-height:1.25;
+      color:var(--pk-muted)}
+  .cv2.real{border-color:rgba(232,160,72,.55);background:rgba(232,160,72,.08)}
+  .cv2.real .k{color:var(--pk-accent)}
+  .cv2.real .v{color:var(--pk-fg)}
+  /* 底板跟着包走：这个圆牌是「一枚印章」，不是「一块深色贴纸」。
+     原来写死 #0B0D12，字色却用 var(--pk-accent)——mono 的 accent 是 #14140F，
+     近黑压深底，四个字直接隐形，页面上一声不吭。
+     深色包上 #0B0D12 本来就≈底色（看着只有环加符号），
+     换成 var(--pk-bg) 后深包外观完全不变，浅包才对。 */
+  .xsign{position:absolute;left:50%;top:470px;width:100px;height:100px;margin-left:-50px;opacity:0;
+      border-radius:50%;background:var(--pk-bg);border:3px solid var(--pk-accent);
+      display:flex;align-items:center;justify-content:center;
+      font-size:34px;font-weight:900;color:var(--pk-accent)}
+  /* 换算三条往上收：收口在 top:922、fline 在 884，
+     三行从 720 开始、每行 62px 高的话第三条落在 844~906，正压着 fline。 */
+  .calc{position:absolute;left:120px;top:672px;width:1680px;opacity:0}
+  .calc .cr{display:flex;align-items:baseline;gap:20px;padding:13px 0;
+      border-bottom:1px solid rgba(244,241,234,.08)}
+  .calc .cn{font-family:ui-monospace,Consolas,monospace;font-size:24px;font-weight:800;
+      color:var(--pk-accent);width:64px}
+  .calc .cc{font-size:32px;color:var(--pk-fg)}
+
+  /* ── 风险页 ── */
+  .rk{position:absolute;left:120px;width:1680px;height:120px;opacity:0}
+  .rk .rule{position:absolute;left:0;right:0;top:0;height:1px;background:rgba(244,241,234,.10)}
+  .rk .rn{position:absolute;left:0;top:26px;width:600px;font-size:38px;font-weight:800;
+      color:var(--pk-fg)}
+  .rk .rd{position:absolute;top:28px;width:20px;height:20px;border-radius:50%;
+      background:rgba(244,241,234,.20)}
+  .rk .rd.on{background:var(--pk-accent)}
+  .rk .rl{position:absolute;left:776px;top:30px;width:120px;font-size:26px;
+      font-weight:700;color:var(--pk-muted)}
+  .rk .ra{position:absolute;left:940px;top:28px;width:740px;font-size:30px;
+      color:var(--pk-fg)}
+
+  /* ── 动作页 ── */
+  .know{position:absolute;left:120px;top:330px;width:1680px;opacity:0;
+      font-size:64px;font-weight:800;line-height:1.35;color:var(--pk-fg)}
+  .arrowdown{position:absolute;left:120px;top:490px;width:0;height:0;opacity:0;
+      border-left:16px solid transparent;border-right:16px solid transparent;
+      border-top:26px solid var(--pk-accent)}
+  .act{position:absolute;top:580px;width:520px;height:250px;opacity:0;
+      border-radius:16px;background:rgba(244,241,234,.05);padding:32px 34px;
+      display:flex;flex-direction:column}
+  .act .an{font-family:ui-monospace,Consolas,monospace;font-size:24px;font-weight:800;
+      letter-spacing:.20em;color:var(--pk-accent)}
+  .act .av{font-size:36px;font-weight:700;line-height:1.45;margin-top:22px;
+      color:var(--pk-fg)}
+
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <div class="eyebrow" id="eb">THE CYCLE</div>
+  <div class="h1" id="h1" data-fit-max="76" data-fit-min="44">能转起来的只有这四步</div>
+  <div class="svgbox" id="csvg" style="position:absolute;left:120px;top:330px;width:1680px;height:300px"></div>
+  <div class="cyc-line" id="line" style="left:420px;top:504px;width:1320px"></div>
+  
+  <div class="stg" id="s0" style="left:300px;top:505px">1</div>
+  <div class="sl" id="sl0" style="left:300px;top:620px">
+    <div class="st" id="n0" data-fit-max="32" data-fit-min="22">定目标</div>
+    <div class="sd" id="d0" data-fit-max="24" data-fit-min="17">一个能验收的数字</div>
+  </div>
+
+  <div class="stg on" id="s1" style="left:740px;top:505px">2</div>
+  <div class="sl" id="sl1" style="left:740px;top:620px">
+    <div class="st" id="n1" data-fit-max="32" data-fit-min="22">执行</div>
+    <div class="sd" id="d1" data-fit-max="24" data-fit-min="17">只做这一件事</div>
+  </div>
+
+  <div class="stg on" id="s2" style="left:1180px;top:505px">3</div>
+  <div class="sl" id="sl2" style="left:1180px;top:620px">
+    <div class="st" id="n2" data-fit-max="32" data-fit-min="22">复盘</div>
+    <div class="sd" id="d2" data-fit-max="24" data-fit-min="17">对数字，不对感受</div>
+  </div>
+
+  <div class="stg on" id="s3" style="left:1620px;top:505px">4</div>
+  <div class="sl" id="sl3" style="left:1620px;top:620px">
+    <div class="st" id="n3" data-fit-max="32" data-fit-min="22">调整</div>
+    <div class="sd" id="d3" data-fit-max="24" data-fit-min="17">改一个变量，不是全部</div>
+  </div>
+
+  <div class="footline" id="fline"></div>
+  <div class="foot" id="foot" data-fit-max="34" data-fit-min="22">闭环的关键在第四步回到第一步。只做前三步的，不是没努力，是每次都在重新开始。</div>
+
+</div>
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+  var tl = B.tl();
+  /* 规格包：先定风格，再建任何元素。
+     画面素材的配色**不跟着包走**——那是"底片"，用户自己的东西不能被模板改色；
+     跟着包走的只有 UI 层（字色、强调色、描边、圆角、曲线）。这个边界必须守住。 */
+  B.pack(v.pack);
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  function q(s) { return document.querySelector(s); }
+  /* 素材位接真视频：留空就继续用 CSS 画面 */
+  function live(n, src) {
+    if (!src) return;
+    var s = document.getElementById('s' + n), e = document.getElementById('v' + n);
+    if (!s || !e) return;
+    s.classList.add('live'); e.src = src;
+    e.play().catch(function () {});
+  }
+  /* 景别缓推：v1/v3 里画面始终在极慢地动，这是「像镜头」的关键 */
+  function push(n, at, dur, from, to, ease) {
+    var s = q('#s' + n + ' .sky'), g = q('#s' + n + ' .glow'), r = q('#s' + n + ' .r2');
+    if (s) tl.fromTo(s, { scale: from, y: '0%' },
+      { scale: to, y: '-2%', duration: dur, ease: ease || 'none' }, at);
+    if (g) tl.fromTo(g, { xPercent: -4, opacity: .8 },
+      { xPercent: 5, opacity: 1, duration: dur, ease: 'none' }, at);
+    if (r) tl.fromTo(r, { xPercent: 0 },
+      { xPercent: -2.5, duration: dur, ease: 'none' }, at);
+  }
+  /* clip-path 形状插值。
+     两个坑都在这里踩过：
+       1. GSAP 各版本对 clipPath 字符串补间的处理不一致，所以不直接补间它，
+          改成补间一个 {t:0→1} 的代理对象，onUpdate 里自己算 8 个点；
+       2. **from 必须是编译期常量，不能从元素当前状态读。**
+          settle 会把时间轴来回扫；一旦回退越过一个已完成的补间，
+          GSAP 会把它按 ratio 0 重渲——onUpdate 拿到的就是起点，
+          形状会「弹回矩形」。写成常量后，形状是 t 的纯函数，
+          停在任何一帧算出来都一样。
+     相邻两段的 from 必须等于上一段的 to，这条由 Python 侧保证。 */
+  function polyStr(pts) {
+    return 'polygon(' + pts.map(function (p) {
+      return p[0].toFixed(2) + '% ' + p[1].toFixed(2) + '%'; }).join(',') + ')';
+  }
+  function morph(el, from, to, at, dur, ease) {
+    if (!el || !to || !from || from.length !== to.length) return;
+    var st = { t: 0 };
+    tl.to(st, { t: 1, duration: dur == null ? .7 : dur, ease: ease || 'power2.inOut',
+      onUpdate: function () {
+        el.style.clipPath = polyStr(from.map(function (p, i) {
+          return [p[0] + (to[i][0] - p[0]) * st.t,
+                  p[1] + (to[i][1] - p[1]) * st.t];
+        }));
+      } }, at);
+  }
+  set('eb', v.eyebrow); set('h1', v.title); set('foot', v.foot);
+  /* 四个步骤用循环绑，不一行行 set()。
+     第一版手写 set('s1n'...)/set('s2n'...)/set('s3n'...)，而生成的是
+     id="s0dn"/"s1dn"…——**id 根本对不上，set 全部静默失败**，
+     画面上四个步骤名变成「定目标 定目标 执行 复盘」这种串位，
+     因为第四条根本没人去覆盖它。
+     这种错探针查不出来（元素都在、文字都有），只有目检能看见。 */
+  var NM = [v.s1n, v.s2n, v.s3n, v.s4n];
+  var DS = [v.s1d, v.s2d, v.s3d, v.s4d];
+  for (var i0 = 0; i0 < 4; i0++) { set('n' + i0, NM[i0]); set('d' + i0, DS[i0]); }
+
+  /* 回环的弧线走 SVG 单独一层：直接 innerHTML 到父容器会把四个圆点清空，
+     而 GSAP 照常补间它们，于是画面上只是「圆点不见了」，时间轴一切正常。
+
+     弧线必须**整个待在 viewBox 里面**：第一版写成
+     `M 1550 40 C 1550 -40 130 -40 130 40`，y=-40 落在 viewBox 之外，
+     SVG 默认 overflow:hidden，上半截被裁掉，画面上只剩左右两个小残片——
+     而 SVG 元素本身在 DOM 里、尺寸正常、探针也报不出问题。
+     容器 1680×300 放在 top:330，圆心在 stage y=505 → 容器内 y=175，
+     圆顶 y=100，所以弧线从 (1500,100) 拱到 (180,100)，最高只到 y=30。 */
+  q('#csvg').innerHTML =
+    '<svg width="100%" height="100%" viewBox="0 0 1680 300" preserveAspectRatio="none">' +
+    '<path d="M 1500 100 C 1500 26 180 26 180 100" fill="none" stroke="#E8A048" ' +
+    'stroke-width="3" stroke-linecap="round"/>' +
+    '<path d="M 180 34 L 180 96 M 158 70 L 180 96 M 202 70 L 180 96" fill="none" ' +
+    'stroke="#E8A048" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '</svg>';
+
+  tl.fromTo('#eb', { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: .4 }, 0);
+  tl.fromTo('#h1', { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .08);
+  tl.fromTo('#line', { scaleX: 0, transformOrigin: '0% 50%' },
+      { scaleX: 1, duration: .7, ease: 'power2.inOut' }, .26);
+  for (var k = 0; k < 4; k++) {
+    var at = .5 + k * .44;
+    tl.fromTo('#s' + k, { opacity: 0, scale: .3 },
+        { opacity: 1, scale: 1, duration: .4, ease: 'back.out(2.4)' }, at);
+    tl.fromTo('#sl' + k, { opacity: 0, y: 18 },
+        { opacity: 1, y: 0, duration: .4, ease: 'power3.out' }, at + .14);
+  }
+  /* 弧线最后画：观众已经知道四个步骤了，这时才看见它是个圈 */
+  var path = q('#csvg path');
+  if (path) {
+    var len = path.getTotalLength ? path.getTotalLength() : 1700;
+    gsap.set(path, { strokeDasharray: len + ' 10', strokeDashoffset: len });
+    tl.to(path, { strokeDashoffset: 0, duration: .9, ease: 'power2.inOut' }, 2.3);
+  }
+  tl.fromTo('#fline', { width: 0 }, { width: 200, duration: .5, ease: 'power3.out' }, 2.9);
+  tl.fromTo('#foot', { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: .5 }, 3.02);
+  B.hold(tl, 4.2, .6);
+  B.fitAll();
+
+})();
+</script>
+</body>
+</html>

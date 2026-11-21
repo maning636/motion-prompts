@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"url","type":"string","label":"地址栏 URL","default":"https://aionui.io/features"},{"id":"title","type":"string","label":"页面标题","default":"AionUI — 长任务与团队协作"},{"id":"headline","type":"string","label":"文章大标题","default":"一个窗口， orchestrate 所有 Agent"},{"id":"body","type":"string","label":"正文段落（\\n 分隔）","default":"长任务不再丢上下文\\n团队可以实时查看同一段对话\\n支持 MCP、CLI 与多模型原生集成"},{"id":"imageUrl","type":"string","label":"配图 URL（可选）","default":""},{"id":"videoUrl","type":"string","label":"录屏视频路径（可选，填入则内容区播放视频）","default":""},{"id":"duration","type":"number","label":"总时长（秒）","default":6},{"id":"accent","type":"color","label":"强调色","default":"#00FF00"},{"id":"background","type":"color","label":"背景色","default":"#12100E"},{"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+*{ box-sizing: border-box;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      html, body{ margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: var(--background, #12100e);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      body{ font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--background, #12100e); color: var(--foreground, #f4efe7); display: flex; align-items: center; justify-content: center;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .scene{ position: absolute; inset: 0; width: 100%; height: 100%; padding: 96px 112px; overflow: hidden; display: flex; align-items: center; justify-content: center;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .browser{ width: 1520px; border: 1px solid #3a3029; border-radius: 12px; overflow: hidden; background: #1a1613;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .browser-header{ height: 56px; border-bottom: 1px solid #3a3029; display: flex; align-items: center; gap: 14px; padding: 0 20px; background: #211c18;font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+      .browser-dot{ width: 12px; height: 12px; border-radius: 50%;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .browser-url{ flex: 1; height: 34px; border-radius: 6px; background: #12100e; border: 1px solid #3a3029; display: flex; align-items: center; padding: 0 14px; font-size: 15px; color: #6B7280; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .browser-body{ padding: 60px 80px; min-height: 680px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .page-title{ font-size: 18px; font-weight: 600; color: #6B7280; margin-bottom: 40px; text-transform: uppercase; letter-spacing: 0.12em;font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+      .headline{ font-size: 64px; font-weight: 700; line-height: 1.15; letter-spacing: -0.02em; margin-bottom: 48px; max-width: 1100px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .body-text{ font-size: 28px; line-height: 1.7; color: #6B7280; max-width: 900px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .body-text p{ margin: 0 0 20px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .body-text p::before{ content: "—"; color: var(--accent); margin-right: 14px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .image-placeholder{ margin-top: 48px; width: 100%; height: 220px; border: 1px dashed #3a3029; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #6B7280; font-size: 18px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .image-placeholder img{ width: 100%; height: 100%; object-fit: cover; border-radius: 8px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .browser-body.video-mode{ padding: 0; min-height: 680px; }
+      .browser-body.video-mode video{ width: 100%; height: 100%; object-fit: cover; display: block; }
+      .cursor{ display: inline-block; width: 8px; height: 18px; background: var(--accent); margin-left: 2px; vertical-align: middle;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+    </style>
+  <style>
+/* [公开版] 原实拍视频未随仓分发，此处为占位块 */
+.pub-media-placeholder{
+  background:
+    repeating-linear-gradient(135deg, rgba(255,255,255,.05) 0 12px, rgba(255,255,255,.11) 12px 24px),
+    rgba(120,120,130,.22);
+  border:1px dashed rgba(255,255,255,.22);
+  border-radius:10px;
+  position:relative;
+}
+.pub-media-placeholder::after{
+  content:"公开版未包含实拍素材";
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  font:400 20px/1.4 'PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,sans-serif;
+  color:rgba(255,255,255,.62);
+  letter-spacing:.04em;
+}
+</style>
+</head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene clip" data-start="0" data-duration="3600" data-track-index="1">
+        <div class="browser">
+          <div class="browser-header">
+            <span class="browser-dot" style="background:#FF5F57"></span>
+            <span class="browser-dot" style="background:#FEBC2E"></span>
+            <span class="browser-dot" style="background:#28C840"></span>
+            <div class="browser-url" id="urlBar"></div>
+          </div>
+          <div class="browser-body">
+            <div class="page-title" id="pageTitle"></div>
+            <h1 class="headline" id="headline"></h1>
+            <div class="body-text" id="bodyText"></div>
+            <div class="image-placeholder" id="imageBox"><span>配图区域</span></div>
+            <!-- [公开版] 原视频 视频 recording.mp4（未随仓分发） 未随仓分发（实拍素材，体积原因）。此位置改为占位块。 -->
+<div id="rec"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <script>
+      const fallback = { url: "https://aionui.io/features", title: "AionUI — 长任务与团队协作", headline: "一个窗口， orchestrate 所有 Agent", body: "长任务不再丢上下文\n团队可以实时查看同一段对话\n支持 MCP、CLI 与多模型原生集成", imageUrl: "", videoUrl: "", duration: 6, accent: "#00FF00", background: "#12100E", foreground: "#F4EFE7" };
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4EFE7");
+      document.documentElement.style.setProperty("--background", v.background ?? "#12100E");
+      const DUR=+v.duration>0?+v.duration:6;
+      document.querySelector('[data-composition-id]').setAttribute('data-duration',String(DUR));
+      document.documentElement.style.setProperty("--accent", v.accent);
+      document.getElementById("root").style.backgroundColor = v.background;
+      document.getElementById("root").style.color = v.foreground;
+
+      const urlBar = document.getElementById("urlBar");
+      const bodyText = document.getElementById("bodyText");
+      const imageBox = document.getElementById("imageBox");
+      const browserBody = document.querySelector(".browser-body");
+      if (v.videoUrl) {
+        // 录屏模式：内容区整幅播放视频，隐藏文章元素
+        browserBody.classList.add("video-mode");
+        document.getElementById("pageTitle").style.display = "none";
+        document.getElementById("headline").style.display = "none";
+        bodyText.style.display = "none";
+        imageBox.style.display = "none";
+        const vid = document.getElementById("rec");
+        vid.src = v.videoUrl;
+        vid.style.display = "block";
+      } else {
+        document.getElementById("pageTitle").textContent = v.title;
+        document.getElementById("headline").textContent = v.headline;
+        const paragraphs = v.body.split(/\n|\\n/).filter(s => s.trim());
+        paragraphs.forEach(text => {
+          const p = document.createElement("p"); p.textContent = text; bodyText.appendChild(p);
+        });
+        if (v.imageUrl) {
+          imageBox.innerHTML = `<img src="${v.imageUrl}" alt="" />`;
+        }
+      }
+
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(".browser", { opacity: 0, y: 40, scale: 0.98 }, { opacity: 1, y: 0, scale: 1, duration: 0.7, ease: "power3.out" }, 0.2);
+      tl.fromTo(".browser-header", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 0.5);
+      const fullUrl = v.url;
+      urlBar.textContent = "";
+      tl.to({}, { duration: fullUrl.length * 0.025, onUpdate: function() {
+        urlBar.textContent = fullUrl.slice(0, Math.round(fullUrl.length * this.progress()));
+      } }, 0.7);
+      tl.fromTo(".page-title", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 1.3);
+      tl.fromTo(".headline", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 1.5);
+      tl.fromTo(".body-text p", { opacity: 0, x: -16 }, { opacity: 1, x: 0, duration: 0.4, stagger: 0.12, ease: "power2.out" }, 1.9);
+      tl.fromTo(".image-placeholder", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 2.6);
+      // 不做场景淡出：探测可见性窗口依赖无变量页面，提前淡出会把嵌入视频的可见窗口截短
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"title","type":"string","label":"卡片标题","default":"信息重组"},
+  {"id":"blocks","type":"string","label":"元素块标签（换行分隔 4-6 条）","default":"数据流\n组织网\n重组态\n决策位"},
+  {"id":"focusOrder","type":"string","label":"焦点接力顺序（逗号分隔索引）","default":"0,1,2,3"},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#0E1216"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#EDEFF1"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #0E1216);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #0E1216);
+        color: var(--foreground, #EDEFF1);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity: .55;
+      }
+      .vig{
+        position:absolute; inset:0; pointer-events:none;
+        background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(0,0,0,.55) 100%);
+      }
+      #scene{ position:absolute; inset:0; }
+
+      /* ---------- 顶头 / 页脚 ---------- */
+      .eyebrow{
+        position:absolute; top: 60px; left: 96px; right: 96px;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.24em; text-transform:uppercase;
+        color: color-mix(in srgb, var(--foreground, #EDEFF1) 60%, transparent);
+      }
+      .eyebrow .acc{ color: var(--accent, #00FF00); font-weight:700; letter-spacing:.18em; }
+      .footnote{
+        position:absolute; bottom: 60px; left: 96px; right: 96px;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.18em; text-transform:uppercase;
+        color: color-mix(in srgb, var(--foreground, #EDEFF1) 55%, transparent);
+      }
+      .seq{
+        position:absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
+        display:flex; gap: 12px; align-items:center;
+      }
+      .seq .dot{
+        width:10px; height:10px; border-radius:50%;
+        border:1.5px solid color-mix(in srgb, var(--foreground, #EDEFF1) 35%, transparent);
+        background: transparent; transition:none;
+      }
+      .seq .dot.on{
+        background: var(--accent, #00FF00);
+        border-color: var(--accent, #00FF00);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+      }
+      .seq .link{
+        width:36px; height:1.5px; background: rgba(255,255,255,.12);
+      }
+
+      /* ---------- 舞台 ---------- */
+      #stage{
+        position:absolute; left: 96px; right: 96px; top: 150px; bottom: 150px;
+      }
+      .block{
+        position:absolute; left: 218px; top: 142px;
+        width: 260px; height: 330px;
+        background: color-mix(in srgb, var(--foreground, #EDEFF1) 6%, var(--background, #0E1216));
+        border: 1px solid color-mix(in srgb, var(--foreground, #EDEFF1) 18%, transparent);
+        border-radius: 12px;
+        padding: 26px 24px;
+        display:flex; flex-direction:column; justify-content:space-between;
+        overflow:hidden;
+        will-change: transform, opacity, box-shadow;
+      }
+      .block::after{
+        content:""; position:absolute; inset:auto -30% -55% auto;
+        width:220px; height:220px; border-radius:50%;
+        background: radial-gradient(circle, color-mix(in srgb, var(--accent,#00FF00) 22%, transparent), transparent 70%);
+        opacity: 0; transition: none;
+      }
+      .block .num{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 48px; font-weight:700; letter-spacing:-.03em;
+        color: color-mix(in srgb, var(--foreground, #EDEFF1) 55%, transparent);
+      }
+      .block .lab{
+        font-size: 34px; font-weight:700; line-height:1.25; letter-spacing:-.01em;
+        color: var(--foreground, #EDEFF1);
+      }
+      .block .tag{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 13px; letter-spacing:.24em; text-transform:uppercase;
+        color: color-mix(in srgb, var(--foreground, #EDEFF1) 55%, transparent);
+        display:flex; align-items:center; gap:10px;
+      }
+      .block .tag .dash{
+        display:inline-block; width:26px; height:2px;
+        background: color-mix(in srgb, var(--foreground, #EDEFF1) 40%, transparent);
+      }
+      .block.focused{
+        border-color: var(--accent, #00FF00);
+        box-shadow:
+          0 0 0 1px var(--accent, #00FF00) inset,
+          0 20px 60px color-mix(in srgb, var(--accent, #00FF00) 22%, transparent),
+          0 0 90px color-mix(in srgb, var(--accent, #00FF00) 14%, transparent);
+      }
+      .block.focused .num{ color: var(--accent, #00FF00); }
+      .block.focused .tag .dash{ background: var(--accent, #00FF00); }
+      .block.focused::after{ opacity: 1; }
+
+      /* 中心焦点光晕 */
+      .focusRing{
+        position:absolute; left: 960px; top: 540px;
+        width: 460px; height: 460px; border-radius: 50%;
+        transform: translate(-50%, -50%);
+        border: 1px dashed color-mix(in srgb, var(--accent, #00FF00) 45%, transparent);
+        opacity: 0;
+        will-change: transform, opacity;
+        pointer-events: none;
+      }
+
+      /* 中心标签（标题所在） */
+      .centerTitle{
+        position:absolute; left: 50%; top: 176px;
+        transform: translateX(-50%);
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 44px; font-weight:700; letter-spacing:-.02em;
+        color: var(--foreground, #EDEFF1);
+        white-space: nowrap;
+        opacity: 0;
+      }
+      .centerTitle b{ color: var(--accent, #00FF00); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" data-start="0" data-duration="6" data-track-index="1">
+        <div class="gridbg"></div>
+        <div class="vig"></div>
+
+        <div class="eyebrow">
+          <span><b class="acc">◉</b>&nbsp;&nbsp;STILL · LAYOUT · RELAY</span>
+          <span>信息重组 · 元素接力</span>
+        </div>
+
+        <div id="stage">
+          <div class="centerTitle" id="centerTitle"><b id="centerTitleB">信息</b> · 静态版面的接力换位</div>
+          <div class="focusRing" id="focusRing"></div>
+          <!-- blocks 由 JS 从 schema 注入，静态兜底也放 4 个 -->
+          <div class="block" data-id="0"><div class="num">01</div><div class="tag"><span class="dash"></span><span>FLOW · 01</span></div><div class="lab">数据流</div></div>
+          <div class="block" data-id="1"><div class="num">02</div><div class="tag"><span class="dash"></span><span>FLOW · 02</span></div><div class="lab">组织网</div></div>
+          <div class="block" data-id="2"><div class="num">03</div><div class="tag"><span class="dash"></span><span>FLOW · 03</span></div><div class="lab">重组态</div></div>
+          <div class="block" data-id="3"><div class="num">04</div><div class="tag"><span class="dash"></span><span>FLOW · 04</span></div><div class="lab">决策位</div></div>
+        </div>
+
+        <div class="footnote">
+          <span>focus · order</span>
+          <span class="seq" id="seq"></span>
+          <span>2026 · FDE · STILL LAYOUT RELAY</span>
+        </div>
+      </section>
+    </div>
+    <script>
+      /* ----- 变量接线 ----- */
+      const fallback = {
+        title: "信息重组",
+        blocks: "数据流\n组织网\n重组态\n决策位",
+        focusOrder: "0,1,2,3",
+        accent: "#00FF00",
+        background: "#0E1216",
+        foreground: "#EDEFF1",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const $ = (id) => document.getElementById(id);
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#EDEFF1");
+      html.style.setProperty("--background", v.background || "#0E1216");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      /* ----- 内容回填 ----- */
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      const rawBlocks = String(v.blocks ?? fallback.blocks).split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+      const MAXB = 6;
+      const MINB = 4;
+      while (rawBlocks.length < MINB) rawBlocks.push("…");
+      const blocks = rawBlocks.slice(0, MAXB);
+
+      const stage = $("stage");
+      const staticList = Array.from(stage.querySelectorAll(".block"));
+      staticList.forEach(el => el.remove());
+
+      blocks.forEach((t, i) => {
+        const el = document.createElement("div");
+        el.className = "block";
+        el.setAttribute("data-id", String(i));
+        el.innerHTML =
+          '<div class="num">' + String(i+1).padStart(2,"0") + '</div>' +
+          '<div class="tag"><span class="dash"></span><span>BLOCK · ' + String(i+1).padStart(2,"0") + '</span></div>' +
+          '<div class="lab">' + escapeHtml(t) + '</div>';
+        stage.appendChild(el);
+      });
+
+      // 底部序列指示器
+      const seq = $("seq");
+      seq.innerHTML = blocks.map((_, i) =>
+        '<span class="dot" data-i="' + i + '"></span>' + (i < blocks.length - 1 ? '<span class="link"></span>' : '')
+      ).join("");
+      const dots = Array.from(seq.querySelectorAll(".dot"));
+
+      // 焦点顺序
+      const orderRaw = String(v.focusOrder ?? fallback.focusOrder).split(/[,\s]+/).map(s=>parseInt(s,10)).filter(n=>!isNaN(n));
+      const focusOrder = orderRaw.length ? orderRaw : blocks.map((_, i) => i);
+
+      // 中心标题
+      $("centerTitle").textContent = "";
+      $("centerTitle").innerHTML = '<b>' + escapeHtml(v.title || fallback.title) + '</b> · 静态版面的接力换位';
+
+      /* ----- 布局坐标 ----- */
+      // stage 尺寸: left 96..1824, top 150..930, block 260x330
+      const N = blocks.length;
+      const totalW = N * 260;
+      const gap = (1728 - totalW) / Math.max(N - 1, 1);
+      const stageX = (i) => 218 + (260 + gap) * i;
+      const stageY = 142;
+      const focusX = 830, focusY = 145;
+
+      const posMap = {};
+      for (let i = 0; i < N; i++) posMap[i] = { x: stageX(i), y: stageY };
+      const corners = [
+        { x: 30,  y: -60, s: 0.34 },
+        { x: 1420, y: -60, s: 0.34 },
+        { x: 30,  y: 250, s: 0.34 },
+        { x: 1420, y: 250, s: 0.34 },
+        { x: 210, y: -20, s: 0.30 },
+        { x: 1240, y: -20, s: 0.30 },
+      ];
+
+      const setFocus = (focusIdx, others) => {
+        for (const el of stage.querySelectorAll(".block")) {
+          const idx = parseInt(el.getAttribute("data-id"), 10);
+          if (idx === focusIdx) {
+            const p = focusOrder.indexOf(idx);
+            if (p >= 0 && dots[p]) dots[p].classList.add("on"); else if (dots[0]) dots[0].classList.add("on");
+          } else {
+            const p = focusOrder.indexOf(idx);
+            if (p >= 0 && dots[p]) dots[p].classList.remove("on");
+          }
+        }
+      };
+
+      /* ----- 时间线 ----- */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+      const tl = gsap.timeline({ paused: true });
+
+      const from = { x: 0, y: 0, scale: 1, opacity: 0 };
+      const toStage = (el, i) => ({ x: posMap[i].x, y: posMap[i].y, scale: 1, opacity: 1 });
+
+      // 入场：4–6 张卡片按 stage 位置错峰浮入
+      stage.querySelectorAll(".block").forEach((el, i) => {
+        tl.fromTo(el, from, toStage(el, i), { duration: 0.5, ease: "power3.out" }, 0.05 + i * 0.08);
+      });
+
+      // 中心标题淡入
+      tl.fromTo("#centerTitle", { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "power2.out" }, 0.15);
+
+      // 焦点光圈
+      tl.fromTo("#focusRing",
+        { opacity: 0, scale: 0.6, x: 960, y: 540 },
+        { opacity: 1, scale: 1, duration: 0.5, ease: "power2.out" }, 0.5);
+
+      // 接力：focusOrder 里每个索引轮流成为焦点；上一焦点缩到角落，下一焦点放大到中心
+      const focusDur = 1.30;
+      const handoff = 0.18;
+      const relayStart = 0.80;
+      focusOrder.forEach((idx, k) => {
+        const t = relayStart + k * (focusDur - handoff);
+        const prevIdx = focusOrder[k - 1];
+        const el = stage.querySelector('.block[data-id="' + idx + '"]');
+        if (!el) return;
+        // 焦点进入中心
+        tl.to(el, { x: focusX, y: focusY, scale: 1.10, duration: focusDur, ease: "back.out(1.4)" }, t);
+        tl.call(() => { el.classList.add("focused"); setFocus(idx); }, null, t + 0.15);
+
+        // 上一焦点退到角落
+        if (prevIdx !== undefined && prevIdx !== idx) {
+          const prevEl = stage.querySelector('.block[data-id="' + prevIdx + '"]');
+          if (prevEl) {
+            tl.call(() => prevEl.classList.remove("focused"), null, t + 0.05);
+            const corner = corners[k % corners.length];
+            tl.to(prevEl, { x: corner.x, y: corner.y, scale: corner.s, duration: 0.9, ease: "power2.inOut" }, t);
+          }
+        }
+        // 其它非焦点保持 stage 位置（若已被推走则略缩）
+        stage.querySelectorAll(".block").forEach(oel => {
+          const oi = parseInt(oel.getAttribute("data-id"), 10);
+          if (oi === idx || oi === prevIdx) return;
+          if (focusOrder.includes(oi)) return; // 未来还会当焦点
+          // 未来焦点保持在 stage 位（无需动）
+        });
+      });
+
+      // 结尾稳定 ~0.8s（不再动，让最后一位焦点静置）
+
+      // 初始：焦点光圈归零、卡片隐藏由 fromTo 处理
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

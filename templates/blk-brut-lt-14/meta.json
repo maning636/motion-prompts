@@ -1,0 +1,16 @@
+{
+ "name": "弹幕贴",
+ "description": "三条错开右端位置的评论块逐条自右拍入，头像方块换三种高饱和色并按固定节奏硬切轮转，三层错峰做匀速往返位移",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "danmaku",
+  "comments",
+  "pink"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "直播与短视频，需要把观众留言以弹幕感的方式压在画面右侧时"
+}

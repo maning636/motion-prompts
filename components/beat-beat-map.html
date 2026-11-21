@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"bpm","name":"BPM","type":"number","label":"速度 BPM（40~220）","default":96},{"id":"beatsPerBar","name":"拍号","type":"number","label":"每小节几拍","default":4},{"id":"color","name":"字色","type":"color","label":"文字颜色","default":"#F4F1EA"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#E8A048"},{"id":"panel","name":"面板底","type":"color","label":"面板底色","default":"rgba(12,12,18,.68)"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":6.4}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>节拍地图 · 小节刻度</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 480px; height: 270px; overflow: hidden; background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .halo { position: absolute; inset: 0;
+    background: radial-gradient(64% 76% at 50% 50%, rgba(0,0,0,.60) 0%, rgba(0,0,0,.30) 54%, rgba(0,0,0,0) 78%); }
+  .panel { position: absolute; left: 20px; right: 20px; background: var(--panel);
+    border-radius: var(--radius, 12px); opacity: 0;
+    box-shadow: 0 12px 40px rgba(0,0,0,.42); }
+  .ac { color: var(--ac); }
+  .fg { color: var(--fg); }
+  .mu { color: rgba(244,241,234,.58); }
+  .mono { font-family: ui-monospace, Consolas, monospace; }
+  .bar { position: absolute; height: 4px; border-radius: 2px; background: var(--ac); }
+  .tick { position: absolute; width: 2px; background: var(--ac); opacity: 0; }
+  .flash { position: absolute; inset: 0; background: var(--ac); opacity: 0; }
+</style>
+</head>
+<body>
+<div id="stage"><div class="halo"></div></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"bpm":96,"beatsPerBar":4,"color":"#F4F1EA","accent":"#E8A048","panel":"rgba(12,12,18,.68)","duration":6.4};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--fg', v.color || FALLBACK.color);
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--panel', v.panel || FALLBACK.panel);
+  const dur = parseFloat(v.duration) || 6.4;
+  const stage = document.getElementById('stage');
+  const put = (tag, cls, css, text) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (css) e.style.cssText = css;
+    if (text != null) e.textContent = text;
+    stage.appendChild(e);
+    return e;
+  };
+
+  /* ── 节拍地图 ──────────────────────────────────────────────
+     这一族的地基：给定 BPM 和拍号，算出每一拍的绝对时刻。
+     后面所有切点、闪光、弹字都从这张表推，不各自算一遍——
+     否则换 BPM 时三处会对不上，正是社区说的「各长各的」。 */
+  const bpm = Math.max(40, Math.min(220, parseFloat(v.bpm) || FALLBACK.bpm));
+  const beatsPerBar = Math.max(1, Math.min(8, parseInt(v.beatsPerBar, 10) || FALLBACK.beatsPerBar));
+  const spb = 60 / bpm;                       // 一拍多少秒
+  const total = Math.floor(dur / spb);
+  const BEATS = [];
+  for (let i = 0; i <= total; i++) {
+    BEATS.push({ i: i, t: i * spb, bar: Math.floor(i / beatsPerBar) + 1,
+                 beat: (i % beatsPerBar) + 1, down: i % beatsPerBar === 0 });
+  }
+  /* 小节线：小节头那一拍 */
+  const BARS = BEATS.filter((b) => b.down);
+  /* 强调拍：每 4 小节的第一拍，社区里最常用的"情绪拉高"点 */
+  const ACCENT = BARS.filter((b) => (b.bar - 1) % 4 === 0);
+
+  const build = 
+(stage, put, v, FB, T) => (tl, dur) => {
+  /* 节拍地图：把那张表画出来。社区的做法就是先看这张图再开工，
+     这一条把它本身做成可复用的资产。 */
+  const panel = put('div', 'panel', 'top:52px;height:166px');
+  const title = put('div', 'mono fg', 'position:absolute;left:18px;top:14px;font-size:12px;' +
+    'letter-spacing:.2em;', T.BPMTEXT);
+  const bpmTxt = put('div', 'mono ac', 'position:absolute;right:18px;top:14px;font-size:12px;' +
+    'letter-spacing:.12em;', T.BPMVAL);
+  const track = put('div', '', 'position:absolute;left:18px;right:18px;top:58px;height:2px;' +
+    'background:rgba(244,241,234,.18)');
+  const fill = put('div', 'bar', 'left:18px;top:58px;width:0');
+  const ticks = T.BEATS.map((b) => {
+    const x = 18 + (b.t / T.dur) * (480 - 36);
+    const h = b.down ? 26 : 12;
+    const el = put('div', 'tick',
+      'left:' + x + 'px;top:' + (58 - h) + 'px;height:' + h + 'px;opacity:' +
+      (b.down ? .95 : .42) + ';');
+    const lab = put('div', 'mono mu', 'position:absolute;left:' + (x - 5) + 'px;top:62px;' +
+      'font-size:9px;', b.down ? String(b.bar) : '');
+    return { el, lab, b };
+  });
+  const marks = put('div', 'mu', 'position:absolute;left:18px;right:18px;top:96px;font-size:11px;' +
+    'line-height:1.6;', T.MAPNOTE);
+  const st = { p: 0 };
+  tl.fromTo(panel, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: .34, ease: 'power3.out' }, 0);
+  tl.fromTo([title, bpmTxt], { opacity: 0 }, { opacity: 1, duration: .3, stagger: .06 }, .06);
+  /* 每一拍亮一下：时间是纯函数，回扫也停在正确的那一帧 */
+  tl.fromTo(st, { p: 0 }, {
+    p: T.dur, duration: T.dur, ease: 'none',
+    onUpdate() { this.targets()[0].p; },
+  }, 0);
+  tl.to(fill, { width: 480 - 36, duration: T.dur, ease: 'none' }, 0);
+  ticks.forEach((t) => {
+    tl.fromTo(t.el, { scaleY: .2, transformOrigin: '50% 100%' },
+      { scaleY: 1, duration: .18, ease: 'back.out(3)' }, t.b.t);
+    tl.fromTo(t.lab, { opacity: 0, y: -6 },
+      { opacity: t.b.down ? 1 : 0, y: 0, duration: .2 }, t.b.t + .03);
+  });
+  tl.fromTo(marks, { opacity: 0 }, { opacity: 1, duration: .35 }, .24);
+}
+;
+  /* 给 build 的东西一次给全：BPM 相关派生值在共用头部算好。
+     早先是把派生代码拼在 BUILD 函数**后面**，结果落在箭头函数体之外，
+     整个表达式语法错误 → ctx 抛错 → 页面只剩一层 halo，
+     nodes=1、D=NO-TL。一眼看不出来是拼接位置错了。
+     （此处刻意不写占位名原文：HEAD 是按占位名做 replace 的，
+       注释里一旦出现同名占位，replace-all 会把函数体塞进注释中间。） */
+  const T = {
+    BEATS: BEATS, BARS: BARS, ACCENT: ACCENT, spb: spb, dur: dur,
+    BPMTEXT: v.bpmLabel || 'BEAT MAP',
+    BPMVAL: Math.round(bpm) + ' BPM · ' + beatsPerBar + '/4',
+    MAPNOTE: '强拍 ' + BARS.length + ' 个 · 共 ' + BEATS.length + ' 拍 · 一拍 '
+      + (spb * 1000).toFixed(0) + 'ms',
+  };
+  const ctx = build(stage, put, v, FALLBACK, T);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+  ctx(tl, dur);
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+{
+  "name": "node-graph",
+  "private": true,
+  "scripts": {
+    "render": "cd ../.. && npm run render -- node-graph"
+  }
+}

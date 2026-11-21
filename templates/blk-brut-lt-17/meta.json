@@ -1,0 +1,16 @@
+{
+ "name": "地点条",
+ "description": "ink 定位板内嵌 3px 描边 SVG 定位针，右侧白底地点卡给地名与地址，最右一块绿色状态块标现场；三块自左依次拍入后错峰微位移",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "location",
+  "onsite",
+  "green"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "线下活动、探店、直播连线，需要把拍摄地与现场状态挂在画面上时"
+}

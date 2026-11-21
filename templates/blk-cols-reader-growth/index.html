@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "eyebrow", "name": "眉标", "type": "string", "label": "顶部眉标", "default": "AUDIENCE / 涨粉复盘"}, {"id": "title", "name": "主标题", "type": "string", "label": "主标题", "default": "哪一步真的拉来了人"}, {"id": "note", "name": "注释", "type": "string", "label": "右上角注释", "default": "单位：人"}, {"id": "accent", "name": "强调色", "type": "color", "label": "强调色", "default": "#2FD07A"}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>分栏数字条 · 哪一步真的拉来了人</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--paper);color:var(--ink);font-family:var(--sans);
+        display:flex;flex-direction:column;padding:58px 72px 0}
+  #stage.on-ink{background:var(--ink);color:var(--paper)}
+
+  .hd{flex:0 0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:36px}
+  .hd h1{font-size:60px;font-weight:900;line-height:1.04;margin:8px 0 0;letter-spacing:-.015em}
+  .hd .note{font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:.1em;
+        border:var(--bw) solid var(--ink);border-radius:9999px;padding:9px 20px;
+        background:var(--white);color:var(--ink);box-shadow:4px 4px 0 var(--ink);white-space:nowrap}
+  #stage.on-ink .hd .note{background:var(--paper);color:var(--ink);box-shadow:4px 4px 0 var(--accent)}
+
+  /* 底部色带：把画面「压」住，不然上面排得再满底部都是飘的 */
+  .ft{flex:0 0 auto;height:18px;border-top:var(--bw) solid var(--ink);
+      border-bottom:var(--bw) solid var(--ink);
+      background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+  #stage.on-ink .ft{border-color:var(--paper)}
+
+  .body{flex:1 1 auto;min-height:0;display:flex;margin-top:32px;padding-bottom:26px}
+
+  /* 图标必须锁死尺寸。只写 viewBox 而不写 width/height 的 SVG，浏览器会按
+     「默认替换元素尺寸」给它 300px——图标从 52px 的底座里横着冲出去，
+     把整张卡片撑破。版图上表现为卡片右边被顶掉一截，而溢出检测只报"出框"，
+     看不出是被一个看不见的图标顶的。 */
+  .ico{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .ico svg{width:100%;height:100%;display:block}
+
+  .body{gap:20px}
+  .col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;
+       border:var(--bw) solid var(--ink);border-radius:4px;overflow:hidden;
+       box-shadow:7px 7px 0 var(--ink)}
+  .col .cap{flex:0 0 auto;height:14px;background:var(--ink)}
+  .col .in{flex:1 1 auto;display:flex;flex-direction:column;align-items:flex-start;
+           justify-content:space-between;padding:24px 22px 20px;min-height:0}
+  .col .top{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .col .ico{width:50px;height:50px;border:var(--bw) solid var(--ink);border-radius:4px;
+            display:flex;align-items:center;justify-content:center;
+            background:var(--paper);color:var(--ink);flex:0 0 auto}
+  .col .idx{font-family:var(--mono);font-weight:700;font-size:34px;line-height:1;
+            letter-spacing:-.04em;opacity:.42}
+  .col .mid{flex:1 1 auto;display:flex;flex-direction:column;gap:12px;min-height:0;
+            justify-content:center;width:100%}
+  .col .k{font-family:var(--mono);font-weight:700;font-size:18px;letter-spacing:.06em;
+          line-height:1.35;width:100%;opacity:.9;white-space:nowrap;overflow:hidden;
+          text-overflow:ellipsis}
+  /* nowrap 是必须的：128px 字号下「1.2亿」「18 个月」会各自断成两行，
+     版面上就是「1.2」下面挂一个「亿」。不锁的话 B.fit 量到的宽度也不对。 */
+  .col .v{font-family:var(--mono);font-weight:700;font-size:128px;line-height:.88;
+          letter-spacing:-.06em;font-variant-numeric:tabular-nums;width:100%;
+          white-space:nowrap;overflow:hidden}
+  .col .share{width:100%;height:12px;border:var(--bw) solid currentColor;position:relative;
+          background:var(--paper);overflow:hidden;flex:0 0 auto}
+  .col .share i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--ink)}
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="blk-corner tl"></div><div class="blk-corner tr"></div>
+  <div class="blk-corner bl"></div><div class="blk-corner br"></div>
+
+  <div class="hd"><div><div class="blk-eyebrow" id="eyebrow">AUDIENCE / 涨粉复盘</div>
+    <h1 id="title" data-fit-max="60" data-fit-min="32">哪一步真的拉来了人</h1></div><div class="note" id="note" data-fit-max="15" data-fit-min="11">单位：人</div></div>
+  <div class="body"><div class="blk col " id="c0" style="background:var(--pink);color:var(--ink);"><div class="cap"></div><div class="in"><span class="top"><span class="ico"><span class="ico"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 41V19M19 41V9M31 41V25M43 41V4"/></svg></span></span><span class="idx">01</span></span><div class="mid"><span class="v" id="v0" data-fit-max="128" data-fit-min="52">8420</span><span class="k" id="k0" data-fit-max="18" data-fit-min="12">净增</span></div><span class="share"><i id="sh0"></i></span></div></div><div class="blk col " id="c1" style="background:var(--orange);color:var(--ink);"><div class="cap"></div><div class="in"><span class="top"><span class="ico"><span class="ico"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M24 5l6 13 14 2-10 10 3 14-13-7-13 7 3-14L4 20l14-2z"/></svg></span></span><span class="idx">02</span></span><div class="mid"><span class="v" id="v1" data-fit-max="128" data-fit-min="52">1130</span><span class="k" id="k1" data-fit-max="18" data-fit-min="12">取关</span></div><span class="share"><i id="sh1"></i></span></div></div><div class="blk col " id="c2" style="background:var(--purple);color:var(--ink);"><div class="cap"></div><div class="in"><span class="top"><span class="ico"><span class="ico"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M8 25l11 11L40 12"/></svg></span></span><span class="idx">03</span></span><div class="mid"><span class="v" id="v2" data-fit-max="128" data-fit-min="52">3.8%</span><span class="k" id="k2" data-fit-max="18" data-fit-min="12">转化率</span></div><span class="share"><i id="sh2"></i></span></div></div><div class="blk col " id="c3" style="background:var(--white);color:var(--ink);"><div class="cap"></div><div class="in"><span class="top"><span class="ico"><span class="ico"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M24 4l18 10v20L24 44 6 34V14zM6 14l18 10 18-10M24 24v20"/></svg></span></span><span class="idx">04</span></span><div class="mid"><span class="v" id="v3" data-fit-max="128" data-fit-min="52">268</span><span class="k" id="k3" data-fit-max="18" data-fit-min="12">客单</span></div><span class="share"><i id="sh3"></i></span></div></div><div class="blk col " id="c4" style="background:var(--yellow);color:var(--ink);"><div class="cap"></div><div class="in"><span class="top"><span class="ico"><span class="ico"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M24 17a7 7 0 100 14 7 7 0 000-14zM24 3l4 6 7-2 1 7 7 3-4 6 4 6-7 3-1 7-7-2-4 6-4-6-7 2-1-7-7-3 4-6-4-6 7-3 1-7 7 2z"/></svg></span></span><span class="idx">05</span></span><div class="mid"><span class="v" id="v4" data-fit-max="128" data-fit-min="52">22%</span><span class="k" id="k4" data-fit-max="18" data-fit-min="12">复购</span></div><span class="share"><i id="sh4"></i></span></div></div></div>
+  <div class="ft"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+    ["eyebrow", "title", "note", "accent", "k0", "v0", "k1", "v1", "k2", "v2", "k3", "v3", "k4", "v4"]
+.forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+  B.fitAll();
+  var tl = B.tl();
+
+  document.querySelectorAll('.col').forEach(function (c, i) {
+    var at = 0.12 + i * 0.08;
+    B.in.drop(tl, c, at, { dist: 150, rot: (i % 2 ? 2 : -2), d: 0.42 });
+    tl.from(c.querySelector('.cap'), { scaleX: 0, transformOrigin: 'left center',
+        duration: 0.42, ease: 'power3.inOut' }, at + 0.1);
+  });
+  var shares = [1.0, 0.134, 0.0, 0.032, 0.003];
+  document.querySelectorAll('.share i').forEach(function (e, i) {
+    B.in.grow(tl, e, Math.max(8, shares[i] * 100) + '%', 0.3 + i * 0.08, { d: 0.42 });
+  });
+  B.finish(tl);
+  B.hold(tl);
+})();
+</script>
+</body></html>

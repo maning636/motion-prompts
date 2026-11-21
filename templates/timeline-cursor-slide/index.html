@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "yearStart", "type": "number", "label": "起始年份", "default": 1975}, {"id": "yearEnd", "type": "number", "label": "结束年份", "default": 2055}, {"id": "title", "type": "string", "label": "标题", "default": "五十年技术演进"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #060806; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #F0F5F0; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      #root::after{ content: ""; position: absolute; inset: 0; pointer-events: none;
+        background: radial-gradient(1200px 500px at 50% 80%, color-mix(in srgb, var(--accent) 5%, transparent), transparent 62%); }
+      .tcs-head{ position: absolute; left: 90px; top: 80px; z-index: 6; }
+      .tcs-kicker{ font-size: 20px; letter-spacing: .34em; color: rgba(240,245,240,.5); }
+      .tcs-title{ margin-top: 14px; font-size: 64px; font-weight: 900; }
+      .tcs-note{ position: absolute; right: 90px; top: 92px; font-size: 22px; color: rgba(240,245,240,.5);
+        letter-spacing: .2em; text-align: right; line-height: 2; z-index: 6; }
+      .tcs-year{ position: absolute; left: 50%; top: 190px; transform: translateX(-50%); z-index: 6;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 150px; font-weight: 900; color: var(--ac);
+        text-shadow: 0 0 60px color-mix(in srgb, var(--accent) 30%, transparent); }
+      .tcs-rulerwrap{ position: absolute; left: 0; right: 0; top: 560px; height: 420px; overflow: hidden; }
+      .tcs-ruler{ position: absolute; left: 0; top: 0; height: 100%; will-change: transform; }
+      .tcs-base{ position: absolute; left: 0; right: 0; bottom: 120px; height: 2px; background: rgba(240,245,240,.25); }
+      .tk{ position: absolute; bottom: 120px; width: 2px; height: 22px; background: rgba(240,245,240,.32); }
+      .tk.big{ width: 3px; height: 46px; background: rgba(240,245,240,.85); }
+      .yr{ position: absolute; bottom: 186px; transform: translateX(-50%); font-size: 26px;
+        color: rgba(240,245,240,.55); letter-spacing: .08em; }
+      .tcs-cursor{ position: absolute; left: 958px; top: 300px; width: 4px; height: 560px; z-index: 5;
+        transform-origin: 50% 100%;
+        background: linear-gradient(to top, #FFFFFF 0%, rgba(255,255,255,.85) 55%, rgba(255,255,255,0) 100%); }
+      .tcs-glow{ position: absolute; left: 50%; bottom: 96px; width: 420px; height: 130px; z-index: 4;
+        transform: translateX(-50%); border-radius: 50%;
+        background: radial-gradient(closest-side, rgba(255,255,255,.5), color-mix(in srgb, var(--accent) 18%, transparent) 55%, transparent 75%);
+        filter: blur(6px); mix-blend-mode: screen; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="tcs-head"><div class="tcs-kicker mono">TIMELINE · FIXED CURSOR</div><div class="tcs-title" id="title"></div></div>
+      <div class="tcs-note mono">不是指针在跑<br>是刻度在跑</div>
+      <div class="tcs-year" id="year"></div>
+      <div class="tcs-rulerwrap"><div class="tcs-ruler" id="ruler"><div class="tcs-base"></div></div></div>
+      <div class="tcs-glow" id="glow"></div>
+      <div class="tcs-cursor" id="cursor"></div>
+
+    </div>
+    <script>
+      const fallback = {"yearStart": 1975, "yearEnd": 2055, "title": "五十年技术演进", "accent": "#00FF00", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      document.documentElement.style.setProperty("--ac", V.accent ?? "#00FF00");
+      $("title").textContent = V.title;
+      let y0 = Number(V.yearStart) || 1975, y1 = Number(V.yearEnd) || 2055;
+      if (y1 <= y0) y1 = y0 + 1;
+      const PPY = 64, CX = 960;
+      const ruler = $("ruler");
+      ruler.style.width = ((y1 - y0) * PPY + 40) + "px";
+      for (let y = y0; y <= y1; y++) {
+        const x = (y - y0) * PPY, big = (y % 5 === 0);
+        const tk = document.createElement("i");
+        tk.className = "tk" + (big ? " big" : "");
+        tk.style.left = x + "px";
+        ruler.appendChild(tk);
+        if (big) {
+          const yr = document.createElement("span");
+          yr.className = "yr mono";
+          yr.style.left = x + "px";
+          yr.textContent = y;
+          ruler.appendChild(yr);
+        }
+      }
+      const yearEl = $("year"), cur = { p: 0 };
+      const applyRuler = () => {
+        const yr = y0 + (y1 - y0) * cur.p;
+        ruler.style.transform = "translateX(" + (CX - (yr - y0) * PPY) + "px)";
+        yearEl.textContent = String(Math.round(yr));
+      };
+      applyRuler();
+      // 光标带底部光晕从底部"生长"入场（非弹入）
+      tl.fromTo("#cursor", { scaleY: 0 }, { scaleY: 1, duration: 0.9, ease: "power3.out" }, 0.15);
+      tl.fromTo("#glow", { opacity: 0 }, { opacity: 1, duration: 0.7 }, 0.35);
+      tl.fromTo([".tcs-kicker", ".tcs-title", ".tcs-note"], { opacity: 0, y: 18 },
+        { opacity: 1, y: 0, duration: 0.6, stagger: 0.12, ease: "power3.out" }, 0.2);
+      tl.fromTo("#year", { opacity: 0 }, { opacity: 1, duration: 0.5 }, 0.5);
+      // 不是指针跑是刻度跑：刻度尺平移挂主 progress，每年小刻度/5 年大刻度+年份
+      tl.to(cur, { p: 1, duration: 2.5, ease: "power1.inOut", onUpdate: applyRuler }, 0.7);
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

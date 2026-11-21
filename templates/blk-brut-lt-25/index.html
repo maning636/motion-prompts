@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"label","name":"进度名","type":"string","label":"进度名（4–12 字）","default":"本期内容进度"},{"id":"pct","name":"百分比","type":"number","label":"完成百分比（0–100）","default":62},{"id":"step","name":"阶段说明","type":"string","label":"右侧阶段说明（6–14 字）","default":"正在讲第 3 节"},{"id":"accent","name":"强调色","type":"color","label":"强调色（填充条 / 游标块）","default":"#3D7BFF"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","hidden":true,"default":"transparent","options":[{"value":"transparent","label":"透明底"},{"value":"mp4","label":"MP4 纯底"},{"value":"webm","label":"WebM 纯底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="进度条贴片：白底长条内一道匀速生长的填充条，填充右端跟一枚 3px 黑边游标方块同步平移，百分比整数跳到设定值后长条与游标做反向微位移">
+<title>进度条贴片 · 本期内容进度</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 透明底贴片：--paper 不出现，底色与阴影色收进变量（风格规范 §7.1 / §7.2 规则 A） */
+  :root{ --shadow:#FFFFFF; --background:transparent; }
+
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--background);color:var(--ink);font-family:var(--sans)}
+
+  /* 长条定高 180px：轨道的行高与游标块尺寸都写死，几何可预期 */
+  #pb{position:absolute;left:96px;bottom:300px;width:1728px;height:180px;
+    display:flex;flex-direction:column;justify-content:center;padding:0 30px;
+    background:var(--white);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  .row{display:flex;align-items:baseline;justify-content:space-between;gap:24px}
+  #label{display:block;font-size:44px;font-weight:900;line-height:1.1;letter-spacing:0;
+    color:var(--ink);white-space:nowrap;overflow:hidden}
+  #step{display:block;font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:.06em;
+    line-height:1;color:var(--ink);white-space:nowrap;overflow:hidden}
+  #pc{display:block;font-family:var(--mono);font-weight:900;font-size:48px;line-height:1;
+    letter-spacing:0;color:var(--ink);font-variant-numeric:tabular-nums;
+    font-feature-settings:"tnum" 1;white-space:nowrap}
+  /* 底槽白底 + 实色填充，长度就是进度，一眼分得清填了多少（blocks.css 进度语义件） */
+  #tr{position:relative;margin-top:18px;height:48px;background:var(--white);
+    border:var(--bw) solid var(--ink);border-radius:4px}
+  #fl{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--accent)}
+  /* 游标方块：压在填充条右端，纯方块 + 3px 黑边 + 4px 直角，不换圆角不换形。
+     初始位置由脚本按轨道实测写入 left/top，这里只给兜底值。 */
+  #mk{position:absolute;left:129px;top:633px;width:44px;height:44px;
+    background:var(--accent);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:4px 4px 0 var(--shadow)}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="pb">
+    <div class="row">
+      <span id="label" data-fit-max="44" data-fit-min="24">本期内容进度</span>
+      <span id="step" data-fit-max="26" data-fit-min="16">正在讲第 3 节</span>
+      <span id="pc">0%</span>
+    </div>
+    <div id="tr"><div id="fl"></div></div>
+  </div>
+  <!-- 游标方块：压在填充条右端，纯方块 + 3px 黑边，不换圆角不换形 -->
+  <div id="mk"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  var isT = (v.exportMode || 'transparent') === 'transparent';
+  var r = document.documentElement.style;
+  r.setProperty('--background', isT ? 'transparent' : '#0F0F0F');
+  r.setProperty('--shadow', isT ? '#FFFFFF' : '#0F0F0F');
+  if (v.accent) r.setProperty('--accent', v.accent);
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+  ['label', 'step'].forEach(function (k) { set(k, v[k]); });
+
+  var PCT = Math.max(0, Math.min(100, Number(v.pct) || 0));
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+
+  /* 游标初始位置：轨道可用宽度在这里量一次就够，之后全程只做 x 补间，
+     onUpdate 里不做任何 DOM 测量（渲染 worker 的 seek 顺序非线性，测量值不可信）。
+     量出来的视口坐标要减掉 #stage 自身的偏移，否则 #stage 不在 (0,0) 时游标会跑偏。 */
+  var tr = document.getElementById('tr');
+  var mk = document.getElementById('mk');
+  var st = document.getElementById('stage');
+  var TRW = tr ? Math.max(0, tr.clientWidth - 6) : 0;
+  var MKS = 44;
+  if (mk && tr && st) {
+    var trb = tr.getBoundingClientRect();
+    var stb = st.getBoundingClientRect();
+    mk.style.left = Math.round(trb.left - stb.left + 3) + 'px';
+    mk.style.top = Math.round(trb.top - stb.top + 3) + 'px';
+  }
+  var ENDX = TRW * PCT / 100 - MKS;
+
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：填充条与游标直接给终值，只留终态 + ≤8px 微位移淡入（规范 §13.5） */
+    gsap.set('#pb', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#mk', { x: ENDX, y: 0, opacity: 1 });
+    gsap.set('#fl', { width: PCT + '%' });
+    gsap.set('#pc', { textContent: PCT + '%' });
+    gsap.set('#label', { x: 0 });
+
+    tl.fromTo('#pb', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, 0);
+    tl.fromTo('#mk', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, .45);
+
+    B.hold(tl, 1.6, 1.2);
+    return;
+  }
+
+  var TOTAL = parseFloat(v.duration) > 0 ? parseFloat(v.duration) : 5;
+  var HOLD = 0.5;
+  var WIN = Math.max(1.6, TOTAL - HOLD);
+  var SH = isT ? '#FFFFFF' : '#0F0F0F';
+
+  /* 模 1 · 硬着陆：长条自左 90px 拍入，落定瞬间阴影压 2 帧再弹回原档 */
+  tl.fromTo('#pb', { x: -90 },
+      { x: 0, duration: .26, ease: 'power4.out' }, 0)
+    .fromTo('#pb', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#pb', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+  tl.fromTo('#label', { x: -24 }, { x: 0, duration: .2, ease: 'power4.out' }, .18);
+  tl.fromTo('#step', { x: 24 }, { x: 0, duration: .2, ease: 'power4.out' }, .24);
+
+  /* 模 10 变体 · 进度：width:0 的填充条一律用 B.in.grow，缓动恒 none（匀速）。
+     wipe 改的是 clip-path，元素本身没宽度，条子压根不显示而所有指标都判它正常。 */
+  var RUN = 1.5;
+  B.in.grow(tl, '#fl', PCT + '%', .34, { d: RUN, ease: 'none' });
+  /* 游标与填充同步平移：位移量在搭建时量一次算好，不在 onUpdate 里做任何测量 */
+  tl.fromTo('#mk', { x: 0 }, { x: ENDX, duration: RUN, ease: 'none' }, .34);
+  /* 百分比整数跳到终值：展示窗口写死 1.5s，onUpdate 只写 textContent */
+  var n = { v: 0 };
+  var ePc = document.getElementById('pc');
+  tl.to(n, { v: PCT, duration: RUN, ease: 'steps(12)',
+      onUpdate: function () { if (ePc) ePc.textContent = String(Math.round(n.v)) + '%'; } }, .34);
+
+  /* 游标落定瞬间阴影压 2 帧再弹回原档 */
+  tl.fromTo('#mk', { y: 30 },
+      { y: 0, duration: .24, ease: 'power4.out' }, .26);
+
+  /* 两层反向微位移：游标上抬、长条下压，匀速往返，零回弹 */
+  var T0 = 2.3;
+  var REP = Math.max(1, Math.round((WIN - T0) / .8));
+  var half = (WIN - T0) / (REP * 2);
+  tl.to('#mk', { y: -6, duration: half, ease: 'none', repeat: REP * 2 - 1, yoyo: true }, T0);
+  tl.to('#pb', { y: 5, duration: half, ease: 'none', repeat: REP * 2 - 2, yoyo: true }, T0 + half);
+
+  var end = tl.duration();
+  B.hold(tl, end, Math.max(HOLD, TOTAL - end));
+})();
+</script>
+</body></html>

@@ -1,0 +1,12 @@
+{
+  "title": "照片墙、手写卡，文艺范儿",
+  "img1": "./assets/promo1.png",
+  "img2": "./assets/promo2.png",
+  "img3": "./assets/promo3.png",
+  "img4": "./assets/promo4.png",
+  "img5": "./assets/promo5.png",
+  "img6": "./assets/promo6.png",
+  "focusIndex": 3,
+  "caption": "都是一句话",
+  "duration": 5
+}

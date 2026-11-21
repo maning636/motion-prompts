@@ -1,0 +1,13 @@
+{
+  "id": "sc2-hachure-01",
+  "name": "排线纵深揭示",
+  "series": "sc2",
+  "createdAt": "2026-08-16T08:00:00.000Z",
+  "energy": "中",
+  "suggestedDuration": 6,
+  "knownPitfalls": [
+    "四层排线框必须共用同一消失点（各框中心都对齐 960×500），否则单点透视立刻穿帮",
+    "透视线用 stroke-dashoffset draw-on，SVG 没有 drawSVG 插件，长度用 Math.hypot 现算",
+    "标题卡是纸白实底+硬投影，别开半透明——排线纹透上来会把字糊掉"
+  ]
+}

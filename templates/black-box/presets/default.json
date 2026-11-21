@@ -1,0 +1,10 @@
+{
+  "title": "大模型黑盒",
+  "subtitle": "输入与输出明确，中间过程不可解释",
+  "inputLabel": "Prompt",
+  "outputLabel": "Answer",
+  "boxLabel": "175B 参数 · 不可解释",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

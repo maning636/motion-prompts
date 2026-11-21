@@ -1,0 +1,7 @@
+{
+  "name": "scene-co-create",
+  "private": true,
+  "scripts": {
+    "render": "cd ../.. && npm run render -- scene-co-create"
+  }
+}

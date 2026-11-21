@@ -1,0 +1,13 @@
+{
+  "id": "split-text-stagger",
+  "name": "分屏文字错峰",
+  "description": "左右两列对仗文字错峰入场，中缝分隔线随之亮起，强调色点亮右侧短杠，结尾两侧同时呼吸定格。",
+  "category": "文字动效",
+  "tags": ["文字动效", "分屏", "对仗", "错峰入场", "分隔线"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-05T00:00:00.000Z"
+}

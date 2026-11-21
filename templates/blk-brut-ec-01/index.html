@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"title","name":"商品名","type":"string","label":"商品名（顶部黑条上的 900 白字）","default":"重磅纯棉圆领卫衣"},{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（黑条上的 mono 字）","default":"PRICE / 今日到手价"},{"id":"note","name":"角标","type":"string","label":"右上角角标（限时说明）","default":"仅限今日 24:00 前下单"},{"id":"wasPrice","name":"划线价","type":"number","label":"划线原价（元）","default":199},{"id":"nowPrice","name":"到手价","type":"number","label":"到手价（元）","default":129},{"id":"wasLabel","name":"原价标签","type":"string","label":"原价侧标签","default":"日常价"},{"id":"nowLabel","name":"到手标签","type":"string","label":"到手价侧标签","default":"券后到手"},{"id":"accent","name":"强调色","type":"color","label":"强调色（到手价色块 / 斜纹带）","default":"#FFD429"},{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–6）","default":5.5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="满版左右对撞价格卡：左半屏反白划线原价、右半屏强调色到手价，中间白色 VS 方块，底部一条算出直降金额与折扣率的收尾条">
+<title>划线价对撞 · 重磅纯棉圆领卫衣</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --accent:#FFD429;
+  }
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--paper);color:var(--ink);font-family:var(--sans);
+    display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+  /* 顶部反白通栏（基因 10：整块换底色，不叠半透明蒙版） */
+  .top{flex:0 0 auto;height:76px;display:flex;align-items:center;gap:22px;
+    padding:0 72px;background:var(--ink);color:var(--white)}
+  .top .tag{flex:0 0 auto;font-family:var(--mono);font-weight:700;font-size:22px;
+    letter-spacing:.12em;padding:4px 16px;background:var(--accent);color:var(--ink);
+    border-radius:9999px;white-space:nowrap}
+  .top .tt{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-weight:900;font-size:34px;letter-spacing:0}
+  .top .eb{flex:0 0 auto;font-family:var(--mono);font-weight:700;font-size:22px;
+    letter-spacing:.12em;color:var(--yellow);white-space:nowrap}
+  .top .nt{margin-left:auto;flex:0 1 auto;min-width:0;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;font-size:24px;font-weight:700;color:var(--white)}
+
+  /* 主体：左右两块铺满，中缝是 3px 实线，不靠留白分段（基因 7） */
+  .duo{flex:1 1 auto;min-height:0;display:flex;position:relative;
+    border-bottom:var(--bw) solid var(--ink)}
+  .side{flex:1 1 0;min-width:0;display:flex;flex-direction:column;
+    justify-content:center;gap:26px;padding:0 88px;overflow:hidden}
+  .sideA{background:var(--ink);color:var(--white)}
+  .sideB{background:var(--accent);color:var(--ink)}
+
+  /* 标签块：mono + 大字距，压 3px 黑边（基因 6：色块不许裸奔） */
+  .k{display:inline-flex;align-self:flex-start;align-items:center;gap:14px;
+    font-family:var(--mono);font-weight:700;font-size:24px;letter-spacing:.14em;
+    padding:8px 22px;border-radius:9999px;white-space:nowrap;
+    max-width:100%;overflow:hidden}
+  .sideA .k{background:var(--yellow);color:var(--ink);border:var(--bw) solid var(--white)}
+  .sideB .k{background:var(--white);color:var(--ink);border:var(--bw) solid var(--ink)}
+
+  /* 价格：mono 大字，块级 nowrap，交给 B.fit() 收口 */
+  .p{display:block;white-space:nowrap;font-family:var(--mono);font-weight:900;
+    font-size:152px;line-height:1;letter-spacing:0;
+    font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+  /* 划线价：硬划一道，不做淡出——本风格没有柔和 */
+  .sideA .p{text-decoration:line-through;text-decoration-thickness:12px;
+    text-decoration-color:var(--yellow)}
+
+  .unit{display:block;white-space:nowrap;font-size:28px;font-weight:700;
+    letter-spacing:0;color:var(--mute)}
+  .sideA .unit{color:var(--white)}
+
+  /* 中缝 VS：白色方块 + 3px 黑边 + 硬阴影，是 #stage 内唯一叠上去的件 */
+  .vs{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5;
+    width:132px;height:132px;display:flex;align-items:center;justify-content:center;
+    background:var(--white);color:var(--ink);border:var(--bw) solid var(--ink);
+    border-radius:4px;box-shadow:8px 8px 0 var(--ink);
+    font-family:var(--mono);font-weight:900;font-size:44px;letter-spacing:.02em}
+
+  /* 收尾条：直降金额与折扣率都由两个价格算出，不手抄第二遍（iart 非协商规则） */
+  .strip{flex:0 0 auto;display:flex;align-items:center;gap:28px;padding:26px 72px;
+    border-bottom:var(--bw) solid var(--ink);background:var(--paper)}
+  .strip .ln{flex:0 0 auto;font-size:34px;font-weight:900;letter-spacing:0;white-space:nowrap}
+  .strip .calc{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-family:var(--mono);font-weight:700;font-size:26px;
+    letter-spacing:.08em;color:var(--mute)}
+  .strip .off{flex:0 0 auto;font-family:var(--mono);font-weight:900;font-size:44px;
+    letter-spacing:0;padding:6px 24px;background:var(--pink);color:var(--ink);
+    border:var(--bw) solid var(--ink);border-radius:4px;box-shadow:6px 6px 0 var(--ink);
+    font-variant-numeric:tabular-nums}
+
+  /* 斜纹带：全系列唯一合法渐变，周期 10px + 10px */
+  .stripe{flex:0 0 auto;height:20px;border-top:var(--bw) solid var(--ink);
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+
+  @media (prefers-reduced-motion: reduce){
+    .anim{transition-duration:.01ms !important;animation-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="top anim" id="top">
+    <span class="tag">PRICE</span>
+    <span class="tt anim" id="title" data-fit-max="34" data-fit-min="20">重磅纯棉圆领卫衣</span>
+    <span class="eb anim" id="eyebrow" data-fit-max="22" data-fit-min="14">PRICE / 今日到手价</span>
+    <span class="nt anim" id="note" data-fit-max="24" data-fit-min="15">仅限今日 24:00 前下单</span>
+  </div>
+
+  <div class="duo anim" id="duo">
+    <div class="side sideA" id="sideA">
+      <span class="k anim" id="wasLabel" data-fit-max="24" data-fit-min="15">日常价</span>
+      <span class="p anim" id="wasPrice" data-fit-max="152" data-fit-min="64">¥199</span>
+      <span class="unit anim" id="wasNote">同款同码，日常不打折</span>
+    </div>
+    <div class="side sideB" id="sideB">
+      <span class="k anim" id="nowLabel" data-fit-max="24" data-fit-min="15">券后到手</span>
+      <span class="p anim" id="nowPrice" data-fit-max="200" data-fit-min="84">¥129</span>
+      <span class="unit anim" id="nowNote">已含平台券 · 无需凑单</span>
+    </div>
+    <div class="vs anim" id="vs">VS</div>
+  </div>
+
+  <div class="strip anim" id="strip">
+    <span class="ln anim" id="stripTitle">比日常价少花</span>
+    <span class="calc anim" id="calc">已算：原价 ¥199 − 到手 ¥129</span>
+    <span class="off anim" id="off"><span id="offPct">35</span>% OFF</span>
+  </div>
+
+  <div class="stripe anim" id="stripe"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  ['title', 'eyebrow', 'note', 'wasLabel', 'nowLabel', 'stripTitle']
+    .forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+
+  /* 数字只能算不能抄两遍：折扣率、直降金额全部由两个价格推导，
+     表单上只暴露 wasPrice / nowPrice，派生值只读显示。 */
+  var was = Number(v.wasPrice), now = Number(v.nowPrice);
+  if (!isFinite(was)) was = 0;
+  if (!isFinite(now)) now = 0;
+  var offPct = was > 0 ? Math.round((1 - now / was) * 100) : 0;
+  var saveAmt = Math.max(0, Math.round(was - now));
+  set('wasPrice', '¥' + was);
+  set('nowPrice', '¥' + now);
+  set('offPct', String(offPct));
+  set('calc', '直降 ¥' + saveAmt + ' · 口径：同一 SKU 同一活动');
+
+  B.fitAll();
+  var tl = B.tl();
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (reduce) {
+    /* 降级：去掉左右对撞与阴影回弹，只留终态 + ≤8px 微位移淡入 */
+    gsap.set('.anim', { x: 0, y: 0, scale: 1, scaleX: 1, rotate: 0 });
+    gsap.set('#vs', { x: '-50%', y: '-50%', scale: 1 });
+    tl.fromTo('#top',   { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, 0);
+    tl.fromTo('#duo',   { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .15);
+    tl.fromTo('#strip', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .35);
+    tl.fromTo('#stripe',{ opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, .5);
+    B.hold(tl, 1.2, 1.1);
+    return;
+  }
+
+  var INK = '#0F0F0F';
+  /* 模 1 拍进来：位移 ≤0.3s 硬着陆，落定瞬间阴影压 2 帧再弹回原档 */
+  function slam(sel, at, dx, dy, d) {
+    tl.fromTo(sel, { x: dx, y: dy },
+      { x: 0, y: 0, duration: d, ease: 'power4.out' }, at);
+  }
+  function shadowBounce(sel, rest, at) {
+    var off = parseInt(rest, 10);
+    tl.set(sel, { boxShadow: off + 'px ' + (off + 3) + 'px 0 ' + INK, immediateRender: false }, at);
+    tl.to(sel, { boxShadow: rest, duration: 0.04, ease: 'steps(2)' }, at + 0.04);
+  }
+
+  slam('#top',      0.00,   0, -76, 0.26);
+  slam('#title',    0.14, -28,  -28, 0.24);
+  slam('#eyebrow',  0.20,  -24,  -20, 0.22);
+  slam('#note',     0.26,   24,  -20, 0.22);
+  /* 左右两块从各自画外硬切入，方向对撞，读起来就是「两个价格撞在一起」 */
+  tl.fromTo('#sideA', { x: -120 }, { x: 0, duration: 0.28, ease: 'power4.out' }, 0.42);
+  tl.fromTo('#sideB', { x: 120 },  { x: 0, duration: 0.28, ease: 'power4.out' }, 0.42);
+  slam('#wasLabel',  0.62,  -24,  -24, 0.22);
+  slam('#nowLabel',  0.66,   24,  -24, 0.22);
+  slam('#wasPrice',  0.76,    0,  -28, 0.26);
+  slam('#nowPrice',  0.84,    0,  -28, 0.26);
+  shadowBounce('#vs', '8px 8px 0 ' + INK, 1.16);
+  slam('#wasNote',   1.10,    0,  -20, 0.22);
+  slam('#nowNote',   1.16,    0,  -20, 0.22);
+  slam('#strip',     1.30,   0,   28, 0.26);
+  slam('#stripTitle',1.46,  -24,  -20, 0.22);
+  slam('#off',       1.60,   24,  -24, 0.24);
+  shadowBounce('#off', '6px 6px 0 ' + INK, 1.84);
+  slam('#stripe',    1.76,   0,   24, 0.24);
+  /* 模 6：斜纹带匀速滚动，位移取 20px 整周期，ease:none */
+  tl.fromTo('#stripe', { backgroundPositionX: '0px' },
+    { backgroundPositionX: '60px', duration: 1.2, ease: 'none' }, 2.00);
+
+  var introEnd = 3.20;
+  var total = Math.min(6, Math.max(5, Number(v.duration) || 5.5));
+  B.hold(tl, introEnd, Math.max(0.6, total - introEnd));
+})();
+</script>
+</body></html>

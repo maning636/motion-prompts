@@ -1,0 +1,10 @@
+{
+  "sceneNo": "03",
+  "title": "三拍时间轴",
+  "en": "MOTION TEST · THREE BEATS",
+  "params": "蒙版形状|RX 24 / RY 46;锚点|ORIGIN TOP;圆内外|INSIDE NEXT / OUTSIDE CURRENT;羽化|FEATHER 14→62;落定|BLUR 16→0 · SCALE 1.06→1.00",
+  "img1": "./placeholder-1.png",
+  "timeRange": "00:15 → 00:25",
+  "accent": "#00FF00",
+  "duration": 6
+}

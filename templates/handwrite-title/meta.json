@@ -1,0 +1,7 @@
+{
+ "id": "handwrite-title",
+ "name": "手写字标题",
+ "createdAt": "2026-07-30T00:00:00.000Z",
+ "status": "draft",
+ "draftNote": "目检判定内容过少，预览近空白；改好内容后把 status 改回 ready 即可重新上架"
+}

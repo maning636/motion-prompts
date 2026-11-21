@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "titleA", "type": "string", "label": "旧场景标题", "default": "上周数据"}, {"id": "titleB", "type": "string", "label": "新场景标题", "default": "本周实时"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+.scene{ position:absolute; inset:0; padding:120px; }
+.scene h2{ font-size:64px; color:var(--fg); margin-bottom:50px; }
+.mc{ width:520px; height:300px; border-radius:18px; background:#15151C; border:1px solid rgba(255,255,255,.1);
+  margin-bottom:36px; padding:30px; }
+.mc i{ display:block; height:12px; border-radius:6px; background:rgba(255,255,255,.14); margin-bottom:12px; }
+.mc b{ display:block; height:26px; width:45%; border-radius:13px; background:var(--accent); opacity:.8; margin-bottom:18px; }
+#sceneB{ display:none; }
+#wash{ position:absolute; inset:0; background:#F4F4F2; opacity:0; pointer-events:none; z-index:5; }
+#bubs{ position:absolute; inset:0; z-index:8; pointer-events:none; }
+.bub{ position:absolute; border-radius:50%; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+<div class="scene" id="sceneA"><h2 id="ha"></h2><div style="display:flex;gap:36px"><div class="mc"><b></b><i></i><i style="width:70%"></i><i style="width:52%"></i></div><div class="mc"><b></b><i></i><i style="width:64%"></i><i style="width:48%"></i></div><div class="mc"><b></b><i></i><i style="width:58%"></i><i style="width:66%"></i></div></div></div><div class="scene" id="sceneB"><h2 id="hb"></h2><div style="display:flex;gap:36px"><div class="mc"><b></b><i></i><i style="width:70%"></i><i style="width:52%"></i></div><div class="mc"><b></b><i></i><i style="width:64%"></i><i style="width:48%"></i></div><div class="mc"><b></b><i></i><i style="width:58%"></i><i style="width:66%"></i></div></div></div><div id="wash"></div><div id="bubs"></div>
+    </div>
+    <script>
+      const FB = {"titleA": "上周数据", "titleB": "本周实时", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#ha').textContent=v.titleA||'';$('#hb').textContent=v.titleB||'';
+const HUES=[[330,'255,150,200'],[270,'200,160,255'],[210,'140,190,255'],[170,'140,255,220']];
+let seed=11; const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+const bubs=$('#bubs');
+const mkBub=(size,cx,cy,layer)=>{
+  const [h,rgb]=HUES[Math.floor(rnd()*4)];
+  const b=document.createElement('div'); b.className='bub';
+  b.style.cssText='width:'+size+'px;height:'+size+'px;'
+    +'background:radial-gradient(circle at 34% 28%, rgba(255,255,255,.95), rgba('+rgb+',.55) 42%, rgba('+rgb+',.18) 72%, rgba('+rgb+',.05));'
+    +'box-shadow:inset 0 0 '+(size/8)+'px rgba(255,255,255,.5), 0 0 '+(size/5)+'px rgba('+rgb+',.35);'
+    +(layer===0?'filter:blur(7px);':layer===2?'filter:blur(9px);':'');
+  bubs.appendChild(b);
+  return {el:b,cx,cy,size};
+};
+// 18 颗随机 + 4 颗网格巨型兜底
+const B=[];
+for(let i=0;i<18;i++){
+  const size=60+rnd()*200, cx=100+rnd()*1720, cy=80+rnd()*920;
+  B.push(mkBub(size,cx,cy,i%3));
+}
+[[480,270],[1440,270],[480,810],[1440,810]].forEach(([cx,cy])=>B.push(mkBub(760+rnd()*220,cx,cy,1)));
+// 入场：四边画外起点 8-50f ease-out 飘入；到点后正弦 wobble（有限 repeat）
+B.forEach((o,i)=>{
+  const side=i%4, off=1100;
+  const sx=o.cx+(side===0?-off:side===1?off:0), sy=o.cy+(side===2?-off:side===3?off:0);
+  const entry=8+Math.floor(rnd()*42);
+  tl.set(o.el,{left:(o.cx-o.size/2)+'px',top:(o.cy-o.size/2)+'px'},0);
+  tl.fromTo(o.el,{x:sx-o.cx,y:sy-o.cy,opacity:0},{x:0,y:0,opacity:1,duration:F(26),ease:'power2.out'},F(entry));
+  const amp=10+rnd()*22, per=14+Math.floor(rnd()*10);
+  tl.to(o.el,{y:'+='+amp.toFixed(0),duration:F(per),yoyo:true,repeat:5,ease:'sine.inOut'},F(entry+26));
+});
+// 洗白层：0→0.92（f42-68）峰值保持 →0（f82-104）
+tl.to('#wash',{opacity:.92,duration:F(26),ease:'power1.inOut'},F(42));
+tl.to('#wash',{opacity:0,duration:F(22),ease:'power1.inOut'},F(82));
+// 峰值帧 75 藏切
+tl.set('#sceneA',{display:'none'},F(75));
+tl.set('#sceneB',{display:'block'},F(75));
+// 散开 f84 起：径向外推 1700px ease-in + 缩小 35% + 尾段淡出
+B.forEach((o,i)=>{
+  const dx=o.cx-960, dy=o.cy-540, len=Math.max(1,Math.hypot(dx,dy));
+  const px=dx/len*1700, py=dy/len*1700;
+  tl.to(o.el,{x:'+='+px.toFixed(0),y:'+='+py.toFixed(0),scale:.65,duration:F(40),ease:'power2.in'},F(84+i%5));
+  tl.to(o.el,{opacity:0,duration:F(12),ease:'power1.in'},F(112+i%5));
+});
+tl.to({},{duration:F(24)},F(126)); // 真静止
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

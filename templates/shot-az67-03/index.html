@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#wrap{ position:absolute; left:210px; top:110px; width:1500px; height:860px; }
+#wire{ position:absolute; inset:0; }
+#solid{ position:absolute; inset:0; clip-path:inset(0 100% 0 0); }
+#scan{ position:absolute; top:0; width:4px; height:860px; background:var(--accent);
+  box-shadow:0 0 24px var(--accent), 0 0 60px color-mix(in srgb, var(--accent) 60%, transparent);
+  opacity:0; }
+.sSide{ position:absolute; left:0; top:0; width:220px; height:860px; background:#141720; }
+.sTop{ position:absolute; left:220px; top:0; width:1280px; height:90px; background:#161A24;
+  border-bottom:1px solid color-mix(in srgb, var(--fg) 8%, transparent); }
+.sCard{ position:absolute; width:396px; height:340px; border-radius:18px; background:#141824;
+  border:1px solid color-mix(in srgb, var(--fg) 10%, transparent); }
+.sCard .t{ position:absolute; left:30px; top:30px; width:55%; height:16px; border-radius:8px;
+  background:color-mix(in srgb, var(--fg) 22%, transparent); }
+.sCard .s{ position:absolute; left:30px; top:64px; width:40%; height:11px; border-radius:5px;
+  background:color-mix(in srgb, var(--fg) 10%, transparent); }
+.sCard .b{ position:absolute; left:30px; bottom:30px; width:120px; height:38px; border-radius:19px;
+  background:color-mix(in srgb, var(--accent) 80%, transparent); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5.0" data-width="1920" data-height="1080">
+
+<div id="wrap">
+  <svg id="wire" width="1500" height="860" viewBox="0 0 1500 860"><rect id="w-side" x="0" y="0" width="220" height="860" rx="14" fill="none" stroke="#8f8f8d" stroke-width="2.5" stroke-linecap="round"/><rect id="w-top" x="220" y="0" width="1280" height="90" rx="14" fill="none" stroke="#8f8f8d" stroke-width="2.5" stroke-linecap="round"/><rect id="w-card0" x="250" y="120" width="396" height="340" rx="14" fill="none" stroke="#8f8f8d" stroke-width="2.5" stroke-linecap="round"/><rect id="w-card1" x="692" y="120" width="396" height="340" rx="14" fill="none" stroke="#8f8f8d" stroke-width="2.5" stroke-linecap="round"/><rect id="w-card2" x="1134" y="120" width="396" height="340" rx="14" fill="none" stroke="#8f8f8d" stroke-width="2.5" stroke-linecap="round"/><rect id="w-card3" x="250" y="490" width="396" height="340" rx="14" fill="none" stroke="#8f8f8d" stroke-width="2.5" stroke-linecap="round"/><rect id="w-card4" x="692" y="490" width="396" height="340" rx="14" fill="none" stroke="#8f8f8d" stroke-width="2.5" stroke-linecap="round"/><rect id="w-card5" x="1134" y="490" width="396" height="340" rx="14" fill="none" stroke="#8f8f8d" stroke-width="2.5" stroke-linecap="round"/><polyline id="w-chart" points="250,760 400,700 550,730 700,640 850,670 1000,580 1150,610 1300,540" fill="none" stroke="#8f8f8d" stroke-width="2.5" stroke-linecap="round"/></svg>
+  <div id="solid"><div class="sSide"></div><div class="sTop"></div><div class="sCard" style="left:250px;top:120px"><div class="t"></div><div class="s"></div><div class="b"></div></div><div class="sCard" style="left:692px;top:120px"><div class="t"></div><div class="s"></div><div class="b"></div></div><div class="sCard" style="left:1134px;top:120px"><div class="t"></div><div class="s"></div><div class="b"></div></div><div class="sCard" style="left:250px;top:490px"><div class="t"></div><div class="s"></div><div class="b"></div></div><div class="sCard" style="left:692px;top:490px"><div class="t"></div><div class="s"></div><div class="b"></div></div><div class="sCard" style="left:1134px;top:490px"><div class="t"></div><div class="s"></div><div class="b"></div></div></div>
+  <div id="scan"></div>
+</div>
+
+    </div>
+    <script>
+      const FB = {"accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+const SCHED=[["side", 20, 20], ["top", 30, 20], ["card0", 40, 18], ["card1", 43, 18], ["card2", 46, 18], ["card3", 49, 18], ["card4", 52, 18], ["card5", 55, 18], ["chart", 52, 24]];
+const items=SCHED.map(([id,st,du])=>{
+  const el=document.getElementById('w-'+id);
+  const len=el.getTotalLength();
+  el.style.strokeDasharray=len;
+  el.style.strokeDashoffset=len;
+  return {el,len,st,du};
+});
+const solid=$('#solid'), scan=$('#scan'), wire=$('#wire');
+function cl(x){return Math.max(0,Math.min(1,x));}
+function cb(x1,y1,x2,y2){return function(x){
+  let t=x;
+  const cx=3*x1,bx=3*(x2-x1)-cx,ax=1-cx-bx;
+  for(let i=0;i<5;i++){
+    const f=((ax*t+bx)*t+cx)*t-x, d=(3*ax*t+2*bx)*t+cx;
+    if(Math.abs(d)<1e-4)break; t-=f/d;
+  }
+  t=Math.max(0,Math.min(1,t));
+  const cy=3*y1,by=3*(y2-y1)-cy,ay=1-cy-by;
+  return ((ay*t+by)*t+cy)*t;
+};}
+const scanE=cb(0.55,0,0.25,1);
+const sim={f:0};
+function paint(){
+  const f=sim.f;
+  items.forEach(it=>{
+    const p=cl((f-it.st)/it.du);
+    it.el.style.strokeDashoffset=(it.len*(1-p)).toFixed(1);
+  });
+  // 实体化扫描：88–118f，竖线与 clip 前沿同一 scan 值驱动
+  const sp=scanE(cl((f-88)/30));
+  solid.style.clipPath='inset(0 '+((1-sp)*100).toFixed(2)+'% 0 0)';
+  scan.style.left=(sp*1500-2).toFixed(1)+'px';
+  scan.style.opacity=(cl((f-86)/6)*(1-cl((f-112)/8))).toFixed(3);
+  // 实体化完成后残线退场，避免未被覆盖的描线残留
+  wire.style.opacity=(1-cl((f-112)/10)).toFixed(3);
+}
+paint();
+tl.to(sim,{f:150,duration:F(150),ease:'none',onUpdate:paint},0);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

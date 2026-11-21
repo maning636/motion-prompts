@@ -1,0 +1,8 @@
+{
+  "title": "声音不是后贴上去的",
+  "subtitle": "口播音频和字幕时间轴一起决定页面什么时候切换",
+  "bars": 32,
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

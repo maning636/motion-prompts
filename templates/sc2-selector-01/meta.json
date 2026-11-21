@@ -1,0 +1,13 @@
+{
+  "id": "sc2-selector-01",
+  "name": "选择器滚筒",
+  "series": "sc2",
+  "createdAt": "2026-08-16T08:00:00.000Z",
+  "energy": "中",
+  "suggestedDuration": 6,
+  "knownPitfalls": [
+    "target 必须与 options 里某一项完全一致（含空格），否则回退到中间项",
+    "候选词超过 6 个时滚动步数增多、6 秒内节拍会挤，建议 4-6 个词",
+    "距离衰减直接写 style 触发逐帧重绘，行高 104px 写死不能改 auto，否则滚动抖动"
+  ]
+}

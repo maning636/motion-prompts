@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "metric", "type": "string", "label": "指标单位", "default": "条"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#page{ position:absolute; left:0; top:0; width:1920px; height:1080px; transform-origin:0 0;
+  background:#101018; padding:0 120px; box-sizing:border-box; }
+.row{ position:relative; height:100px; margin-bottom:35px; border-radius:16px; background:#17171F;
+  border:1px solid rgba(255,255,255,.1); display:flex; align-items:center; padding:0 44px; overflow:hidden; }
+.row .rk{ font-size:40px; color:rgba(255,255,255,.35); width:90px; }
+.row .rl{ width:300px; height:20px; border-radius:10px; background:rgba(255,255,255,.28); }
+.row .rl2{ width:180px; height:20px; border-radius:10px; background:rgba(255,255,255,.14); margin-left:36px; }
+.row .rv{ margin-left:auto; font-size:46px; color:var(--accent); }
+.row .rv small{ font-size:24px; color:rgba(255,255,255,.4); margin-left:8px; }
+.row .pulse{ position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+<div id="page"><div class="row" id="r0"><div class="rk">01</div><div class="rl"></div><div class="rl2"></div><div class="rv">12,480<small>{{UNIT}}</small></div><div class="pulse"></div></div><div class="row" id="r1"><div class="rk">02</div><div class="rl"></div><div class="rl2"></div><div class="rv">9,312<small>{{UNIT}}</small></div><div class="pulse"></div></div><div class="row" id="r2"><div class="rk">03</div><div class="rl"></div><div class="rl2"></div><div class="rv">8,755<small>{{UNIT}}</small></div><div class="pulse"></div></div><div class="row" id="r3"><div class="rk">04</div><div class="rl"></div><div class="rl2"></div><div class="rv">6,209<small>{{UNIT}}</small></div><div class="pulse"></div></div><div class="row" id="r4"><div class="rk">05</div><div class="rl"></div><div class="rl2"></div><div class="rv">5,847<small>{{UNIT}}</small></div><div class="pulse"></div></div><div class="row" id="r5"><div class="rk">06</div><div class="rl"></div><div class="rl2"></div><div class="rv">4,196<small>{{UNIT}}</small></div><div class="pulse"></div></div><div class="row" id="r6"><div class="rk">07</div><div class="rl"></div><div class="rl2"></div><div class="rv">3,620<small>{{UNIT}}</small></div><div class="pulse"></div></div><div class="row" id="r7"><div class="rk">08</div><div class="rl"></div><div class="rl2"></div><div class="rv">2,958<small>{{UNIT}}</small></div><div class="pulse"></div></div></div>
+    </div>
+    <script>
+      const FB = {"metric": "条", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+document.querySelectorAll('.rv small').forEach(e=>e.textContent=v.metric||'');
+// 相机：transform-origin 0 0，translate=屏幕中心−对准点×scale；scale 与 fy 共用同一 p
+const cam={p:0};
+const S=()=>3.2-2.2*cam.p, FY=()=>995-455*cam.p;
+const applyCam=()=>{ const s=S(); gsap.set('#page',{scale:s, x:960-960*s, y:540-FY()*s}); };
+applyCam();
+// 行脉冲触发帧：可见区上缘 visTop=fy−540/s 越过行顶（逐帧数值解出，与运镜严格同步）
+const ROW_H=135, T0=20, RISE=100;
+const vt=p=>(995-455*p)-540/(3.2-2.2*p);
+const trig=[];
+for(let i=7;i>=0;i--){
+  const y=i*ROW_H; let hit=1;
+  for(let p=0;p<=1.0001;p+=0.001){ if(vt(p)<=y){ hit=p; break; } }
+  trig.push([i,Math.min(0.999,hit)]);
+}
+trig.forEach(([i,p])=>{
+  const f=T0+p*RISE;
+  tl.to('#r'+i+' .pulse',{opacity:.18,duration:F(4),ease:'power1.out'},F(f));
+  tl.to('#r'+i+' .pulse',{opacity:0,duration:F(18),ease:'power1.in'},F(f+4));
+});
+// 特写 hold 20f → 拉升 100f power2.out（先快后慢的升降臂手感）→ 满幅真静止
+tl.to(cam,{p:1,duration:F(RISE),ease:'power2.out',onUpdate:applyCam},F(T0));
+tl.to({},{duration:F(30)},F(120));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

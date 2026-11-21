@@ -1,0 +1,16 @@
+{
+ "name": "阶梯 · 出门干活带这几样就够",
+ "description": "逐级向右的阶梯，每级缩进固定、行长按数值收窄，读得出高低关系",
+ "category": "数据可视化",
+ "tags": [
+  "积木社",
+  "chart",
+  "berry",
+  "heavy"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "card",
+ "when": "数据卡片 / 阶梯"
+}

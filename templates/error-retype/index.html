@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"eyebrow","type":"string","label":"顶部小标签","default":"INPUT DEMO · TYPE / BACKSPACE / RE-TYPE"},
+  {"id":"title","type":"string","label":"标题","default":"打错，删掉，再对一次"},
+  {"id":"subTitle","type":"string","label":"副标题","default":"输入过程中的自我纠正"},
+  {"id":"prefix","type":"string","label":"正确前缀（先打对的）","default":"npm install "},
+  {"id":"errorText","type":"string","label":"会打错的那段（红字）","default":"fack"},
+  {"id":"correctText","type":"string","label":"正确文案（重打的完整词）","default":"fastify"},
+  {"id":"suffix","type":"string","label":"正确后缀（重打后追加）","default":" --save"},
+  {"id":"errorMsg","type":"string","label":"错误提示","default":"拼写错误 · 回退重打"},
+  {"id":"okMsg","type":"string","label":"成功提示","default":"包已安装 · 2.1s"},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; margin:0; padding:0; }
+      html, body{
+        width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+
+      /* 背景点阵 */
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity:.5;
+      }
+      /* 中央纵向暗带，突出命令行 */
+      .band{
+        position:absolute; left:0; right:0; top:420px; height:240px;
+        background: linear-gradient(180deg,
+          transparent 0%,
+          rgba(0,0,0,.35) 45%,
+          rgba(0,0,0,.35) 55%,
+          transparent 100%);
+        pointer-events:none;
+      }
+
+      /* 顶部小标签 */
+      .eyebrow{
+        position:absolute; top:96px; left:160px; right:160px;
+        display:flex; align-items:center; gap:18px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:20px; letter-spacing:.28em; text-transform:uppercase;
+        color: #8A8A85;
+      }
+      .eyebrow::before{
+        content:""; flex:none; width:40px; height:2px;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 10px color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+      }
+      .eyebrow .dot{
+        flex:none; width:8px; height:8px; border-radius:50%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+      }
+
+      /* 主标题 */
+      .titleBlock{
+        position:absolute; top:172px; left:160px; right:160px;
+      }
+      .title{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight:700; letter-spacing:-.02em;
+        font-size:96px; line-height:1.05;
+      }
+      .title .slash{
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 32%, transparent);
+        padding: 0 6px;
+      }
+      .title .wrong{
+        color: #FF5C5C;
+        text-decoration: line-through;
+        text-decoration-color: color-mix(in srgb, #FF5C5C 70%, transparent);
+        text-decoration-thickness: 6px;
+        padding: 0 4px;
+      }
+      .title .ok{
+        color: var(--accent, #00FF00);
+        text-shadow: 0 0 24px color-mix(in srgb, var(--accent, #00FF00) 45%, transparent);
+      }
+      .subtitle{
+        margin-top:18px;
+        font-size:30px; letter-spacing:.02em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 62%, transparent);
+      }
+
+      /* 终端窗口 */
+      .term{
+        position:absolute; top:504px; left:160px;
+        width:1600px; height:340px;
+        border-radius:18px;
+        background: #0D1117;
+        border:1px solid rgba(255,255,255,.08);
+        box-shadow:
+          0 24px 60px rgba(0,0,0,.45),
+          0 0 0 1px rgba(0,0,0,.25) inset,
+          0 0 60px color-mix(in srgb, var(--accent, #00FF00) 8%, transparent);
+        overflow:hidden;
+      }
+      .termBar{
+        position:relative; height:52px;
+        background: #12161C;
+        display:flex; align-items:center; padding:0 24px;
+        border-bottom:1px solid rgba(255,255,255,.06);
+      }
+      .termBar .dots{ display:flex; gap:10px; }
+      .termBar .dots i{ width:14px; height:14px; border-radius:50%; }
+      .termBar .dots i:nth-child(1){ background:#FF5F57; }
+      .termBar .dots i:nth-child(2){ background:#FEBC2E; }
+      .termBar .dots i:nth-child(3){ background:#28C840; }
+      .termBar .path{
+        position:absolute; left:0; right:0; text-align:center;
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+        font-size:18px; color:#6B6B66; letter-spacing:.14em;
+      }
+      .termBar .badge{
+        position:absolute; right:24px;
+        display:flex; align-items:center; gap:8px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:13px; letter-spacing:.22em; text-transform:uppercase;
+        color:#6B6B66;
+      }
+      .termBar .badge .led{
+        width:8px; height:8px; border-radius:50%;
+        background: #6B6B66;
+      }
+      .termBar.err .badge .led{
+        background: #FF5C5C;
+        box-shadow: 0 0 10px rgba(255,92,92,.7);
+      }
+      .termBar.err .badge{ color:#FF9090; }
+      .termBar.ok  .badge .led{
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 10px color-mix(in srgb, var(--accent, #00FF00) 80%, transparent);
+      }
+      .termBar.ok  .badge{ color: var(--accent, #00FF00); }
+
+      .termBody{
+        position:relative; padding: 40px 44px;
+        display:flex; flex-direction:column; justify-content:center;
+      }
+      .scan{
+        position:absolute; inset:52px 0 0 0;
+        background: repeating-linear-gradient(0deg, rgba(255,255,255,.028) 0 1px, transparent 1px 3px);
+        pointer-events:none;
+      }
+
+      /* 命令行 */
+      .codeLine{
+        position:relative;
+        display:flex; align-items:center; gap:14px;
+        min-height: 76px;
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+        font-size:52px; line-height:1;
+        color: var(--foreground, #F4EFE7);
+      }
+      .prompt{
+        flex:none; color: var(--accent, #00FF00);
+        font-size:50px;
+        text-shadow: 0 0 14px color-mix(in srgb, var(--accent, #00FF00) 55%, transparent);
+      }
+      #codeLine{
+        flex:1 1 auto; display:inline-flex; align-items:center;
+        flex-wrap:nowrap; white-space:nowrap;
+        min-width:0;
+      }
+      #codeLine .char{
+        display:inline-block;
+        opacity:0;
+        transform: translateY(4px);
+        will-change: opacity, transform;
+      }
+      #codeLine .char.sp{
+        width: 0.36em;
+      }
+      #codeLine .char.char-error{
+        color: #FF5C5C;
+        text-shadow: 0 0 12px rgba(255,92,92,.55);
+      }
+      #cursor{
+        flex:none;
+        display:inline-block;
+        width:14px; height:52px; margin-left:4px;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 14px color-mix(in srgb, var(--accent, #00FF00) 80%, transparent);
+        border-radius:2px;
+      }
+
+      /* 状态条 */
+      .status{
+        position:relative;
+        margin-top: 32px;
+        display:flex; align-items:center; justify-content:space-between;
+        padding: 0 6px;
+      }
+      .statusMsg{
+        display:inline-flex; align-items:center; gap:14px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:24px; letter-spacing:.06em;
+        color:#8A8A85;
+        opacity:0;
+        transform: translateY(6px);
+      }
+      .statusMsg .icon{
+        display:inline-grid; place-items:center;
+        width:32px; height:32px; border-radius:50%;
+        border:1.5px solid currentColor;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:18px; font-weight:700;
+      }
+      .statusMsg.err{ color:#FF9090; }
+      .statusMsg.ok{ color: var(--accent, #00FF00); }
+
+      /* 右侧进度条 */
+      .prog{
+        display:flex; align-items:center; gap:12px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:15px; letter-spacing:.24em; text-transform:uppercase;
+        color:#6B6B66;
+      }
+      .progBar{
+        position:relative; width:220px; height:6px;
+        background: rgba(255,255,255,.08); border-radius:3px;
+        overflow:hidden;
+      }
+      .progFill{
+        position:absolute; left:0; top:0; bottom:0;
+        width:0%;
+        background: linear-gradient(90deg,
+          color-mix(in srgb, var(--accent, #00FF00) 40%, transparent) 0%,
+          var(--accent, #00FF00) 100%);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+      }
+      .progStep{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:15px; letter-spacing:.14em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+      }
+
+      /* 底部脚注 */
+      .footnote{
+        position:absolute; bottom:64px; left:160px; right:160px;
+        display:flex; align-items:center; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:16px; letter-spacing:.22em; text-transform:uppercase;
+        color:#5E5E5A;
+      }
+      .footnote .k{
+        display:inline-flex; align-items:center; gap:10px;
+      }
+      .footnote .k::before{
+        content:""; width:6px; height:6px; border-radius:50%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+      }
+      .footnote .k.got{ color:#8A8A85; }
+
+      /* 抖动动画（错字时） */
+      @keyframes shakeX{
+        0%,100% { transform: translate(0, 0); }
+        20% { transform: translate(-4px, 2px); }
+        40% { transform: translate(4px, -2px); }
+        60% { transform: translate(-3px, 1px); }
+        80% { transform: translate(3px, -1px); }
+      }
+      #codeLine.shaking{
+        animation: shakeX 0.28s steps(4) infinite;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+        <div class="band"></div>
+
+        <div class="eyebrow" id="eyebrow">
+          <span id="eyebrowText">INPUT DEMO · TYPE / BACKSPACE / RE-TYPE</span>
+          <span class="dot"></span>
+        </div>
+
+        <div class="titleBlock" id="titleBlock">
+          <h1 class="title" id="title">
+            <span class="wrong" id="titleWrong">打错</span><span class="slash">/</span><span>删掉</span><span class="slash">/</span><span class="ok" id="titleOk">再对一次</span>
+          </h1>
+          <div class="subtitle" id="subTitle">输入过程中的自我纠正</div>
+        </div>
+
+        <div class="term" id="term">
+          <div class="termBar" id="termBar">
+            <div class="dots"><i></i><i></i><i></i></div>
+            <div class="path">~/workspace — zsh</div>
+            <div class="badge" id="badge"><span class="led"></span><span id="badgeText">TYPING</span></div>
+          </div>
+          <div class="termBody">
+            <div class="codeLine">
+              <span class="prompt">❯</span>
+              <span id="codeLine"></span>
+              <span id="cursor"></span>
+            </div>
+            <div class="scan"></div>
+            <div class="status">
+              <span class="statusMsg" id="statusMsg">
+                <span class="icon" id="statusIcon">!</span>
+                <span id="statusText"></span>
+              </span>
+              <span class="prog">
+                <span id="progStep">TYPE</span>
+                <span class="progBar"><span class="progFill" id="progFill"></span></span>
+                <span id="progPct">0%</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="footnote">
+          <span class="k">input · type-backspace-retype</span>
+          <span class="k got">3 phases · 6s loop</span>
+        </div>
+
+      </section>
+    </div>
+    <script>
+      /* ----- 变量接线（与全库契约一致） ----- */
+      const fallback = {
+        eyebrow: "INPUT DEMO · TYPE / BACKSPACE / RE-TYPE",
+        title: "打错，删掉，再对一次",
+        subTitle: "输入过程中的自我纠正",
+        prefix: "npm install ",
+        errorText: "fack",
+        correctText: "fastify",
+        suffix: " --save",
+        errorMsg: "拼写错误 · 回退重打",
+        okMsg: "包已安装 · 2.1s",
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const $ = (id) => document.getElementById(id);
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || fallback.foreground);
+      html.style.setProperty("--background", v.background || fallback.background);
+      html.style.setProperty("--accent",     v.accent     || fallback.accent);
+
+      /* ----- 内容回填 ----- */
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      $("eyebrowText").textContent = v.eyebrow || fallback.eyebrow;
+      $("subTitle").textContent    = v.subTitle || fallback.subTitle;
+      $("statusText").textContent  = v.errorMsg || fallback.errorMsg;
+
+      const PREFIX    = String(v.prefix      ?? fallback.prefix);
+      const ERROR_TXT = String(v.errorText   ?? fallback.errorText);
+      const CORRECT   = String(v.correctText ?? fallback.correctText);
+      const SUFFIX    = String(v.suffix      ?? fallback.suffix);
+      const OK_MSG    = String(v.okMsg       ?? fallback.okMsg);
+
+      /* ----- 构造字符 span（全部初始 opacity:0，动画阶段显式显示） ----- */
+      /* DOM 顺序：PREFIX + ERROR_TXT(红字) + CORRECT + SUFFIX
+         Phase A 显 PREFIX；Phase B 显 ERROR_TXT；Phase C 隐 ERROR_TXT；Phase D 显 CORRECT + SUFFIX。
+         退格删除的是错字本身，之后从 CORRECT 起继续键入。 */
+      const box = $("codeLine");
+      const chars = []; // { el, text, kind: "normal" | "error" }
+      const buildChars = () => {
+        box.innerHTML = "";
+        chars.length = 0;
+        const push = (text, kind) => {
+          for (const c of text) {
+            const s = document.createElement("span");
+            s.className = "char" + (kind === "error" ? " char-error" : "");
+            if (c === " ") { s.classList.add("sp"); s.innerHTML = "&nbsp;"; }
+            else { s.textContent = c; }
+            box.appendChild(s);
+            chars.push({ el: s, text: c, kind });
+          }
+        };
+        push(PREFIX, "normal");
+        push(ERROR_TXT, "error");
+        push(CORRECT, "normal");
+        push(SUFFIX, "normal");
+      };
+      buildChars();
+
+      /* ----- 时间轴：三阶段 ----- */
+      /* 6s 内：
+         Phase A  t=0.0 → 0.85  键入 PREFIX（正常色）
+         Phase B  t=0.90 → 2.50 键入 errorText（红字 + 抖动）→ 触发错误状态
+         Phase C  t=2.60 → 3.20 退格删除 errorText
+         Phase D  t=3.20 → 5.00 键入 CORRECT + SUFFIX（正确色）
+         Phase E  t=5.00 → 6.00 光标闪烁 + 成功状态
+       */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+      const tl = gsap.timeline({ paused: true });
+
+      const STEP = 0.055; // 每字键入间隔
+
+      // 入场：eyebrow + title 淡入上移
+      tl.fromTo("#eyebrow", { opacity: 0, y: -14 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.05);
+      tl.fromTo("#titleBlock", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.15);
+      tl.fromTo("#term", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.3);
+
+      // 光标初始常亮
+      tl.set("#cursor", { opacity: 1 }, 0);
+
+      /* Phase A: 键入 PREFIX */
+      const PA = 0.85; // 起始
+      const prefixChars = chars.slice(0, PREFIX.length);
+      prefixChars.forEach((c, i) => {
+        const t = PA + i * STEP;
+        tl.set(c.el, { opacity: 1, y: 0 }, t);
+      });
+      const paEnd = PA + prefixChars.length * STEP;
+
+      // Phase A 期间：进度条推进到 20%
+      tl.to("#progFill", { width: "20%", duration: (paEnd - PA) - 0.05, ease: "power1.inOut" }, PA);
+      tl.set("#progStep", { textContent: "TYPE" }, PA);
+
+      /* Phase B: 键入 ERROR_TXT（红字，最后一起加 class 触发抖动） */
+      const PB = 1.35; // 起始
+      const errorStartIdx = PREFIX.length;
+      const errorChars = chars.slice(errorStartIdx, errorStartIdx + ERROR_TXT.length);
+      errorChars.forEach((c, i) => {
+        const t = PB + i * STEP;
+        tl.set(c.el, { opacity: 1, y: 0 }, t);
+      });
+      const pbEnd = PB + errorChars.length * STEP;
+
+      // Phase B 期间：进度条推进到 55%（红字阶段）
+      tl.to("#progFill", { width: "55%", duration: (pbEnd - PB) - 0.05, ease: "power1.inOut" }, PB);
+      tl.set("#progStep", { textContent: "ERROR" }, PB);
+
+      // 触发错误状态：抖动 + 状态条 + badge
+      tl.to("#codeLine", { className: "+=shaking", duration: 0.001 }, pbEnd + 0.05);
+      tl.fromTo("#statusMsg",
+        { opacity: 0, y: 6 },
+        { opacity: 1, y: 0, duration: 0.35, ease: "power2.out", className: "+=err" }, pbEnd + 0.1);
+      tl.set("#statusIcon", { textContent: "✕" }, pbEnd + 0.1);
+      tl.set("#badge", { className: "badge", opacity: 1 }, 0);
+      tl.set("#termBar", { className: "+=err" }, pbEnd + 0.1);
+      tl.set("#badgeText", { textContent: "ERROR" }, pbEnd + 0.1);
+      tl.set("#statusText", { textContent: fallback.errorMsg || v.errorMsg }, pbEnd + 0.1);
+
+      /* Phase C: 退格删除 ERROR_TXT */
+      const PC = 2.35;
+      errorChars.forEach((c, i) => {
+        const t = PC + i * 0.06;
+        tl.set(c.el, { opacity: 0, y: 0 }, t);
+      });
+      const pcEnd = PC + errorChars.length * 0.06;
+
+      // 进度条回退到 20%（重新打字阶段）
+      tl.to("#progFill", { width: "20%", duration: pcEnd - PC, ease: "power1.inOut" }, PC);
+      tl.set("#progStep", { textContent: "RE-TYPE" }, PC);
+
+      /* Phase D: 键入 CORRECT + SUFFIX */
+      const PD = pcEnd + 0.05;
+      const correctStartIdx = PREFIX.length;
+      const correctChars = chars.slice(correctStartIdx, correctStartIdx + CORRECT.length + SUFFIX.length);
+      correctChars.forEach((c, i) => {
+        const t = PD + i * 0.055;
+        tl.set(c.el, { opacity: 1, y: 0 }, t);
+      });
+      const pdEnd = PD + correctChars.length * 0.055;
+
+      // 进度条推进到 95%
+      tl.to("#progFill", { width: "95%", duration: pdEnd - PD, ease: "power1.inOut" }, PD);
+
+      /* Phase E: 收尾 —— 停抖动、切成功状态、进度到 100% */
+      const PE = 4.8;
+      tl.to("#codeLine", { className: "-=shaking", duration: 0.001 }, PE);
+      tl.to("#statusMsg", { opacity: 0, y: -4, duration: 0.15, ease: "power1.in" }, PE);
+      tl.fromTo("#statusMsg",
+        { opacity: 0, y: 6, className: "statusMsg err" },
+        { opacity: 1, y: 0, className: "statusMsg ok", duration: 0.35, ease: "power2.out" }, PE + 0.1);
+      tl.set("#statusIcon", { textContent: "✓" }, PE + 0.1);
+      tl.set("#statusText", { textContent: OK_MSG }, PE + 0.1);
+      tl.set("#termBar", { className: "-=err", duration: 0.001 }, PE + 0.1);
+      tl.set("#termBar", { className: "+=ok", duration: 0.001 }, PE + 0.15);
+      tl.set("#badgeText", { textContent: "OK" }, PE + 0.15);
+
+      tl.to("#progFill", { width: "100%", duration: 0.4, ease: "power2.out" }, PE);
+      tl.set("#progStep", { textContent: "DONE" }, PE + 0.1);
+
+      // 光标闪烁 4 次收尾
+      for (let i = 0; i < 4; i++) {
+        tl.set("#cursor", { opacity: 0 }, PE + 0.25 + i * 0.3);
+        tl.set("#cursor", { opacity: 1 }, PE + 0.4  + i * 0.3);
+      }
+
+      // 定格收尾（保证 t=DUR 时不为空）
+      tl.set("#root", { opacity: 1 }, DUR);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

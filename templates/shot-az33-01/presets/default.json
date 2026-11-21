@@ -1,0 +1,8 @@
+{
+  "metric": "0.3s",
+  "cap": "平均响应延迟",
+  "title": "答案已经揭晓",
+  "accent": "#00FF00",
+  "background": "#0A0A0F",
+  "foreground": "#F4F4F2"
+}

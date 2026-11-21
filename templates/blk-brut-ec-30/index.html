@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（黑条上的 mono 字）","default":"REVIEW / 用户证言"},{"id":"quote","name":"证言正文","type":"string","label":"证言正文（逐行显现，可多行）","default":"洗了三次没有变形，袖口也没有松。\n尺码按平时穿的选就行，我 175/130 穿 L 刚好。"},{"id":"name","name":"署名","type":"string","label":"用户署名","default":"陈女士"},{"id":"role","name":"身份","type":"string","label":"身份 / 地区（mono 小字）","default":"杭州 · 已购 2 件"},{"id":"rating","name":"评分","type":"number","label":"评分（1–5）","default":5},{"id":"headline","name":"顶部注释","type":"string","label":"黑条上的注释","default":"真实买家 · 追评第 12 天"},{"id":"note","name":"口径说明","type":"string","label":"口径说明（一行 mono）","default":"口径：证言原文引用未做删改 · 头像以首字代替"},{"id":"accent","name":"强调色","type":"color","label":"强调色（卡底 / 引号 / 斜纹带）","default":"#FF5FA2"},{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–6）","default":6},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="评价卡构图：画面正中一张大评价卡，顶部一枚 72px 引号带文字硬投影，中部证言正文逐行显现，底部星级与署名块撑住卡片">
+<title>用户证言卡 · 洗了三次没有变形</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --accent:#FF5FA2;
+  }
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--paper);color:var(--ink);font-family:var(--sans);
+    display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+  .hd{flex:0 0 auto;height:70px;display:flex;align-items:center;gap:22px;
+    padding:0 72px;background:var(--ink);color:var(--white)}
+  .hd .tag{flex:0 0 auto;font-family:var(--mono);font-weight:700;font-size:24px;
+    letter-spacing:.12em;padding:4px 18px;background:var(--accent);color:var(--ink);
+    border-radius:9999px;white-space:nowrap}
+  .hd .eb{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-family:var(--mono);font-weight:700;font-size:24px;
+    letter-spacing:.14em;color:var(--yellow)}
+  .hd .nt{margin-left:auto;flex:0 1 auto;min-width:0;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;font-size:24px;font-weight:700;
+    color:var(--white)}
+
+  /* 评价卡：引号 → 正文 → 星级 → 署名 */
+  .tcard{flex:1 1 auto;min-height:0;display:flex;align-items:center;
+    justify-content:center;padding:34px 72px;overflow:hidden}
+  .card{flex:0 1 auto;width:1340px;display:flex;flex-direction:column;gap:26px;
+    padding:40px 56px 44px;background:var(--accent);color:var(--ink);
+    border:var(--bw) solid var(--ink);border-radius:4px;box-shadow:10px 10px 0 var(--ink)}
+  /* 引号：大号装饰字符一律用文字硬投影，不加框不加影（§3.8 标准写法） */
+  .q{display:block;flex:0 0 auto;font-size:132px;line-height:.7;font-weight:900;
+    letter-spacing:0;color:var(--ink);text-shadow:4px 4px 0 var(--white);
+    height:96px;overflow:hidden}
+  .qt{display:block;white-space:normal;font-size:46px;font-weight:900;
+    line-height:1.5;letter-spacing:0;max-height:300px;overflow:hidden}
+  .qt .ln{display:block}
+  /* 星级：裸字符件，前 rating 颗点强调色，其余点 mute 色，不用 fill: 也不用 scale 弹入 */
+  .stars{flex:0 0 auto;display:flex;gap:10px}
+  .stars i{display:block;font-style:normal;font-size:60px;line-height:1;font-weight:900;
+    color:var(--ink);text-shadow:2px 2px 0 var(--white)}
+  .stars i.off{color:var(--mute)}
+  .who{margin-top:auto;display:flex;align-items:center;gap:22px;
+    padding-top:26px;border-top:var(--bw) solid var(--ink)}
+  .av{flex:0 0 auto;width:96px;height:96px;display:flex;align-items:center;
+    justify-content:center;background:var(--ink);color:var(--accent);
+    border:var(--bw) solid var(--ink);border-radius:4px;
+    font-size:44px;font-weight:900;letter-spacing:0}
+  .who .tx{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:10px}
+  .who .nm{display:block;white-space:nowrap;font-size:40px;font-weight:900;
+    letter-spacing:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .who .rl{display:block;white-space:nowrap;font-family:var(--mono);font-weight:700;
+    font-size:24px;letter-spacing:.08em;max-width:100%;overflow:hidden;
+    text-overflow:ellipsis}
+
+  .foot{flex:0 0 auto;display:flex;align-items:center;gap:24px;padding:0 72px 22px}
+  .foot .sq{flex:0 0 auto;width:22px;height:22px;background:var(--accent);
+    border:var(--bw) solid var(--ink);border-radius:4px}
+  .foot .tx{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-family:var(--mono);font-weight:700;font-size:24px;
+    letter-spacing:.06em;color:var(--mute)}
+
+  .stripe{flex:0 0 auto;height:20px;border-top:var(--bw) solid var(--ink);
+    background:repeating-linear-gradient(-45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+
+  @media (prefers-reduced-motion: reduce){
+    .anim{transition-duration:.01ms !important;animation-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="hd anim" id="hd">
+    <span class="tag">REVIEW</span>
+    <span class="eb anim" id="eyebrow" data-fit-max="24" data-fit-min="15">REVIEW / 用户证言</span>
+    <span class="nt anim" id="headline" data-fit-max="24" data-fit-min="15">真实买家 · 追评第 12 天</span>
+  </div>
+
+  <div class="tcard anim" id="tcard">
+    <div class="card anim" id="card">
+      <span class="q anim" id="q">&ldquo;</span>
+      <div class="qt" id="qt"></div>
+      <div class="stars" id="stars"></div>
+      <div class="who anim" id="who">
+        <span class="av" id="av">陈</span>
+        <span class="tx">
+          <span class="nm anim" id="name" data-fit-max="40" data-fit-min="22">陈女士</span>
+          <span class="rl anim" id="role" data-fit-max="24" data-fit-min="15">杭州 · 已购 2 件</span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot anim" id="foot">
+    <span class="sq"></span>
+    <span class="tx anim" id="note" data-fit-max="24" data-fit-min="15">口径：证言原文引用未做删改 · 头像以首字代替</span>
+  </div>
+
+  <div class="stripe anim" id="stripe"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  ['eyebrow', 'headline', 'name', 'role', 'note']
+    .forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+
+  /* 证言按换行拆成独立的行块，逐行显现比整段淡入更硬 */
+  var qt = document.getElementById('qt');
+  var lines = String(v.quote == null ? '' : v.quote).split('\n')
+    .filter(function (s) { return s.replace(/\s/g, '') !== ''; })
+    .slice(0, 4);
+  if (!lines.length) lines = ['（证言正文为空）'];
+  lines.forEach(function (s) {
+    var el = document.createElement('span');
+    el.className = 'ln';
+    el.setAttribute('data-fit-max', '46');
+    el.setAttribute('data-fit-min', '22');
+    el.textContent = s;
+    qt.appendChild(el);
+  });
+
+  /* 星级由评分推出，不单独再填一个星级变量 */
+  var rating = Number(v.rating);
+  if (!isFinite(rating)) rating = 5;
+  rating = Math.max(0, Math.min(5, Math.round(rating)));
+  var stars = document.getElementById('stars');
+  for (var i = 0; i < 5; i++) {
+    var s = document.createElement('i');
+    s.textContent = '★';
+    if (i >= rating) s.className = 'off';
+    stars.appendChild(s);
+  }
+  set('av', String(v.name == null || v.name === '' ? '客' : v.name).charAt(0));
+
+  B.fitAll();
+  var tl = B.tl();
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (reduce) {
+    gsap.set('.anim', { x: 0, y: 0, scale: 1, scaleX: 1, rotate: 0 });
+    gsap.set('#qt .ln', { y: 0, opacity: 1 });
+    tl.fromTo('#hd',    { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, 0);
+    tl.fromTo('#tcard', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .15);
+    tl.fromTo('#foot',  { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .38);
+    tl.fromTo('#stripe',{ opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, .56);
+    B.hold(tl, 1.35, 1.1);
+    return;
+  }
+
+  var INK = '#0F0F0F', WHT = '#FFFFFF';
+  function slam(sel, at, dx, dy, d) {
+    tl.fromTo(sel, { x: dx, y: dy },
+      { x: 0, y: 0, duration: d, ease: 'power4.out' }, at);
+  }
+  function shadowBounce(sel, off, at) {
+    tl.set(sel, { boxShadow: off + 'px ' + (off + 3) + 'px 0 ' + INK, immediateRender: false }, at);
+    tl.to(sel, { boxShadow: off + 'px ' + off + 'px 0 ' + INK, duration: 0.04, ease: 'steps(2)' }, at + 0.04);
+  }
+
+  slam('#hd',       0.00,   0, -70, 0.26);
+  slam('#eyebrow',  0.14, -24, -20, 0.22);
+  slam('#headline', 0.20,  24, -20, 0.22);
+  /* 大面积卡片：power3.out + from:.86，面积单调涨到末帧 */
+  tl.fromTo('#card', { scale: .86, opacity: 0 },
+      { scale: 1, opacity: 1, duration: .3, ease: 'power3.out' }, 0.40);
+  slam('#q', 0.72, -28, -28, 0.26);
+  /* 模 2 硬着陆：正文逐行自左拍入，纯位移，opacity 恒为 1 */
+  tl.from('#qt .ln', { x: -34, duration: .24, ease: 'power4.out', stagger: .14 }, 0.86);
+  /* 星级逐颗点亮：只换颜色档位，不做 scale 弹入 */
+  tl.from('#stars i', { y: 20, duration: .18, ease: 'power4.out', stagger: .06 }, 1.26);
+  shadowBounce('#card', 10, 1.34);
+  slam('#who',  1.44,   0,  28, 0.26);
+  slam('#name', 1.58, -24, -20, 0.22);
+  slam('#role', 1.66, -24, -18, 0.2);
+  slam('#foot',  1.78,   0,  28, 0.26);
+  slam('#note',  1.90, -24, -20, 0.22);
+  slam('#stripe',1.98,   0,  24, 0.24);
+  tl.fromTo('#stripe', { backgroundPositionX: '0px' },
+    { backgroundPositionX: '60px', duration: 1.1, ease: 'none' }, 2.22);
+
+  var introEnd = 3.32;
+  var total = Math.min(6, Math.max(5, Number(v.duration) || 6));
+  B.hold(tl, introEnd, Math.max(0.6, total - introEnd));
+})();
+</script>
+</body></html>

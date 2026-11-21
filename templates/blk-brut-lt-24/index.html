@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"q","name":"题目","type":"string","label":"题目（10–20 字，单行）","default":"下面哪一个不是判断题的标准？"},{"id":"a","name":"选项 A","type":"string","label":"选项 A（4–12 字）","default":"能不能讲清楚"},{"id":"b","name":"选项 B","type":"string","label":"选项 B（4–12 字）","default":"有没有具体例子"},{"id":"c","name":"选项 C","type":"string","label":"选项 C（4–12 字）","default":"有没有人点赞"},{"id":"mark","name":"正确项标记","type":"string","label":"正确项标记（2–5 字）","default":"选它"},{"id":"accent","name":"强调色","type":"color","label":"强调色（正确项整块底）","default":"#2FD07A"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","hidden":true,"default":"transparent","options":[{"value":"transparent","label":"透明底"},{"value":"mp4","label":"MP4 纯底"},{"value":"webm","label":"WebM 纯底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="多选题贴：顶部白底题条 + 三行等宽选项，最后一行整块换强调色并挂一枚选中方块，选项自上错峰落位后正确项做一次按压反馈">
+<title>多选题贴 · 判断题的标准</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 透明底贴片：--paper 不出现，底色与阴影色收进变量（风格规范 §7.1 / §7.2 规则 A） */
+  :root{ --shadow:#FFFFFF; --background:transparent; }
+
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--background);color:var(--ink);font-family:var(--sans)}
+
+  /* 题条：白底黑字，900 大字单行 */
+  #qh{position:absolute;left:96px;bottom:600px;width:1728px;height:128px;
+    display:flex;align-items:center;padding:0 36px;
+    background:var(--white);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  #q{display:block;font-size:60px;font-weight:900;line-height:1.1;letter-spacing:0;color:var(--ink);
+    white-space:nowrap;overflow:hidden}
+
+  /* 三行等宽等高：行间 16px，靠 3px 黑边分层而不是留白（基因 7） */
+  .opt{position:absolute;left:96px;width:1728px;height:132px;
+    display:flex;align-items:center;gap:26px;padding:0 30px;
+    background:var(--white);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  #o1{bottom:444px}
+  #o2{bottom:296px}
+  #o3{bottom:148px;background:var(--accent)}
+  /* 选项编号方块：正方 + 3px 黑边 + 4px 直角，三行形状完全一致 */
+  .key{flex:0 0 auto;width:88px;height:88px;display:flex;align-items:center;justify-content:center;
+    background:var(--ink);color:var(--yellow);border:var(--bw) solid var(--ink);border-radius:4px;
+    font-family:var(--mono);font-weight:700;font-size:44px;line-height:1}
+  .opt span.tx{flex:1 1 auto;min-width:0;font-size:48px;font-weight:900;line-height:1.1;
+    letter-spacing:0;color:var(--ink);white-space:nowrap;overflow:hidden}
+  /* 选中标记：裸字符方块 + 文字硬投影，不另加底（§3.8 / §7.3.4） */
+  .flag{flex:0 0 auto;display:flex;align-items:center;gap:12px;font-family:var(--mono);
+    font-weight:900;font-size:28px;letter-spacing:.1em;color:var(--ink)}
+  .flag .box{width:44px;height:44px;background:var(--ink);border:var(--bw) solid var(--ink);
+    border-radius:4px}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="qh"><div id="q" data-fit-max="60" data-fit-min="30">下面哪一个不是判断题的标准？</div></div>
+  <div class="opt" id="o1">
+    <span class="key">A</span><span class="tx" id="a" data-fit-max="48" data-fit-min="24">能不能讲清楚</span>
+  </div>
+  <div class="opt" id="o2">
+    <span class="key">B</span><span class="tx" id="b" data-fit-max="48" data-fit-min="24">有没有具体例子</span>
+  </div>
+  <div class="opt" id="o3">
+    <span class="key">C</span><span class="tx" id="c" data-fit-max="48" data-fit-min="24">有没有人点赞</span>
+    <span class="flag"><span class="box"></span><span id="mark" data-fit-max="28" data-fit-min="18">选它</span></span>
+  </div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  var isT = (v.exportMode || 'transparent') === 'transparent';
+  var r = document.documentElement.style;
+  r.setProperty('--background', isT ? 'transparent' : '#0F0F0F');
+  r.setProperty('--shadow', isT ? '#FFFFFF' : '#0F0F0F');
+  if (v.accent) r.setProperty('--accent', v.accent);
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+  ['q', 'a', 'b', 'c', 'mark'].forEach(function (k) { set(k, v[k]); });
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：去掉落位、按压与错峰微位移，只留终态 + ≤8px 微位移淡入（规范 §13.5） */
+    gsap.set('#qh', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#o1', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#o2', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#o3', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#q', { x: 0 });
+    gsap.set('#a', { x: 0 });
+
+    tl.fromTo('#qh', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, 0);
+    tl.fromTo('#o1', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, .45);
+
+    B.hold(tl, 1.6, 1.2);
+    return;
+  }
+
+  var TOTAL = parseFloat(v.duration) > 0 ? parseFloat(v.duration) : 5;
+  var HOLD = 0.5;
+  var WIN = Math.max(1.6, TOTAL - HOLD);
+  var SH = isT ? '#FFFFFF' : '#0F0F0F';
+
+  /* 模 7 · 分格擦出：题条自左分六格推出来 */
+  tl.fromTo('#qh', { clipPath: 'inset(0 100% 0 0)' },
+      { clipPath: 'inset(0 0% 0 0)', duration: .32, ease: 'steps(6)' }, 0)
+    .fromTo('#qh', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#qh', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+  tl.fromTo('#q', { x: -28 }, { x: 0, duration: .22, ease: 'power4.out' }, .18);
+
+  /* 模 2 · 零件装上去：三行选项自上错峰落位，纯位移，opacity 恒为 1 */
+  var rows = ['#o1', '#o2', '#o3'];
+  rows.forEach(function (sel, i) {
+    var at = .26 + i * .16;
+    tl.fromTo(sel, { x: -60 },
+        { x: 0, duration: .24, ease: 'power4.out' }, at)
+      .fromTo(sel, { boxShadow: '8px 8px 0 ' + SH },
+        { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<' + at)
+      .to(sel, { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<' + at);
+  });
+  tl.fromTo('#a', { x: -24 }, { x: 0, duration: .2, ease: 'power4.out' }, .44);
+  tl.fromTo('#b', { x: -24 }, { x: 0, duration: .2, ease: 'power4.out' }, .6);
+  tl.fromTo('#c', { x: -24 }, { x: 0, duration: .2, ease: 'power4.out' }, .76);
+
+  /* 模 3 · 按下反馈：选中项位移量恒等于阴影偏移量，1 帧完成不补间（基因 2 唯一交互签名） */
+  tl.fromTo('#o3 .flag', { x: 26, opacity: 0 },
+      { x: 0, opacity: 1, duration: .28, ease: 'steps(5)' }, 1.1);
+  tl.set('#o3', { x: 6, y: 6, boxShadow: '2px 2px 0 ' + SH, duration: 0 }, 1.7)
+    .set('#o3', { x: 0, y: 0, boxShadow: '8px 8px 0 ' + SH, duration: 0 }, 2.06);
+
+  /* 三行错峰微位移：正确项下压、上面两行反向，匀速往返 */
+  var T0 = 2.4;
+  var REP = Math.max(1, Math.round((WIN - T0) / .8));
+  var half = (WIN - T0) / (REP * 2);
+  tl.to('#o3', { y: 5, duration: half, ease: 'none', repeat: REP * 2 - 1, yoyo: true }, T0);
+  tl.to('#o1', { y: -5, duration: half, ease: 'none', repeat: REP * 2 - 2, yoyo: true }, T0 + half);
+  tl.to('#o2', { y: -4, duration: half, ease: 'none', repeat: REP * 2 - 2, yoyo: true }, T0 + half);
+
+  var end = tl.duration();
+  B.hold(tl, end, Math.max(HOLD, TOTAL - end));
+})();
+</script>
+</body></html>

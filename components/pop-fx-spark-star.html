@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="zh-CN" data-audit-offcanvas="星爆余晖按阻尼飞出画布，是余韵衰减的一部分" data-composition-variables='[{"id":"text","name":"文案","type":"string","label":"主文案","default":"叮！"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"accent2","name":"次强调色","type":"color","label":"次强调色","default":"#FFC93C"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":2.4}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>星爆闪光</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-tint { position: absolute; inset: 0; background: rgba(12, 12, 18, .48); }
+  .p-halo { position: absolute; inset: 0;
+    background: radial-gradient(70% 80% at 50% 50%, rgba(0,0,0,.50) 0%, rgba(0,0,0,.26) 54%, rgba(0,0,0,0) 84%); }
+  .p-glow { position: absolute; left: 240px; top: 135px; width: 300px; height: 300px; margin: -150px 0 0 -150px;
+    border-radius: 50%; opacity: 0; will-change: transform, opacity;
+    background: radial-gradient(50% 50% at 50% 50%, rgba(255,255,255,.85) 0%, rgba(255,201,60,.42) 42%, rgba(255,107,53,0) 74%); }
+  .p-star { position: absolute; left: 240px; top: 135px; width: 210px; height: 210px; margin: -105px 0 0 -105px;
+    opacity: 0; will-change: transform, opacity; transform-origin: 50% 50%;
+    background: radial-gradient(50% 50% at 50% 50%, rgba(255,255,255,.92) 0%, rgba(255,255,255,.28) 48%, rgba(255,255,255,0) 72%); }
+  .p-star .sp { position: absolute; left: 50%; top: 50%; width: 210px; height: 22px; margin: -11px 0 0 -105px;
+    background: linear-gradient(90deg, rgba(255,255,255,0), #FFFFFF 26%, #FFE9A8 50%, #FFFFFF 74%, rgba(255,255,255,0)); }
+  .p-star .sp.v { transform: rotate(90deg); }
+  .p-star .sp.d { transform: rotate(45deg); opacity: .45; height: 10px; }
+  .p-star .sp.d2 { transform: rotate(-45deg); opacity: .45; height: 10px; }
+  .p-core { position: absolute; left: 240px; top: 135px; width: 34px; height: 34px; margin: -17px 0 0 -17px;
+    border-radius: 50%; background: #FFFFFF; opacity: 0; will-change: transform, opacity; }
+  .p-ring { position: absolute; left: 240px; top: 135px; width: 110px; height: 110px; margin: -55px 0 0 -55px;
+    border-radius: 50%; border: 4px solid var(--ac2); opacity: 0; will-change: transform, opacity; }
+  .p-wordrow { position: absolute; left: 0; right: 0; top: 100px; display: flex; justify-content: center; }
+  .p-word { display: inline-block; white-space: nowrap; font-size: 62px; font-weight: 900;
+    line-height: 1.06; color: var(--fg); -webkit-text-stroke: 3px var(--ink);
+    text-shadow: 6px 6px 0 rgba(0,0,0,.85); }
+  .p-spark { position: absolute; left: 240px; top: 135px; width: 9px; height: 9px; border-radius: 50%;
+    opacity: 0; will-change: transform, opacity; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"叮！","accent":"#FF6B35","accent2":"#FFC93C","duration":2.4};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  const dur = parseFloat(v.duration) || 2.4;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--ac2', v.accent2 || FALLBACK.accent2);
+  root.style.setProperty('--fg', '#FFF8EE');
+  root.style.setProperty('--ink', '#1B1B24');
+  const text = String(v.text == null ? FALLBACK.text : v.text);
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, tx, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (tx != null) el.textContent = tx;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  put('div', 'p-tint');
+  put('div', 'p-halo');
+  const glow = put('div', 'p-glow');
+
+  const star = put('div', 'p-star');
+  put('div', 'sp', '', null, star);
+  put('div', 'sp v', '', null, star);
+  put('div', 'sp d', '', null, star);
+  put('div', 'sp d2', '', null, star);
+  const core = put('div', 'p-core', 'background:' + (v.accent2 || FALLBACK.accent2) + ';');
+
+  const rings = [];
+  for (let i = 0; i < 3; i++) {
+    rings.push(put('div', 'p-ring', 'border-color:' + (i % 2 ? 'var(--ac)' : 'var(--ac2)') + ';'));
+  }
+
+  const row = put('div', 'p-wordrow');
+  const word = put('div', 'p-word', '', text, row);
+
+  /* 余晖小点：固定种子推参数，位置是 t 的纯函数 */
+  const H = (i, s) => {
+    let x = (Math.imul(i + 1, 374761393) + Math.imul(s + 5, 668265263)) >>> 0;
+    x = (x ^ (x >>> 13)) >>> 0;
+    x = Math.imul(x, 1274126177) >>> 0;
+    return ((x >>> 8) & 0xffff) / 65535;
+  };
+  const SPARKS = 12;
+  const sparks = [];
+  for (let i = 0; i < SPARKS; i++) {
+    const sz = 5 + Math.round(H(i, 1) * 7);
+    const el = put('div', 'p-spark',
+      'background:' + (i % 3 === 0 ? '#FFFFFF' : (i % 2 ? 'var(--ac)' : 'var(--ac2)')) +
+      ';width:' + sz + 'px;height:' + sz + 'px;margin-left:-' + (sz / 2) + 'px;margin-top:-' + (sz / 2) + 'px;');
+    sparks.push({
+      el: el,
+      ang: H(i, 2) * 6.2832,
+      v0: 120 + H(i, 3) * 150,
+      drag: 2.4 + H(i, 4) * 2.0,
+      delay: H(i, 5) * .12
+    });
+  }
+
+  function fitText(el, maxPx, avail, minPx) {
+    el.style.fontSize = maxPx + 'px';
+    el.style.whiteSpace = 'nowrap';
+    const natural = el.scrollWidth;
+    if (natural > avail && natural > 0) {
+      el.style.fontSize = Math.max(minPx, Math.floor(maxPx * avail / natural)) + 'px';
+    }
+  }
+  fitText(word, 62, 400, 22);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+  tl.fromTo(word, { scale: .2, opacity: 0, rotate: -10 },
+    { scale: 1, opacity: 1, rotate: -3, duration: .42, ease: 'back.out(2.6)' }, .05);
+
+  /* 两次闪烁：快 + 慢。纯高斯函数，只吃绝对时间。 */
+  const flick = (t) => {
+    const a = Math.exp(-Math.pow((t - .10) / .045, 2));
+    const b = .72 * Math.exp(-Math.pow((t - .30) / .075, 2));
+    return Math.min(1.25, a + b);
+  };
+  const P = { t: 0 };
+  const paint = (t) => {
+    const F = flick(t);
+    const idle = Math.max(0, Math.min(1, (t - .12) / .5));
+    star.style.opacity = Math.min(1, F + idle * .34).toFixed(3);
+    star.style.transform = 'rotate(' + (t * 26).toFixed(2) + 'deg) scale(' + (1 + F * .30).toFixed(3) + ')';
+    glow.style.opacity = Math.min(1, F * .85 + idle * .18).toFixed(3);
+    glow.style.transform = 'scale(' + (.45 + F * .75).toFixed(3) + ')';
+    core.style.opacity = Math.min(1, F + .2).toFixed(3);
+    core.style.transform = 'scale(' + (.2 + F * 1.15).toFixed(3) + ')';
+    for (let i = 0; i < rings.length; i++) {
+      const u = Math.max(0, Math.min(1, (t - .07 - i * .12) / .62));
+      const e = 1 - Math.pow(1 - u, 3);
+      rings[i].style.transform = 'scale(' + (.22 + e * 2.45).toFixed(3) + ')';
+      rings[i].style.opacity = ((1 - u) * .85).toFixed(3);
+    }
+    for (let i = 0; i < sparks.length; i++) {
+      const s = sparks[i];
+      const age = t - s.delay;
+      if (age <= 0) { s.el.style.opacity = '0'; continue; }
+      /* 阻尼位移：v0/k*(1-e^-kt)，速度单调衰减，不含任何历史量 */
+      const d = s.v0 / s.drag * (1 - Math.exp(-s.drag * age));
+      const x = 240 + Math.cos(s.ang) * d;
+      const y = 135 + Math.sin(s.ang) * d * .78 + 22 * age * age;
+      s.el.style.transform = 'translate3d(' + (x - 240).toFixed(2) + 'px,' + (y - 135).toFixed(2) + 'px,0)';
+      s.el.style.opacity = Math.max(0, 1 - age / .95).toFixed(3);
+    }
+    word.style.filter = 'brightness(' + (1 + F * .5).toFixed(2) + ') drop-shadow(0 0 ' + (F * 16).toFixed(1) + 'px rgba(255,201,60,.9))';
+  };
+  tl.fromTo(P, { t: 0 }, {
+    t: dur, duration: dur, ease: 'none',
+    onUpdate() { paint(P.t); }
+  }, 0);
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+  paint(0);
+})();
+</script>
+</body>
+</html>

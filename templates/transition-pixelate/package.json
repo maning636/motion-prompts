@@ -1,0 +1,17 @@
+{
+  "name": "transition-pixelate",
+  "version": "1.0.0",
+  "private": true,
+  "description": "像素化切换",
+  "main": "index.html",
+  "scripts": {
+    "build": "node -e \"console.log(1920, 1080, 30, 6)\""
+  },
+  "hyperframes": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "duration": 6,
+    "format": "mp4"
+  }
+}

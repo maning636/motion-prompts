@@ -1,0 +1,13 @@
+{
+  "id": "gallery-wall-dolly",
+  "name": "照片墙推镜浏览",
+  "description": "照片墙缓慢推镜浏览（dolly-in），焦点照片逐级提亮，其余保持暗调，营造画廊漫步的节奏。",
+  "category": "叙事推进",
+  "tags": ["照片墙", "推镜", "dolly-in", "画廊", "焦点"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-20T00:00:00.000Z"
+}

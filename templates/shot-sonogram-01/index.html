@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#cap{ position:absolute; left:50%; top:50%; width:1320px; height:170px; margin:-85px 0 0 -660px;
+  border-radius:85px; background:#14161D; border:1px solid color-mix(in srgb, var(--fg) 10%, transparent);
+  display:flex; align-items:center; padding:0 46px; gap:34px; }
+#mic{ width:54px; height:54px; border-radius:50%; flex:none; position:relative;
+  background:color-mix(in srgb, var(--accent) 25%, transparent); }
+#mic::after{ content:''; position:absolute; left:21px; top:12px; width:12px; height:22px;
+  border-radius:6px; background:var(--accent); }
+#micGlow{ position:absolute; inset:-14px; border-radius:50%;
+  box-shadow:0 0 40px color-mix(in srgb, var(--accent) 80%, transparent); opacity:0; }
+#bars{ flex:1; display:flex; align-items:center; gap:8px; height:120px; }
+.bar{ width:12px; border-radius:6px; background:var(--accent); height:5px; }
+#send{ flex:none; width:120px; height:56px; border-radius:28px; background:var(--accent);
+  color:#0A0A0A; font-size:22px; font-weight:900; text-align:center; line-height:56px;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; will-change:transform; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5.0" data-width="1920" data-height="1080">
+
+<div id="cap">
+  <div id="mic"><div id="micGlow"></div></div>
+  <div id="bars"><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div></div>
+  <div id="send">发送</div>
+</div>
+
+    </div>
+    <script>
+      const FB = {"accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+const bars=Array.from(document.querySelectorAll('.bar'));
+const N=bars.length;
+const glow=$('#micGlow'), send=$('#send');
+// mulberry32 值噪声：帧确定、相邻连续
+function rand(i){let t=(i+0x6D2B79F5)|0;t=Math.imul(t^(t>>>15),t|1);
+  t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;}
+function noiseAt(t){
+  const i=Math.floor(t), fr=t-i;
+  const u=fr*fr*(3-2*fr);
+  return rand(i)+(rand(i+1)-rand(i))*u;
+}
+// 说/停包络：说 15–57f、80–124f，rise 5f fall 7f 梯形
+function seg(t,a,b){
+  if(t<a-5||t>b+7)return 0;
+  if(t<a)return (t-(a-5))/5;
+  if(t>b)return 1-(t-b)/7;
+  return 1;
+}
+function envAt(t){return Math.max(seg(t,15,57),seg(t,80,124));}
+const sim={f:0};
+function paint(){
+  const f=sim.f;
+  // 提交塌缩：126f 起 12f ease-in 到 0.06
+  const cp=f<126?1:Math.max(0.06,1-Math.pow((f-126)/12,2));
+  const envNow=envAt(f);
+  glow.style.opacity=(envNow*0.9*cp).toFixed(3);
+  for(let i=0;i<N;i++){
+    const ti=f-(N-1-i)*1.6;            // 最右条是"现在"，历史向左流
+    const e=envAt(ti);
+    let h=5;
+    if(e>0.02){
+      const syl=0.55+0.45*noiseAt(ti/4.5);
+      const sp=Math.pow(Math.sin(Math.PI*(i+0.5)/N),0.8);
+      const jit=0.35+0.65*noiseAt(ti*1.7+i*13);
+      h=Math.max(5, e*syl*sp*jit*120);
+    }
+    bars[i].style.height=(h*cp).toFixed(1)+'px';
+  }
+  // 发送按钮：124f 压缩回弹 3f
+  const bp=f<124?1:(f<127?0.82:1);
+  send.style.transform='scale('+bp+')';
+}
+paint();
+tl.to(sim,{f:150,duration:F(150),ease:'none',onUpdate:paint},0);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

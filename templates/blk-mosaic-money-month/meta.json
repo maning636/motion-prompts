@@ -1,0 +1,16 @@
+{
+ "name": "华夫图 · 把收入拆开看才不慌",
+ "description": "每项一列点阵，填满的格数就是占比——给的是面积不是长度",
+ "category": "数据可视化",
+ "tags": [
+  "积木社",
+  "grid",
+  "berry",
+  "calm"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "card",
+ "when": "数据卡片 / 华夫图"
+}

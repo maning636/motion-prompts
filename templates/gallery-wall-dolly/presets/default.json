@@ -1,0 +1,12 @@
+{
+  "eyebrow": "PHOTO WALL · DOLLY IN",
+  "title": "照片墙缓慢推镜浏览",
+  "subtitle": "焦点照片逐级提亮，其余保持暗调。",
+  "photoCount": 5,
+  "focusIndex": 2,
+  "dollyScale": 1.25,
+  "accent": "#00FF00",
+  "background": "#0E0C0A",
+  "foreground": "#F4EFE7",
+  "exportMode": "transparent"
+}

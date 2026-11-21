@@ -1,0 +1,7 @@
+{
+  "name": "icon-grid",
+  "private": true,
+  "scripts": {
+    "render": "cd ../.. && npm run render -- icon-grid"
+  }
+}

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#fld{ position:absolute; inset:0; }
+.ic{ position:absolute; width:64px; height:64px; opacity:0; will-change:transform; }
+.ic svg{ display:block; width:100%; height:100%; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4" data-width="1920" data-height="1080">
+<div id="fld"></div>
+    </div>
+    <script>
+      const FB = {"accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+// 170 枚灰阶小图标（行间半格错位），5 种实心简笔形
+const SHAPES=[
+ '<svg viewBox="0 0 64 64"><path d="M32 54 C10 38 8 20 22 14 C28 12 32 16 32 20 C32 16 36 12 42 14 C56 20 54 38 32 54Z" fill="FC"/></svg>',
+ '<svg viewBox="0 0 64 64"><path d="M32 8 L39 25 L57 25 L43 36 L48 54 L32 43 L16 54 L21 36 L7 25 L25 25Z" fill="FC"/></svg>',
+ '<svg viewBox="0 0 64 64"><path d="M36 4 L14 36 L28 36 L26 60 L50 26 L35 26Z" fill="FC"/></svg>',
+ '<svg viewBox="0 0 64 64"><path d="M12 33 L26 47 L52 19 L45 12 L26 32 L19 26Z" fill="FC"/></svg>',
+ '<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="24" fill="FC"/></svg>'];
+const GRAYS=['rgba(255,255,255,.18)','rgba(255,255,255,.28)','rgba(255,255,255,.38)','rgba(255,255,255,.5)'];
+const WAVES=['#3E7BFA','#FF8A3D','#00FF00','#FF4D5E'];
+let seed=7; const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+const fld=$('#fld'), icons=[];
+for(let r=0;r<10;r++)for(let c=0;c<17;c++){
+  const el=document.createElement('div'); el.className='ic';
+  const g=GRAYS[Math.floor(rnd()*4)], sh=SHAPES[Math.floor(rnd()*5)];
+  el.innerHTML=sh.replace('FC',g);
+  el.style.left=(40+c*108+(r%2?54:0))+'px'; el.style.top=(30+r*106)+'px';
+  fld.appendChild(el);
+  icons.push({el,r,c});
+}
+// 浮现：10 批错峰，批间 4f + 批内 ≤3f 抖动，0.55→1.07→1 微弹
+icons.forEach((o,i)=>{
+  const cue=(i%10)*4+rnd()*3;
+  tl.fromTo(o.el,{opacity:0,scale:.55},{opacity:1,scale:1.07,duration:F(6),ease:'power2.out'},F(cue));
+  tl.to(o.el,{scale:1,duration:F(3),ease:'power1.out'},F(cue+6));
+});
+// 静置一拍后翻色：4 道色波按行推进，行差1.4f+列微倾0.25f+抖动，前沿 pop 1.22x
+const HOLD=48;
+icons.forEach(o=>{
+  const band=Math.min(3,Math.floor(o.r/2.5));
+  const cue=HOLD+band*3+(o.r-band*2.5)*1.4+o.c*0.25+rnd()*1.5;
+  const col=WAVES[band];
+  // fill 用 attr 补间（可回放），不用 onStart/call 改 DOM
+  tl.to(o.el.firstElementChild.firstElementChild,{attr:{fill:col},duration:F(.5)},F(cue));
+  tl.to(o.el,{scale:1.22,duration:F(1.5),ease:'sine.out'},F(cue));
+  tl.to(o.el,{scale:1,duration:F(1.5),ease:'sine.in'},F(cue+1.5));
+});
+tl.to({},{duration:F(50)},F(HOLD+22)); // 真静止（补齐到 120f=data-duration）
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

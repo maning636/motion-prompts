@@ -1,0 +1,13 @@
+{
+  "id": "countdown-arc-scatter",
+  "name": "倒计时弧形聚合散开",
+  "description": "倒计时紧迫感：弧形刻度聚合收拢成中心数字，数字跳变时旧数字散开、新数字聚合，制造脉冲式紧迫感",
+  "category": "序列进程",
+  "tags": ["倒计时", "序列进程", "紧迫感", "数字动效", "粒子"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-05T00:00:00.000Z"
+}

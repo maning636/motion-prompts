@@ -1,0 +1,13 @@
+{
+  "id": "reticle-lock-on",
+  "name": "科技感准星锁定",
+  "description": "四个 L 形取景框线从画外四角冲入、超调回弹'咔'地咬合中央目标，锁定帧目标高亮+十字微标+参数标签错峰弹出，结尾状态条确认。",
+  "category": "转场镜头",
+  "tags": ["HUD", "准星", "锁定", "科技感", "聚焦"],
+  "duration": 6.5,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-22T00:00:00.000Z"
+}

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <!-- 米白牛皮纸底 + 细网格 + 老化斑 -->
+  <defs>
+    <pattern id="paperGrid" x="0" y="0" width="48" height="48" patternUnits="userSpaceOnUse">
+      <rect width="48" height="48" fill="#faf6ed"/>
+      <path d="M 48 0 L 0 0 0 48" fill="none" stroke="#3d2817" stroke-width="0.25" opacity="0.08"/>
+    </pattern>
+    <radialGradient id="paperFade" cx="50%" cy="50%" r="80%">
+      <stop offset="0%" stop-color="#faf6ed" stop-opacity="1"/>
+      <stop offset="70%" stop-color="#faf6ed" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#c8b89a" stop-opacity="0.4"/>
+    </radialGradient>
+    <filter id="paperNoise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="3"/>
+      <feColorMatrix values="0 0 0 0 0.24
+                              0 0 0 0 0.16
+                              0 0 0 0 0.09
+                              0 0 0 0.06 0"/>
+    </filter>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#paperGrid)"/>
+  <rect width="1920" height="1080" fill="url(#paperFade)"/>
+  <rect width="1920" height="1080" filter="url(#paperNoise)" opacity="0.6"/>
+</svg>

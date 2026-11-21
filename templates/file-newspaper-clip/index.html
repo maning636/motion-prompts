@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "masthead", "type": "string", "label": "报头", "default": "科技观察报"}, {"id": "body", "type": "string", "label": "正文段", "default": "本报获悉，多家内容团队已开始把脚本、素材、剪辑、发布四个环节交给自动化流程接管。其中一家头部账号在三个月内把单条内容的生产周期从三天压缩到四小时，人力成本下降超过六成。业内人士指出，这波效率革命的门槛正在快速降低，中小团队也能用得起。"}, {"id": "hl", "type": "string", "label": "高亮句（须为正文子串）", "default": "生产周期从三天压缩到四小时"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      #root{ background: #EAE2CF; font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; color: #26211A; }
+      .f-vig{ position: absolute; inset: 0; pointer-events: none;
+        background: radial-gradient(ellipse at center, transparent 52%, rgba(64,48,26,.32) 100%); }
+      .f-clip{ position: absolute; left: 530px; top: 60px; width: 860px; height: 960px;
+        background: #FBF7EC; padding: 46px 52px; box-shadow: 9px 11px 0 rgba(38,33,26,.2);
+        clip-path: polygon(0 2%, 4% 0, 97% 1%, 100% 4%, 99% 96%, 96% 100%, 60% 98.5%, 30% 100%, 3% 98%); }
+      .f-mast{ text-align: center; }
+      .f-mast h1{ font-size: 52px; font-weight: 900; letter-spacing: .1em; }
+      .f-mastline{ margin-top: 12px; border-top: 3px solid #26211A; border-bottom: 1px solid #26211A;
+        padding: 6px 0; font-size: 20px; color: #57503F; display: flex; justify-content: space-between; }
+      .f-body{ margin-top: 36px; height: 690px; display: flex; align-items: center;
+        font-size: 28px; line-height: 2.1; font-weight: 600;
+        letter-spacing: .04em; color: #2E2A20; text-align: justify; }
+      .f-body-in{ display: block; width: 100%; }
+      .f-body .hl{ background: #F5D73F; padding: 0 2px; clip-path: inset(0 100% 0 0); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="f-vig"></div>
+      <div class="f-clip" id="clip">
+        <div class="f-mast">
+          <h1 id="masthead"></h1>
+          <div class="f-mastline mono"><span>2026年8月13日 星期四</span><span>第 3 版 · 调查</span></div>
+        </div>
+        <div class="f-body" id="body"></div>
+      </div>
+
+    </div>
+    <script>
+      const fallback = {"masthead": "科技观察报", "body": "本报获悉，多家内容团队已开始把脚本、素材、剪辑、发布四个环节交给自动化流程接管。其中一家头部账号在三个月内把单条内容的生产周期从三天压缩到四小时，人力成本下降超过六成。业内人士指出，这波效率革命的门槛正在快速降低，中小团队也能用得起。", "hl": "生产周期从三天压缩到四小时", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      $("masthead").textContent = V.masthead;
+      const body = String(V.body ?? "");
+      const key = String(V.hl ?? "");
+      const bodyEl = $("body");
+      const inner = document.createElement("div");
+      inner.className = "f-body-in";
+      const idx = key ? body.indexOf(key) : -1;
+      if (idx >= 0) {
+        const pre = document.createElement("span");
+        pre.textContent = body.slice(0, idx);
+        const hl = document.createElement("span");
+        hl.className = "hl";
+        hl.id = "hlSpan";
+        hl.textContent = key;
+        const post = document.createElement("span");
+        post.textContent = body.slice(idx + key.length);
+        inner.append(pre, hl, post);
+      } else {
+        inner.textContent = body;
+      }
+      bodyEl.append(inner);
+      tl.fromTo("#clip", { opacity: 0, rotation: -4, y: 30 }, { opacity: 1, rotation: -1.5, y: 0, duration: 0.55, ease: "power3.out" }, 0.1);
+      tl.fromTo(".f-mast h1", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 0.5);
+      tl.fromTo(".f-mastline", { opacity: 0 }, { opacity: 1, duration: 0.3 }, 0.7);
+      tl.fromTo("#body", { opacity: 0 }, { opacity: 1, duration: 0.5 }, 0.85);
+      if ($("hlSpan")) {
+        tl.to("#hlSpan", { clipPath: "inset(0 0% 0 0)", duration: 0.7, ease: "power2.inOut" }, 1.5);
+      }
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

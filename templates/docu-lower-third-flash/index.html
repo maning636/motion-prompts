@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-composition-variables='[{"id":"name","type":"string","label":"name","default":""},{"id":"role","type":"string","label":"role","default":""},{"id":"quote","type":"string","label":"quote","default":""},{"id":"duration","type":"number","label":"总时长(秒)","default":6}]' data-duration="6">
+<head>
+<meta charset="UTF-8" />
+<title>闪入字幕条·皮影档案</title>
+<script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width: 1920px; height: 1080px; overflow: hidden; font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; color: var(--foreground, #0a0a0a); }
+.composition { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #faf6ed; }
+.layer { position: absolute; inset: 0; }
+.l1 { background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080"><rect width="1920" height="1080" fill="%23faf6ed"/><g fill="none" stroke="%238b7355" stroke-width="0.5" opacity="0.25"><path d="M0 90H1920M0 180H1920M0 270H1920M0 360H1920M0 450H1920M0 540H1920M0 630H1920M0 720H1920M0 810H1920M0 900H1920M0 990H1920M0 1080H1920"/></g></svg>') center / cover; }
+.l2 { background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g fill="none" stroke="%23b91c1c" stroke-width="2"><path d="M10 10 H60 M10 10 V60"/><path d="M10 22 H48 M22 10 V48"/></g></svg>') 40px 40px / 60px 60px no-repeat; }
+.l3 { background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g fill="none" stroke="%23b91c1c" stroke-width="2"><path d="M10 10 H60 M10 10 V60"/><path d="M10 22 H48 M22 10 V48"/></g></svg>') 1820px 40px / 60px 60px no-repeat; }
+.l4 { background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g fill="none" stroke="%23b91c1c" stroke-width="2"><path d="M10 10 H60 M10 10 V60"/><path d="M10 22 H48 M22 10 V48"/></g></svg>') 40px 1000px / 60px 60px no-repeat; }
+.l5 { background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g fill="none" stroke="%23b91c1c" stroke-width="2"><path d="M10 10 H60 M10 10 V60"/><path d="M10 22 H48 M22 10 V48"/></g></svg>') 1820px 1000px / 60px 60px no-repeat; }
+.l6 { background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 40" preserveAspectRatio="none"><rect x="0" y="0" width="800" height="40" fill="%230a0a0a"/><g fill="%23faf6ed"><rect x="15" y="5" width="20" height="12"/><rect x="60" y="5" width="20" height="12"/><rect x="105" y="5" width="20" height="12"/><rect x="150" y="5" width="20" height="12"/><rect x="195" y="5" width="20" height="12"/><rect x="240" y="5" width="20" height="12"/><rect x="285" y="5" width="20" height="12"/><rect x="330" y="5" width="20" height="12"/><rect x="375" y="5" width="20" height="12"/><rect x="420" y="5" width="20" height="12"/><rect x="465" y="5" width="20" height="12"/><rect x="510" y="5" width="20" height="12"/><rect x="555" y="5" width="20" height="12"/><rect x="600" y="5" width="20" height="12"/><rect x="645" y="5" width="20" height="12"/><rect x="690" y="5" width="20" height="12"/><rect x="735" y="5" width="20" height="12"/><rect x="15" y="23" width="20" height="12"/><rect x="60" y="23" width="20" height="12"/><rect x="105" y="23" width="20" height="12"/><rect x="150" y="23" width="20" height="12"/><rect x="195" y="23" width="20" height="12"/><rect x="240" y="23" width="20" height="12"/><rect x="285" y="23" width="20" height="12"/><rect x="330" y="23" width="20" height="12"/><rect x="375" y="23" width="20" height="12"/><rect x="420" y="23" width="20" height="12"/><rect x="465" y="23" width="20" height="12"/><rect x="510" y="23" width="20" height="12"/><rect x="555" y="23" width="20" height="12"/><rect x="600" y="23" width="20" height="12"/><rect x="645" y="23" width="20" height="12"/><rect x="690" y="23" width="20" height="12"/><rect x="735" y="23" width="20" height="12"/></g></svg>') left bottom / 100% 30px no-repeat; opacity: 0.4; }
+.topbar { position: absolute; left: 100px; top: 80px; display: flex; align-items: center; gap: 18px; z-index: 5; font-family: "Source Han Mono", "Courier New", monospace; font-size: 13px; color: #0a0a0a; letter-spacing: 4px; }
+.topbar .dot { width: 8px; height: 8px; background: #b91c1c; border-radius: 50%; }
+.topbar .line { width: 120px; height: 1px; background: #0a0a0a; opacity: 0.4; }
+.progress-bar { position: absolute; left: 0; bottom: 0; height: 3px; background: #b91c1c; width: 0%; z-index: 100; }
+
+</style>
+</head>
+<body>
+<div id="composition" class="composition" data-composition-id="docu-lower-third-flash-2026-09-01" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+<div class="layer l1"></div>
+<div class="layer l2"></div>
+<div class="layer l3"></div>
+<div class="layer l4"></div>
+<div class="layer l5"></div>
+<div class="layer l6"></div>
+
+<style>
+.flash-wrap { position: absolute; left: 100px; bottom: 200px; width: 1400px; z-index: 10; }
+.flash-bar { position: absolute; left: 0; top: 0; width: 1400px; height: 100px; background: #0a0a0a; }
+.flash-accent { position: absolute; left: 0; top: 0; width: 1400px; height: 8px; background: #b91c1c; }
+.flash-inner { position: absolute; left: 30px; top: 25px; width: 1340px; height: 60px; display: flex; align-items: center; gap: 24px; }
+.flash-mono { font-family: "Source Han Mono", monospace; font-size: 16px; color: #faf6ed; letter-spacing: 4px; }
+.flash-divider { width: 1px; height: 50px; background: #b91c1c; }
+.flash-name { font-family: "Noto Serif SC", Georgia, serif; font-size: 44px; font-weight: 700; color: #faf6ed; letter-spacing: 6px; line-height: 1; }
+.flash-tag { margin-left: auto; font-family: "Source Han Mono", monospace; font-size: 13px; color: #faf6ed; letter-spacing: 4px; opacity: 0.85; }
+.flash-sub { position: absolute; left: 30px; bottom: 30px; font-family: "Noto Serif SC", Georgia, serif; font-size: 20px; color: #0a0a0a; letter-spacing: 3px; font-style: italic; }
+.flash-num { position: absolute; right: 60px; bottom: 50px; font-family: "Noto Serif SC", Georgia, serif; font-size: 72px; font-weight: 700; color: #b91c1c; letter-spacing: 2px; opacity: 0.9; }
+</style>
+<div class="topbar"><span class="dot"></span><span>DOC · 008</span><span class="line"></span><span>LOWER THIRD / FLASH</span></div>
+<div class="flash-wrap" id="flash">
+  <div class="flash-accent"></div>
+  <div class="flash-bar"></div>
+  <div class="flash-inner">
+    <span class="flash-mono">// INT.</span>
+    <span class="flash-name" data-composition-variable="name">张 文 华</span>
+    <span class="flash-divider"></span>
+    <span class="flash-tag" data-composition-variable="role">摄 影 记 者 · 2026</span>
+  </div>
+  <div class="flash-sub" data-composition-variable="quote">— 用 图 像 记 录 时 间 —</div>
+</div>
+<div class="flash-num" id="fn">08</div>
+<script>
+window.addEventListener("load", () => {
+  const vars = window.__hyperframes?.getVariables?.() || {};
+  const duration = Math.max(1, Number(vars.duration) || 6);
+  const tl = gsap.timeline({ paused: true, defaults: { ease: "power3.out" } });
+          // 注册到 window.__timelines：云渲染的 settle/逐帧定位靠它驱动时间轴。
+          // 此前有一批素材没注册，导致渲染停在第 0 帧（主体初始 opacity:0 → 整层空）。
+          // gsap 时间轴就地 mutate，先存引用即可，后续 tl.to() 作用在同一对象上。
+          window.__timelines = window.__timelines || {};
+          window.__timelines.main = tl;
+  window.__timelines = window.__timelines || {};
+  tl.from('#flash .flash-accent', { duration: 0.5, scaleX: 0, transformOrigin: 'left', ease: 'power2.out' }, 0);
+  tl.from('#flash .flash-bar', { duration: 0.7, x: -200, opacity: 0, ease: 'power3.out' }, 0.3);
+  tl.from('#flash .flash-inner > *', { duration: 0.4, opacity: 0, stagger: 0.08, ease: 'power2.out' }, 0.7);
+  tl.from('#flash .flash-sub', { duration: 0.5, opacity: 0, x: -30, ease: 'power2.out' }, 1.1);
+  tl.from('#fn', { duration: 0.6, opacity: 0, scale: 1.3, ease: 'back.out(1.5)' }, 1.2);
+  tl.to('#flash', { duration: 0.5, opacity: 0, ease: 'power2.in' }, 4.8);
+  tl.to('#fn', { duration: 0.5, opacity: 0, ease: 'power2.in' }, 4.8);
+  tl.to('.progress-bar', { width: '100%', duration: duration, ease: 'none' }, 0);
+  window.__timelines['docu-lower-third-flash-2026-09-01'] = tl;
+  window.__hyperframes?.ready?.();
+});
+</script>
+<div class="progress-bar"></div>
+</div>
+</body>
+</html>

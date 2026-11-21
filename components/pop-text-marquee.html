@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="zh-CN" data-audit-offcanvas="跑马灯文字循环滚出画布右侧，接缝由 mask 渐隐遮住" data-composition-variables='[{"id":"text","name":"文案","type":"string","label":"滚动字幕","default":"这是一条横向滚动的字幕 · 匀速 · 边缘渐隐"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FFC93C"},{"id":"size","name":"字号","type":"number","label":"字号（px）","default":22},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":2.4}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>横向滚动字幕</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+
+  /* 滚动带：左右各留渐隐，靠 mask-image 让字真的淡掉而不是被盖住 */
+  .p-mq-band {
+    position: absolute; left: 0; right: 0; top: 108px; height: 54px;
+    overflow: hidden; display: flex; align-items: center;
+    will-change: opacity;
+    -webkit-mask-image: linear-gradient(to right,
+      rgba(0, 0, 0, 0) 0px, rgba(0, 0, 0, .22) 26px,
+      rgba(0, 0, 0, 1) 62px, rgba(0, 0, 0, 1) 418px,
+      rgba(0, 0, 0, .22) 454px, rgba(0, 0, 0, 0) 480px);
+    mask-image: linear-gradient(to right,
+      rgba(0, 0, 0, 0) 0px, rgba(0, 0, 0, .22) 26px,
+      rgba(0, 0, 0, 1) 62px, rgba(0, 0, 0, 1) 418px,
+      rgba(0, 0, 0, .22) 454px, rgba(0, 0, 0, 0) 480px);
+  }
+  /* 轨道：两段一模一样的文字，位移正好一个身位 → 接缝无跳变 */
+  .p-mq-track {
+    position: absolute; left: 0; top: 0; height: 100%;
+    display: flex; align-items: center; white-space: nowrap; flex: 0 0 auto;
+    will-change: transform;
+  }
+  .p-mq-seg {
+    display: inline-flex; align-items: center; flex: 0 0 auto;
+    white-space: nowrap; padding-right: 46px;
+  }
+  .p-mq-text {
+    display: inline-block; white-space: nowrap;
+    font-size: 22px; line-height: 1.2; font-weight: 800; letter-spacing: .02em;
+    color: var(--fg, #FFF8EE);
+    text-shadow: 0 2px 6px rgba(0, 0, 0, .75), 0 0 14px rgba(0, 0, 0, .45);
+  }
+  .p-mq-dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--ac, #FFC93C); margin-left: 20px; flex: 0 0 auto;
+  }
+  /* 上下两条装饰细线，交代这是个字幕带 */
+  .p-mq-rule {
+    position: absolute; left: 30px; right: 30px; height: 2px;
+    background: rgba(255, 248, 238, .26); border-radius: 1px;
+    transform: scaleX(0); will-change: transform, opacity;
+  }
+  .p-mq-rule.top { top: 96px; }
+  .p-mq-rule.bot { top: 178px; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"这是一条横向滚动的字幕 · 匀速 · 边缘渐隐","accent":"#FFC93C","size":22,"duration":2.4};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = Math.max(1.2, parseFloat(v.duration) || 2.4);
+  const size = Math.max(12, Math.min(40, parseFloat(v.size) || 22));
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  const raw = (v.text == null || v.text === '' ? FALLBACK.text : v.text).toString();
+  const text = raw.replace(/\s+/g, ' ').trim().slice(0, 40);
+
+  const ruleTop = put('div', 'p-mq-rule top');
+  const band = put('div', 'p-mq-band');
+  const track = put('div', 'p-mq-track', null, null, band);
+  const ruleBot = put('div', 'p-mq-rule bot');
+
+  function buildSeg() {
+    const seg = put('div', 'p-mq-seg', null, null, track);
+    put('div', 'p-mq-text', 'font-size:' + size + 'px', text, seg);
+    put('i', 'p-mq-dot', null, null, seg);
+    return seg;
+  }
+  const segA = buildSeg();
+  const segB = buildSeg();
+
+  /* §3.2 中文溢出防护：字号兜底，量的是 nowrap 自然宽 */
+  const tEl = segA.querySelector('.p-mq-text');
+  tEl.style.whiteSpace = 'nowrap';
+  const natural = tEl.scrollWidth;
+  if (natural > 420 && natural > 0) {
+    tEl.style.fontSize = String(Math.max(12, Math.floor(size * 420 / natural))) + 'px';
+  }
+
+  /* 一个身位的距离 = 单段宽度（运行时量，不写死） */
+  const segW = segA.offsetWidth || 300;
+  /* 接缝无缝的条件：位移必须正好是 segW 的整数倍——
+     轨道上每 segW 重复同样内容，移整倍数则首尾画面完全一致。
+     至少要移够一屏（480px），不然文字滚不到头就跳回去。 */
+  const steps = Math.max(1, Math.ceil(480 / segW));
+  const travel = steps * segW;
+
+  /* 文案短的时候两份不够铺满 480px，左边会露空。
+     按段宽补足拷贝数，保证任意时刻轨道都盖住整条带。 */
+  let copies = 2;
+  while (copies * segW < 480 + travel && copies < 12) {
+    buildSeg();
+    copies += 1;
+  }
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* ① 上下细线拉开 */
+  tl.fromTo(ruleTop, { scaleX: 0, opacity: 0 },
+    { scaleX: 1, opacity: 1, duration: .36, ease: 'back.out(2.2)' }, 0);
+  tl.fromTo(ruleBot, { scaleX: 0, opacity: 0 },
+    { scaleX: 1, opacity: 1, duration: .36, ease: 'back.out(2.2)' }, .06);
+
+  /* ② 匀速右→左。ease:'none' 保证是真匀速，不是缓入缓出。
+        起点 x:480（第一段刚从右缘外进来）→ 终点 480 - travel（正好走完一屏+身位）。 */
+  const CYCLES = 2;
+  tl.fromTo(band, { opacity: 0 }, { opacity: 1, duration: .20, ease: 'power2.out' }, 0);
+  tl.fromTo(track, { x: 480 },
+    { x: 480 - travel, duration: dur / CYCLES, ease: 'none', repeat: CYCLES - 1 }, 0);
+
+  /* ③ 循环接缝：位移是 segW 的整数倍，且每段内容一致，
+        所以 tl 循环时画面完全连续，看不到跳变。
+        repeat 用有限次（不是 -1），让 tl.duration() 保持有限，
+        播放器再 tl.repeat(-1) 循环播放。 */
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "eyebrow", "name": "眉标", "type": "string", "label": "顶部眉标", "default": "COST / 成本结构"}, {"id": "title", "name": "主标题", "type": "string", "label": "主标题", "default": "钱花在哪，删掉才知道"}, {"id": "note", "name": "注释", "type": "string", "label": "右上角注释", "default": "单位：元 / 月"}, {"id": "accent", "name": "强调色", "type": "color", "label": "强调色", "default": "#FFD429"}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>阶梯 · 钱花在哪，删掉才知道</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--paper);color:var(--ink);font-family:var(--sans);
+        display:flex;flex-direction:column;padding:58px 72px 0}
+  #stage.on-ink{background:var(--ink);color:var(--paper)}
+
+  .hd{flex:0 0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:36px}
+  .hd h1{font-size:60px;font-weight:900;line-height:1.04;margin:8px 0 0;letter-spacing:-.015em}
+  .hd .note{font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:.1em;
+        border:var(--bw) solid var(--ink);border-radius:9999px;padding:9px 20px;
+        background:var(--white);color:var(--ink);box-shadow:4px 4px 0 var(--ink);white-space:nowrap}
+  #stage.on-ink .hd .note{background:var(--paper);color:var(--ink);box-shadow:4px 4px 0 var(--accent)}
+
+  /* 底部色带：把画面「压」住，不然上面排得再满底部都是飘的 */
+  .ft{flex:0 0 auto;height:18px;border-top:var(--bw) solid var(--ink);
+      border-bottom:var(--bw) solid var(--ink);
+      background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+  #stage.on-ink .ft{border-color:var(--paper)}
+
+  .body{flex:1 1 auto;min-height:0;display:flex;margin-top:32px;padding-bottom:26px}
+
+  /* 图标必须锁死尺寸。只写 viewBox 而不写 width/height 的 SVG，浏览器会按
+     「默认替换元素尺寸」给它 300px——图标从 52px 的底座里横着冲出去，
+     把整张卡片撑破。版图上表现为卡片右边被顶掉一截，而溢出检测只报"出框"，
+     看不出是被一个看不见的图标顶的。 */
+  .ico{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .ico svg{width:100%;height:100%;display:block}
+
+  /* padding-bottom 给最后一级的硬阴影留位置：舞台 padding 是 58px 72px 0，
+     底边没有余量，最后一级的 box-shadow 被画布直接切掉，底边框看着是断的。 */
+  .body{flex-direction:column;justify-content:center;gap:16px;padding-bottom:10px}
+  .rung{flex:1 1 0;display:flex;align-items:center;gap:0;min-height:0;
+        border:var(--bw) solid var(--ink);border-radius:4px;overflow:hidden;
+        box-shadow:6px 6px 0 var(--ink)}
+  .rung .no{flex:0 0 96px;align-self:stretch;display:flex;align-items:center;
+        justify-content:center;background:var(--ink);color:var(--paper);
+        font-family:var(--mono);font-weight:700;font-size:34px;letter-spacing:-.03em}
+  /* 阶梯感只做在**标签**上。原来整行都缩进（margin-left + width:calc），
+     于是填充条的起点在五级里一路右移，五条彩色条子像被切碎的色带，
+     条长根本没法横向比——而条长正是这一版要表达的东西。
+     标签递进缩进、条子起点对齐，长短才读得出高低。 */
+  .rung .nm{flex:0 0 300px;padding:0 22px;font-weight:900;font-size:30px;
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rung .fill{flex:1 1 auto;height:100%;position:relative;min-width:0;
+        border-left:var(--bw) solid var(--ink)}
+  .rung .fill i{position:absolute;left:0;top:0;bottom:0;width:0;display:block;opacity:.95}
+  .rung .vl{flex:0 0 190px;align-self:stretch;display:flex;align-items:center;
+        justify-content:flex-end;padding:0 24px;background:var(--ink);color:var(--paper);
+        font-family:var(--mono);font-weight:700;font-size:40px;letter-spacing:-.03em;
+        font-variant-numeric:tabular-nums;white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="blk-corner tl"></div><div class="blk-corner tr"></div>
+  <div class="blk-corner bl"></div><div class="blk-corner br"></div>
+
+  <div class="hd"><div><div class="blk-eyebrow" id="eyebrow">COST / 成本结构</div>
+    <h1 id="title" data-fit-max="60" data-fit-min="32">钱花在哪，删掉才知道</h1></div><div class="note" id="note" data-fit-max="15" data-fit-min="11">单位：元 / 月</div></div>
+  <div class="body"><div class="rung" id="r0"><span class="no">01</span><span class="nm" id="l0" data-fit-max="30" data-fit-min="15" style="margin-left:0px">房租</span><span class="fill"><i id="f0" style="background:var(--white)"></i></span><span class="vl" id="v0" data-fit-max="44" data-fit-min="22">4200</span></div><div class="rung" id="r1"><span class="no">02</span><span class="nm" id="l1" data-fit-max="30" data-fit-min="15" style="margin-left:34px">人力</span><span class="fill"><i id="f1" style="background:var(--yellow)"></i></span><span class="vl" id="v1" data-fit-max="44" data-fit-min="22">18000</span></div><div class="rung" id="r2"><span class="no">03</span><span class="nm" id="l2" data-fit-max="30" data-fit-min="15" style="margin-left:68px">投放</span><span class="fill"><i id="f2" style="background:var(--blue)"></i></span><span class="vl" id="v2" data-fit-max="44" data-fit-min="22">6500</span></div><div class="rung" id="r3"><span class="no">04</span><span class="nm" id="l3" data-fit-max="30" data-fit-min="15" style="margin-left:102px">软件订阅</span><span class="fill"><i id="f3" style="background:var(--green)"></i></span><span class="vl" id="v3" data-fit-max="44" data-fit-min="22">2300</span></div><div class="rung" id="r4"><span class="no">05</span><span class="nm" id="l4" data-fit-max="30" data-fit-min="15" style="margin-left:136px">差旅</span><span class="fill"><i id="f4" style="background:var(--pink)"></i></span><span class="vl" id="v4" data-fit-max="44" data-fit-min="22">4100</span></div></div>
+  <div class="ft"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+    ["eyebrow", "title", "note", "accent", "k0", "v0", "k1", "v1", "k2", "v2", "k3", "v3", "k4", "v4"]
+.forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+  B.fitAll();
+  var tl = B.tl();
+
+  document.querySelectorAll('.rung').forEach(function (r, i) {
+    B.in.slideX(tl, r, 0.12 + i * 0.11, { from: -70, d: 0.62 * 0.85 });
+  });
+  /* 填充条按各自数值，不是一律 100%——一律 100% 的话这根条子就不表达任何信息 */
+  var sh = [0.233, 1.0, 0.361, 0.128, 0.228];
+  document.querySelectorAll('.rung .fill i').forEach(function (e, i) {
+    B.in.grow(tl, e, Math.max(6, (sh[i] || 0) * 100) + '%', 0.5 + i * 0.11, { d: 0.62 });
+  });
+  B.finish(tl);
+  B.hold(tl);
+})();
+</script>
+</body></html>

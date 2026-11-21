@@ -1,0 +1,7 @@
+{
+  "name": "funnel-chart",
+  "private": true,
+  "scripts": {
+    "render": "cd ../.. && npm run render -- funnel-chart"
+  }
+}

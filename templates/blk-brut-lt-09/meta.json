@@ -1,0 +1,16 @@
+{
+ "name": "价格贴",
+ "description": "强调色价格块自左拍入，价格数字 steps(9) 整数跳到到手价，右侧白底原价块带 3px 划线后自右补上，两块落定后反向微位移",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "price",
+  "commerce",
+  "yellow"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "电商直播与带货短视频，需要同时给出到手价与划线原价时"
+}

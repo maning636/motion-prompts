@@ -1,0 +1,13 @@
+{
+  "id": "sc2-azchip-01",
+  "name": "芯片网格单选压暗",
+  "series": "sc2",
+  "createdAt": "2026-08-16T08:00:00.000Z",
+  "energy": "中",
+  "suggestedDuration": 6,
+  "knownPitfalls": [
+    "chips 用逗号分隔，固定取 12 个（4×3）；词长建议 2-4 字，过长会撑破胶囊网格",
+    "target 从 1 开始数；超出范围会被钳制",
+    "其余芯片只压暗 opacity、位置绝不动——一动就读作页面刷新，丢失单选语义"
+  ]
+}

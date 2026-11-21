@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"text","name":"被划的词","type":"string","label":"要划掉的词","default":"重点"},{"id":"accent","name":"强调色","type":"color","label":"荧光笔颜色","default":"#FFC93C"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":2.6}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>手绘下划线</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  /* 纸底：跟同批 pop-hand-circle / pop-hand-keycap 统一走「浅色纸底 + 深墨笔迹」。
+     旧版整条用深墨 #241C18 画笔迹和文字，而挂件底下可以是任意画面，
+     深墨落在深色画面上等于隐形——渲出来只剩一道若有若无的黄痕，
+     文字完全读不出来，webm 也压成了 3.3KB（几乎无有效画面）。
+     纸底只托住词和下划线这一小块，不铺满屏。 */
+  .p-paper { position: absolute; left: 0; top: 84px; width: 200px; height: 96px;
+    background: #FFFDF5; border: 3px solid #241C18; border-radius: 12px;
+    box-shadow: 3px 4px 0 rgba(36, 28, 24, .85); transform: rotate(-.8deg); }
+  .p-word { position: absolute; left: -9999px; top: 96px; line-height: 40px;
+    font-size: 34px; font-weight: 800; color: #241C18; white-space: nowrap; }
+  .p-marker { position: absolute; height: 26px; background: var(--ac); opacity: .45;
+    transform: scaleX(0); transform-origin: 0 50%; }
+  .p-ul { position: absolute; overflow: visible; }
+  .p-tip { position: absolute; width: 11px; height: 11px; border-radius: 50%;
+    background: #241C18; opacity: 0; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"重点","accent":"#FFC93C","duration":2.6};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || FALLBACK.duration;
+
+  /* 时间轴先建先注册：排在任何可能抛异常的代码之前。
+     注册之后再抛错，预览至少还能拿到一条已注册的时间轴（症状可读），
+     注册之前抛错则整条组件没有时间轴，画面全黑且毫无线索。
+     这条的 old 版正是这个毛病：注册前的 DOM 布局代码一抛，
+     渲染器只看到一个没时间轴的页面。 */
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  /* ── 纸底（最先建 = 画在最底层） ───────────────────────────
+     ⚠️ 叠放顺序 = 建元素的顺序。这几个全是 position:absolute，
+     后建的压先建的。纸底**必须第一个建**，否则它会盖住词和笔迹，
+     画面上只剩一张空白纸片——正是这个 bug 的形态。
+     尺寸依赖词的自然宽，所以先建壳、量完再回填 left/width。 */
+  const paper = put('div', 'p-paper', 'left:0;top:82px;width:120px;');
+
+  /* 荧光笔刷在词**背后**（像真的马克笔），不是刷在笔迹底下——
+   压在笔迹上时半透明黄把深墨吃掉了，线几乎看不见。
+   同样要排在词前面：marker 在 word 之后建的话会盖住半个字。 */
+  const marker = put('div', 'p-marker', 'left:0;top:100px;width:120px;');
+
+  /* ── 被作用的对象：一个词 ───────────────────────────────── */
+  const word = put('div', 'p-word', '', String(v.text || FALLBACK.text));
+  /* 先摆在画外量自然宽（nowrap + 绝对定位 = 收缩包裹），
+     量完搬到中间。改文案不用重填坐标。 */
+  const nat = word.scrollWidth;
+  const W = Math.max(90, Math.min(430, nat + 30));   // 笔迹两端出头 15px
+  const x0 = Math.round((480 - W) / 2);
+  const xw = Math.round((480 - nat) / 2);
+  word.style.left = xw + 'px';
+
+  /* 量完回填纸底和荧光笔的尺寸：只托这一小块，不铺满屏——
+     那是挂件，底下是用户自己的画面。 */
+  paper.style.left = (x0 - 18) + 'px';
+  paper.style.width = (W + 36) + 'px';
+  marker.style.left = x0 + 'px';
+  marker.style.width = W + 'px';
+
+  const ul = put('div', 'p-ul', 'left:' + x0 + 'px;top:142px;width:' + W + 'px;height:20px;');
+  /* 手绘笔迹：微起伏的一笔，不是 border。 */
+  const d = 'M 2 11 C ' + (W * .25).toFixed(1) + ' 3, ' + (W * .48).toFixed(1) + ' 16, '
+    + (W * .72).toFixed(1) + ' 8 S ' + (W * .88).toFixed(1) + ' 4, ' + (W - 2).toFixed(1) + ' 11';
+  ul.innerHTML =
+    '<svg width="' + W + '" height="20" viewBox="0 0 ' + W + ' 20">' +
+    '<path d="' + d + '" fill="none" stroke="#241C18" stroke-width="3.4" ' +
+    'stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const path = ul.querySelector('path');
+  /* 长度运行时取，不写死 */
+  const len = path.getTotalLength ? path.getTotalLength() : W;
+  path.style.strokeDasharray = len + ' ' + len;
+  path.style.strokeDashoffset = String(len);
+
+  const tip = put('div', 'p-tip', 'left:' + (x0 + 2) + 'px;top:145px;');
+
+  /* 纸底跟词一起落位：先垫底，字才有东西可落 */
+  tl.fromTo(paper, { opacity: 0, y: 18, scale: .9 },
+    { opacity: 1, y: 0, scale: 1, duration: .4, ease: 'back.out(2.2)' }, 0);
+  tl.fromTo(word, { opacity: 0, y: 14, scale: .88 },
+    { opacity: 1, y: 0, scale: 1, duration: .4, ease: 'back.out(2.2)' }, 0);
+
+  /* ── 生长：笔迹与荧光笔底必须同一个进度 ───────────────────
+     这两条用**完全相同**的位置、时长、缓动，所以 GSAP 给它们的
+     进度逐帧一致，笔尖不会跑到笔迹前面。
+     不要图省事拆成两条不同 ease 的 tween，会明显错开。
+     （也不用 onUpdate 回调驱动：实测 GSAP 3.12.7 的 pause(t)/seek
+       只推进子动画比例，不触发 onUpdate 也不触发 onComplete，
+       渲染器来回扫时间轴时靠回调驱动的元素会停在旧帧。） */
+  const T0 = 0.34, D = 0.6, EASE = 'power2.inOut';
+  tl.fromTo(path, { strokeDashoffset: len },
+    { strokeDashoffset: 0, duration: D, ease: EASE }, T0);
+  tl.fromTo(marker, { scaleX: 0, opacity: 0 },
+    { scaleX: 1, opacity: .45, duration: D, ease: EASE }, T0);
+  /* 笔尖跟着笔迹头走 */
+  tl.fromTo(tip, { opacity: 0, x: 0 }, { opacity: 1, duration: .08, ease: 'none' }, T0);
+  tl.to(tip, { x: W - 6, duration: D, ease: EASE }, T0);
+
+  /* 画完末端顶一下，像笔尖划过去又收回来 */
+  tl.fromTo(ul, { rotate: 0 }, { rotate: -1.1, duration: .1, ease: 'power2.out' }, T0 + D);
+  tl.to(ul, { rotate: 0, duration: .26, ease: 'power2.out' }, T0 + D + .1);
+  tl.fromTo(tip, { scale: 1.45 }, { scale: 1, duration: .22, ease: 'back.out(3)' }, T0 + D);
+  tl.to(tip, { opacity: 0, duration: .18, ease: 'power2.in' }, T0 + D + .12);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "img1": "./placeholder-1.png",
+  "img2": "./placeholder-2.png",
+  "img3": "./placeholder-3.png",
+  "img4": "./placeholder-4.png",
+  "drops": "62,38;30,64;70,66;45,30",
+  "dropDur": 2.3,
+  "duration": 9.3
+}

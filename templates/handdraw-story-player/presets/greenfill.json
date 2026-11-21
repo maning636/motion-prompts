@@ -1,0 +1,10 @@
+{
+  "img1": "./assets/_gf0.png",
+  "img2": "./assets/_gf1.png",
+  "title": "凌晨四点的豆浆",
+  "caption": "凌晨四点，他只买一个馒头。她总会多放一杯热豆浆。",
+  "sceneNo": 1,
+  "sceneTotal": 3,
+  "accent": "#FF9F1C",
+  "duration": 6
+}

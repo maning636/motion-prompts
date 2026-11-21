@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"text","name":"被修正的内容","type":"string","label":"纸上的原文","default":"这里的说法不对"},{"id":"stamp","name":"印章字","type":"string","label":"印章上的字","default":"已修正"},{"id":"accent","name":"强调色","type":"color","label":"印章强调色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":2.8}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>手绘印章盖章</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-card { position: absolute; left: 142px; top: 132px; width: 196px; height: 62px;
+    background: #FFFDF5; box-shadow: 3px 4px 0 rgba(36, 28, 24, .85); }
+  .p-card-txt { position: absolute; left: 0; right: 0; top: 21px; text-align: center;
+    font-size: 16px; font-weight: 700; color: #4C4139; }
+  .p-rule { position: absolute; left: 24px; top: 44px; height: 2px; background: #241C18;
+    transform-origin: 0 50%; transform: scaleX(0); }
+  /* 印章本体：整块绕中心旋转落下。压在纸的右上角上，不是浮在旁边 */
+  .p-seal { position: absolute; left: 234px; top: 96px; width: 120px; height: 120px; }
+  .p-seal-w { position: absolute; left: 0; top: 0; width: 120px; height: 120px;
+    transform-origin: 50% 50%; }
+  .p-seal-txt { position: absolute; left: 0; right: 0; top: 50px; text-align: center;
+    font-size: 21px; font-weight: 800; letter-spacing: .04em; color: #241C18; }
+  .p-ink-ring { position: absolute; left: 198px; top: 108px; width: 120px; height: 120px;
+    border-radius: 50%; border: 3px solid var(--ac); opacity: 0; }
+  .p-speck { position: absolute; width: 9px; height: 9px; border-radius: 50%;
+    background: #241C18; opacity: 0; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"这里的说法不对","stamp":"已修正","accent":"#FF6B35","duration":2.8};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || FALLBACK.duration;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  function fit(el, avail, maxPx, minPx) {
+    const prev = el.style.whiteSpace;
+    el.style.whiteSpace = 'nowrap';
+    const nat = el.scrollWidth;
+    el.style.whiteSpace = prev;
+    if (nat > avail && nat > 0) {
+      el.style.fontSize = Math.max(minPx, Math.floor(maxPx * avail / nat)) + 'px';
+    }
+  }
+
+  /* ── 被盖的纸：盖章这个动作得有个落点 ───────────────────── */
+  const card = put('div', 'p-card', 'transform: rotate(-1.6deg)');
+  const txt = put('div', 'p-card-txt', '', String(v.text || FALLBACK.text), card);
+  txt.style.whiteSpace = 'nowrap';
+  txt.style.left = txt.style.right = '';
+  txt.style.left = '14px'; txt.style.right = '14px';
+  fit(txt, 168, 16, 8);
+  const rule = put('div', 'p-rule', 'width:150px', '', card);
+
+  /* ── 印章：手绘歪圆环，不用 border 假装 ─────────────────── */
+  const seal = put('div', 'p-seal');
+  const sealW = put('div', 'p-seal-w', '', null, seal);
+  sealW.innerHTML =
+    '<svg width="120" height="120" viewBox="0 0 120 120">' +
+    '<path d="M60 8 C84 5 106 21 111 46 C116 72 101 100 75 109 C49 117 22 107 12 82 ' +
+    'C2 57 10 27 33 15 C41 11 50 9 60 8 Z" fill="none" stroke="#241C18" stroke-width="3" ' +
+    'stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<path d="M62 20 C82 18 99 32 103 52 C107 74 95 95 74 102 C52 109 31 100 23 80 ' +
+    'C15 60 21 36 39 27 C47 23 54 21 62 20 Z" fill="none" stroke="#241C18" stroke-width="1.6" ' +
+    'stroke-linecap="round" opacity=".55"/>' +
+    '<path d="M46 34 L54 34 L50 42 Z" fill="#241C18" opacity=".8"/>' +
+    '<path d="M36 96 C48 102 66 103 82 97" fill="none" stroke="#241C18" stroke-width="2.4" ' +
+    'stroke-linecap="round" opacity=".7"/>' +
+    '</svg>';
+  const stampTxt = put('div', 'p-seal-txt', '', String(v.stamp || FALLBACK.stamp), seal);
+  stampTxt.style.whiteSpace = 'nowrap';
+  stampTxt.style.left = '4px'; stampTxt.style.right = '4px'; stampTxt.style.top = '50px';
+  fit(stampTxt, 112, 21, 11);
+
+  /* 墨迹扩散环 + 溅出的墨点 */
+  const ring = put('div', 'p-ink-ring');
+  const specks = [
+    put('div', 'p-speck', 'left:206px;top:172px;'),
+    put('div', 'p-speck', 'left:196px;top:204px;width:6px;height:6px;'),
+    put('div', 'p-speck', 'left:346px;top:172px;width:11px;height:11px;'),
+    put('div', 'p-speck', 'left:322px;top:212px;width:7px;height:7px;'),
+  ];
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 纸先在 */
+  tl.fromTo(card, { opacity: 0, y: 16, scale: .95, rotate: -5 },
+    { opacity: 1, y: 0, scale: 1, rotate: -1.6, duration: .34, ease: 'power3.out' }, 0);
+
+  /* 印章旋转落下 —— ease power4.in 是「砸」的关键 */
+  tl.fromTo(seal, { y: -132, rotate: -34, scale: 1.5, opacity: 0 },
+    { y: 0, rotate: -9, scale: 1, opacity: 1, duration: .34, ease: 'power4.in' }, .2);
+  /* 盖下去的一瞬：印面压扁再回弹 */
+  tl.fromTo(seal, { scaleY: 1, scaleX: 1, rotate: -9 },
+    { scaleY: .8, scaleX: 1.14, duration: .09, ease: 'power2.out',
+      yoyo: true, repeat: 1 }, .54);
+
+  /* 墨迹扩散 */
+  tl.fromTo(ring, { scale: .46, opacity: .9 },
+    { scale: 2.15, opacity: 0, duration: .52, ease: 'power2.out' }, .54);
+  tl.fromTo(specks, { opacity: 0, scale: 0 },
+    { opacity: 1, scale: 1, duration: .3, ease: 'back.out(3.4)', stagger: .035 }, .55);
+  /* 盖章震一下纸 */
+  tl.fromTo(card, { x: 0 }, { x: 3.5, duration: .05, ease: 'none', yoyo: true, repeat: 5 }, .54);
+  /* 原文被划掉：横线从左往右拉开 */
+  tl.fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: .3, ease: 'power2.inOut' }, .66);
+  /* 印泥糊上来的一下，字先淡入再压实 */
+  tl.fromTo(stampTxt, { opacity: .35 }, { opacity: 1, duration: .16, ease: 'power2.out' }, .56);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

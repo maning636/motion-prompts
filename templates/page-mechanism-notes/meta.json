@@ -1,0 +1,13 @@
+{
+  "id": "page-mechanism-notes",
+  "name": "机制条目+配图页（侧便签翻亮）",
+  "series": "page",
+  "createdAt": "2026-08-16T08:00:00.000Z",
+  "energy": "中",
+  "suggestedDuration": 7,
+  "knownPitfalls": [
+    "items 用「标题|说明」配对、分号分隔，只取前 3 条；notes 不足 3 条时对应便签留空",
+    "配图建议竖版 3:4（如 1080×1440），横版图会被 cover 裁掉两侧",
+    "便签文字建议 12 字以内，太长会折行顶进右侧配图区"
+  ]
+}

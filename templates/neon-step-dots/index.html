@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "s1", "type": "string", "label": "步骤1标签", "default": "新手小白"}, {"id": "s2", "type": "string", "label": "步骤2标签", "default": "从零开始"}, {"id": "s3", "type": "string", "label": "步骤3标签", "default": "一步步完成"}, {"id": "note", "type": "string", "label": "底部灰色注释", "default": "不用懂代码，它会一步一步问你。"}, {"id": "accentColor", "type": "color", "label": "主色（圆圈/连线）", "default": "#10B981"}, {"id": "duration", "type": "number", "label": "总时长（秒，演完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+:root{
+  --acc:#10B981; --accHi:#34D399;
+  --accA85:rgba(16,185,129,.85); --accA80:rgba(16,185,129,.8);
+  --accA50:rgba(16,185,129,.5);  --accA40:rgba(16,185,129,.4);
+  --accA35:rgba(16,185,129,.35); --accA12:rgba(16,185,129,.12); --accA06:rgba(16,185,129,.06);
+  --accHiA55:rgba(52,211,153,.55); --accHiA60:rgba(52,211,153,.6);
+}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12);
+  color: var(--foreground, #F5F5F3); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+/* 顶部英文小标签 */
+.enlabel{ position:absolute; left:0; right:0; top:296px; text-align:center;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:24px; letter-spacing:10px;
+  color:var(--acc); text-transform:uppercase; text-shadow:0 0 12px var(--accA40); }
+
+/* 步骤：绿色描边圆圈 + 白色数字 + 圈下白色标签 */
+.step{ position:absolute; top:380px; width:240px; margin-left:-120px; text-align:center; }
+#step1{ left:640px; } #step2{ left:960px; } #step3{ left:1280px; }
+.circle{ width:128px; height:128px; margin:0 auto; border-radius:50%;
+  border:2px solid var(--accA85); background:var(--accA06);
+  box-shadow:0 0 22px var(--accA35), 0 0 56px var(--accA12), inset 0 0 24px var(--accA12);
+  display:flex; align-items:center; justify-content:center; will-change:transform; }
+.cnum{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:56px; color:#FFFFFF;
+  text-shadow:0 0 14px var(--accA50); line-height:1; }
+.slabel{ margin-top:26px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:36px;
+  color:#FFFFFF; letter-spacing:2px; max-width:240px; overflow-wrap:break-word; }
+
+/* 圆圈之间的绿色连线（从左向右画出） */
+.line{ position:absolute; top:443px; height:4px; width:172px; border-radius:2px;
+  background:var(--acc); box-shadow:0 0 12px var(--accA80), 0 0 30px var(--accA35);
+  transform-origin:left center; will-change:transform; }
+#line1{ left:714px; } #line2{ left:1034px; }
+
+/* 底部灰色注释 */
+.note{ position:absolute; left:0; right:0; top:664px; text-align:center;
+  font-size:30px; color:#9CA3AF; letter-spacing:1px; }
+.note span{ display:inline-block; max-width:1200px; overflow-wrap:break-word; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="enlabel" id="enLabel">STEP BY STEP</div>
+
+      <div class="line" id="line1"></div>
+      <div class="line" id="line2"></div>
+
+      <div class="step" id="step1">
+        <div class="circle"><div class="cnum">1</div></div>
+        <div class="slabel" id="sl1"></div>
+      </div>
+      <div class="step" id="step2">
+        <div class="circle"><div class="cnum">2</div></div>
+        <div class="slabel" id="sl2"></div>
+      </div>
+      <div class="step" id="step3">
+        <div class="circle"><div class="cnum">3</div></div>
+        <div class="slabel" id="sl3"></div>
+      </div>
+
+      <div class="note" id="noteWrap"><span id="noteText"></span></div>
+    </div>
+    <script>
+      const FB = {"s1": "新手小白", "s2": "从零开始", "s3": "一步步完成", "note": "不用懂代码，它会一步一步问你。", "accentColor": "#10B981", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $=(s)=>document.querySelector(s);
+      const DUR=+v.duration>0?+v.duration:6;
+      $('[data-composition-id]').setAttribute('data-duration',String(DUR));
+      $('#sl1').textContent=v.s1||'';
+      $('#sl2').textContent=v.s2||'';
+      $('#sl3').textContent=v.s3||'';
+      $('#noteText').textContent=v.note||'';
+
+      /* 主色变量：accentColor 驱动全部主色/高亮 CSS 变量（含各透明度衍生值） */
+      (function(){
+        const acc=String(v.accentColor||'#10B981').trim();
+        const m=/^#?([0-9a-f]{6})$/i.exec(acc); if(!m) return;
+        const n=parseInt(m[1],16), r=n>>16&255, g=n>>8&255, b=n&255;
+        const rgba=(a)=>'rgba('+r+','+g+','+b+','+a+')';
+        /* 发光高亮：默认主色 #10B981 固定对应 #34D399；自定义主色时向白色混合 35% 推导 */
+        let hr=52,hg=211,hb=153;
+        if(!/^#?10b981$/i.test(m[1])){
+          const t=0.35;
+          hr=Math.round(r+(255-r)*t); hg=Math.round(g+(255-g)*t); hb=Math.round(b+(255-b)*t);
+        }
+        const hrgba=(a)=>'rgba('+hr+','+hg+','+hb+','+a+')';
+        const st=document.documentElement.style;
+        st.setProperty('--acc','#'+m[1].toLowerCase());
+        st.setProperty('--accHi','rgb('+hr+','+hg+','+hb+')');
+        st.setProperty('--accA85',rgba(0.85)); st.setProperty('--accA80',rgba(0.8));
+        st.setProperty('--accA50',rgba(0.5));  st.setProperty('--accA40',rgba(0.4));
+        st.setProperty('--accA35',rgba(0.35)); st.setProperty('--accA12',rgba(0.12));
+        st.setProperty('--accA06',rgba(0.06));
+        st.setProperty('--accHiA55',hrgba(0.55)); st.setProperty('--accHiA60',hrgba(0.6));
+      })();
+
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+
+      /* 递进构建：英文标签 → 圈1 弹入 → 线1 画出 → 圈2 → 线2 → 圈3 → 注释淡入 → 定格 */
+      tl.fromTo('#enLabel',{opacity:0,y:16},{opacity:1,y:0,duration:0.5,ease:'power3.out'},0.2);
+      /* 圈1 + 标签1 */
+      tl.fromTo('#step1 .circle',{opacity:0,scale:0},{opacity:1,scale:1,duration:0.55,ease:'back.out(2)'},0.5);
+      tl.fromTo('#step1 .slabel',{opacity:0,y:18},{opacity:1,y:0,duration:0.4,ease:'power2.out'},0.72);
+      /* 线1 从左向右画出 */
+      tl.fromTo('#line1',{scaleX:0},{scaleX:1,duration:0.4,ease:'power2.inOut'},1.1);
+      /* 圈2 + 标签2 */
+      tl.fromTo('#step2 .circle',{opacity:0,scale:0},{opacity:1,scale:1,duration:0.55,ease:'back.out(2)'},1.5);
+      tl.fromTo('#step2 .slabel',{opacity:0,y:18},{opacity:1,y:0,duration:0.4,ease:'power2.out'},1.72);
+      /* 线2 */
+      tl.fromTo('#line2',{scaleX:0},{scaleX:1,duration:0.4,ease:'power2.inOut'},2.1);
+      /* 圈3 + 标签3 */
+      tl.fromTo('#step3 .circle',{opacity:0,scale:0},{opacity:1,scale:1,duration:0.55,ease:'back.out(2)'},2.5);
+      tl.fromTo('#step3 .slabel',{opacity:0,y:18},{opacity:1,y:0,duration:0.4,ease:'power2.out'},2.72);
+      /* 注释淡入 */
+      tl.fromTo('#noteWrap',{opacity:0,y:14},{opacity:1,y:0,duration:0.5,ease:'power2.out'},3.2);
+      /* 演完定格：补 set 占满总时长防黑帧，无收尾出场动画 */
+      tl.set('#root',{opacity:1},Math.max(3.8,DUR-0.05));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

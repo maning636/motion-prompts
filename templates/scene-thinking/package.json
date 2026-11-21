@@ -1,0 +1,7 @@
+{
+  "name": "scene-thinking",
+  "private": true,
+  "scripts": {
+    "render": "cd ../.. && npm run render -- scene-thinking"
+  }
+}

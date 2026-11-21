@@ -1,0 +1,12 @@
+{
+  "title": "上千张照片里，有一张改变了一切",
+  "img1": "./assets/photo1.png",
+  "img2": "./assets/photo2.png",
+  "img3": "./assets/photo3.png",
+  "img4": "./assets/photo4.png",
+  "img5": "./assets/photo5.png",
+  "img6": "./assets/photo6.png",
+  "focusIndex": 3,
+  "caption": "就是这张",
+  "duration": 7
+}

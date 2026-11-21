@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"text","name":"文案","type":"string","label":"高亮文案","default":"跟着节拍唱一遍"},{"id":"accent","name":"强调色","type":"color","label":"高亮色","default":"#FFC93C"},{"id":"sung","name":"字色","type":"color","label":"已唱字色","default":"#1B1B24"},{"id":"idle","name":"未唱色","type":"color","label":"未唱字色","default":"#6E6E7C"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.4}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>卡拉OK高亮</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+
+  /* 局部软晕：只托住中间这一行，不铺满屏 */
+  .p-kr-halo {
+    position: absolute; left: 40px; top: 76px; width: 400px; height: 118px;
+    background: radial-gradient(66% 76% at 50% 50%,
+      rgba(0, 0, 0, .55) 0%, rgba(0, 0, 0, .28) 54%, rgba(0, 0, 0, 0) 84%);
+  }
+  .p-kr-wrap {
+    position: absolute; left: 0; right: 0; top: 96px; height: 78px;
+    display: flex; align-items: center; justify-content: center;
+    will-change: transform, opacity;
+  }
+  /* 衬板：自带深色底板，按 §5 不要再加整屏 halo */
+  .p-kr-plate {
+    position: absolute; left: 22px; right: 22px; top: 8px; bottom: 8px;
+    background: rgba(27, 27, 36, .58); border-radius: 14px;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, .34);
+    will-change: transform, opacity;
+  }
+  .p-kr-box {
+    position: relative; flex: 0 0 auto; display: inline-block; white-space: nowrap;
+    font-size: 27px; line-height: 1.16; font-weight: 800; letter-spacing: .02em;
+  }
+  .p-kr-base { color: var(--idle, #6E6E7C); white-space: nowrap; }
+  /* 底层高亮色块：从左往右被拉开 */
+  .p-kr-bar {
+    position: absolute; left: -5px; right: -5px; top: 0; bottom: 0; z-index: 1;
+    background: var(--ac, #FFC93C); border-radius: 7px;
+    transform: scaleX(0); transform-origin: 0 50%;
+    will-change: transform;
+  }
+  /* 上层同字：clip-path 从右往左收，已唱部分露出来 */
+  .p-kr-lit {
+    position: absolute; left: 0; top: 0; z-index: 2; white-space: nowrap;
+    color: var(--sung, #1B1B24);
+    clip-path: inset(0 100% 0 0);
+    will-change: clip-path;
+  }
+  /* 高亮前沿的小竖标，跟着扫光走 */
+  .p-kr-head {
+    position: absolute; left: -5px; top: 4px; bottom: 4px; z-index: 3;
+    width: 3px; border-radius: 2px; background: #FFF8EE; opacity: 0;
+    will-change: transform, opacity;
+  }
+  /* 下方进度条，交代这条扫光的尺度 */
+  .p-kr-track {
+    position: absolute; left: 120px; right: 120px; top: 196px; height: 4px;
+    background: rgba(255, 248, 238, .18); border-radius: 2px; overflow: hidden;
+    will-change: opacity;
+  }
+  .p-kr-fill {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 100%;
+    background: var(--ac, #FFC93C); border-radius: 2px;
+    transform: scaleX(0); transform-origin: 0 50%;
+    will-change: transform;
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"跟着节拍唱一遍","accent":"#FFC93C","sung":"#1B1B24","idle":"#6E6E7C","duration":3.4};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--sung', v.sung || FALLBACK.sung);
+  root.style.setProperty('--idle', v.idle || FALLBACK.idle);
+  const dur = parseFloat(v.duration) || 3.4;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  const text = (v.text == null || v.text === '' ? FALLBACK.text : v.text)
+    .toString().replace(/\s+/g, ' ').trim().slice(0, 20);
+
+  put('div', 'p-kr-halo');
+  const wrap = put('div', 'p-kr-wrap');
+  const plate = put('div', 'p-kr-plate', null, null, wrap);
+  const box = put('div', 'p-kr-box', null, null, wrap);
+  const base = put('div', 'p-kr-base', null, text, box);
+  const bar = put('div', 'p-kr-bar', null, null, box);
+  const lit = put('div', 'p-kr-lit', null, text, box);
+  const head = put('div', 'p-kr-head', null, null, box);
+  const track = put('div', 'p-kr-track');
+  const fill = put('div', 'p-kr-fill', null, null, track);
+
+  /* §3.2 中文溢出防护 */
+  const MAXFS = 27, MINFS = 13, AVAIL = 384;
+  base.style.whiteSpace = 'nowrap';
+  const natural = base.scrollWidth;
+  if (natural > AVAIL && natural > 0) {
+    const fs = String(Math.max(MINFS, Math.floor(MAXFS * AVAIL / natural))) + 'px';
+    box.style.fontSize = fs;
+  }
+  /* 用 offsetWidth（布局宽）而不是 getBoundingClientRect：
+     后者会被预览页的祖先 transform 放大，量出来是 2 倍长 */
+  const runW = base.offsetWidth || base.scrollWidth;
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  const SWEEP_END = Math.max(1.5, dur - .95);
+  const SWEEP = SWEEP_END - .55;
+
+  /* ① 衬板 + 文字错拍落位 */
+  tl.fromTo(plate, { scale: .90, opacity: 0 },
+    { scale: 1, opacity: 1, duration: .40, ease: 'back.out(2.2)' }, 0);
+  tl.fromTo(base, { y: 12, opacity: 0 },
+    { y: 0, opacity: 1, duration: .40, ease: 'back.out(2.6)' }, .06);
+  tl.fromTo(track, { opacity: 0 }, { opacity: 1, duration: .30, ease: 'power2.out' }, .22);
+
+  /* ② 高亮块拉开 + 同字 clip 同步收 + 前沿竖标跟上 */
+  tl.fromTo(bar, { scaleX: 0 }, { scaleX: 1, duration: SWEEP, ease: 'none' }, .55);
+  tl.fromTo(lit, { clipPath: 'inset(0 100% 0 0)' },
+    { clipPath: 'inset(0 0% 0 0)', duration: SWEEP, ease: 'none' }, .55);
+  tl.fromTo(fill, { scaleX: 0 }, { scaleX: 1, duration: SWEEP, ease: 'none' }, .55);
+  tl.fromTo(head, { opacity: 0 }, { opacity: 1, duration: .18, ease: 'power2.out' }, .50);
+  tl.fromTo(head, { x: 0 }, { x: runW + 5, duration: SWEEP, ease: 'none' }, .55);
+  tl.to(head, { opacity: 0, duration: .22, ease: 'power2.in' }, SWEEP_END);
+
+  /* ③ 唱完一拍轻呼吸 */
+  const rest = Math.max(1.0, dur - .8);
+  tl.to(bar, { opacity: .70, duration: .40, ease: 'sine.inOut' }, rest);
+  tl.to(bar, { opacity: 1, duration: .40, ease: 'sine.inOut' }, rest + .40);
+  tl.to(box, { y: -2, duration: .40, ease: 'sine.inOut' }, rest);
+  tl.to(box, { y: 0, duration: .40, ease: 'sine.inOut' }, rest + .40);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

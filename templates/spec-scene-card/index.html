@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "sceneNo", "type": "string", "label": "编号", "default": "03"}, {"id": "title", "type": "string", "label": "中文标题", "default": "三拍时间轴"}, {"id": "en", "type": "string", "label": "英文小标", "default": "MOTION TEST · THREE BEATS"}, {"id": "params", "type": "string", "label": "参数行（名称|值，分号分隔）", "default": "蒙版形状|RX 24 / RY 46;锚点|ORIGIN TOP;圆内外|INSIDE NEXT / OUTSIDE CURRENT;羽化|FEATHER 14→62;落定|BLUR 16→0 · SCALE 1.06→1.00"}, {"id": "img1", "type": "image", "label": "LIVE 预览图", "default": "./placeholder-1.png"}, {"id": "timeRange", "type": "string", "label": "时间码区间", "default": "00:15 → 00:25"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #0E100F; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #EDF2EE; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      .corner{ position: absolute; width: 34px; height: 34px; border: 3px solid var(--ac, #00FF00); }
+      .c-tl{ left: -3px; top: -3px; border-right: none; border-bottom: none; }
+      .c-tr{ right: -3px; top: -3px; border-left: none; border-bottom: none; }
+      .c-bl{ left: -3px; bottom: -3px; border-right: none; border-top: none; }
+      .c-br{ right: -3px; bottom: -3px; border-left: none; border-top: none; }
+      .tc{ position: absolute; right: 90px; top: 84px; text-align: right; font-family: 'IBM Plex Mono', monospace;
+        font-size: 20px; letter-spacing: .22em; color: rgba(237,242,238,.5); line-height: 1.9; z-index: 6; }
+      .ssc-ghost{ position: absolute; left: 66px; top: 56px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 180px; font-weight: 900; color: var(--ac); opacity: .14; line-height: 1; z-index: 3; }
+      .ssc-head{ position: absolute; left: 240px; top: 88px; z-index: 5; }
+      .ssc-no{ font-size: 20px; letter-spacing: .3em; color: var(--ac); }
+      .ssc-title{ margin-top: 10px; font-size: 62px; font-weight: 900; }
+      .ssc-en{ margin-top: 12px; font-size: 22px; letter-spacing: .3em; color: rgba(237,242,238,.5); }
+      .ssc-panel{ position: absolute; left: 90px; top: 330px; width: 560px; height: 560px; z-index: 4;
+        background: #121513; border: 1px solid rgba(237,242,238,.1); border-radius: 16px; padding: 36px 40px; }
+      .ssc-ph{ font-size: 20px; letter-spacing: .3em; color: rgba(237,242,238,.5); margin-bottom: 12px; }
+      .ssc-prow{ display: flex; justify-content: space-between; align-items: baseline; gap: 20px;
+        padding: 21px 0; border-top: 1px solid rgba(237,242,238,.09); font-size: 24px; }
+      .ssc-prow .pn{ color: rgba(237,242,238,.85); }
+      .ssc-prow .pv{ color: var(--ac); text-align: right; }
+      .ssc-live{ position: absolute; left: 700px; top: 330px; width: 1130px; height: 560px; z-index: 4;
+        background: #131614; border: 1px solid rgba(237,242,238,.12); }
+      .ssc-live img{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      .ssc-tag{ position: absolute; left: 22px; top: 20px; font-size: 20px; letter-spacing: .26em;
+        color: #EDF2EE; background: rgba(10,12,10,.72); padding: 8px 18px; border-radius: 6px; z-index: 5; }
+      .ssc-tag b{ color: var(--ac); font-weight: 400; }
+      .ssc-tl{ position: absolute; left: 90px; right: 90px; bottom: 76px; height: 96px; z-index: 5; }
+      .ssc-tl-h{ display: flex; justify-content: space-between; font-size: 20px; letter-spacing: .26em;
+        color: rgba(237,242,238,.5); margin-bottom: 14px; }
+      .ssc-segs{ display: flex; gap: 6px; height: 52px; }
+      .ssc-seg{ display: flex; align-items: center; justify-content: center; font-size: 20px;
+        letter-spacing: .14em; border-radius: 6px; color: #0B0E0B; font-family: 'IBM Plex Mono', monospace;
+        transform: scaleX(0); transform-origin: 0 50%; white-space: nowrap; overflow: hidden; }
+      .ssc-seg.hold{ background: rgba(237,242,238,.1); color: rgba(237,242,238,.45); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="ssc-ghost" id="ghost"></div>
+      <div class="ssc-head">
+        <div class="ssc-no mono" id="sno"></div>
+        <div class="ssc-title" id="title"></div>
+        <div class="ssc-en mono" id="en"></div>
+      </div>
+      <div class="tc mono" id="timecode"></div>
+      <div class="ssc-panel"><div class="ssc-ph mono">参数 · PARAMETERS</div><div id="prows"></div></div>
+      <div class="ssc-live" id="live">
+        <img id="liveImg" alt="">
+        <span class="ssc-tag mono"><b>●</b> LIVE RESULT</span>
+        <span class="corner c-tl"></span><span class="corner c-tr"></span>
+        <span class="corner c-bl"></span><span class="corner c-br"></span>
+      </div>
+      <div class="ssc-tl">
+        <div class="ssc-tl-h mono"><span>ONE GSAP TIMELINE</span><span id="ttotal"></span></div>
+        <div class="ssc-segs" id="segs"></div>
+      </div>
+
+    </div>
+    <script>
+      const fallback = {"sceneNo": "03", "title": "三拍时间轴", "en": "MOTION TEST · THREE BEATS", "params": "蒙版形状|RX 24 / RY 46;锚点|ORIGIN TOP;圆内外|INSIDE NEXT / OUTSIDE CURRENT;羽化|FEATHER 14→62;落定|BLUR 16→0 · SCALE 1.06→1.00", "img1": "./placeholder-1.png", "timeRange": "00:15 → 00:25", "accent": "#00FF00", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      document.documentElement.style.setProperty("--ac", V.accent ?? "#00FF00");
+      const sno = String(V.sceneNo ?? "03").padStart(2, "0");
+      $("ghost").textContent = sno;
+      $("sno").textContent = "SCENE " + sno + " / 11";
+      $("title").textContent = V.title;
+      $("en").textContent = V.en;
+      $("timecode").innerHTML = (V.timeRange || "") + "<br>EP.13 · SPEC DOC";
+      $("ttotal").textContent = V.timeRange || "";
+      if (V.img1) $("liveImg").src = V.img1;
+      const rows = String(V.params ?? "").split(";").map((r) => r.split("|").map((s) => s.trim())).filter((r) => r[0]);
+      const wrap = $("prows");
+      rows.forEach((r) => {
+        const d = document.createElement("div");
+        d.className = "ssc-prow";
+        d.innerHTML = '<span class="pn"></span><span class="pv mono"></span>';
+        d.querySelector(".pn").textContent = r[0];
+        d.querySelector(".pv").textContent = r[1] || "";
+        wrap.appendChild(d);
+      });
+      const SEGS = [["DROP · 0.5S", 25, "#00FF00"], ["IMPACT", 9, "#7CE8A5"], ["SPREAD · 1.35S", 40, "#0FA35A"]];
+      const segsEl = $("segs");
+      SEGS.forEach(([lab, w, color]) => {
+        const d = document.createElement("div");
+        d.className = "ssc-seg";
+        d.style.width = w + "%";
+        d.style.background = color;
+        d.textContent = lab;
+        segsEl.appendChild(d);
+      });
+      const hold = document.createElement("div");
+      hold.className = "ssc-seg hold";
+      hold.style.width = "26%";
+      hold.textContent = "HOLD · 定格";
+      segsEl.appendChild(hold);
+      tl.fromTo(["#ghost"], { opacity: 0 }, { opacity: 0.14, duration: 0.7 }, 0.1);
+      tl.fromTo([".ssc-no", "#title", "#en", "#timecode"], { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.5, stagger: 0.09, ease: "power3.out" }, 0.2);
+      tl.fromTo([".ssc-ph", ".ssc-prow"], { opacity: 0, x: -22 }, { opacity: 1, x: 0, duration: 0.4, stagger: 0.08 }, 0.45);
+      tl.fromTo("#live", { opacity: 0, scale: 0.97 }, { opacity: 1, scale: 1, duration: 0.6, ease: "power3.out" }, 0.55);
+      tl.fromTo("#live .corner", { opacity: 0, scale: 0.4 }, { opacity: 1, scale: 1, duration: 0.3, stagger: 0.06, ease: "back.out(2)" }, 0.95);
+      tl.fromTo(".ssc-tag", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 1.1);
+      tl.fromTo(".ssc-tl-h", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 1.2);
+      tl.to(".ssc-seg", { scaleX: 1, duration: 0.5, stagger: 0.14, ease: "power3.out" }, 1.3);
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

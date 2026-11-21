@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（mono + 大字距）","default":"SCAN ME / 扫码关注"},
+{"id":"big","name":"大字","type":"string","label":"中间的大字（一行，4–8 字）","default":"扫一下，关注我"},
+{"id":"handle","name":"账号","type":"string","label":"账号名（mono）","default":"@积木社BLOCKBRUT"},
+{"id":"t1","name":"标签 1","type":"string","label":"底部标签 1（mono）","default":"每周二"},
+{"id":"t2","name":"标签 2","type":"string","label":"底部标签 2（mono）","default":"AI 与自媒体"},
+{"id":"t3","name":"标签 3","type":"string","label":"底部标签 3（mono）","default":"不发广告"},
+{"id":"note","name":"注脚","type":"string","label":"底部 mono 注脚","default":"二维码位为占位图 · 请替换成自己的码"},
+{"id":"accent","name":"强调色","type":"color","label":"强调色（斜纹带）","default":"#FFD429"},
+{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–8）","default":5.5},
+{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>二维码关注收尾卡 · 扫一下，关注我</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 字号阶梯 = 风格规范基因 8 的 76/48/24/17/13/11 在 1920×1080 画布上等比放大 2.0，即 152/96/48/34/26/22。 */
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --accent:#FFD429;
+  }
+  html,body{margin:0;padding:0;background:var(--ink)}
+  /* 整块换底色（基因 10）：ink 底 + white 字，反白是整块替换，不叠蒙版 */
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--ink);color:var(--white);font-family:var(--sans);
+    display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+  /* 深底专用阴影档位（规则 B：承载底色是深色，阴影换成白） */
+  .sh-w{box-shadow:8px 8px 0 var(--white)}
+  .sh-s{box-shadow:4px 4px 0 var(--white)}
+
+  /* 深底上把 ink 那档换成 paper，整块反白（基因 10） */
+  .stripe{flex:0 0 auto;height:20px;border-top:var(--bw) solid var(--paper);
+    border-bottom:var(--bw) solid var(--paper);
+    background:repeating-linear-gradient(45deg,var(--paper) 0 10px,var(--accent) 10px 20px)}
+
+  .hd{flex:0 0 auto;display:flex;align-items:center;gap:22px;padding:44px 88px 0}
+  .eyebrow{font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:.14em;
+    color:var(--accent);white-space:nowrap;flex:0 0 auto}
+  .hd .rule{flex:1 1 auto;border-top:var(--bw) solid var(--paper)}
+
+  .main{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;
+    gap:88px;padding:24px 88px 0}
+  /* 中文大字：块级 + nowrap，交给 B.fit() 按容器实测缩放，字距 0 */
+  .txt{flex:1 1 auto;min-width:0}
+  .big{display:block;white-space:nowrap;font-weight:900;font-size:132px;line-height:1.14;
+    letter-spacing:0;color:var(--white);padding-right:20px}
+  .handle{display:block;margin-top:26px;font-family:var(--mono);font-weight:700;
+    font-size:30px;letter-spacing:.06em;color:var(--accent);white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+
+  /* 二维码位：纯 div 拼的方格，不引图表 / 图片 / 生成库 */
+  .qr{flex:0 0 auto;width:460px;height:460px;background:var(--white);
+    border:var(--bw) solid var(--paper);border-radius:4px;box-shadow:8px 8px 0 var(--white);
+    padding:26px;display:grid;grid-template-columns:repeat(9,1fr);
+    grid-template-rows:repeat(9,1fr);gap:5px}
+  .qr i{display:block;background:var(--white)}
+  .qr i.on{background:var(--ink)}
+
+  .foot{flex:0 0 auto;padding:0 88px 44px}
+  .tags{display:flex;align-items:center;gap:20px;padding-bottom:24px;
+    border-bottom:var(--bw) solid var(--paper)}
+  .tag{display:inline-block;font-family:var(--mono);font-weight:700;font-size:22px;
+    letter-spacing:.10em;padding:8px 20px;border-radius:9999px;white-space:nowrap;
+    background:var(--white);color:var(--ink);border:var(--bw) solid var(--paper);
+    box-shadow:4px 4px 0 var(--white)}
+  .note{display:block;font-family:var(--mono);font-weight:700;font-size:22px;
+    letter-spacing:.10em;color:var(--white);white-space:nowrap;min-width:0;
+    overflow:hidden;text-overflow:ellipsis;padding-top:22px}
+
+  @media (prefers-reduced-motion: reduce){
+    .anim{transition-duration:.01ms !important;animation-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="stripe anim" id="stripeA"></div>
+
+  <div class="hd anim" id="hd">
+    <span class="eyebrow anim" id="eyebrow" data-fit-max="26" data-fit-min="16">SCAN ME / 扫码关注</span>
+    <span class="rule anim" id="ruleTop"></span>
+  </div>
+
+  <div class="main anim" id="main">
+    <div class="txt anim" id="txt">
+      <div class="big anim" id="big" data-fit-max="132" data-fit-min="64">扫一下，关注我</div>
+      <span class="handle anim" id="handle" data-fit-max="30" data-fit-min="16">@积木社BLOCKBRUT</span>
+    </div>
+    <div class="qr anim" id="qr"></div>
+  </div>
+
+  <div class="foot anim" id="foot">
+    <div class="tags anim" id="tags">
+      <span class="tag anim" id="t1" data-fit-max="22" data-fit-min="14">每周二</span>
+      <span class="tag anim" id="t2" data-fit-max="22" data-fit-min="14">AI 与自媒体</span>
+      <span class="tag anim" id="t3" data-fit-max="22" data-fit-min="14">不发广告</span>
+    </div>
+    <span class="note anim" id="note" data-fit-max="22" data-fit-min="14">二维码位为占位图 · 请替换成自己的码</span>
+  </div>
+
+  <div class="stripe anim" id="stripeB"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  ['eyebrow', 'big', 'handle', 't1', 't2', 't3', 'note'].forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+
+  /* 二维码位：纯 div 拼的方格。图案由行列坐标算出来，**不用 Math.random**——
+     渲染器可能乱序刷帧，随机图案每次重渲都不一样，预览就不可信了。 */
+  var qr = document.getElementById('qr');
+  if (qr) {
+    var html = '';
+    for (var r = 0; r < 9; r++) {
+      for (var c = 0; c < 9; c++) {
+        var on = false;
+        var corner = [[0, 0], [0, 6], [6, 0]];
+        for (var k = 0; k < corner.length; k++) {
+          var dr = r - corner[k][0], dc = c - corner[k][1];
+          if (dr >= 0 && dr < 3 && dc >= 0 && dc < 3) {
+            on = (dr === 0 || dc === 0 || dr === 2 || dc === 2 || (dr === 1 && dc === 1));
+          }
+        }
+        if (!on) on = ((r * 4 + c * 7 + r * c) % 4 === 0);
+        html += '<i class="' + (on ? 'on' : '') + '"></i>';
+      }
+    }
+    qr.innerHTML = html;
+  }
+
+  B.fitAll();
+  var tl = B.tl();
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (reduce) {
+    gsap.set('.anim', { x: 0, y: 0, scaleX: 1, scale: 1, rotate: 0 });
+    tl.fromTo('#stripeA', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0);
+    tl.fromTo('#hd',      { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.55, ease: 'power3.out' }, 0.12);
+    tl.fromTo('#main',    { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' }, 0.28);
+    tl.fromTo('#foot',    { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.55, ease: 'power3.out' }, 0.46);
+    tl.fromTo('#stripeB', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.6);
+    B.hold(tl, 1.2, 1.1);
+    return;
+  }
+
+  function slam(sel, at, dx, dy, d) {
+    tl.fromTo(sel, { x: dx, y: dy },
+      { x: 0, y: 0, duration: d, ease: 'power4.out' }, at);
+  }
+  var WHITE = '#FFFFFF';
+
+  /* 模 7 分格揭示：上下两条斜纹带各自从一端逐格推出 */
+  tl.fromTo('#stripeA', { clipPath: 'inset(0 100% 0 0)' },
+    { clipPath: 'inset(0 0% 0 0%)', duration: 0.34, ease: 'steps(8)' }, 0);
+
+  slam('#hd', 0.10, -28, -20, 0.24);
+  tl.fromTo('#ruleTop', { scaleX: 0, transformOrigin: 'left center' },
+    { scaleX: 1, duration: 0.28, ease: 'power4.out' }, 0.22);
+
+  slam('#main', 0.28,   0, -24, 0.28);
+  slam('#big',  0.42, -40, -40, 0.28);
+  slam('#handle', 0.62,   0, -16, 0.22);
+
+  /* 模 7 分格揭示：二维码位自右逐格推出 */
+  tl.fromTo('#qr', { clipPath: 'inset(0 0 0 100%)' },
+    { clipPath: 'inset(0 0 0 0%)', duration: 0.4, ease: 'steps(8)' }, 0.56);
+
+  slam('#foot', 0.96, 0, 24, 0.26);
+  slam('#tags', 1.08, 0, -18, 0.24);
+  tl.set('#t1', { boxShadow: '4px 7px 0 ' + WHITE, immediateRender: false }, 1.32);
+  tl.to('#t1', { boxShadow: '4px 4px 0 ' + WHITE, duration: 0.04, ease: 'steps(2)' }, 1.36);
+  slam('#t2', 1.20, -24, -24, 0.22);
+  slam('#t3', 1.30, -24, -24, 0.22);
+  slam('#note', 1.46, 0, -16, 0.22);
+
+  /* 模 7 分格揭示：底部斜纹带从左逐格推出 */
+  tl.fromTo('#stripeB', { clipPath: 'inset(0 100% 0 0)' },
+    { clipPath: 'inset(0 0% 0 0%)', duration: 0.34, ease: 'steps(8)' }, 1.66);
+  /* 模 6：斜纹带匀速滚动，位移取 20px 整周期，ease:none */
+  tl.fromTo('.stripe', { backgroundPositionX: '0px' },
+    { backgroundPositionX: '40px', duration: 1.2, ease: 'none' }, 2.00);
+
+  var introEnd = 3.20;
+  var total = Math.min(8, Math.max(5, Number(v.duration) || 5.5));
+  B.hold(tl, introEnd, Math.max(0.6, total - introEnd));
+})();
+</script>
+</body></html>

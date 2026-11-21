@@ -1,0 +1,11 @@
+{
+  "title": "AI 自主程度光谱",
+  "subtitle": "从完全规则驱动到完全智能体驱动",
+  "leftPole": "规则驱动",
+  "rightPole": "智能体驱动",
+  "markerLabel": "当前产品",
+  "markerPosition": 0.62,
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

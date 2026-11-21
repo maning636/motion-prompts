@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "titleEn", "type": "string", "label": "英文小标签（全大写）", "default": "ONE LINE COMMAND"}, {"id": "titleCn", "type": "string", "label": "中文标题", "default": "说一句，它就照做"}, {"id": "titleAccent", "type": "string", "label": "标题高亮词（绿色，须为标题子串）", "default": "说一句"}, {"id": "cmdText", "type": "string", "label": "命令文本（逐字打出）", "default": "初始化 个人工作台生成器"}, {"id": "out1", "type": "string", "label": "输出行 1", "default": "读取你的偏好设置"}, {"id": "out2", "type": "string", "label": "输出行 2", "default": "生成 5 个功能模块"}, {"id": "out3", "type": "string", "label": "输出行 3", "default": "应用摸鱼绿主题"}, {"id": "statusText", "type": "string", "label": "状态行文字", "default": "完成 · 共耗时 3.2s"}, {"id": "duration", "type": "number", "label": "总时长（秒，演完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12);
+  color: var(--foreground, #F5F5F3); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+/* 左上标题组 */
+#titleGroup{ position:absolute; left:150px; top:104px; }
+.ten{ display:flex; align-items:center; gap:14px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700;
+  font-size:22px; letter-spacing:6px; color:#10B981; text-transform:uppercase; white-space:nowrap; }
+.ten::before{ content:''; width:34px; height:2px; background:#10B981;
+  box-shadow:0 0 8px rgba(16,185,129,.7); }
+.tcn{ margin-top:18px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:64px;
+  letter-spacing:2px; white-space:nowrap; color:#F5F5F3; }
+.tcn .acc{ color:#34D399; text-shadow:0 0 20px rgba(52,211,153,.6); position:relative; padding:0 4px; }
+.tcn .acc::after{ content:''; position:absolute; left:6px; right:6px; bottom:-10px; height:5px;
+  border-radius:3px; background:#10B981; box-shadow:0 0 14px rgba(16,185,129,.8); }
+
+/* 终端窗口 */
+#term{ position:absolute; left:410px; top:378px; width:1100px; border-radius:16px;
+  background:#0D1117; border:1px solid rgba(16,185,129,.9);
+  box-shadow:0 0 26px rgba(16,185,129,.35), 0 0 60px rgba(16,185,129,.12), inset 0 0 30px rgba(16,185,129,.04);
+  overflow:hidden; will-change:transform; }
+.tbar{ position:relative; height:48px; background:#12161C; display:flex; align-items:center;
+  padding:0 22px; border-bottom:1px solid rgba(16,185,129,.25); }
+.dots{ display:flex; gap:10px; }
+.dots i{ width:14px; height:14px; border-radius:50%; }
+.dots i:nth-child(1){ background:#FF5F57; }
+.dots i:nth-child(2){ background:#FEBC2E; }
+.dots i:nth-child(3){ background:#28C840; }
+.tpath{ position:absolute; left:0; right:0; text-align:center; font-size:20px; color:#9CA3AF;
+  letter-spacing:2px; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; pointer-events:none; }
+.tbody{ position:relative; padding:38px 44px 42px; }
+.scan{ position:absolute; inset:0; pointer-events:none; border-radius:16px;
+  background:repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 1px, transparent 1px 3px); }
+
+/* 命令行 */
+.cmdline{ position:relative; display:flex; align-items:center; min-height:52px;
+  font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-size:36px; color:#E8EAED; }
+.prompt{ flex:0 0 auto; color:#10B981; margin-right:18px; font-size:34px;
+  text-shadow:0 0 12px rgba(16,185,129,.6); }
+.cmdtext{ flex:0 1 auto; max-width:880px; overflow:hidden; line-height:52px; }
+.cmdtext .ch{ display:none; opacity:0; }
+.cursor{ flex:0 0 auto; width:16px; height:34px; margin-left:6px; background:#34D399;
+  box-shadow:0 0 14px rgba(52,211,153,.8); border-radius:2px; }
+.sweep{ position:absolute; left:52px; right:0; top:50%; height:48px; transform:translateY(-50%) scaleX(0);
+  transform-origin:left center; pointer-events:none; border-radius:6px;
+  background:linear-gradient(90deg, rgba(16,185,129,.10) 0%, rgba(52,211,153,.38) 55%, rgba(167,243,208,.55) 100%);
+  box-shadow:0 0 22px rgba(52,211,153,.35); }
+
+/* 输出行 */
+.outs{ margin-top:30px; }
+.out{ display:flex; align-items:center; gap:16px; height:44px; margin-top:14px;
+  font-size:28px; color:#C9CDD4; letter-spacing:1px; opacity:0;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.out .arw{ flex:0 0 auto; color:#10B981; font-size:24px; text-shadow:0 0 10px rgba(16,185,129,.55); }
+
+/* 状态行 */
+#status{ display:flex; align-items:center; gap:16px; margin-top:34px; height:52px;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:30px; letter-spacing:2px;
+  color:#34D399; text-shadow:0 0 14px rgba(52,211,153,.55); opacity:0; }
+#status .ok{ font-size:32px; filter:drop-shadow(0 0 10px rgba(52,211,153,.7)); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div id="titleGroup">
+        <div class="ten" id="tEn"></div>
+        <div class="tcn"><span id="tPre"></span><span class="acc" id="tAcc"></span><span id="tPost"></span></div>
+      </div>
+
+      <div id="term">
+        <div class="tbar">
+          <div class="dots"><i></i><i></i><i></i></div>
+          <div class="tpath">~/workbench — zsh</div>
+        </div>
+        <div class="tbody">
+          <div class="cmdline">
+            <span class="prompt">❯</span>
+            <span class="cmdtext" id="cmdChars"></span>
+            <span class="cursor" id="cursor"></span>
+            <div class="sweep" id="sweep"></div>
+          </div>
+          <div class="outs">
+            <div class="out" id="out1"><span class="arw">▸</span><span class="otx"></span></div>
+            <div class="out" id="out2"><span class="arw">▸</span><span class="otx"></span></div>
+            <div class="out" id="out3"><span class="arw">▸</span><span class="otx"></span></div>
+          </div>
+          <div id="status"><span class="ok">✓</span><span id="statusTxt"></span></div>
+        </div>
+        <div class="scan"></div>
+      </div>
+    </div>
+    <script>
+      const FB = {"titleEn": "ONE LINE COMMAND", "titleCn": "说一句，它就照做", "titleAccent": "说一句", "cmdText": "初始化 个人工作台生成器", "out1": "读取你的偏好设置", "out2": "生成 5 个功能模块", "out3": "应用摸鱼绿主题", "statusText": "完成 · 共耗时 3.2s", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $=(s)=>document.querySelector(s);
+      const DUR=+v.duration>0?+v.duration:6;
+      $('[data-composition-id]').setAttribute('data-duration',String(DUR));
+
+      /* 标题：英文小标签 + 中文标题（高亮词子串染绿，照 neon-good-bad） */
+      $('#tEn').textContent=v.titleEn||'';
+      const title=String(v.titleCn??''), acc=String(v.titleAccent??'');
+      const idx=acc?title.indexOf(acc):-1;
+      if(idx>=0){
+        $('#tPre').textContent=title.slice(0,idx);
+        $('#tAcc').textContent=acc;
+        $('#tPost').textContent=title.slice(idx+acc.length);
+      }else{
+        $('#tPre').textContent=title;
+        $('#tAcc').textContent=acc;
+        $('#tPost').textContent='';
+      }
+
+      /* 命令逐字拆 span（空格转 NBSP 防止 inline-block 塌宽），同步构建保证确定性 */
+      const cmd=String(v.cmdText??'');
+      const cmdBox=$('#cmdChars');
+      const charSpans=[];
+      for(const c of cmd){
+        const s=document.createElement('span');
+        s.className='ch';
+        s.textContent=(c===' ')?' ':c;
+        cmdBox.appendChild(s);
+        charSpans.push(s);
+      }
+
+      $('#out1 .otx').textContent=v.out1||'';
+      $('#out2 .otx').textContent=v.out2||'';
+      $('#out3 .otx').textContent=v.out3||'';
+      $('#statusTxt').textContent=v.statusText||'';
+
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+
+      /* 1. t≈0.3s 标题组淡入上移 */
+      tl.fromTo('#titleGroup',{opacity:0,y:36},{opacity:1,y:0,duration:0.6,ease:'power3.out'},0.3);
+      /* 2. t≈0.7s 终端窗口从下方升入+淡入 */
+      tl.fromTo('#term',{opacity:0,y:90},{opacity:1,y:0,duration:0.7,ease:'power3.out'},0.7);
+
+      /* 3. t≈1.2s 起逐字打字：0.05s/字，光标在文本流内自动跟随 */
+      const TYPE_T=1.2, STEP=0.05;
+      charSpans.forEach((s,i)=>{
+        const t=TYPE_T+i*STEP;
+        tl.set(s,{display:'inline-block'},t);
+        tl.to(s,{opacity:1,duration:0.04,ease:'none'},t);
+      });
+      const typeEnd=TYPE_T+charSpans.length*STEP+0.05;
+
+      /* 4. 招牌动作：绿色高光横扫整行（回车执行），0.3s */
+      tl.fromTo('#sweep',{scaleX:0,opacity:1},{scaleX:1,duration:0.22,ease:'power2.inOut'},typeEnd);
+      tl.to('#sweep',{opacity:0,duration:0.1,ease:'power1.out'},typeEnd+0.22);
+
+      /* 5. 三条输出行 stagger cascade：淡入+右移 8px，间隔 0.25s */
+      const OUT_T=typeEnd+0.75;
+      ['#out1','#out2','#out3'].forEach((sel,i)=>{
+        tl.fromTo(sel,{opacity:0,x:-8},{opacity:1,x:0,duration:0.4,ease:'power2.out'},OUT_T+i*0.25);
+      });
+
+      /* 6. 状态行 back.out 弹入 + 一次绿色发光脉冲 */
+      const ST_T=OUT_T+3*0.25+0.15;
+      tl.fromTo('#status',{opacity:0,scale:0.85},{opacity:1,scale:1,duration:0.55,ease:'back.out(2)'},ST_T);
+      tl.to('#status',{textShadow:'0 0 30px rgba(52,211,153,.95)',duration:0.16,ease:'power1.in'},ST_T+0.35);
+      tl.to('#status',{textShadow:'0 0 14px rgba(52,211,153,.55)',duration:0.3,ease:'power1.out'},ST_T+0.51);
+
+      /* 7. 光标闪 3 次后常亮（显式 set，5.5s 起定格常亮） */
+      const BLK_T=ST_T+0.5;
+      for(let i=0;i<3;i++){
+        tl.set('#cursor',{opacity:0},BLK_T+i*0.6);
+        tl.set('#cursor',{opacity:1},BLK_T+i*0.6+0.3);
+      }
+
+      /* 定格占满 data-duration，防止末端 seek 黑帧 */
+      tl.set('#root',{opacity:1},DUR);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

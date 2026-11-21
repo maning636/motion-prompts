@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>AI 图片生成</title>
+<script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+</head>
+<body style="margin:0;padding:0;background:#0f0f0f;width:1920px;height:1080px;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei',sans-serif;">
+<div data-composition-id="ai-image-generate" data-duration="6" data-no-timeline
+     data-composition-variables='[{"id":"title","label":"标题","type":"text","default":"AI 图片生成"},{"id":"desc","label":"描述","type":"text","default":"图片从模糊到清晰"}]'
+     style="width:1920px;height:1080px;position:relative;overflow:hidden;background:linear-gradient(135deg,#0f0f0f 0%,#1a1a2e 100%);">
+
+  <!-- 装饰背景 -->
+  <div id="bg-glow" style="position:absolute;top:-200px;right:-200px;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,#6366f122 0%,transparent 70%);"></div>
+  <div id="bg-grid" style="position:absolute;inset:0;background-image:linear-gradient(#6366f108 1px,transparent 1px),linear-gradient(90deg,#6366f108 1px,transparent 1px);background-size:60px 60px;opacity:0.5;"></div>
+
+  <!-- 主内容区 -->
+  <div id="main-content" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;width:1400px;">
+
+    <!-- 图标/标识 -->
+    <div id="icon-badge" style="display:inline-flex;align-items:center;justify-content:center;width:100px;height:100px;border-radius:24px;background:#6366f1;margin-bottom:40px;box-shadow:0 0 60px #6366f166;">
+      <span style="font-size:48px;color:#fff;font-weight:bold;">AI</span>
+    </div>
+
+    <!-- 标题 -->
+    <h1 id="title-text" style="font-size:72px;font-weight:800;color:#fff;margin:0 0 20px;letter-spacing:2px;">AI 图片生成</h1>
+
+    <!-- 描述 -->
+    <p id="desc-text" style="font-size:32px;color:#888;margin:0 0 50px;">图片从模糊到清晰</p>
+
+    <!-- 演示内容区 -->
+    <div id="demo-area" style="display:flex;justify-content:center;gap:20px;flex-wrap:wrap;">
+      <div style="width:300px;height:200px;border-radius:16px;background:linear-gradient(135deg,#6366f144,#6366f111);border:1px solid #6366f155;display:flex;align-items:center;justify-content:center;">
+      <span style="font-size:48px;">🖼️</span>
+    </div>
+    </div>
+  </div>
+
+  <!-- 底部进度条 -->
+  <div id="progress-bar" style="position:absolute;bottom:0;left:0;width:0;height:6px;background:#6366f1;"></div>
+
+  <!-- 底部标签 -->
+  <div id="footer-tag" style="position:absolute;bottom:20px;left:40px;font-size:18px;color:#444;letter-spacing:1px;">Talking Studio · ai-image-generate</div>
+</div>
+
+<script>
+window.__timelines = window.__timelines || {};
+(function() {
+  const tl = gsap.timeline({ paused: true });
+          // 注册到 window.__timelines：云渲染的 settle/逐帧定位靠它驱动时间轴。
+          // 此前有一批素材没注册，导致渲染停在第 0 帧（主体初始 opacity:0 → 整层空）。
+          // gsap 时间轴就地 mutate，先存引用即可，后续 tl.to() 作用在同一对象上。
+          window.__timelines = window.__timelines || {};
+          window.__timelines.main = tl;
+  const accent = "#6366f1";
+
+  // 入场
+  tl.from("#icon-badge", { scale: 0, rotation: -180, duration: 0.6, ease: "back.out(1.7)" }, 0);
+  tl.from("#title-text", { y: 60, opacity: 0, duration: 0.5, ease: "power3.out" }, 0.2);
+  tl.from("#desc-text", { y: 30, opacity: 0, duration: 0.5, ease: "power3.out" }, 0.4);
+  tl.from("#demo-area > *", { y: 40, opacity: 0, duration: 0.4, stagger: 0.1, ease: "power2.out" }, 0.6);
+
+  // 持续微动（只补间到片尾 6s：repeat:-1 会把时间轴拖成无限长，duration() 变非有限值）
+  tl.to("#icon-badge", { scale: 1.05, duration: 1.5, ease: "sine.inOut", yoyo: true, repeat: 2 }, 1.5);
+
+  // 进度条
+  tl.fromTo("#progress-bar", { width: 0 }, { width: "100%", duration: 6, ease: "none" }, 0);
+
+  // 背景光晕漂移
+  tl.to("#bg-glow", { x: -100, y: 50, duration: 6, ease: "sine.inOut" }, 0);
+
+  window.__timelines["ai-image-generate"] = tl;
+})();
+</script>
+</body>
+</html>

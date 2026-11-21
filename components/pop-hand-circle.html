@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"label","name":"被圈住的东西","type":"string","label":"圈选对象的标签","default":"这条要留"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.0}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>手绘圈选</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-ring { position: absolute; left: 0; top: 0; width: 480px; height: 270px; }
+  .p-tgt { position: absolute; left: 170px; top: 96px; width: 140px; height: 84px;
+    background: #FFFDF5; box-shadow: 3px 4px 0 rgba(36, 28, 24, .85); }
+  .p-tgt-box { position: absolute; left: 54px; top: 15px; width: 32px; height: 32px;
+    background: var(--ac); border: 2.5px solid #241C18; border-radius: 4px; transform: rotate(-4deg); }
+  .p-tgt-txt { position: absolute; left: 10px; right: 10px; top: 56px; text-align: center;
+    font-size: 14px; font-weight: 700; color: #241C18; }
+  .p-badge { position: absolute; left: 292px; top: 172px; width: 38px; height: 38px;
+    border-radius: 50%; background: #FFFDF5; border: 3px solid #241C18;
+    box-shadow: 2px 2px 0 rgba(36, 28, 24, .85); opacity: 0; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"label":"这条要留","accent":"#FF6B35","duration":3.0};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || FALLBACK.duration;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  function fit(el, avail, maxPx, minPx) {
+    const prev = el.style.whiteSpace;
+    el.style.whiteSpace = 'nowrap';
+    const nat = el.scrollWidth;
+    el.style.whiteSpace = prev;
+    if (nat > avail && nat > 0) {
+      el.style.fontSize = Math.max(minPx, Math.floor(maxPx * avail / nat)) + 'px';
+    }
+  }
+
+  /* ── 被圈的对象 ─────────────────────────────────────────── */
+  const tgt = put('div', 'p-tgt', 'transform: rotate(-1.2deg)');
+  put('div', 'p-tgt-box', '', null, tgt);
+  const ttx = put('div', 'p-tgt-txt', '', String(v.label || FALLBACK.label), tgt);
+  ttx.style.whiteSpace = 'nowrap';
+  fit(ttx, 120, 14, 8);
+
+  /* ── 手绘圈：画一圈多 7%，末端自然出头 ───────────────────
+     用采样点连成闭合曲线，不用 SVG 的 A 椭圆弧命令：
+     large-arc/sweep 两个标志一旦取反，Chrome 会解到**镜像那一个**
+     圆心上去，整圈跑到别处去（实测整圈偏了 87px）。
+     采样自己算圆心，半径叠一点固定的正弦起伏当手抖。 */
+  const ring = put('div', 'p-ring');
+  const CX = 240, CY = 138, RX = 86, RY = 58;
+  const SEG = 56, A0 = -2.35, SWEEP = Math.PI * 2 * 1.075;
+  const pts = [];
+  for (let i = 0; i <= SEG; i++) {
+    const u = i / SEG, a = A0 + SWEEP * u;
+    /* 半径的起伏是角度的确定函数，不是随机 */
+    const wob = 1 + .022 * Math.sin(a * 3 + .7) + .014 * Math.sin(a * 5 - 1.3);
+    pts.push([CX + RX * wob * Math.cos(a), CY + RY * wob * Math.sin(a)]);
+  }
+  /* Catmull-Rom 转三次贝塞尔，采样点密一点就够顺 */
+  let d = 'M ' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || pts[i + 1];
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += ' C ' + c1x.toFixed(1) + ' ' + c1y.toFixed(1) + ', ' + c2x.toFixed(1) + ' '
+      + c2y.toFixed(1) + ', ' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1);
+  }
+  ring.innerHTML =
+    '<svg width="480" height="270" viewBox="0 0 480 270">' +
+    '<path d="' + d + '" fill="none" stroke="#241C18" stroke-width="3.4" ' +
+    'stroke-linecap="round" stroke-linejoin="round"/>' +
+    '</svg>';
+  const ringPath = ring.querySelector('path');
+  const len = ringPath.getTotalLength ? ringPath.getTotalLength() : 460;
+  ringPath.style.strokeDasharray = len + ' ' + len;
+  ringPath.style.strokeDashoffset = String(len);
+
+  /* 打勾徽章 */
+  const badge = put('div', 'p-badge');
+  badge.innerHTML =
+    '<svg width="38" height="38" viewBox="0 0 38 38">' +
+    '<path d="M 9 20 L 15 27" fill="none" stroke="#241C18" stroke-width="3.4" stroke-linecap="round"/>' +
+    '<path d="M 15 27 L 29 11" fill="none" stroke="#241C18" stroke-width="3.4" stroke-linecap="round"/>' +
+    '</svg>';
+  const c1 = badge.querySelectorAll('path')[0], c2 = badge.querySelectorAll('path')[1];
+  const l1 = c1.getTotalLength(), l2 = c2.getTotalLength();
+  c1.style.strokeDasharray = l1 + ' ' + l1; c1.style.strokeDashoffset = String(l1);
+  c2.style.strokeDasharray = l2 + ' ' + l2; c2.style.strokeDashoffset = String(l2);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  tl.fromTo(tgt, { opacity: 0, scale: .82, rotate: -5 },
+    { opacity: 1, scale: 1, rotate: -1.2, duration: .42, ease: 'back.out(1.9)' }, 0);
+
+  /* 圈沿路径长出来 —— dashoffset 从全长到 0 */
+  tl.to(ringPath, { strokeDashoffset: 0, duration: .62, ease: 'power2.inOut' }, .26);
+  /* 收笔时手抖一下 */
+  tl.fromTo(ring, { rotate: 0 }, { rotate: 1.2, duration: .1, ease: 'power2.out' }, .88);
+  tl.to(ring, { rotate: 0, duration: .28, ease: 'power2.out' }, .98);
+
+  /* 打勾弹出 */
+  tl.fromTo(badge, { opacity: 0, scale: 0, rotate: -34 },
+    { opacity: 1, scale: 1, rotate: 0, duration: .44, ease: 'back.out(3.4)' }, .92);
+  /* 勾是两笔，依次画出来 */
+  tl.to(c1, { strokeDashoffset: 0, duration: .11, ease: 'power1.out' }, 1.06);
+  tl.to(c2, { strokeDashoffset: 0, duration: .16, ease: 'power1.out' }, 1.16);
+  tl.fromTo(tgt, { scale: 1 }, { scale: 1.05, duration: .12, ease: 'power2.out', yoyo: true, repeat: 1 }, .92);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

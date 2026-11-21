@@ -1,0 +1,7 @@
+{
+  "name": "simple-flow-chart",
+  "private": true,
+  "scripts": {
+    "render": "cd ../.. && npm run render -- simple-flow-chart"
+  }
+}

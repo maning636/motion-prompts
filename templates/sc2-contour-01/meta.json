@@ -1,0 +1,13 @@
+{
+  "id": "sc2-contour-01",
+  "name": "描边字充填",
+  "series": "sc2",
+  "createdAt": "2026-08-16T08:00:00.000Z",
+  "energy": "高",
+  "suggestedDuration": 5,
+  "knownPitfalls": [
+    "巨字适合 2-4 个短词，字一多 300px 字号会顶出画布，需同步缩 font-size",
+    "充填靠 clip-path inset 收放，fill 层与描边层文字必须完全一致，错一个字就穿帮",
+    "-webkit-text-stroke 仅 Chromium/WebKit 生效，Firefox 下描边层不可见"
+  ]
+}

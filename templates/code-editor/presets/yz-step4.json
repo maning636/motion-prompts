@@ -1,0 +1,10 @@
+{
+  "filename": "第3屏.html",
+  "language": "HTML · 动效屏",
+  "code": "第3屏 内容规划\n\n大标题 先进场\n字幕 逐行对上配音\n卡片 随后弹入\n\n// 哪屏不满意 说一句就改\n// 只重写这一屏 别的不动",
+  "highlightLine": 3,
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7",
+  "duration": 6.3
+}

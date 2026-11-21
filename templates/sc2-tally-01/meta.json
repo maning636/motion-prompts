@@ -1,0 +1,14 @@
+{
+  "id": "sc2-tally-01",
+  "name": "计数破阈礼花",
+  "series": "sc2",
+  "createdAt": "2026-08-16T08:00:00.000Z",
+  "energy": "高",
+  "suggestedDuration": 5,
+  "knownPitfalls": [
+    "纸屑抢拍 0.35s（burst = 计数到位前）：改 countDur 必须同步平移 burst，提前量没了情绪就塌",
+    "纸屑 x 匀速 + y 两段抛物线是分离 tween，别合并成单条贝塞尔，钉帧跳采时落点会错",
+    "target < 10 会被钳到 10：数字太小冲刺曲线读不出来",
+    "时间轴末尾必须盖过 data-duration：hyperframes 渲染超出时间轴的帧是空白"
+  ]
+}

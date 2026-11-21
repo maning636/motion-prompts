@@ -1,0 +1,20 @@
+{
+  "title": "选专业不如选能力",
+  "front1": "提问力",
+  "num1": "5 min",
+  "label1": "80 分答案",
+  "front2": "取舍力",
+  "num2": "10→1",
+  "label2": "方案你来定",
+  "front3": "翻译力",
+  "num3": "A×B",
+  "label3": "跨域最值钱",
+  "img1": "./assets/ability_question_3430fe52.png",
+  "img2": "./assets/ability_decision_1578332a.png",
+  "img3": "./assets/ability_translation_fb0df8dd.png",
+  "duration": 7,
+  "caption": "AI 时代三大底层能力",
+  "accent": "#00FF00",
+  "background": "#0A0A0F",
+  "foreground": "#F4F4F2"
+}

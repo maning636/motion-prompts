@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"text","name":"拟声词","type":"string","label":"贴纸上的文案","default":"撤错！"},{"id":"accent","name":"强调色","type":"color","label":"贴纸上的字色","default":"#FF6B35"},{"id":"color","name":"硬阴影色","type":"color","label":"撕边硬阴影深色","default":"#241C18"},{"id":"fontSize","name":"字号","type":"number","label":"字号 px（超出画面自动缩）","default":58},{"id":"angle","name":"歪斜角","type":"number","label":"贴纸歪斜角度（度）","default":-7},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":2.8}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>贴纸式拟声词</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    /* 透明底：这层是挂件，底下是用户自己的实拍 */
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+
+  .p-grp { position: absolute; inset: 0; display: flex;
+           align-items: center; justify-content: center; }
+  /* 贴纸本体。撕边用 clip-path 的百分比顶点切出来，
+     百分比的好处：贴纸随文案变宽变窄，撕边形状跟着缩放，不用为每组文案重画。
+     硬阴影不用 drop-shadow —— drop-shadow 会被 clip-path 裁掉（filter 在 clip 之前），
+     改成同形状的深色副本垫在下面偏移 6/7px：撕边毛刺全在，还不会有 filter 的额外开销。 */
+  .p-paper { position: relative; display: inline-block;
+             transform: rotate(var(--ang, -7deg)); }
+  .p-shadow, .p-plate { position: absolute; left: 0; top: 0;
+                        width: 100%; height: 100%; }
+  .p-shadow { background: var(--ink, #241C18); transform: translate(6px, 7px); }
+  .p-plate { position: relative; background: var(--fg, #FFF8EE); padding: 24px 36px; }
+  .p-slabel {
+    display: inline-block; white-space: nowrap;
+    font-size: var(--fs, 58px); font-weight: 900; line-height: 1.06;
+    letter-spacing: .01em; color: var(--ac); position: relative;
+    text-shadow: 4px 4px 0 var(--ink);
+    transform-origin: 50% 50%;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* 纸上两道很淡的印刷划痕：压在文字底下，opacity 压到 .1 以下，
+     再高就会读成「画错了的一道线」 */
+  .p-scratch { position: absolute; background: var(--ink); opacity: .1; border-radius: 2px; }
+  /* 盖章瞬间迸出来的几根冲击短杠 */
+  .p-tick { position: absolute; left: 50%; top: 50%; width: 8px; height: 22px;
+            margin-left: -4px; margin-top: -11px; border-radius: 4px;
+            background: var(--ac2); opacity: 0; transform-origin: 50% 50%;
+            filter: drop-shadow(1.5px 1.5px 0 var(--ink)); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"撤错！","accent":"#FF6B35","color":"#241C18","fontSize":58,"angle":-7,"duration":2.8};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--ink', v.color || FALLBACK.color);
+  root.style.setProperty('--fg', '#FFF8EE');
+  root.style.setProperty('--ac2', '#FFC93C');
+  const dur = parseFloat(v.duration) || 2.8;
+  const fs = parseFloat(v.fontSize) || 58;
+  const angRaw = parseFloat(v.angle);
+  const ang = isNaN(angRaw) ? -7 : Math.max(-24, Math.min(24, angRaw));
+  root.style.setProperty('--fs', fs + 'px');
+  root.style.setProperty('--ang', ang + 'deg');
+  const text = String(v.text == null ? FALLBACK.text : v.text);
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text_, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text_ != null) el.textContent = text_;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  const grp = put('div', 'p-grp', '');
+  const paper = put('div', 'p-paper', '', null, grp);
+  /* 撕边顶点：固定数组，取的就是「手撕的不规则」，不是随机数 */
+  const TEAR = [[3, 7], [14, 2], [26, 8], [38, 1], [50, 7], [62, 2], [74, 8], [86, 3], [96, 9],
+                [99, 22], [96, 42], [100, 60], [95, 78], [98, 93],
+                [86, 99], [74, 94], [62, 100], [50, 95], [38, 99], [26, 94], [14, 100], [4, 95],
+                [1, 80], [5, 62], [0, 44], [4, 26], [1, 13]];
+  const poly = TEAR.map(function (p) { return p[0] + '% ' + p[1] + '%'; }).join(', ');
+  const shad = put('div', 'p-shadow', '', null, paper);
+  const plate = put('div', 'p-plate', '', null, paper);
+  shad.style.clipPath = 'polygon(' + poly + ')';
+  plate.style.clipPath = 'polygon(' + poly + ')';
+  const label = put('span', 'p-slabel', '', text, plate);
+  put('div', 'p-scratch', 'left:8%;top:12%;width:54px;height:4px;transform:rotate(-8deg);', null, plate);
+  put('div', 'p-scratch', 'right:8%;bottom:14%;width:38px;height:3px;transform:rotate(6deg);', null, plate);
+
+  const ticks = [];
+  for (let i = 0; i < 6; i++) ticks.push(put('div', 'p-tick', '', null, grp));
+
+  const tl = gsap.timeline({ paused: true });
+  /* 注册：云渲染的 settle / 逐帧定位靠 window.__timelines 驱动时间轴 */
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 收口：贴纸最大 400 宽，减掉左右 padding（36×2）才是字能占的宽度。
+     padding 给得比"看起来够"大一圈，是为了让字的 4px 硬阴影也落在纸内，
+     压在撕边上。 */
+  (function fit() {
+    root.style.setProperty('--fs', fs + 'px');
+    const natural = label.scrollWidth;
+    const avail = 328;
+    if (natural > avail) {
+      root.style.setProperty('--fs', Math.max(22, Math.floor(fs * avail / natural)) + 'px');
+    }
+  })();
+
+  // 盖章：从大远处压下来，power4.in = 后半程极快，是"啪"一下贴上去的手感
+  tl.fromTo(grp, { scale: 2.6, rotation: -20, opacity: 0 },
+    { scale: 1, rotation: 0, opacity: 1, duration: .3, ease: 'power4.in',
+      immediateRender: false }, 0);
+  // 贴实了压一下再弹回
+  tl.to(grp, { scaleX: 1.05, scaleY: .9, duration: .09, yoyo: true, repeat: 1,
+    ease: 'power2.inOut' }, .3);
+  // 歪斜角左右晃两下（GSAP 会先读出 CSS 里的 rotate(var(--ang)) 再补间）
+  tl.to(paper, { rotation: ang + 4.5, duration: .17, yoyo: true, repeat: 1,
+    ease: 'sine.inOut' }, .48);
+
+  // 盖章瞬间迸出的冲击短杠
+  const step = 360 / ticks.length;
+  ticks.forEach(function (t, i) {
+    const a = i * step + 30;
+    tl.fromTo(t, { scale: .3, rotation: a, opacity: 0 },
+      { scale: 1.5, rotation: a, opacity: .95, duration: .16, ease: 'power3.out',
+        immediateRender: false }, .28 + i * .012);
+    tl.to(t, { scale: 2.1, opacity: 0, duration: .26, ease: 'power2.in' }, .46 + i * .012);
+  });
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"label","name":"控件文案","type":"string","label":"控件说明文案","default":"导出进度"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.4}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>进度条推进</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-halo { position: absolute; inset: 0;
+    background: radial-gradient(62% 74% at 50% 50%,
+      rgba(0,0,0,.56) 0%, rgba(0,0,0,.30) 54%, rgba(0,0,0,0) 84%); }
+  .p-label { position: absolute; font-size: 11px; font-weight: 700; letter-spacing: .18em;
+    color: rgba(255,248,238,.6); white-space: nowrap; }
+  .p-track { position: absolute; left: 90px; top: 140px; width: 300px; height: 18px;
+    border-radius: 9px; background: rgba(255,248,238,.12);
+    border: 1.5px solid rgba(255,248,238,.28); }
+  .p-fill { position: absolute; left: 0; top: 0; height: 100%; width: 0;
+    border-radius: 9px; overflow: hidden;
+    background: linear-gradient(90deg, #FFC93C, var(--ac)); }
+  /* 条纹铺在固定 300 宽的子层里，底下的 fill 只负责裁切，
+     这样滚动的是纹理而不是被横向压扁的纹理。 */
+  .p-stripe { position: absolute; left: 0; top: 0; width: 300px; height: 100%;
+    background-image: repeating-linear-gradient(90deg,
+      rgba(255,255,255,.34) 0, rgba(255,255,255,.34) 9px,
+      rgba(255,255,255,0) 9px, rgba(255,255,255,0) 22px); }
+  /* 走到头时在填充末端留一道白色收口 */
+  .p-cap { position: absolute; right: 0; top: 0; height: 100%; width: 4px;
+    background: #FFF8EE; opacity: 0; }
+  .p-dot { position: absolute; left: 84px; top: 143px; width: 13px; height: 13px;
+    border-radius: 50%; background: #FFF8EE; border: 2px solid var(--ac);
+    box-shadow: 0 0 12px 3px rgba(255,201,60,.6); }
+  .p-val { position: absolute; left: 90px; top: 94px; width: 300px; text-align: right;
+    font-size: 27px; font-weight: 900; color: #FFF8EE;
+    font-variant-numeric: tabular-nums; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"label":"导出进度","accent":"#FF6B35","duration":3.4};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || 3.4;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  const fits = [];
+  function fit(list) { fits.push.apply(fits, list); }
+  function runFit() {
+    fits.forEach((f) => {
+      const el = f.el;
+      el.style.fontSize = f.max + 'px';
+      const avail = f.box || el.clientWidth;
+      const ws = el.style.whiteSpace;
+      el.style.whiteSpace = 'nowrap';
+      const natural = el.scrollWidth;
+      el.style.whiteSpace = ws;
+      if (natural > avail) {
+        el.style.fontSize = Math.max(f.min, Math.floor(f.max * avail / natural)) + 'px';
+      }
+    });
+  }
+
+  put('div', 'p-halo');
+  const label = put('div', 'p-label', 'left:90px; top:174px;', v.label || FALLBACK.label);
+  const track = put('div', 'p-track');
+  const fill  = put('div', 'p-fill', '', null, track);
+  const stripe = put('div', 'p-stripe', '', null, fill);
+  const cap   = put('div', 'p-cap', '', null, fill);
+  const dot   = put('div', 'p-dot');
+  const valEl = put('div', 'p-val', '', '0%');
+
+  fit([{ el: label, max: 11, min: 9, box: 300 },
+       { el: valEl, max: 27, min: 16, box: 300 }]);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  const TRACK_X = 90, TRACK_W = 300, P0 = 0.42, P1 = 2.42;
+  const clamp01 = (x) => x < 0 ? 0 : (x > 1 ? 1 : x);
+  function paint() {
+    const t = tl.time();
+    const k = clamp01((t - P0) / (P1 - P0));
+    const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    const w = TRACK_W * e;
+    fill.style.width = w.toFixed(2) + 'px';
+    const txt = Math.round(e * 100) + '%';
+    if (valEl.textContent !== txt) valEl.textContent = txt;
+    dot.style.left = (TRACK_X + w - 6.5).toFixed(2) + 'px';
+    dot.style.opacity = clamp01((t - P0) / 0.18).toFixed(3);
+  }
+  tl.to({}, { duration: dur, onUpdate: paint }, 0);
+
+  tl.fromTo(track, { opacity: 0, scaleX: 0.7 },
+    { opacity: 1, scaleX: 1, duration: .36, ease: 'power3.out' }, 0);
+  tl.fromTo(label, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .3 }, .06);
+  tl.fromTo(valEl, { opacity: 0, y: -10 },
+    { opacity: 1, y: 0, duration: .32, ease: 'back.out(2)' }, .04);
+  /* 条纹滚动：周期整除位移量 → 无缝循环，次数由时长推出来，不是随机 */
+  const reps = Math.max(1, Math.round((dur - P0 - 0.1) / 0.62));
+  tl.fromTo(stripe, { backgroundPosition: '0px 0px' },
+    { backgroundPosition: '-22px 0px', duration: .62, repeat: reps, ease: 'none' }, P0 - 0.14);
+  /* 光点扫过：轻微呼吸 */
+  /* opacity 由 paint 管（光点在 P0 才出现），这里只做弹出的缩放 */
+  tl.fromTo(dot, { scale: 0 },
+    { scale: 1, duration: .22, ease: 'back.out(3)' }, P0 - 0.06);
+  /* 两次定长呼吸。不用 repeat:-1——无限循环的子补间会把时间轴 duration 撑成
+     Infinity，settle 按归一化进度定位时行为不可预期。 */
+  tl.to(dot, { scale: 1.34, duration: .42, yoyo: true, repeat: 1, ease: 'sine.inOut' }, P0 + 0.24);
+  /* 收尾：填充到头后光点轻轻顶一下 + 数值定格的小弹 */
+  tl.to(dot, { scale: 1.5, duration: .16, ease: 'power2.out' }, P1);
+  tl.to(dot, { scale: 1, duration: .34, ease: 'elastic.out(1,.55)' }, P1 + 0.16);
+  tl.fromTo(cap, { opacity: 0 }, { opacity: .9, duration: .2 }, P1 - 0.1);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  runFit();
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

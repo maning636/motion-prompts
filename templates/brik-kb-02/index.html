@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（本期讲法标签）","default":"拆条讲"},
+{"id":"title","name":"主标题","type":"string","label":"主标题（8–16 字）","default":"三步把一件难事拆成块"},
+{"id":"k1","name":"步骤一","type":"string","label":"步骤一 · 名（≤4 字）","default":"先定位"},
+{"id":"d1","name":"说明一","type":"string","label":"步骤一 · 说明（≤12 字）","default":"只写清楚要做的一件事"},
+{"id":"k2","name":"步骤二","type":"string","label":"步骤二 · 名（≤4 字）","default":"再拆块"},
+{"id":"d2","name":"说明二","type":"string","label":"步骤二 · 说明（≤12 字）","default":"把一件事拆成三块"},
+{"id":"k3","name":"步骤三","type":"string","label":"步骤三 · 名（≤4 字）","default":"后拼装"},
+{"id":"d3","name":"说明三","type":"string","label":"步骤三 · 说明（≤12 字）","default":"三块对齐就拼上了"},
+{"id":"accent","name":"强调色","type":"color","label":"强调色（眉标 / 封顶斜纹带 / 凸点亮起色）","default":"#FFD429"},
+{"id":"brickColor","name":"配色包","type":"enum","label":"配色包（三层步骤块的轮转顺序）","default":"mixed","options":[{"value":"yellow","label":"暖黄主调"},{"value":"pink","label":"桃粉主调"},{"value":"green","label":"薄荷主调"},{"value":"blue","label":"靛蓝主调"},{"value":"mixed","label":"四色轮转"}]},
+{"id":"entry","name":"入场母题","type":"enum","label":"入场母题（塔块从哪个方向进）","default":"stack","options":[{"value":"stack","label":"逐块下落"},{"value":"pushup","label":"自下顶起"},{"value":"rail","label":"左轨推入"}]},
+{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–6）","default":5.5},
+{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}
+]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>三步堆叠塔</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 积木风 · 知识口播 · 三步堆叠塔
+     三个步骤块逐块落进同一列槽位并共边成塔 → 每落定一块点亮它左上角的一枚凸点作序号
+     → 三块齐了再压一条 45° 斜纹带封顶。块宽只用 720，块高只用 120，间距只用 24。 */
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --mod:240px; --mod-h:120px; --shadow:#0F0F0F; --background:var(--paper); --accent:#FFD429;
+  }
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--background);color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased}
+  .blk-noise{background-image:radial-gradient(rgba(15,15,15,.12) 1px,transparent 1px);
+    background-size:10px 10px}
+  .sh-s{box-shadow:4px 4px 0 var(--shadow)}
+  .sh-l{box-shadow:8px 8px 0 var(--shadow)}
+  .sh-xl{box-shadow:10px 10px 0 var(--shadow)}
+
+  .promo{position:absolute;left:0;top:0;width:1920px;height:56px;display:flex;
+    align-items:center;justify-content:space-between;padding:0 72px;
+    background:var(--ink);color:var(--white);font-family:var(--mono);
+    font-size:24px;font-weight:700;letter-spacing:.14em}
+  .promo .pc{color:var(--accent)}
+
+  .head{position:absolute;left:600px;top:128px;width:720px;display:flex;
+    flex-direction:column;gap:12px}
+  .head .eb{font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:.14em;
+    color:var(--ink);white-space:nowrap}
+  .head .ti{font-size:60px;font-weight:900;line-height:1.2;letter-spacing:0;
+    color:var(--ink);white-space:nowrap}
+
+  /* 封顶斜纹带：全族唯一的合法渐变，周期 10+10=20px。斜纹带就是分隔件本身，不加阴影。 */
+  .cap{position:absolute;left:600px;top:442px;width:720px;height:20px;
+    border:3px solid var(--ink);border-radius:4px;
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--green) 10px 20px)}
+
+  /* 塔：三层步骤块逐块错开 -3px，边界合成单线缝 */
+  .tower{position:absolute;left:600px;top:470px;width:720px;height:360px}
+  .step{position:absolute;left:0;width:720px;height:120px;display:flex;align-items:center;
+    gap:24px;padding:0 28px;border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  .step.s1{top:237px}
+  .step.s2{top:117px}
+  .step.s3{top:0}
+  .step .st{flex:0 0 auto;width:60px;height:60px;display:block}
+  .step .no{flex:0 0 auto;width:48px;font-family:var(--mono);font-size:30px;font-weight:700;
+    letter-spacing:.1em;color:inherit}
+  .step .k{flex:0 0 auto;font-size:44px;font-weight:900;line-height:1.1;letter-spacing:0;
+    color:inherit;white-space:nowrap}
+  .step .d{flex:0 0 auto;margin-left:auto;font-size:28px;font-weight:400;line-height:1.3;
+    letter-spacing:0;color:inherit;white-space:nowrap}
+
+  .foot{position:absolute;left:0;bottom:0;width:1920px;height:64px;display:flex;
+    align-items:center;justify-content:space-between;padding:0 72px;
+    background:var(--ink);color:var(--white);font-family:var(--mono);
+    font-size:26px;font-weight:700;letter-spacing:.1em}
+  .foot em{font-style:normal;color:var(--accent)}
+  .divline{position:absolute;left:0;bottom:64px;width:1920px;height:20px;
+    border-top:3px solid var(--ink);border-bottom:3px solid var(--ink);
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="promo">
+    <span class="pc">BRICK / 积木风</span>
+    <span>图解流程 · 三步堆叠塔</span>
+  </div>
+
+  <div class="head" id="head">
+    <span class="eb" id="eyebrow" data-fit-max="30" data-fit-min="16">拆条讲</span>
+    <h1 class="ti" id="title" data-fit-max="60" data-fit-min="28">三步把一件难事拆成块</h1>
+  </div>
+
+  <div class="cap" id="cap"></div>
+
+  <div class="tower" id="tower">
+    <div class="step s1" id="st1">
+      <svg class="st" width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden="true">
+        <circle class="sc" id="c1" cx="30" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+      </svg>
+      <span class="no">01</span>
+      <span class="k" id="k1" data-fit-max="44" data-fit-min="20">先定位</span>
+      <span class="d" id="d1" data-fit-max="28" data-fit-min="16">只写清楚要做的一件事</span>
+    </div>
+    <div class="step s2" id="st2">
+      <svg class="st" width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden="true">
+        <circle class="sc" id="c2" cx="30" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+      </svg>
+      <span class="no">02</span>
+      <span class="k" id="k2" data-fit-max="44" data-fit-min="20">再拆块</span>
+      <span class="d" id="d2" data-fit-max="28" data-fit-min="16">把一件事拆成三块</span>
+    </div>
+    <div class="step s3" id="st3">
+      <svg class="st" width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden="true">
+        <circle class="sc" id="c3" cx="30" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+      </svg>
+      <span class="no">03</span>
+      <span class="k" id="k3" data-fit-max="44" data-fit-min="20">后拼装</span>
+      <span class="d" id="d3" data-fit-max="28" data-fit-min="16">三块对齐就拼上了</span>
+    </div>
+  </div>
+
+  <div class="divline"></div>
+  <div class="foot">
+    <span>KB / 知识口播</span>
+    <span id="meta">步骤 3 · 凸点 3</span>
+  </div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+  ['eyebrow', 'title', 'k1', 'd1', 'k2', 'd2', 'k3', 'd3'].forEach(function (k) { set(k, v[k]); });
+
+  var rs = document.documentElement.style;
+  if (v.accent) rs.setProperty('--accent', v.accent);
+  var ACC = v.accent || '#FFD429';
+
+  var PACK = {
+    yellow: ['#FFD429', '#FFFFFF', '#FF5FA2'],
+    pink:   ['#FF5FA2', '#FFFFFF', '#3D7BFF'],
+    green:  ['#2FD07A', '#FFFFFF', '#FFD429'],
+    blue:   ['#3D7BFF', '#FFFFFF', '#2FD07A'],
+    mixed:  ['#FFD429', '#FF5FA2', '#2FD07A']
+  };
+  function inkOn(hex) {
+    var h = String(hex || '').replace('#', '');
+    if (h.length !== 6) return '#0F0F0F';
+    var f = function (c) { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    var L = 0.2126 * f(parseInt(h.slice(0, 2), 16)) +
+            0.7152 * f(parseInt(h.slice(2, 4), 16)) +
+            0.0722 * f(parseInt(h.slice(4, 6), 16));
+    return L > 0.42 ? '#0F0F0F' : '#FFFFFF';
+  }
+  var pack = PACK[v.brickColor] || PACK.mixed;
+  var STEPS = ['#st1', '#st2', '#st3'];
+  STEPS.forEach(function (id, i) {
+    var el = document.querySelector(id);
+    if (!el) return;
+    el.style.background = pack[i];
+    var fg = inkOn(pack[i]);
+    ['no', 'k', 'd'].forEach(function (c) {
+      var t = el.querySelector('.' + c);
+      if (t) t.style.color = fg;
+    });
+  });
+
+  /* 派生量：步骤数 / 凸点枚数 / 说明总字数全部现算 */
+  var studs = [].slice.call(document.querySelectorAll('#tower .sc'));
+  var noteChars = [v.d1, v.d2, v.d3].reduce(function (a, s) {
+    return a + String(s == null ? '' : s).replace(/\s+/g, '').length;
+  }, 0);
+  var meta = document.getElementById('meta');
+  if (meta) {
+    meta.innerHTML = '步骤 <em>' + STEPS.length + '</em> · 凸点 <em>' + studs.length +
+      '</em> · 说明字数 <em>' + noteChars + '</em>';
+  }
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：去掉逐块下落与封顶斜纹带的压影，只留终态 + ≤8px 微位移淡入 */
+    gsap.set('#head', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#tower', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#cap', { x: 0, y: 0, opacity: 1 });
+    if (studs.length) gsap.set(studs, { attr: { fill: ACC } });
+    tl.fromTo('#head',   { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .55, ease: 'power3.out' }, 0);
+    tl.fromTo('#tower',  { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .60, ease: 'power3.out' }, .16);
+    tl.fromTo('#cap',    { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .45, ease: 'power3.out' }, .30);
+    B.hold(tl, 1.15, 1.05);
+    return;
+  }
+
+  var SHADOW = '8px 8px 0 #0F0F0F';
+  var stageRect = document.getElementById('stage').getBoundingClientRect();
+  var promoEl = document.querySelector('.promo');
+  var CEIL = promoEl ? Math.round(promoEl.getBoundingClientRect().bottom - stageRect.top) : 0;
+
+  /* 式 2 堆叠：逐块下沉落位，单轴、零 overshoot，落定压 2 帧再回原档。
+     三块用同一段位移，塔才读成「逐块叠上去」而不是三块各飞各的。 */
+  var mode = v.entry || 'stack';
+  var topBox = document.querySelector('#st3').getBoundingClientRect();
+  var botBox = document.querySelector('#st1').getBoundingClientRect();
+  var FROM;
+  if (mode === 'pushup') FROM = { x: 0, y: Math.round(stageRect.bottom - botBox.bottom) };
+  else if (mode === 'rail') FROM = { x: Math.round(stageRect.left - topBox.left), y: 0 };
+  else FROM = { x: 0, y: CEIL - Math.round(topBox.top - stageRect.top) };
+
+  STEPS.forEach(function (sel, i) {
+    var at = 0.55 + i * 0.42;
+    tl.fromTo(sel, FROM, { x: 0, y: 0, duration: 0.24, ease: 'power4.out' }, at);
+    tl.set(sel, { boxShadow: '8px 11px 0 #0F0F0F', immediateRender: false }, at + 0.24);
+    tl.to(sel, { boxShadow: SHADOW, duration: 0.04, ease: 'steps(2)' }, at + 0.28);
+    /* 落定一块就点亮它自己那一枚凸点（式 8，单枚间隔 ≥0.12s） */
+    tl.set(sel + ' .sc', { attr: { fill: ACC }, immediateRender: false }, at + 0.34);
+  });
+
+  /* 眉标 / 主标题从桌沿铭牌下方直落 */
+  var headEl = document.getElementById('head');
+  tl.fromTo('#head', { y: CEIL - Math.round(headEl.getBoundingClientRect().top - stageRect.top) },
+    { y: 0, duration: 0.26, ease: 'power4.out' }, 0.00);
+
+  /* 三块齐了 → 45° 斜纹带自上压下封顶（起点同样贴桌沿铭牌下沿，不越框） */
+  var capEl = document.getElementById('cap');
+  tl.fromTo('#cap', { y: CEIL - Math.round(capEl.getBoundingClientRect().top - stageRect.top) },
+    { y: 0, duration: 0.24, ease: 'power4.out' }, 2.05);
+
+  var introEnd = tl.duration();
+  var TOTAL = Math.min(6, Math.max(5, Number(v.duration) || 5.5));
+  var holdAt = Math.min(introEnd, TOTAL - 0.8);
+  B.hold(tl, holdAt, Math.max(0.8, TOTAL - holdAt));
+})();
+</script>
+</body></html>

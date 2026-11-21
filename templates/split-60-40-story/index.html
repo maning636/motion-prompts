@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"leftLabel","type":"string","label":"左侧栏标签","default":"主叙事"},
+  {"id":"leftEyebrow","type":"string","label":"左侧 eyebrow","default":"主标题 / CORE NARRATIVE"},
+  {"id":"leftTitle","type":"string","label":"左侧主标题","default":"把 60% 的注意力给结论，把 40% 留给证据"},
+  {"id":"leftPoints","type":"string","label":"左侧要点（换行分隔）","default":"主信息占左 60%，权重最大\n要点短句、单条一行、强对齐\n错峰入场，先讲结论再讲证据\n末段停留 ≥0.8s 让读者读得完"},
+  {"id":"rightLabel","type":"string","label":"右侧栏标签","default":"辅助信息"},
+  {"id":"rightHeadline","type":"string","label":"右侧栏核心词","default":"60 / 40"},
+  {"id":"rightSub","type":"string","label":"右侧栏副文案","default":"非对称权重 · 信息层级"},
+  {"id":"rightMeta","type":"string","label":"右侧栏底部 meta","default":"viewbox 1920×1080 · margin 96px\n字号 76 / 26 · 行高 1.45"},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity: .5;
+      }
+
+      /* ===== 顶头 eyebrow（贯通左右） ===== */
+      .eyebrow{
+        position:absolute; top: 56px; left: 96px; right: 96px;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.22em; text-transform:uppercase;
+        color: #8A8A85; z-index: 3;
+      }
+      .eyebrow .acc{ color: var(--accent, #00FF00); font-weight:700; letter-spacing:.18em; }
+
+      /* ===== 60/40 分屏 ===== */
+      .stage{ position:absolute; inset:0; }
+      .col{
+        position:absolute; top:0; bottom:0;
+        display:flex; flex-direction:column;
+        opacity:0; will-change: transform, opacity;
+      }
+      /* 左 60%：从 96px 起算到中缝，padding-right 让标题不要撞中缝 */
+      .col.left{
+        left: 96px; width: 1056px;           /* 60% ≈ 1152，再留点呼吸 */
+        padding: 168px 80px 200px 0;
+      }
+      /* 右 40%：从中缝起到 96px 结束 */
+      .col.right{
+        right: 96px; width: 672px;            /* 40% ≈ 768 */
+        padding: 168px 0 200px 64px;
+        border-left: 1px solid rgba(255,255,255,.08);
+      }
+
+      /* 中缝装饰：虚线渐隐 */
+      .col.right::before{
+        content:""; position:absolute; top:160px; bottom:160px; left:-1px;
+        width:1px; background: linear-gradient(180deg,
+          transparent 0%, color-mix(in srgb, var(--accent, #00FF00) 55%, transparent) 22%,
+          color-mix(in srgb, var(--accent, #00FF00) 55%, transparent) 78%, transparent 100%);
+      }
+
+      /* chip（顶部小标签） */
+      .chip{
+        display:inline-flex; align-items:center; gap:10px;
+        padding: 8px 16px; border:1px solid #2A2A2E; border-radius:999px;
+        font-size:18px; letter-spacing:.16em; color:#9CA3AF; text-transform:uppercase;
+        white-space: nowrap;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+      }
+      .chip b{ color: var(--accent, #00FF00); font-weight:700; letter-spacing:.05em; }
+
+      .eyebrow-inner{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 18px; letter-spacing:.18em; text-transform:uppercase;
+        color: #8A8A85;
+      }
+      .eyebrow-inner b{ color: var(--accent, #00FF00); font-weight:700; letter-spacing:.18em; }
+
+      /* 左侧主标题 */
+      .title{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight:700; letter-spacing:-.02em;
+        font-size: 76px; line-height: 1.06;
+        margin: 26px 0 24px;
+        color: var(--foreground, #F4EFE7);
+      }
+      .title .em{
+        color: var(--accent, #00FF00);
+      }
+
+      /* 左侧要点 */
+      .points{
+        list-style:none; padding:0; margin: 8px 0 0;
+        display:flex; flex-direction:column; gap: 18px;
+      }
+      .points li{
+        display:flex; gap: 18px; align-items:flex-start;
+        font-size: 28px; line-height: 1.45;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 88%, transparent);
+        opacity:0; will-change: transform, opacity;
+      }
+      .points li::before{
+        content:""; flex:none; margin-top: 18px;
+        width: 22px; height: 2px;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 10px color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+      }
+      .points li .num{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 15px; letter-spacing:.14em;
+        color: var(--accent, #00FF00); margin-top: 8px; min-width: 28px;
+      }
+
+      /* 左侧底部 meta 行 */
+      .left-foot{
+        margin-top: auto;
+        display:flex; gap: 24px; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 17px; letter-spacing:.10em; text-transform:uppercase;
+        color: #6B6B66;
+      }
+      .left-foot .dot{
+        width:6px; height:6px; border-radius:50%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+      }
+
+      /* ===== 右栏：辅助信息 ===== */
+      .right-eyebrow{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 15px; letter-spacing:.22em; text-transform:uppercase;
+        color: #8A8A85;
+      }
+      .right-eyebrow b{ color: var(--accent, #00FF00); font-weight:700; letter-spacing:.18em; }
+
+      /* 右栏核心比例 */
+      .ratio{
+        margin-top: 22px;
+        display:flex; align-items:baseline; gap: 14px;
+        opacity:0; will-change: transform, opacity;
+      }
+      .ratio .big{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight:700; letter-spacing:-.04em;
+        font-size: 132px; line-height: 1;
+        color: var(--foreground, #F4EFE7);
+      }
+      .ratio .big .slash{
+        color: var(--accent, #00FF00);
+      }
+      .ratio .unit{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 22px; letter-spacing:.10em;
+        color: #8A8A85;
+      }
+
+      /* 比例可视化条（60/40） */
+      .bar-vis{
+        margin-top: 28px;
+        height: 14px; border-radius: 999px;
+        background: rgba(255,255,255,.06);
+        overflow:hidden; display:flex;
+        opacity:0; will-change: transform, opacity;
+      }
+      .bar-vis .seg-left{
+        flex: 60;
+        background: linear-gradient(90deg,
+          var(--accent, #00FF00),
+          color-mix(in srgb, var(--accent, #00FF00) 55%, transparent));
+        transform-origin: left center;
+        transform: scaleX(0);
+      }
+      .bar-vis .seg-right{
+        flex: 40;
+        background: rgba(255,255,255,.18);
+        transform-origin: left center;
+        transform: scaleX(0);
+      }
+      .bar-vis .legend{
+        display:flex; gap: 14px;
+        margin-top: 12px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 14px; letter-spacing:.14em; text-transform:uppercase;
+        color: #8A8A85;
+      }
+      .bar-vis .legend .lg-dot{
+        display:inline-block; width:8px; height:8px; border-radius:50%;
+        margin-right: 8px; vertical-align: middle;
+      }
+      .bar-vis .legend .lg-dot.acc{ background: var(--accent, #00FF00); }
+      .bar-vis .legend .lg-dot.mut{ background: rgba(255,255,255,.35); }
+
+      /* 副文案 */
+      .right-sub{
+        margin-top: 28px;
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+        font-size: 24px; line-height: 1.5;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 78%, transparent);
+        opacity:0; will-change: transform, opacity;
+      }
+
+      /* 底部 meta 块 */
+      .right-meta{
+        margin-top: auto;
+        padding-top: 24px;
+        border-top: 1px dashed rgba(255,255,255,.10);
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; line-height: 1.65; letter-spacing:.04em;
+        color: #8A8A85;
+        white-space: pre-line;
+        opacity:0; will-change: transform, opacity;
+      }
+
+      /* 底脚贯通页 */
+      .footnote{
+        position:absolute; bottom: 56px; left: 96px; right: 96px;
+        display:flex; align-items:center; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 17px; letter-spacing:.10em; text-transform:uppercase;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+        z-index: 3;
+      }
+      .footnote .tag{
+        color: var(--accent, #00FF00); font-weight:700; letter-spacing:.18em;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="stage" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+
+        <div class="eyebrow">
+          <span><b class="acc">60 / 40</b>&nbsp;&nbsp;ASYMMETRIC SPLIT</span>
+          <span>primary · secondary</span>
+        </div>
+
+        <!-- 左 60%：主叙事 -->
+        <div class="col left" id="colLeft">
+          <span class="chip" id="chipLeft"><b id="chipLeftB">P</b><span id="chipLeftLab">主叙事</span></span>
+          <div class="eyebrow-inner" id="leftEyebrow" style="margin-top:18px;"></div>
+          <h2 class="title" id="titleLeft">把 60% 的注意力给结论，把 40% 留给证据</h2>
+          <ul class="points" id="pointsLeft">
+            <li><span class="num">01</span><span>主信息占左 60%，权重最大</span></li>
+            <li><span class="num">02</span><span>要点短句、单条一行、强对齐</span></li>
+            <li><span class="num">03</span><span>错峰入场，先讲结论再讲证据</span></li>
+            <li><span class="num">04</span><span>末段停留 ≥0.8s 让读者读得完</span></li>
+          </ul>
+          <div class="left-foot" id="leftFoot">
+            <span class="dot"></span><span>PRIMARY · 60%</span><span>·</span><span>主导视觉重心</span>
+          </div>
+        </div>
+
+        <!-- 右 40%：辅助信息栏 -->
+        <div class="col right" id="colRight">
+          <span class="chip" id="chipRight"><b id="chipRightB">S</b><span id="chipRightLab">辅助信息</span></span>
+          <div class="right-eyebrow" style="margin-top:18px;">WEIGHT&nbsp;·&nbsp;比例</div>
+          <div class="ratio" id="ratio">
+            <span class="big"><span id="ratioLeft">60</span><span class="slash">/</span><span id="ratioRight">40</span></span>
+            <span class="unit">PRIMARY / SECONDARY</span>
+          </div>
+          <div class="bar-vis" id="barVis">
+            <div class="seg-left"></div>
+            <div class="seg-right"></div>
+          </div>
+          <div class="legend" style="display:flex;gap:18px;margin-top:14px;font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:#8A8A85;opacity:0;" id="barLegend">
+            <span><span class="lg-dot acc" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;background:var(--accent,#00FF00);vertical-align:middle;"></span>PRIMARY · 60%</span>
+            <span><span class="lg-dot mut" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;background:rgba(255,255,255,.35);vertical-align:middle;"></span>SECONDARY · 40%</span>
+          </div>
+          <div class="right-sub" id="rightSub">非对称权重 · 信息层级</div>
+          <div class="right-meta" id="rightMeta">viewbox 1920×1080 · margin 96px
+字号 76 / 26 · 行高 1.45</div>
+        </div>
+
+        <!-- 底脚 -->
+        <div class="footnote">
+          <span><span class="tag">FDE</span>&nbsp;&nbsp;split · 60/40 · story</span>
+          <span>asymmetric · primary / secondary</span>
+        </div>
+
+      </section>
+    </div>
+    <script>
+      /* ----- 变量接线（与全库契约一致） ----- */
+      const fallback = {
+        leftLabel: "主叙事",
+        leftEyebrow: "主标题 / CORE NARRATIVE",
+        leftTitle: "把 60% 的注意力给结论，把 40% 留给证据",
+        leftPoints: "主信息占左 60%，权重最大\n要点短句、单条一行、强对齐\n错峰入场，先讲结论再讲证据\n末段停留 ≥0.8s 让读者读得完",
+        rightLabel: "辅助信息",
+        rightHeadline: "60 / 40",
+        rightSub: "非对称权重 · 信息层级",
+        rightMeta: "viewbox 1920×1080 · margin 96px\n字号 76 / 26 · 行高 1.45",
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const $ = (id) => document.getElementById(id);
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      /* ----- 内容回填 ----- */
+      // 左 chip + chip首字母
+      $("chipLeftLab").textContent  = v.leftLabel  || fallback.leftLabel;
+      $("chipLeftB").textContent    = String(v.leftLabel || fallback.leftLabel).trim().charAt(0).toUpperCase() || "P";
+      $("leftEyebrow").innerHTML    = `<b>${escapeHtml(v.leftEyebrow || fallback.leftEyebrow)}</b>`;
+      $("titleLeft").textContent    = v.leftTitle  || fallback.leftTitle;
+
+      const setPoints = (hostId, raw) => {
+        const ul = $(hostId);
+        if (!ul) return;
+        const lines = String(raw ?? "").split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        const maxN = Math.min(Math.max(lines.length, 1), 4);
+        const padded = lines.slice(0, maxN);
+        while (padded.length < 4) padded.push("");
+        ul.innerHTML = padded.map((t, i) =>
+          `<li><span class="num">${String(i+1).padStart(2,"0")}</span><span>${escapeHtml(t)}</span></li>`
+        ).join("");
+      };
+      setPoints("pointsLeft", v.leftPoints || fallback.leftPoints);
+
+      // 右 chip
+      $("chipRightLab").textContent = v.rightLabel || fallback.rightLabel;
+      $("chipRightB").textContent   = String(v.rightLabel || fallback.rightLabel).trim().charAt(0).toUpperCase() || "S";
+
+      // 比例 headline（默认 60/40，变量是 rightHeadline，可被改写）
+      const parseHeadline = (raw) => {
+        const s = String(raw || "").trim();
+        const m = s.match(/^\s*(\d+)\s*[\/\-:]\s*(\d+)\s*$/);
+        if (m) return { l: m[1], r: m[2] };
+        return { l: "60", r: "40" };
+      };
+      const hd = parseHeadline(v.rightHeadline);
+      $("ratioLeft").textContent  = hd.l;
+      $("ratioRight").textContent = hd.r;
+
+      $("rightSub").textContent  = v.rightSub  || fallback.rightSub;
+      $("rightMeta").textContent = v.rightMeta || fallback.rightMeta;
+
+      /* ----- 时间线 ----- */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+      const tl = gsap.timeline({ paused: true });
+
+      // 顶头 eyebrow：先 wipe 入场
+      tl.fromTo(".eyebrow",
+        { opacity: 0, y: -12 },
+        { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 0.05);
+
+      // 左 60%：主叙事—— chip + eyebrow-inner + 主标题 一起入
+      tl.fromTo("#colLeft",
+        { opacity: 0, y: 28 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 0.18);
+
+      // 左要点：错峰入场，stagger 0.1s（主重更明显）
+      tl.fromTo("#pointsLeft li",
+        { opacity: 0, x: -22 },
+        { opacity: 1, x: 0, duration: 0.45, ease: "power2.out", stagger: 0.10 }, 0.45);
+
+      // 左底部 meta 行
+      tl.fromTo("#leftFoot",
+        { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 1.45);
+
+      // 右 40%：辅助信息——晚一拍入场（明显节奏差）
+      tl.fromTo("#colRight",
+        { opacity: 0, y: 28 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 0.75);
+
+      // 比例核心数值：scale 0.9 → 1.0，弹一下
+      tl.fromTo("#ratio",
+        { opacity: 0, scale: 0.9 },
+        { opacity: 1, scale: 1.0, duration: 0.55, ease: "back.out(1.6)" }, 1.05);
+
+      // 比例条扫开：先左段、再右段
+      tl.to(".bar-vis .seg-left",
+        { scaleX: 1, duration: 0.7, ease: "power3.out" }, 1.35);
+      tl.to(".bar-vis .seg-right",
+        { scaleX: 1, duration: 0.55, ease: "power3.out" }, 1.55);
+      tl.fromTo("#barVis",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.35, ease: "power2.out" }, 1.30);
+      tl.fromTo("#barLegend",
+        { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 1.85);
+
+      // 副文案 + 底部 meta
+      tl.fromTo("#rightSub",
+        { opacity: 0, y: 10 },
+        { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 1.95);
+      tl.fromTo("#rightMeta",
+        { opacity: 0, y: 10 },
+        { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 2.20);
+
+      // 比例数字呼吸（强调"60"），后半段 ~1 轮
+      tl.to("#ratio .big",
+        { scale: 1.04, duration: 1.1, ease: "sine.inOut", yoyo: true, repeat: 1 }, 2.6);
+
+      // 结尾：比例数字回到 1.0，副文案轻微再淡入一下表示"读完"
+      tl.to("#ratio .big",
+        { scale: 1.0, duration: 0.35, ease: "power2.out" }, 4.7);
+
+      // 底脚贯通页 fade in（在结尾前完成，确保停留可见）
+      tl.fromTo(".footnote",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.5, ease: "power2.out" }, 0.9);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

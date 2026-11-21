@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"speaker","type":"string","label":"说话人","default":"主持人"},{"id":"subtitle","type":"string","label":"字幕","default":"真正决定效果的，不是模型参数，而是你的提示词工程。"},{"id":"highlight","type":"string","label":"高亮词","default":"提示词工程"},{"id":"accent","type":"color","label":"强调色","default":"#00FF00"},{"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},{"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"}]}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+html[data-export-mode="mp4"] body, html[data-export-mode="mp4"] #root{ background: #12100E !important;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      *{ box-sizing: border-box;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      html, body{ margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: var(--background, transparent);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      body{ font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--background, #12100E); color: var(--foreground);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .scene{ position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: 0 120px 120px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .bar{ position: relative; max-width: 1400px; padding: 30px 48px 28px; border-radius: 16px; background: rgba(18,16,14,0.82); border: 2px solid color-mix(in srgb, var(--accent) 38%, transparent); backdrop-filter: blur(18px);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .speaker{ position: absolute; left: 24px; top: -14px; padding: 4px 14px; background: var(--accent); color: #12100E; font-size: 18px; font-weight: 800; border-radius: 4px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .subtitle{ margin: 0; font-size: 38px; font-weight: 700; line-height: 1.35; letter-spacing: -0.02em;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .highlight{ color: var(--accent);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+      <section id="scene" class="scene clip" data-start="0" data-duration="5" data-track-index="1">
+        <div class="bar">
+          <div class="speaker" id="speaker"></div>
+          <p class="subtitle" id="subtitle"></p>
+        </div>
+      </section>
+    </div>
+    <script>
+      const fallback = { speaker: "主持人", subtitle: "真正决定效果的，不是模型参数，而是你的提示词工程。", highlight: "提示词工程", accent: "#00FF00", foreground: "#F4EFE7" };
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.documentElement.dataset.exportMode = v.exportMode || "transparent";
+      document.documentElement.style.setProperty("--accent", v.accent);
+      document.documentElement.style.setProperty("--foreground", v.foreground);
+      document.getElementById("speaker").textContent = v.speaker;
+      const hl = v.highlight || "";
+      const subtitleEl = document.getElementById("subtitle");
+      if (hl && v.subtitle.includes(hl)) {
+        subtitleEl.innerHTML = v.subtitle.replace(hl, `<span class="highlight">${hl}</span>`);
+      } else {
+        subtitleEl.textContent = v.subtitle;
+      }
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(".bar", { opacity: 0, y: 50 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.1);
+      tl.fromTo(".speaker", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 0.35);
+      tl.fromTo(".subtitle", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 0.45);
+      if (subtitleEl.querySelector(".highlight")) {
+        tl.fromTo(".highlight", { opacity: 0.3, scale: 0.98 }, { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(2)" }, 1.1);
+      }
+      tl.to(".scene", { opacity: 0, y: -16, duration: 0.4, ease: "power2.in" }, 4.4);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

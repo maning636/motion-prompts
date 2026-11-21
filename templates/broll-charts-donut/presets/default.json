@@ -1,0 +1,11 @@
+{
+  "title": "2024 年度业绩",
+  "subtitle": "各部门季度销售额对比",
+  "labels": "搜索,推荐,广告,其他",
+  "values": "45,30,18,7",
+  "center_label": "总收入",
+  "center_value": "100",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

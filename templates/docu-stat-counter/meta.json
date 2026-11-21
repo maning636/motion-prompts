@@ -1,0 +1,12 @@
+{
+  "id": "docu-stat-counter",
+  "name": "计数器·皮影档案",
+  "description": "双联半圆仪表盘+中心巨型百分比计数，弧线画入+数字跳动（B 族皮影·纪录片档案风，2026-08-31）",
+  "category": "口播工厂",
+  "series": "docu",
+  "slot": "docu-puppet",
+  "tags": ["口播工厂","皮影档案","纪录片","docu-stat-counter"],
+  "duration": 6,
+  "size": "1920×1080",
+  "status": "ready"
+}

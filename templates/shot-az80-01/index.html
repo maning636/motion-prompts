@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "nameA", "type": "string", "label": "角色A名牌", "default": "设计"}, {"id": "nameB", "type": "string", "label": "角色B名牌", "default": "开发"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+.cur{ position:absolute; left:0; top:0; will-change:transform; }
+.cur svg{ display:block; filter:drop-shadow(0 6px 18px rgba(0,0,0,.5)); }
+.tag{ position:absolute; left:34px; top:38px; padding:8px 18px; border-radius:999px; font-size:22px;
+  color:#0A0A0F; white-space:nowrap; }
+#curA .tag{ background:#3E7BFA; color:#fff; }
+#curB .tag{ background:var(--accent); color:#0A0A0F; }
+#stage-note{ position:absolute; left:0; right:0; bottom:90px; text-align:center; font-size:26px;
+  color:rgba(255,255,255,.4); letter-spacing:8px; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4.7" data-width="1920" data-height="1080">
+<div class="cur" id="curA"><svg width="46" height="46" viewBox="0 0 46 46"><path d="M4,2 L4,34 L12,26 L18,40 L23,38 L17,24 L29,24 Z" fill="#3E7BFA" stroke="#fff" stroke-width="2.5"/></svg><div class="tag" id="tagA"></div></div><div class="cur" id="curB"><svg width="46" height="46" viewBox="0 0 46 46"><path d="M4,2 L4,34 L12,26 L18,40 L23,38 L17,24 L29,24 Z" fill="#00FF00" stroke="#0A0A0F" stroke-width="2.5"/></svg><div class="tag" id="tagB"></div></div><div id="stage-note">HANDOFF</div>
+    </div>
+    <script>
+      const FB = {"nameA": "设计", "nameB": "开发", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#tagA').textContent=v.nameA||'';$('#tagB').textContent=v.nameB||'';
+gsap.set('#curA',{transformOrigin:'0px 0px'}); gsap.set('#curB',{transformOrigin:'0px 0px'});
+const CX=960, CY=540, R=270;
+// 灯光交接：名牌亮度/饱和/辉光随 lit 走（可回放属性）
+const lit={a:1,b:0};
+const applyLit=()=>{
+  $('#tagA').style.opacity=(0.28+0.72*lit.a).toFixed(3);
+  $('#tagA').style.filter='saturate('+(0.35+0.65*lit.a).toFixed(3)+')'+(lit.a>0.6?' drop-shadow(0 0 14px rgba(62,123,250,.9))':'');
+  $('#tagB').style.opacity=(0.28+0.72*lit.b).toFixed(3);
+  $('#tagB').style.filter='saturate('+(0.35+0.65*lit.b).toFixed(3)+')'+(lit.b>0.6?' drop-shadow(0 0 14px color-mix(in srgb, var(--accent) 90%, transparent))':'');
+};
+applyLit();
+// 绕位 proxy：A 上弧 180°→360°，B 下弧 0°→180°（礼让分弧）
+const ang={a:180,b:0};
+const place=()=>{
+  gsap.set('#curA',{x:CX+R*Math.cos(ang.a*Math.PI/180), y:CY+R*Math.sin(ang.a*Math.PI/180)});
+  gsap.set('#curB',{x:CX+R*Math.cos(ang.b*Math.PI/180), y:CY+R*Math.sin(ang.b*Math.PI/180)});
+};
+// 1) 贝塞尔入场 24f easeOut（画外→外场位）
+gsap.set('#curA',{x:-200,y:860}); gsap.set('#curB',{x:2120,y:220});
+tl.to('#curA',{x:520,y:640,duration:F(24),ease:'power2.out'},0);
+tl.to('#curB',{x:1400,y:440,duration:F(24),ease:'power2.out'},0);
+// 2) 相互靠近 30f easeInOut → 圆两端（对话距离）
+tl.to('#curA',{x:CX-R,y:CY,duration:F(30),ease:'power2.inOut'},F(24));
+tl.to('#curB',{x:CX+R,y:CY,duration:F(30),ease:'power2.inOut'},F(24));
+// 靠近时脉冲呼吸（有限 repeat）
+tl.to('#curA',{scale:1.06,duration:F(7),yoyo:true,repeat:3,ease:'sine.inOut'},F(28));
+tl.to('#curB',{scale:1.06,duration:F(7),yoyo:true,repeat:3,ease:'sine.inOut'},F(28));
+// 3) 绕位交换 38f（f54-92）：位移改由 proxy 驱动，先接管位置
+tl.call(place,[],F(54));
+tl.to(ang,{a:360,duration:F(38),ease:'power2.inOut',onUpdate:place},F(54));
+tl.to(ang,{b:180,duration:F(38),ease:'power2.inOut',onUpdate:place},F(54));
+// 4) 灯光交接 f70-84（绕位中段）：话语权 A→B
+tl.to(lit,{a:0,b:1,duration:F(14),ease:'power2.inOut',onUpdate:applyLit},F(70));
+// 5) 绿光标甩出成转场 f100-134：名牌先淡，easeIn 放大冲向画外角落
+tl.to('#tagB',{opacity:0,duration:F(12),ease:'power1.in'},F(100));
+tl.to('#curB',{x:1500,y:-380,scale:68,duration:F(34),ease:'power2.in'},F(100));
+tl.to('#curA',{scale:1,duration:F(6)},F(54)); // 呼吸归位
+tl.to({},{duration:F(7)},F(134)); // 巨箭头遮挡静止收尾
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

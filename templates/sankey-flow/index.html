@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"title","type":"string","label":"标题","default":"流量转化漏斗"},{"id":"subtitle","type":"string","label":"副标题","default":"用户从访问到付费的流转分布"},{"id":"sources","type":"string","label":"来源节点（逗号分隔）","default":"自然搜索,社交媒体,直接访问"},{"id":"targets","type":"string","label":"目标节点（逗号分隔）","default":"注册,购买"},{"id":"values","type":"string","label":"流量矩阵（分号分隔来源，逗号分隔目标）","default":"400,120;280,90;150,60"},{"id":"accent","type":"color","label":"强调色","default":"#00FF00"},{"id":"background","type":"color","label":"背景色","default":"#12100E"},{"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+*{ box-sizing: border-box;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      html, body{ margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: var(--background, #12100e);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      body{ font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--background, #12100e); color: var(--foreground, #f4efe7);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .scene{ position: absolute; inset: 0; width: 100%; height: 100%; padding: 96px 112px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .title-area{ margin-bottom: 48px;font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+      .title{ margin: 0 0 12px; font-size: 72px; font-weight: 700; line-height: 1.1; letter-spacing: -0.03em;font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+      .subtitle{ margin: 0; font-size: 32px; font-weight: 400; color: #6B7280;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .chart-area{ position: relative; width: 100%; height: 640px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .chart-svg{ width: 100%; height: 100%; overflow: visible;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .node{ fill: #211c18; stroke: #3a3029; stroke-width: 2;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .node-label{ fill: #f4efe7; font-size: 22px; font-weight: 600; text-anchor: middle;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .node-value{ fill: #6B7280; font-size: 16px; font-weight: 500; text-anchor: middle;font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+      .link{ fill: none; stroke-width: 24; stroke-linecap: round; opacity: 0;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene clip" data-start="0" data-duration="6" data-track-index="1">
+        <div class="title-area">
+          <h1 class="title" id="title"></h1>
+          <p class="subtitle" id="subtitle"></p>
+        </div>
+        <div class="chart-area">
+          <svg class="chart-svg" id="chart-svg" viewBox="0 0 1696 640" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+      </section>
+    </div>
+    <script>
+      const fallback = { title: "流量转化漏斗", subtitle: "用户从访问到付费的流转分布", sources: "自然搜索,社交媒体,直接访问", targets: "注册,购买", values: "400,120;280,90;150,60", accent: "#00FF00", background: "#12100E", foreground: "#F4EFE7" };
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4EFE7");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0E0E0E");
+      document.documentElement.style.setProperty("--accent", v.accent);
+      document.getElementById("root").style.backgroundColor = v.background;
+      document.getElementById("root").style.color = v.foreground;
+      document.getElementById("title").textContent = v.title;
+      document.getElementById("subtitle").textContent = v.subtitle;
+
+      const sources = v.sources.split(",");
+      const targets = v.targets.split(",");
+      const matrix = v.values.split(";").map(row => row.split(",").map(Number));
+      const totalPerSource = matrix.map(row => row.reduce((a, b) => a + b, 0));
+      const totalPerTarget = matrix[0].map((_, j) => matrix.reduce((a, row) => a + row[j], 0));
+      const maxTotal = Math.max(...totalPerSource, ...totalPerTarget);
+
+      const svg = document.getElementById("chart-svg");
+      const chartW = 1696, chartH = 640, marginLeft = 120, marginRight = 120, marginTop = 40, marginBottom = 40;
+      const plotH = chartH - marginTop - marginBottom;
+      const leftX = marginLeft + 80, rightX = chartW - marginRight - 80;
+
+      const sourceNodes = sources.map((name, i) => {
+        const h = (totalPerSource[i] / maxTotal) * plotH * 0.7;
+        const y = marginTop + (plotH / sources.length) * i + (plotH / sources.length - h) / 2;
+        return { name, value: totalPerSource[i], x: leftX, y, h };
+      });
+      const targetNodes = targets.map((name, i) => {
+        const h = (totalPerTarget[i] / maxTotal) * plotH * 0.7;
+        const y = marginTop + (plotH / targets.length) * i + (plotH / targets.length - h) / 2;
+        return { name, value: totalPerTarget[i], x: rightX, y, h };
+      });
+
+      const linkElems = [];
+      sourceNodes.forEach((src, i) => {
+        targetNodes.forEach((tgt, j) => {
+          const val = matrix[i][j];
+          if (!val) return;
+          const strokeW = Math.max(8, (val / maxTotal) * plotH * 0.35);
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          const cp1x = src.x + (tgt.x - src.x) * 0.5, cp2x = src.x + (tgt.x - src.x) * 0.5;
+          const sy = src.y + src.h / 2, ty = tgt.y + tgt.h / 2;
+          path.setAttribute("d", `M ${src.x + 12} ${sy} C ${cp1x} ${sy}, ${cp2x} ${ty}, ${tgt.x - 12} ${ty}`);
+          path.setAttribute("class", "link"); path.setAttribute("stroke", v.accent);
+          path.setAttribute("stroke-width", strokeW); path.setAttribute("opacity", "0");
+          svg.appendChild(path);
+          linkElems.push(path);
+        });
+      });
+
+      const nodeElems = [];
+      [...sourceNodes, ...targetNodes].forEach(n => {
+        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("x", n.x - 12); rect.setAttribute("y", n.y); rect.setAttribute("width", 24); rect.setAttribute("height", n.h); rect.setAttribute("rx", 4); rect.setAttribute("class", "node"); rect.setAttribute("opacity", "0"); svg.appendChild(rect);
+        const lab = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        lab.setAttribute("x", n.x); lab.setAttribute("y", n.y + n.h / 2 - 6); lab.setAttribute("class", "node-label"); lab.textContent = n.name; lab.setAttribute("opacity", "0"); svg.appendChild(lab);
+        const val = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        val.setAttribute("x", n.x); val.setAttribute("y", n.y + n.h / 2 + 18); val.setAttribute("class", "node-value"); val.textContent = n.value; val.setAttribute("opacity", "0"); svg.appendChild(val);
+        nodeElems.push({ rect, lab, val });
+      });
+
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(".title", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }, 0.1);
+      tl.fromTo(".subtitle", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.3);
+      nodeElems.forEach((ne, i) => {
+        tl.fromTo(ne.rect, { opacity: 0, scaleY: 0 }, { opacity: 1, scaleY: 1, duration: 0.5, ease: "power3.out", transformOrigin: "center center" }, 0.6 + i * 0.08);
+        tl.fromTo([ne.lab, ne.val], { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 0.9 + i * 0.08);
+      });
+      linkElems.forEach((link, i) => {
+        tl.fromTo(link, { opacity: 0, strokeDasharray: 1000, strokeDashoffset: 1000 }, { opacity: 0.45, strokeDashoffset: 0, duration: 1.0, ease: "power2.out" }, 1.2 + i * 0.08);
+      });
+      tl.to(".scene", { opacity: 0, scale: 1.01, duration: 0.5, ease: "power2.in" }, 5.3);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

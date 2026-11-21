@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"eyebrow","type":"string","label":"角标","default":"老马批注 · 01"},{"id":"beforeText","type":"string","label":"关键词前文字","default":"他们赚的不是钱，"},{"id":"keyword","type":"string","label":"被圈关键词","default":"是你的注意力"},{"id":"afterText","type":"string","label":"关键词后文字","default":"。"},{"id":"note","type":"string","label":"手写批注","default":"看明白没，这才是收割"},{"id":"caption","type":"string","label":"底部字幕","default":"口播字幕位置 · 画面底部灰字一行"},{"id":"accent","type":"color","label":"批注绿","default":"#22c55e"},{"id":"duration","type":"number","label":"总时长(秒)","default":6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+*{ box-sizing: border-box; }
+html, body{ margin:0; width:1920px; height:1080px; overflow:hidden; background: var(--background, #F5F0E6); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #F5F0E6); color: var(--foreground, #1D1D20);
+  font-family:'Noto Sans SC','PingFang SC',sans-serif; }
+.frame{ position:absolute; inset:0; border:10px solid #1D1D20; pointer-events:none; z-index:9; }
+.scene{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+.card{ position:relative; width:1520px; min-height:560px; margin-bottom:70px;
+  background:#FFFDF7; border:4px solid #1D1D20; border-radius:14px; box-shadow:10px 10px 0 #2A292B;
+  padding:96px 110px 150px; }
+.tape{ position:absolute; width:130px; height:34px; border:3px solid #1D1D20; border-radius:4px; z-index:6; }
+.chip{ display:inline-flex; align-items:center; gap:10px; padding:8px 20px; border:4px solid #1D1D20;
+  border-radius:999px; font-family:'Fredoka','Noto Sans SC',sans-serif; font-weight:700; font-size:24px;
+  letter-spacing:.06em; white-space:nowrap; box-shadow:5px 5px 0 #2A292B; color:#1D1D20; }
+.sentence{ position:relative; margin:64px 0 0; text-align:center; font-weight:900; font-size:88px;
+  line-height:1.4; letter-spacing:.01em; color:#1D1D20; word-break:break-all; }
+.sentence .kw{ position:relative; white-space:nowrap; }
+#penlayer{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:5; overflow:visible; }
+.note{ position:absolute; right:70px; bottom:-72px; transform:rotate(3deg); max-width:760px;
+  background:#FFFDF7; border:4px solid #1D1D20; border-radius:999px; box-shadow:8px 8px 0 #2A292B;
+  padding:22px 44px; z-index:7; }
+.note .ntape{ position:absolute; left:50%; top:-20px; transform:translateX(-50%) rotate(-4deg);
+  width:110px; height:30px; border:3px solid #1D1D20; border-radius:4px; }
+.note .ntext{ display:block; font-family:'Ma Shan Zheng','Noto Sans SC',sans-serif; font-weight:400;
+  font-size:52px; line-height:1.3; white-space:nowrap; }
+.note .ntext .ch{ display:inline-block; }
+.caption{ position:absolute; left:50%; bottom:56px; transform:translateX(-50%); max-width:1360px;
+  font-size:30px; font-weight:700; color:#4D4A48; text-align:center; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene" data-start="0" data-duration="6" data-track-index="1">
+        <div class="frame"></div>
+
+        <div class="card" id="card">
+          <span class="tape" id="tape1" style="left:90px;top:-20px;transform:rotate(-5deg);"></span>
+          <span class="tape" id="tape2" style="right:90px;top:-20px;transform:rotate(4deg);"></span>
+          <span class="chip" id="eyebrow"></span>
+
+          <h1 class="sentence" id="sentence">
+            <span id="before"></span><span class="kw" id="keyword"></span><span id="after"></span>
+          </h1>
+
+          <svg id="penlayer">
+            <path id="underline" fill="none" stroke-linecap="round" stroke-width="12"
+              pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" d="" />
+            <ellipse id="circle" fill="none" stroke-linecap="round" stroke-width="12"
+              pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" cx="0" cy="0" rx="0" ry="0" />
+          </svg>
+
+          <div class="note" id="note">
+            <span class="ntape" id="ntape"></span>
+            <span class="ntext" id="ntext"></span>
+          </div>
+        </div>
+
+        <div class="caption" id="caption"></div>
+      </section>
+    </div>
+    <script>
+      const fallback = {"eyebrow":"老马批注 · 01","beforeText":"他们赚的不是钱，","keyword":"是你的注意力","afterText":"。","note":"看明白没，这才是收割","caption":"口播字幕位置 · 画面底部灰字一行","accent":"#22c55e","duration":6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.documentElement.style.setProperty("--accent", v.accent ?? "#22c55e");
+      const $ = (id) => document.getElementById(id);
+      const accent = v.accent ?? "#22c55e";
+      const dur = Math.max(1, Number(v.duration) || 6);
+      const root = $("root");
+      root.setAttribute("data-duration", dur);
+      $("scene").setAttribute("data-duration", dur);
+
+      $("eyebrow").textContent = v.eyebrow ?? "老马批注 · 01";
+      $("eyebrow").style.background = accent;
+      $("before").textContent = v.beforeText ?? "";
+      $("keyword").textContent = v.keyword ?? "";
+      $("after").textContent = v.afterText ?? "";
+      $("caption").textContent = v.caption ?? "";
+      for (const id of ["tape1","tape2","ntape"]) {
+        $(id).style.background = accent; $(id).style.opacity = "0.55";
+      }
+      $("underline").setAttribute("stroke", accent);
+      $("circle").setAttribute("stroke", accent);
+      $("ntext").style.color = accent;
+
+      // 手写批注逐字拆分（逐笔出现的观感）
+      const ntext = $("ntext");
+      const noteChars = String(v.note ?? "").split("");
+      for (const c of noteChars) {
+        const s = document.createElement("span");
+        s.className = "ch"; s.textContent = c;
+        ntext.appendChild(s);
+      }
+
+      // 依据文字实际排版位置计算圈与下划线（留足余量防止字体回退造成偏移）
+      const card = $("card"), kw = $("keyword"), sentence = $("sentence");
+      const cr = card.getBoundingClientRect();
+      const kr = kw.getBoundingClientRect();
+      const sr = sentence.getBoundingClientRect();
+      const kx = kr.left - cr.left + kr.width / 2;
+      const ky = kr.top - cr.top + kr.height / 2;
+      const circle = $("circle");
+      circle.setAttribute("cx", kx); circle.setAttribute("cy", ky);
+      circle.setAttribute("rx", kr.width / 2 + 34); circle.setAttribute("ry", kr.height / 2 + 22);
+      circle.setAttribute("transform", `rotate(-3 ${kx} ${ky})`);
+      const ux1 = sr.left - cr.left + 10, ux2 = sr.right - cr.left - 10;
+      const uy = sr.bottom - cr.top + 26;
+      $("underline").setAttribute("d",
+        `M ${ux1} ${uy} Q ${(ux1 + ux2) / 2} ${uy + 16}, ${ux2} ${uy}`);
+
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      tl.fromTo("#card", { y: 64, opacity: 0, scale: 0.92 },
+        { y: 0, opacity: 1, scale: 1, duration: 0.5, ease: "back.out(1.4)" }, 0.15);
+      tl.fromTo(".tape", { scale: 0 }, { scale: 1, duration: 0.3, ease: "back.out(2.5)", stagger: 0.1 }, 0.5);
+      tl.fromTo("#eyebrow", { scale: 0 }, { scale: 1, duration: 0.28, ease: "back.out(2.2)" }, 0.55);
+      tl.fromTo("#sentence", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 0.7);
+      tl.fromTo("#caption", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 0.9);
+      // 绿笔下划线划过全句
+      tl.fromTo("#underline", { strokeDashoffset: 100 },
+        { strokeDashoffset: 0, duration: 0.55, ease: "power1.inOut" }, 1.25);
+      // 绿笔圈住关键词
+      tl.fromTo("#circle", { strokeDashoffset: 100 },
+        { strokeDashoffset: 0, duration: 0.65, ease: "power1.inOut" }, 1.85);
+      // 批注贴纸啪上 + 手写文字逐字出现
+      tl.fromTo("#note", { scale: 0.7, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.32, ease: "back.out(2.4)" }, 2.55);
+      tl.fromTo("#ntape", { scale: 0 }, { scale: 1, duration: 0.25, ease: "back.out(2.5)" }, 2.7);
+      tl.fromTo("#ntext .ch", { opacity: 0, y: 10, rotation: -6 },
+        { opacity: 1, y: 0, rotation: 0, duration: 0.18, ease: "power1.out", stagger: 0.07 }, 2.8);
+      // 动效段到此为止，剩余时长定格等剪辑切镜
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

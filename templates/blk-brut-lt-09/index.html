@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"tag","name":"价格标签","type":"string","label":"价格标签（2–5 字）","default":"到手价"},{"id":"cur","name":"现价","type":"number","label":"现价数字（不含货币符号）","default":299},{"id":"unit","name":"货币","type":"string","label":"货币单位（1–2 字）","default":"元"},{"id":"was","name":"原价","type":"number","label":"原价数字（划线显示）","default":599},{"id":"note","name":"补充","type":"string","label":"价格下方补充说明（8–16 字）","default":"含一年服务 · 下单后 3 分钟生效"},{"id":"accent","name":"强调色","type":"color","label":"强调色（价格块底 / 原价块）","default":"#FFD429"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","hidden":true,"default":"transparent","options":[{"value":"transparent","label":"透明底"},{"value":"mp4","label":"MP4 纯底"},{"value":"webm","label":"WebM 纯底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="价格贴：强调色价格块自左拍入，数字 steps(9) 整数跳到到手价，右侧白底原价块带 3px 划线后自右补上，两块落定后做反向微位移">
+<title>价格贴 · 到手价</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 透明底贴片：--paper 不出现，底色与阴影色收进变量（风格规范 §7.1 / §7.2 规则 A） */
+  :root{ --shadow:#FFFFFF; --background:transparent; }
+
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--background);color:var(--ink);font-family:var(--sans)}
+
+  /* 价格块定高 296px，右侧原价块靠固定坐标摆位，不依赖文字长度 */
+  #pn{position:absolute;left:120px;bottom:176px;width:780px;height:296px;
+    display:flex;flex-direction:column;justify-content:center;
+    background:var(--accent);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow);padding:26px 40px}
+  #tag{display:block;font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:.14em;
+    line-height:1;color:var(--ink);white-space:nowrap;overflow:hidden}
+  /* 价格数字：mono + tabular-nums，字号比标签 ≥1.6×（iart §7 停留帧判据） */
+  .amt{display:flex;align-items:baseline;gap:14px;margin-top:14px}
+  #cur{display:block;font-family:var(--mono);font-weight:900;font-size:132px;line-height:.92;
+    letter-spacing:0;color:var(--ink);font-variant-numeric:tabular-nums;
+    font-feature-settings:"tnum" 1;white-space:nowrap;overflow:hidden}
+  #unit{display:block;font-size:44px;font-weight:900;line-height:1;letter-spacing:0;color:var(--ink);
+    white-space:nowrap}
+  #note{display:block;margin-top:18px;font-family:var(--mono);font-weight:700;font-size:22px;
+    letter-spacing:.02em;line-height:1.2;color:var(--ink);white-space:nowrap;overflow:hidden}
+
+  /* 原价块：白底 + 3px 划线压住数字，划线是 3px 实线不是删除线样式 */
+  #od{position:absolute;left:940px;bottom:288px;width:440px;height:112px;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--white);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow);overflow:hidden}
+  .was{display:flex;align-items:baseline;gap:10px}
+  .was .lb{font-family:var(--mono);font-weight:700;font-size:24px;letter-spacing:.08em;color:var(--ink)}
+  #was{display:block;font-family:var(--mono);font-weight:700;font-size:52px;line-height:1;
+    letter-spacing:0;color:var(--ink);font-variant-numeric:tabular-nums;
+    font-feature-settings:"tnum" 1}
+  .was .cu{font-size:26px;font-weight:900;line-height:1;color:var(--ink)}
+  #strike{position:absolute;left:24px;right:24px;top:50%;height:3px;background:var(--ink)}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="pn">
+    <div id="tag" data-fit-max="26" data-fit-min="16">到手价</div>
+    <div class="amt"><span id="cur" data-fit-max="132" data-fit-min="64">299</span><span id="unit" data-fit-max="44" data-fit-min="24">元</span></div>
+    <div id="note" data-fit-max="22" data-fit-min="14">含一年服务 · 下单后 3 分钟生效</div>
+  </div>
+  <div id="od">
+    <div class="was"><span class="lb">原价</span><span id="was">599</span><span class="cu">元</span></div>
+    <div id="strike"></div>
+  </div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  var isT = (v.exportMode || 'transparent') === 'transparent';
+  var r = document.documentElement.style;
+  r.setProperty('--background', isT ? 'transparent' : '#0F0F0F');
+  r.setProperty('--shadow', isT ? '#FFFFFF' : '#0F0F0F');
+  if (v.accent) r.setProperty('--accent', v.accent);
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+  ['tag', 'cur', 'unit', 'was', 'note'].forEach(function (k) { set(k, v[k]); });
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：数字直接给终值，跳数与对撞全部去掉，只留 ≤8px 微位移淡入（规范 §13.5） */
+    gsap.set('#pn', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#od', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#cur', { textContent: v.cur });
+    gsap.set('#strike', { scaleX: 1 });
+
+    tl.fromTo('#pn', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, 0);
+    tl.fromTo('#od', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, .45);
+
+    B.hold(tl, 1.6, 1.2);
+    return;
+  }
+
+  var TOTAL = parseFloat(v.duration) > 0 ? parseFloat(v.duration) : 5;
+  var HOLD = 0.5;
+  var WIN = Math.max(1.6, TOTAL - HOLD);
+  var SH = isT ? '#FFFFFF' : '#0F0F0F';
+
+  /* 模 1 · 硬着陆：价格块自左 70px 拍入，落定瞬间阴影压 2 帧再弹回原档 */
+  tl.fromTo('#pn', { x: -70 },
+      { x: 0, duration: .26, ease: 'power4.out' }, 0)
+    .fromTo('#pn', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#pn', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+
+  /* 模 4 · 整数跳数：steps(9) 只跳 9 次，比连续滚动硬得多。展示窗口写死 1.2s，
+     数字只决定显示的数值，绝不用变量推算时间轴长度（规范 §15 回调专项）。 */
+  var n = { v: 0 };
+  var to = Number(v.cur) || 0;
+  tl.to(n, { v: to, duration: 1.2, ease: 'steps(9)',
+      onUpdate: function () {
+        var e = document.getElementById('cur');
+        if (e) e.textContent = String(Math.round(n.v));
+      } }, .2);
+
+  tl.fromTo('#tag', { x: -20 }, { x: 0, duration: .2, ease: 'power4.out' }, .18);
+  tl.fromTo('#note', { x: -20 }, { x: 0, duration: .2, ease: 'power4.out' }, .4);
+  tl.fromTo('#unit', { x: -18 }, { x: 0, duration: .2, ease: 'power4.out' }, .34);
+
+  /* 原价块自右拍入，划线用 clip-path 分格画出（模 7，steps(6)） */
+  tl.fromTo('#od', { x: 70 },
+      { x: 0, duration: .26, ease: 'power4.out' }, .24)
+    .fromTo('#od', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#od', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+  tl.fromTo('#strike', { clipPath: 'inset(0 100% 0 0)' },
+      { clipPath: 'inset(0 0% 0 0)', duration: .3, ease: 'steps(6)' }, .72);
+
+  /* 两块反向微位移：价格块下压、原价块上抬，匀速往返，零回弹 */
+  var T0 = 1.7;
+  var REP = Math.max(1, Math.round((WIN - T0) / 1.0));
+  var half = (WIN - T0) / (REP * 2);
+  tl.to('#pn', { y: 6, duration: half, ease: 'none', repeat: REP * 2 - 1, yoyo: true }, T0);
+  tl.to('#od', { y: -6, duration: half, ease: 'none', repeat: REP * 2 - 2, yoyo: true }, T0 + half);
+
+  var end = tl.duration();
+  B.hold(tl, end, Math.max(HOLD, TOTAL - end));
+})();
+</script>
+</body></html>

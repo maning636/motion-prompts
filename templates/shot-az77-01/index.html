@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "metric", "type": "string", "label": "比分数字", "default": "98.6%"}, {"id": "cap", "type": "string", "label": "说明文字", "default": "本月交付成功率"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#wrap{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+#card{ position:relative; text-align:center; will-change:transform; }
+#m{ font-size:250px; font-weight:900; color:var(--accent); line-height:1; }
+#c{ margin-top:26px; font-size:36px; opacity:.6; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+#ring{ position:absolute; left:50%; top:46%; width:80px; height:80px; margin:-40px 0 0 -40px;
+  border:6px solid var(--accent); border-radius:50%; opacity:0; will-change:transform,opacity; }
+.dust{ position:absolute; left:50%; top:46%; border-radius:50%; background:var(--fg); opacity:0; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4.5" data-width="1920" data-height="1080">
+
+<div id="wrap">
+  <div id="card"><div id="m"></div><div id="c"></div></div>
+  <div id="ring"></div>
+</div>
+
+    </div>
+    <script>
+      const FB = {"metric": "98.6%", "cap": "本月交付成功率", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#m').textContent=v.metric||'';$('#c').textContent=v.cap||'';
+const card=$('#card'), ring=$('#ring'), wrap=$('#wrap');
+const dusts=[];
+for(let i=0;i<10;i++){
+  const d=document.createElement('div');d.className='dust';
+  const sz=18+Math.round(12*i/9);
+  d.style.width=sz+'px';d.style.height=sz+'px';d.style.margin=(-sz/2)+'px 0 0 '+(-sz/2)+'px';
+  wrap.appendChild(d);dusts.push(d);
+}
+gsap.set(card,{scale:2.5,rotate:5,autoAlpha:0});
+tl.to(card,{autoAlpha:1,duration:F(2)},F(18));
+// 6 帧 ease-in 砸落（加速砸，不是减速放）
+tl.to(card,{scale:1,rotate:0,duration:F(6),ease:'power2.in'},F(20));
+// 落点 f26：圆环扩散 + 尘点飞散 + 震屏 同帧起爆
+tl.set(ring,{opacity:.9,scale:1},F(26));
+tl.to(ring,{scale:10.75,duration:F(14),ease:'power3.out'},F(26));
+tl.to(ring,{opacity:0,duration:F(14),ease:'none'},F(26));
+dusts.forEach((d,i)=>{
+  const th=(i/10)*Math.PI*2+0.35;
+  const dist=160+16*((i*37)%10);
+  tl.set(d,{opacity:.85},F(26));
+  tl.to(d,{x:Math.cos(th)*dist,y:Math.sin(th)*dist*0.62,duration:F(16),ease:'power3.out'},F(26));
+  tl.to(d,{opacity:0,duration:F(16),ease:'none'},F(26));
+});
+const sh={f:0};
+tl.to(sh,{f:4,duration:F(4),ease:'none',onUpdate:()=>{
+  const a=18*Math.exp(-sh.f/1.1);
+  wrap.style.transform='translate('+(a*Math.sin(sh.f*5.5)).toFixed(1)+'px,'+(a*0.7*Math.cos(sh.f*4.2)).toFixed(1)+'px)';
+}},F(26));
+tl.set(wrap,{clearProps:'transform'},F(31));
+tl.to({},{duration:F(104)},F(31));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

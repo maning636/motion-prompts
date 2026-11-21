@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"cnText","type":"string","label":"中文文案（≤12字）","default":"把简单留给观众"},{"id":"enText","type":"string","label":"英文文案","default":"KEEP IT SIMPLE"},{"id":"hlText","type":"string","label":"高亮关键词（句中需包含）","default":"简单"},{"id":"stepLabel","type":"string","label":"章节标签","default":"STEP"},{"id":"stepNo","type":"string","label":"章节编号","default":"03"},{"id":"totalSteps","type":"string","label":"总步数（页码分母）","default":"12"},{"id":"panelColor","type":"color","label":"衬板底色（默认米白）","default":"#F3EEE2"},{"id":"accentColor","type":"color","label":"强调色（荧光绿高亮）","default":"#39FF85"},{"id":"textColor","type":"color","label":"主文字色","default":"#23281F"},{"id":"cornerPosition","type":"enum","label":"位置","options":[{"label":"左下","value":"bl"},{"label":"右下","value":"br"},{"label":"左上","value":"tl"},{"label":"右上","value":"tr"}],"default":"bl"},{"id":"entranceDir","type":"enum","label":"入场方向","options":[{"label":"从底部滑入","value":"bottom"},{"label":"从外侧滑入","value":"left"},{"label":"弹性缩放入场","value":"scale"}],"default":"bottom"},{"id":"loopDuration","type":"number","label":"循环时长（秒，2-4）","default":"3"}]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=480, height=270" />
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { width: 480px; height: 270px; overflow: hidden; background: transparent; }
+      body { font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+      /* ===== 角落定位容器（⑨ 教学外壳 · 教程字幕角）===== */
+      #cap {
+        position: absolute;
+        transform-origin: var(--origin, left bottom);
+        will-change: transform, opacity;
+      }
+      #cap.bl { left: 20px;  bottom: 18px; --origin: left bottom; }
+      #cap.br { right: 20px; bottom: 18px; --origin: right bottom; }
+      #cap.tl { left: 20px;  top: 18px;    --origin: left top; }
+      #cap.tr { right: 20px; top: 18px;    --origin: right top; }
+
+      /* ===== 章节节点：STEP 03 绿标签（先醒）===== */
+      #step-tab {
+        position: absolute;
+        top: -8px;
+        left: 12px;
+        display: flex;
+        align-items: baseline;
+        gap: 5px;
+        padding: 2px 7px 3px;
+        background: var(--ac, #39FF85);
+        color: #18211B;
+        font-size: 8px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        line-height: 1;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.22);
+        will-change: transform, opacity;
+        z-index: 3;
+      }
+      #step-tab b {
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ===== 米白衬板（教科书纸面）===== */
+      #panel {
+        position: relative;
+        display: flex;
+        align-items: stretch;
+        min-width: 244px;
+        max-width: 340px;
+        padding: 12px 12px 9px 16px;
+        background: var(--pc, #F3EEE2);
+        border: 1px solid rgba(35,40,31,0.28);
+        box-shadow:
+          0 3px 14px rgba(0,0,0,0.20),
+          inset 0 0 0 1px rgba(255,255,255,0.35);
+        will-change: transform, opacity;
+      }
+      /* 纸面微噪点 */
+      #panel::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='5'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+        mix-blend-mode: multiply;
+        pointer-events: none;
+      }
+
+      /* 取景框角标（四角 L 形细线） */
+      .tick {
+        position: absolute;
+        width: 7px;
+        height: 7px;
+        border: 0 solid rgba(35,40,31,0.55);
+        will-change: transform;
+      }
+      .tick.t1 { left: 3px;   top: 3px;    border-top-width: 1px; border-left-width: 1px;  transform-origin: left top; }
+      .tick.t2 { right: 3px;  top: 3px;    border-top-width: 1px; border-right-width: 1px; transform-origin: right top; }
+      .tick.t3 { left: 3px;   bottom: 3px; border-bottom-width: 1px; border-left-width: 1px;  transform-origin: left bottom; }
+      .tick.t4 { right: 3px;  bottom: 3px; border-bottom-width: 1px; border-right-width: 1px; transform-origin: right bottom; }
+
+      /* ===== 左侧文字列 ===== */
+      #text-col {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 5px;
+        padding-right: 12px;
+        min-width: 0;
+      }
+
+      #cn-line {
+        font-size: var(--cn-size, 21px);
+        line-height: 1.1;
+        letter-spacing: 0.06em;
+        color: var(--tc, #23281F);
+        white-space: nowrap;
+        will-change: transform, opacity;
+      }
+      #cn-line .ch {
+        display: inline-block;
+        will-change: transform, opacity;
+      }
+      /* 高亮关键词：荧光绿块扫入 */
+      .hl-wrap {
+        position: relative;
+        display: inline-block;
+      }
+      .hl-block {
+        position: absolute;
+        left: -3px;
+        right: -3px;
+        top: 6%;
+        height: 82%;
+        background: var(--ac, #39FF85);
+        transform: scaleX(0);
+        transform-origin: left center;
+        will-change: transform, opacity;
+        pointer-events: none;
+      }
+      .hl-wrap .ch { position: relative; z-index: 1; }
+      .hl-wrap.lit .ch { color: #141B15; }
+
+      #rule {
+        height: 1px;
+        background: rgba(35,40,31,0.30);
+        transform: scaleX(0);
+        transform-origin: left center;
+        will-change: transform;
+      }
+
+      #en-line {
+        font-size: var(--en-size, 8.5px);
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+        color: rgba(35,40,31,0.62);
+        white-space: nowrap;
+        will-change: transform, opacity, letter-spacing;
+      }
+
+      /* ===== 右侧页码列（栏线分隔）===== */
+      #meta {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: flex-end;
+        gap: 3px;
+        padding-left: 11px;
+        border-left: 1px solid rgba(35,40,31,0.22);
+        will-change: transform, opacity;
+      }
+      #meta .m-label {
+        font-size: 6.5px;
+        letter-spacing: 0.26em;
+        text-transform: uppercase;
+        color: rgba(35,40,31,0.45);
+      }
+      #meta .m-num {
+        font-size: 15px;
+        line-height: 1;
+        letter-spacing: 0.02em;
+        color: var(--tc, #23281F);
+        font-variant-numeric: tabular-nums;
+      }
+      #meta .m-num span {
+        font-size: 8px;
+        color: rgba(35,40,31,0.45);
+      }
+      #meta .m-dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: var(--ac, #39FF85);
+      }
+
+      /* ===== 暗色衬板适配 ===== */
+      body.dark-mode #panel {
+        border-color: rgba(245,241,232,0.30);
+        box-shadow: 0 3px 14px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(255,255,255,0.05);
+      }
+      body.dark-mode #panel::after { mix-blend-mode: screen; }
+      body.dark-mode .tick { border-color: rgba(245,241,232,0.6); }
+      body.dark-mode #cn-line { color: rgba(245,241,232,0.94); }
+      body.dark-mode .hl-wrap.lit .ch { color: #141B15; }
+      body.dark-mode #rule { background: rgba(245,241,232,0.3); }
+      body.dark-mode #en-line { color: rgba(245,241,232,0.55); }
+      body.dark-mode #meta { border-left-color: rgba(245,241,232,0.22); }
+      body.dark-mode #meta .m-label { color: rgba(245,241,232,0.4); }
+      body.dark-mode #meta .m-num { color: rgba(245,241,232,0.92); }
+      body.dark-mode #meta .m-num span { color: rgba(245,241,232,0.4); }
+    </style>
+  </head>
+  <body>
+    <div id="cap" class="bl">
+      <div id="step-tab"><span id="step-label">STEP</span><b id="step-num">03</b></div>
+      <div id="panel">
+        <i class="tick t1"></i><i class="tick t2"></i><i class="tick t3"></i><i class="tick t4"></i>
+        <div id="text-col">
+          <div id="cn-line"></div>
+          <div id="rule"></div>
+          <div id="en-line"></div>
+        </div>
+        <div id="meta">
+          <span class="m-label">Lesson</span>
+          <span class="m-num" id="m-num">03<span>/12</span></span>
+          <span class="m-dot"></span>
+        </div>
+      </div>
+    </div>
+
+  <script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+  <script>
+    (() => {
+      const fallback = {
+        cnText: "把简单留给观众",
+        enText: "KEEP IT SIMPLE",
+        hlText: "简单",
+        stepLabel: "STEP",
+        stepNo: "03",
+        totalSteps: "12",
+        panelColor: "#F3EEE2",
+        accentColor: "#39FF85",
+        textColor: "#23281F",
+        cornerPosition: "bl",
+        entranceDir: "bottom",
+        loopDuration: "3"
+      };
+      const v = (window.__hyperframes && window.__hyperframes.getVariables)
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const cnText = (v.cnText || fallback.cnText).toString().slice(0, 12);
+      const enText = (v.enText || fallback.enText).toString().slice(0, 32);
+      const hlText = (v.hlText || "").toString();
+      const stepLabel = (v.stepLabel || "STEP").toString().slice(0, 8);
+      const stepNo = (v.stepNo || "03").toString().slice(0, 4);
+      const totalSteps = (v.totalSteps || "12").toString().slice(0, 4);
+      const pc = v.panelColor || "#F3EEE2";
+      const ac = v.accentColor || "#39FF85";
+      const tc = v.textColor || "#23281F";
+      const pos = v.cornerPosition || "bl";
+      const dir = v.entranceDir || "bottom";
+      const loopDur = Math.min(4, Math.max(2, parseFloat(v.loopDuration) || 3));
+
+      document.documentElement.style.setProperty('--pc', pc);
+      document.documentElement.style.setProperty('--ac', ac);
+      document.documentElement.style.setProperty('--tc', tc);
+
+      // 暗色衬板检测
+      function hexToRgb(h) {
+        const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h || '');
+        return m ? [parseInt(m[1],16), parseInt(m[2],16), parseInt(m[3],16)] : [35,40,31];
+      }
+      const rgb = hexToRgb(pc);
+      const luminance = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+      if (luminance < 0.5) document.body.classList.add('dark-mode');
+
+      // 字号自适应（比例诚实：按真实字幕条字号排）
+      const cnLen = Array.from(cnText).length;
+      const cnSize = cnLen <= 6 ? 21 : (cnLen <= 9 ? 17 : 14);
+      document.documentElement.style.setProperty('--cn-size', cnSize + 'px');
+
+      // 文案装配
+      document.getElementById('step-label').textContent = stepLabel;
+      document.getElementById('step-num').textContent = stepNo;
+      document.getElementById('m-num').innerHTML = stepNo + '<span>/' + totalSteps + '</span>';
+      document.getElementById('en-line').textContent = enText;
+
+      // 中文逐字渲染 + 高亮关键词包裹
+      const cnLine = document.getElementById('cn-line');
+      const charEls = [];
+      const hlWraps = [];
+      (function buildCn() {
+        const chars = Array.from(cnText);
+        const hlIdx = hlText ? cnText.indexOf(hlText) : -1;
+        let i = 0;
+        while (i < chars.length) {
+          if (hlIdx >= 0 && i === hlIdx) {
+            const wrap = document.createElement('span');
+            wrap.className = 'hl-wrap';
+            const block = document.createElement('span');
+            block.className = 'hl-block';
+            wrap.appendChild(block);
+            const chs = [];
+            for (let j = 0; j < hlText.length; j++) {
+              const s = document.createElement('span');
+              s.className = 'ch';
+              s.textContent = chars[i + j];
+              wrap.appendChild(s);
+              chs.push(s);
+              charEls.push(s);
+            }
+            cnLine.appendChild(wrap);
+            hlWraps.push({ wrap, block, chs });
+            i += hlText.length;
+          } else {
+            const s = document.createElement('span');
+            s.className = 'ch';
+            s.textContent = chars[i];
+            cnLine.appendChild(s);
+            charEls.push(s);
+            i++;
+          }
+        }
+      })();
+
+      // 角落定位
+      const cap = document.getElementById('cap');
+      cap.className = pos;
+
+      // 入场偏移（从外侧进）
+      const off = { x: 0, y: 0, scale: 1 };
+      if (dir === 'bottom') {
+        off.y = (pos === 'bl' || pos === 'br') ? 28 : -28;
+      } else if (dir === 'left') {
+        off.x = (pos === 'bl' || pos === 'tl') ? -38 : 38;
+      } else {
+        off.scale = 0.72;
+      }
+
+      // 节点
+      const tab = document.getElementById('step-tab');
+      const panel = document.getElementById('panel');
+      const tickEls = Array.from(document.querySelectorAll('.tick'));
+      const rule = document.getElementById('rule');
+      const enLine = document.getElementById('en-line');
+      const meta = document.getElementById('meta');
+
+      // 目标值先捕获（陷阱：gsap.set 后再读 computed 全是内联值）
+      const enLsTarget = getComputedStyle(enLine).letterSpacing;
+
+      const initial = () => ({
+        cap:    { x: off.x, y: off.y, scale: off.scale, opacity: 1 },
+        tab:    { opacity: 0, scale: 0.4 },
+        panel:  { opacity: 0 },
+        ticks:  { scale: 0 },
+        chars:  { opacity: 0, y: 9 },
+        hl:     { scaleX: 0, opacity: 1 },
+        rule:   { scaleX: 0 },
+        en:     { opacity: 0, letterSpacing: '0.55em' },
+        meta:   { opacity: 0, y: 5 }
+      });
+
+      function resetState() {
+        const s = initial();
+        gsap.set(cap, s.cap);
+        gsap.set(tab, s.tab);
+        gsap.set(panel, s.panel);
+        gsap.set(tickEls, s.ticks);
+        gsap.set(charEls, s.chars);
+        gsap.set(hlWraps.map(h => h.block), s.hl);
+        gsap.set(rule, s.rule);
+        gsap.set(enLine, s.en);
+        gsap.set(meta, s.meta);
+        hlWraps.forEach(h => h.wrap.classList.remove('lit'));
+      }
+      resetState();
+
+      function litHl() { hlWraps.forEach(h => h.wrap.classList.add('lit')); }
+      function unlitHl() { hlWraps.forEach(h => h.wrap.classList.remove('lit')); }
+
+      function runLoop() {
+        const tl = gsap.timeline();
+          // 注册到 window.__timelines：云渲染的 settle/逐帧定位靠它驱动时间轴。
+          // 组件此前全部没注册，导致渲染停在第 0 帧（主体初始 opacity:0 → 整层空）。
+          // gsap 时间轴就地 mutate，先存引用即可，后续 tl.to() 作用在同一对象上。
+          window.__timelines = window.__timelines || {};
+          window.__timelines.main = tl;
+
+        // ── ① 章节节点先醒（0.00–0.45）──
+        tl.to(cap, {
+          x: 0, y: 0, scale: 1,
+          duration: 0.45,
+          ease: dir === 'scale' ? 'back.out(1.8)' : 'power3.out'
+        }, 0.00);
+        tl.to(panel, { opacity: 1, duration: 0.28, ease: 'power2.out' }, 0.12);
+        tl.to(tab, { opacity: 1, scale: 1, duration: 0.36, ease: 'back.out(2.4)' }, 0.16);
+
+        // ── ② 取景框角标生长（0.30–0.56）──
+        tl.to(tickEls, { scale: 1, duration: 0.20, ease: 'power2.out', stagger: 0.055 }, 0.30);
+
+        // ── ③ 中文主句错落浮入（0.50–1.05）──
+        tl.to(charEls, { opacity: 1, y: 0, duration: 0.28, ease: 'power3.out', stagger: 0.045 }, 0.50);
+
+        // ── ④ 荧光绿高亮扫入（1.00–1.42）──
+        if (hlWraps.length) {
+          tl.call(litHl, [], 1.00);
+          tl.to(hlWraps.map(h => h.block), {
+            scaleX: 1, duration: 0.40, ease: 'power2.inOut'
+          }, 1.02);
+        }
+
+        // ── ⑤ 英文辅排延迟浮现 + 页码列（1.15–1.62）──
+        tl.to(rule,   { scaleX: 1, duration: 0.30, ease: 'power2.inOut' }, 1.16);
+        tl.to(enLine, { opacity: 1, letterSpacing: enLsTarget, duration: 0.42, ease: 'power2.out' }, 1.20);
+        tl.to(meta,   { opacity: 1, y: 0, duration: 0.30, ease: 'power2.out' }, 1.34);
+
+        // ── ⑥ 呼吸循环（1.85–2.75，安静一拍）──
+        tl.to(panel, { y: -1.6, duration: 0.45, ease: 'sine.inOut' }, 1.85);
+        tl.to(tab,   { y: -2.2, duration: 0.45, ease: 'sine.inOut' }, 1.85);
+        tl.to(panel, { y: 0, duration: 0.45, ease: 'sine.inOut' }, 2.30);
+        tl.to(tab,   { y: 0, duration: 0.45, ease: 'sine.inOut' }, 2.30);
+        if (hlWraps.length) {
+          tl.to(hlWraps.map(h => h.block), { opacity: 0.72, duration: 0.45, ease: 'sine.inOut' }, 1.85);
+          tl.to(hlWraps.map(h => h.block), { opacity: 1, duration: 0.45, ease: 'sine.inOut' }, 2.30);
+        }
+
+        // ── ⑦ 收尾淡出（2.78–3.16）──
+        tl.to(enLine, { opacity: 0, duration: 0.22, ease: 'power2.in' }, 2.78);
+        tl.to(meta,   { opacity: 0, y: 3, duration: 0.22, ease: 'power2.in' }, 2.82);
+        tl.to(rule,   { scaleX: 0, duration: 0.22, ease: 'power2.in' }, 2.84);
+        tl.to(charEls,{ opacity: 0, y: -5, duration: 0.24, ease: 'power2.in' }, 2.86);
+        if (hlWraps.length) {
+          tl.to(hlWraps.map(h => h.block), { opacity: 0, duration: 0.20, ease: 'power2.in' }, 2.88);
+        }
+        tl.call(unlitHl, [], 3.06);
+        tl.to(panel, { opacity: 0, duration: 0.26, ease: 'power2.in' }, 2.92);
+        tl.to(tab,   { opacity: 0, scale: 0.6, duration: 0.24, ease: 'power2.in' }, 2.96);
+        tl.to(cap,   { x: off.x * 0.5, y: off.y * 0.5, duration: 0.26, ease: 'power2.in' }, 2.92);
+
+        // ── ⑧ 复位（循环点：全空场，跳变不可察觉）──
+        tl.call(resetState, [], 3.20);
+
+        return tl;
+      }
+
+      const master = gsap.timeline({ repeat: -1, delay: 0.2 });
+      master.add(runLoop());
+      master.duration(loopDur);
+      window.__master = master;
+    })();
+  </script>
+  </body>
+</html>

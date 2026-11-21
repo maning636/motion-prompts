@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-CN" data-audit-offcanvas="铅笔写完抬笔后飞出画布右侧，是「写完就走」的收尾" data-composition-variables='[{"id":"label","name":"上方标签","type":"string","label":"笔迹上方的标签","default":"签字处"},{"id":"accent","name":"强调色","type":"color","label":"笔杆强调色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.0}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>手绘铅笔书写</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-label { position: absolute; left: 0; right: 0; top: 92px; text-align: center;
+    font-size: 18px; font-weight: 700; color: rgba(36, 28, 24, .34); }
+  .p-stroke { position: absolute; left: 0; top: 0; width: 480px; height: 270px; }
+  /* 铅笔锚点在自己的笔尖上：transform-origin 0 0，translate 到哪笔尖就在哪 */
+  .p-pen { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
+  .p-pen-wood { position: absolute; left: -16px; top: -8px; width: 16px; height: 16px;
+    background: #F0D2A8; clip-path: polygon(0 0, 0 100%, 100% 50%); }
+  .p-pen-lead { position: absolute; left: -5px; top: -8px; width: 5px; height: 16px;
+    background: #241C18; clip-path: polygon(0 0, 0 100%, 100% 50%); }
+  .p-pen-body { position: absolute; left: -80px; top: -9px; width: 64px; height: 18px;
+    background: #FFC93C; }
+  .p-pen-stripe { position: absolute; left: -80px; top: -4px; width: 64px; height: 2px;
+    background: rgba(36, 28, 24, .22); }
+  .p-pen-ferrule { position: absolute; left: -88px; top: -9px; width: 8px; height: 18px;
+    background: #C6CBD4; }
+  .p-pen-eraser { position: absolute; left: -98px; top: -9px; width: 10px; height: 18px;
+    background: #F3A9A0; clip-path: polygon(22% 0, 100% 0, 100% 100%, 22% 100%, 0 50%); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"label":"签字处","accent":"#FF6B35","duration":3.0};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || FALLBACK.duration;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  function fit(el, avail, maxPx, minPx) {
+    const prev = el.style.whiteSpace;
+    el.style.whiteSpace = 'nowrap';
+    const nat = el.scrollWidth;
+    el.style.whiteSpace = prev;
+    if (nat > avail && nat > 0) {
+      el.style.fontSize = Math.max(minPx, Math.floor(maxPx * avail / nat)) + 'px';
+    }
+  }
+
+  const lab = put('div', 'p-label', '', String(v.label || FALLBACK.label));
+  lab.style.whiteSpace = 'nowrap';
+  fit(lab, 400, 18, 10);
+
+  /* ── 笔迹就是铅笔要走的那条轨迹 ─────────────────────────── */
+  const svg = put('div', 'p-stroke');
+  svg.innerHTML =
+    '<svg width="480" height="270" viewBox="0 0 480 270">' +
+    '<path d="M 86 190 C 112 160 138 160 164 190 C 190 220 216 220 242 190 ' +
+    'C 268 160 294 160 320 190 C 346 220 372 220 396 190" ' +
+    'fill="none" stroke="#241C18" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '</svg>';
+  const path = svg.querySelector('path');
+  const len = path.getTotalLength ? path.getTotalLength() : 330;
+  path.style.strokeDasharray = len + ' ' + len;
+  path.style.strokeDashoffset = String(len);
+
+  const ptAt = function (l) { return path.getPointAtLength(Math.max(0, Math.min(len, l))); };
+  function angAt(l) {
+    const a = ptAt(l - 3), b = ptAt(l + 3);
+    return Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+  }
+  const start = ptAt(0), end = ptAt(len);
+  const a0 = angAt(0), aEnd = angAt(len);
+
+  /* ── 铅笔 ───────────────────────────────────────────────── */
+  const pen = put('div', 'p-pen');
+  put('div', 'p-pen-body', '', null, pen);
+  put('div', 'p-pen-stripe', '', null, pen);
+  put('div', 'p-pen-ferrule', '', null, pen);
+  put('div', 'p-pen-eraser', '', null, pen);
+  put('div', 'p-pen-wood', '', null, pen);
+  put('div', 'p-pen-lead', '', null, pen);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* ── 飞入 → 书写 → 抬笔 → 走人 ──────────────────────────
+     铅笔位置取 getPointAtLength，笔迹取同一进度的 dashoffset，
+     两者天生同步。整段写成「时间 → 画面」的纯函数后烘成
+     GSAP 关键帧交给 tween 插值：扫到哪一帧都是那一帧该有的样子。
+     （不用 onUpdate 回调：实测 GSAP 3.12.7 的 pause(t)/seek
+       只推进子动画比例，不触发 onUpdate 也不触发 onComplete。） */
+  const T_IN = 0.32, T_DRAW = 1.44, T_LIFT = 0.3, T_OUT = 0.55;
+  function clamp01(x) { return x <= 0 ? 0 : (x >= 1 ? 1 : x); }
+  function lerp(a, b, c) { return a + (b - a) * c; }
+  function easeOut(p) { return 1 - Math.pow(1 - p, 3); }
+  function easeInOut(p) { return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; }
+
+  function frame(t) {
+    let px, py, an, op = 1, stroke = len;
+    if (t < T_IN) {
+      const c = easeOut(clamp01(t / T_IN));
+      px = lerp(-52, start.x, c); py = lerp(66, start.y, c);
+      an = lerp(-38, a0, c);
+    } else if (t < T_IN + T_DRAW) {
+      const c = easeInOut(clamp01((t - T_IN) / T_DRAW));
+      const p = ptAt(len * c);
+      px = p.x; py = p.y; an = angAt(len * c);
+      stroke = len * (1 - c);
+    } else if (t < T_IN + T_DRAW + T_LIFT) {
+      const c = easeOut(clamp01((t - T_IN - T_DRAW) / T_LIFT));
+      px = end.x + 18 * c; py = end.y - 36 * c;
+      an = aEnd - 22 * c;
+      stroke = 0;
+    } else {
+      const c = easeInOut(clamp01((t - T_IN - T_DRAW - T_LIFT) / T_OUT));
+      px = lerp(end.x + 18, 552, c); py = lerp(end.y - 36, 92, c);
+      an = lerp(aEnd - 22, aEnd + 38, c);
+      op = 1 - clamp01(c * 1.3);
+      stroke = 0;
+    }
+    return { x: px, y: py, rotate: an, opacity: op, strokeDashoffset: stroke };
+  }
+  const PEN_END = T_IN + T_DRAW + T_LIFT + T_OUT;
+  const N = Math.round(PEN_END / (1 / 60)) + 1;
+  const kfPen = [], kfStroke = [];
+  for (let i = 0; i < N; i++) {
+    const f = frame(PEN_END * (i / (N - 1)));
+    kfPen.push({ x: f.x, y: f.y, rotate: f.rotate, opacity: f.opacity });
+    kfStroke.push({ strokeDashoffset: f.strokeDashoffset });
+  }
+  tl.to(pen, { keyframes: kfPen, duration: PEN_END, ease: 'none' }, 0);
+  tl.to(path, { keyframes: kfStroke, duration: PEN_END, ease: 'none' }, 0);
+
+  tl.fromTo(lab, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: .3, ease: 'power2.out' }, .04);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

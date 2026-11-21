@@ -1,0 +1,13 @@
+{
+  "leftLabel": "方案 A",
+  "leftTitle": "传统做法",
+  "leftPoints": "流程靠人盯\n跨部门拉群对齐\n出错再回炉返工\n汇报全靠截图与口头",
+  "rightLabel": "方案 B",
+  "rightTitle": "AI 协作流",
+  "rightPoints": "结构化卡片沉淀\n上下游语义互通\n实时校验与回放\n看板一键取数",
+  "startPosition": 28,
+  "endPosition": 72,
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

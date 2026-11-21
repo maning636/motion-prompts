@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "vol", "type": "string", "label": "页眉左（卷/栏目）", "default": "VOL.15 · 视觉动效库"}, {"id": "pageno", "type": "string", "label": "页眉右（页码）", "default": "P.303 / 400"}, {"id": "title", "type": "string", "label": "横幅大标题", "default": "这本书适合谁"}, {"id": "cards", "type": "string", "label": "受众卡（标签|说明，分号分隔3条）", "default": "谁该看|想系统入门 AI 工具链、愿意动手练的独立创作者;谁慎用|已有成熟团队、只想找现成 SOP 的读者;谁绕道|期待三天速成、不愿改工作流的人"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #F6F5EF; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #141414;
+        background-image: linear-gradient(rgba(20,20,20,.045) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(20,20,20,.045) 1px, transparent 1px);
+        background-size: 36px 36px; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      /* 顶部细线页眉 */
+      .pat-head{ position: absolute; left: 90px; right: 90px; top: 48px; height: 44px; z-index: 6; }
+      .pat-head .rule{ position: absolute; left: 0; right: 0; top: 0; height: 2px; background: #141414;
+        transform: scaleX(0); transform-origin: 0 50%; }
+      .pat-head .l{ position: absolute; left: 0; top: 12px; font-size: 19px; letter-spacing: .22em; color: #141414; }
+      .pat-head .r{ position: absolute; right: 0; top: 12px; font-size: 19px; letter-spacing: .22em; color: #9A9A92; }
+      /* 墨黑横幅大标题 */
+      .pat-banner{ position: absolute; left: 90px; right: 90px; top: 140px; height: 190px; background: #141414;
+        border: 3px solid #141414; box-shadow: 12px 12px 0 var(--ac, #00FF00); z-index: 5;
+        display: flex; align-items: center; padding: 0 64px; }
+      .pat-banner .bt{ font-size: 76px; font-weight: 900; color: #F6F5EF; letter-spacing: .02em; }
+      .pat-banner .bt b{ color: var(--ac, #00FF00); font-weight: 900; }
+      .pat-banner .idx{ position: absolute; right: 64px; top: 50%; transform: translateY(-50%);
+        font-size: 20px; letter-spacing: .3em; color: #9A9A92; }
+      /* 三张受众卡 */
+      .pat-cards{ position: absolute; left: 170px; top: 400px; width: 1580px; height: 480px;
+        display: flex; gap: 40px; z-index: 5; perspective: 1400px; }
+      .pat-card{ flex: 1; background: #fff; border: 3px solid #141414; box-shadow: 10px 10px 0 #141414;
+        padding: 42px 40px; position: relative; transform-style: preserve-3d; }
+      .pat-card .lb{ display: inline-block; font-size: 20px; letter-spacing: .22em; padding: 9px 18px;
+        border: 2px solid #141414; background: var(--ac, #00FF00); color: #141414; margin-bottom: 30px; }
+      .pat-card:nth-child(2) .lb{ background: #141414; color: var(--ac, #00FF00); }
+      .pat-card:nth-child(3) .lb{ background: #fff; color: #141414; }
+      .pat-card .no{ position: absolute; right: 34px; top: 40px; font-size: 20px; letter-spacing: .2em; color: #9A9A92; }
+      .pat-card .ds{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 30px; line-height: 1.7; color: #55554E; }
+      .pat-card .bar{ position: absolute; left: 0; bottom: 0; height: 10px; width: 100%; background: var(--ac, #00FF00);
+        transform: scaleX(0); transform-origin: 0 50%; }
+      /* 底部绿色署名条 */
+      .pat-foot{ position: absolute; left: 0; right: 0; bottom: 0; height: 64px; background: var(--ac, #00FF00);
+        z-index: 6; display: flex; align-items: center; justify-content: space-between; padding: 0 90px;
+        transform: translateY(64px); }
+      .pat-foot .f1{ font-size: 22px; font-weight: 900; letter-spacing: .12em; color: #141414; }
+      .pat-foot .f2{ font-size: 18px; letter-spacing: .26em; color: #141414; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="pat-head">
+        <div class="rule" id="rule"></div>
+        <div class="l mono" id="vol"></div>
+        <div class="r mono" id="pageno"></div>
+      </div>
+      <div class="pat-banner" id="banner">
+        <div class="bt" id="title"></div>
+        <div class="idx mono">AUDIENCE · 03</div>
+      </div>
+      <div class="pat-cards">
+        <div class="pat-card" id="card0"><span class="lb mono"></span><span class="no mono">01 / 03</span><div class="ds"></div><div class="bar"></div></div>
+        <div class="pat-card" id="card1"><span class="lb mono"></span><span class="no mono">02 / 03</span><div class="ds"></div><div class="bar"></div></div>
+        <div class="pat-card" id="card2"><span class="lb mono"></span><span class="no mono">03 / 03</span><div class="ds"></div><div class="bar"></div></div>
+      </div>
+      <div class="pat-foot" id="foot">
+        <div class="f1">@老马AI研习社</div>
+        <div class="f2 mono">MOTION LIBRARY · AUDIENCE</div>
+      </div>
+    </div>
+    <script>
+      const fallback = {"vol": "VOL.15 · 视觉动效库", "pageno": "P.303 / 400", "title": "这本书适合谁", "cards": "谁该看|想系统入门 AI 工具链、愿意动手练的独立创作者;谁慎用|已有成熟团队、只想找现成 SOP 的读者;谁绕道|期待三天速成、不愿改工作流的人", "accent": "#00FF00", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      document.documentElement.style.setProperty("--ac", V.accent ?? "#00FF00");
+      $("vol").textContent = V.vol;
+      $("pageno").textContent = V.pageno;
+      $("title").textContent = V.title;
+      const items = String(V.cards).split(";").map(s => s.trim()).filter(Boolean).slice(0, 3);
+      for (let i = 0; i < 3; i++) {
+        const [lb, ds] = String(items[i] || "|").split("|");
+        $("card" + i).querySelector(".lb").textContent = (lb || "").trim();
+        $("card" + i).querySelector(".ds").textContent = (ds || "").trim();
+      }
+      // 页眉细线 + 文字
+      tl.to("#rule", { scaleX: 1, duration: 0.5, ease: "power3.out" }, 0);
+      tl.fromTo(["#vol", "#pageno"], { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.4, stagger: 0.08 }, 0.25);
+      // 墨黑横幅落下
+      tl.fromTo("#banner", { opacity: 0, y: -50 }, { opacity: 1, y: 0, duration: 0.6, ease: "expo.out" }, 0.4);
+      tl.fromTo(".pat-banner .idx", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 0.9);
+      // 三张受众卡逐张翻亮点名
+      tl.fromTo(["#card0", "#card1", "#card2"],
+        { opacity: 0, rotateX: -62, y: 46, transformPerspective: 1400 },
+        { opacity: 1, rotateX: 0, y: 0, duration: 0.62, stagger: 0.28, ease: "power3.out" }, 1.1);
+      tl.to(".pat-card .bar", { scaleX: 1, duration: 0.4, stagger: 0.28, ease: "power2.inOut" }, 1.35);
+      // 底部署名条
+      tl.to("#foot", { y: 0, duration: 0.5, ease: "expo.out" }, 2.5);
+      tl.fromTo([".pat-foot .f1", ".pat-foot .f2"], { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.35, stagger: 0.08 }, 2.75);
+      // 呼吸浮动定格（无收尾 fade-out）
+      tl.to(["#card0", "#card1", "#card2"], { y: -7, duration: 1.4, ease: "sine.inOut", yoyo: true, repeat: 1, stagger: 0.2 }, 3.4);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

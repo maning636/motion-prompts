@@ -1,0 +1,16 @@
+{
+ "name": "打钩清单 · 用一整天走完一条街",
+ "description": "两列清单，勾选框逐个砸落、划掉线自左向右扫过，节奏是「做完一件」",
+ "category": "信息卡片",
+ "tags": [
+  "积木社",
+  "check",
+  "sun",
+  "snappy"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "card",
+ "when": "数据卡片 / 打钩清单"
+}

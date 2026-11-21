@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "words", "name": "注脚短句", "type": "string", "label": "每个维度的注脚短句（逗号分隔，4 段：0D/1D/2D/3D）", "default": "一个点,一条线,一个面,一个体"}, {"id": "bpm", "name": "节拍", "type": "number", "label": "节拍 BPM（120-180）", "default": 150}, {"id": "redTarget", "name": "强调色给谁", "type": "enum", "label": "强调色的归属", "options": [{"label": "几何体", "value": "shape"}, {"label": "文字", "value": "word"}], "default": "shape"}, {"id": "cycles", "name": "循环轮数", "type": "number", "label": "维度循环几轮（1 = 0D 到 3D 再塌回 0D，首尾帧一致）", "default": 1}, {"id": "accent", "name": "强调色", "type": "color", "label": "强调色（几何体或文字）", "default": "#E02020"}, {"id": "duration", "name": "总时长", "type": "number", "label": "总时长（秒，0 = 自动按 cycles 算）", "default": 0}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<title>快闪 · 维度循环</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: #050508;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #050508; }
+  #cv { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+</style>
+</head>
+<body>
+<div id="stage" data-composition-id="main" data-start="0" data-duration="12.8"
+     data-width="1920" data-height="1080">
+  <canvas id="cv" width="1920" height="1080"></canvas>
+</div>
+<script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  /* ---------------------------------------------------------------
+     快闪 · 维度循环（flash-dim-01）  1920x1080  loop（首尾帧一致）
+     上游：GitHub GaoFei2025-0314/opus5.5_video 的 V11（快闪 · 维度）
+     一镜到底的同一个世界：几何母题 0D 点 → 1D 线 → 2D 面 → 3D 体 → 塌回 0D 点。
+     与 motion kinetic 族的区分（详见 flash-dim-01-blacklist.md）：
+       1 四维闭环（motion 是单调升一次就结束）
+       2 统一几何母题连续变形（motion 是 12 个独立词块字隧道）
+       3 红只给当前维度的几何体，字一律黑白（motion 是红铺满字块底 + 中央红字）
+       4 维度指示器在右下角、用几何符号，不写「3D 体」文字
+       5 注脚短句由 agent 填 4 段（不是固定 12 词）
+       6 保留源 V11 的光轨掠过（motion 没有），且只在升维时出现
+     硬规则：画面只由时间 t 决定（纯函数），逐帧 seek 不打架。
+     --------------------------------------------------------------- */
+
+  const FALLBACK = {
+    words: '一个点,一条线,一个面,一个体',
+    bpm: 150,
+    redTarget: 'shape',
+    cycles: 1,
+    accent: '#E02020',
+    duration: 0
+  };
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+
+  const W = 1920, H = 1080;
+  const BG = '#050508';
+  const WHITE = '#F5F5F5';
+  const DIMTXT = 'rgba(245,245,245,0.40)';
+
+  const pick = (val, fb) => (val === undefined || val === null || val === '') ? fb : val;
+  const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const easeInOutCubic = (x) => {
+    x = clamp(x, 0, 1);
+    return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+  };
+  /* 尾巴抹平：亚像素残差直接归零，保证首帧与尾帧逐像素相同 */
+  const snap0 = (x) => (Math.abs(x) < 2e-3 ? 0 : x);
+
+  /* 固定种子伪随机（禁用 Math.random） */
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function hex2rgb(h) {
+    let s = String(h).trim().replace('#', '');
+    if (s.length === 3) s = s.split('').map(c => c + c).join('');
+    if (!/^[0-9a-fA-F]{6}$/.test(s)) s = 'E02020';
+    return [parseInt(s.slice(0, 2), 16), parseInt(s.slice(2, 4), 16), parseInt(s.slice(4, 6), 16)];
+  }
+  const rgba = (c, a) => 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')';
+
+  /* ---------------- 槽位取值 ---------------- */
+  const DEF_WORDS = ['一个点', '一条线', '一个面', '一个体'];
+  const rawWords = String(pick(v.words, FALLBACK.words));
+  const parts = rawWords.split(/[,，|｜]/).map(s => s.trim()).filter(Boolean);
+  const WORDS = [];
+  for (let i = 0; i < 4; i++) WORDS.push(parts[i] || DEF_WORDS[i]);
+
+  let BPM = parseFloat(pick(v.bpm, FALLBACK.bpm));
+  if (!isFinite(BPM)) BPM = FALLBACK.bpm;
+  BPM = clamp(BPM, 60, 240);
+
+  const RED_TO_WORD = String(pick(v.redTarget, FALLBACK.redTarget)).trim().toLowerCase() === 'word';
+
+  let CYCLES = parseInt(pick(v.cycles, FALLBACK.cycles), 10);
+  if (!isFinite(CYCLES)) CYCLES = FALLBACK.cycles;
+  CYCLES = clamp(CYCLES, 1, 4);
+
+  const ACCENT_RGB = hex2rgb(pick(v.accent, FALLBACK.accent));
+  const GEO = RED_TO_WORD ? [245, 245, 245] : ACCENT_RGB;   /* 几何体的颜色 */
+  const TXT = RED_TO_WORD ? ACCENT_RGB : [245, 245, 245];   /* 注脚头的颜色 */
+
+  let DUR = parseFloat(pick(v.duration, FALLBACK.duration));
+  if (!isFinite(DUR) || DUR < 0) DUR = 0;
+
+  /* ---------------- 时间结构 ---------------- */
+  const SEGS = 4;                 /* 四个维度段 */
+  const BEATS_PER_SEG = 8;        /* 每段 8 拍 */
+  const TICKS_PER_SEG = 16;       /* 每段 16 个换字节拍（bpm=150 时 0.2s 一换） */
+  const SEG0 = BEATS_PER_SEG * 60 / BPM;
+  const CYCLE0 = SEGS * SEG0;
+  const TOTAL = DUR > 0 ? DUR : CYCLE0 * CYCLES;
+  const SEG = TOTAL / (SEGS * CYCLES);     /* 实际每段长度（秒） */
+  const TICK = SEG / TICKS_PER_SEG;        /* 换字间隔（秒） */
+
+  /* ---------------- 版面常量 ---------------- */
+  const CX = 1180, CY = 470;        /* 几何母题中心 */
+  const K0 = 470;                   /* 每世界单位的屏幕像素 */
+  const FOV_FLAT = 2.5, FOV_WIDE = 60;
+  const CAP_SIZE = 108;
+  const CAP_ADV = 112;              /* 横排槽距 */
+  const CAP_ADV_V = 104;             /* 竖排槽距 */
+  const SLOTS = 9;                  /* 注脚条槽位数 */
+  const H_X = 112, H_Y = 906;       /* 横排行：左端 x / 基线 y */
+  const V_X = 132, V_Y = 150;       /* 竖排列：x / 顶 y */
+  const IND_R = W - 112, IND_Y = H - 92;
+  const DOT_R = 62;                 /* 0D 实心点的半径（随变形收缩成线） */
+
+  /* 光轨（只在升维时掠过）—— 固定种子生成一次，之后完全由时间驱动 */
+  const rng = mulberry32(20241115);
+  const STREAKS = [];
+  for (let i = 0; i < 5; i++) {
+    STREAKS.push({
+      y: 110 + rng() * 850,
+      len: 240 + rng() * 520,
+      h: 3 + rng() * 6,
+      dir: (i % 2 === 0) ? 1 : -1
+    });
+  }
+
+  /* ---------------- 几何：单位立方体 8 顶点 12 边 ---------------- */
+  const CORNERS = [
+    [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
+    [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]
+  ];
+  const EDGES = [
+    [0, 1], [1, 2], [2, 3], [3, 0],
+    [4, 5], [5, 6], [6, 7], [7, 4],
+    [0, 4], [1, 5], [2, 6], [3, 7]
+  ];
+
+  function rot3(p, rx, ry, rz) {
+    const cy = Math.cos(ry), sy = Math.sin(ry);
+    const x1 = p[0] * cy + p[2] * sy, z1 = -p[0] * sy + p[2] * cy;
+    const cx = Math.cos(rx), sx = Math.sin(rx);
+    const y2 = p[1] * cx - z1 * sx, z2 = p[1] * sx + z1 * cx;
+    const cz = Math.cos(rz), sz = Math.sin(rz);
+    return [x1 * cz - y2 * sz, x1 * sz + y2 * cz, z2];
+  }
+
+  const canvas = document.getElementById('cv');
+  const ctx = canvas.getContext('2d');
+
+  /* ---------------- FOV 曲线（滑动变焦的镜头部分） ----------------
+     平面段压成 2.5° 超长焦；升维瞬间推到 60°；
+     降维（3D 段末尾）退回长焦。每段首尾与下一段连续。 */
+  function fovAt(k, p) {
+    if (k === 0) {
+      if (p < 0.72) return FOV_FLAT;
+      return FOV_FLAT + (FOV_WIDE - FOV_FLAT) * easeInOutCubic((p - 0.72) / 0.28);
+    }
+    if (k === 3) {
+      if (p < 0.72) return FOV_WIDE;
+      return FOV_WIDE - (FOV_WIDE - FOV_FLAT) * easeInOutCubic((p - 0.72) / 0.28);
+    }
+    if (p < 0.28) return FOV_WIDE - (FOV_WIDE - FOV_FLAT) * easeInOutCubic(p / 0.28);
+    if (p < 0.72) return FOV_FLAT;
+    return FOV_FLAT + (FOV_WIDE - FOV_FLAT) * easeInOutCubic((p - 0.72) / 0.28);
+  }
+
+  /* ---------------- 四个维度的形态参数（闭合环） ----------------
+     0D (0,0,0) → 1D (1,0,0) → 2D (1,1,0) → 3D (1,1,1) → 0D (0,0,0)
+     每段前 72% 保持该维度，最后 28% 变形到下一维度；
+     第 4 段是降维，按 3D→2D→1D→0D 三步收回。 */
+  const EXT = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [1, 1, 1]];
+  function extAt(k, p) {
+    if (k < 3) {
+      const a = EXT[k], b = EXT[k + 1];
+      const m = p < 0.72 ? 0 : easeInOutCubic((p - 0.72) / 0.28);
+      return [lerp(a[0], b[0], m), lerp(a[1], b[1], m), lerp(a[2], b[2], m)];
+    }
+    if (p < 0.72) return [1, 1, 1];
+    const s = (p - 0.72) / 0.28;
+    if (s < 1 / 3) { const m = easeInOutCubic(s * 3); return [1, 1, 1 - m]; }
+    if (s < 2 / 3) { const m = easeInOutCubic((s - 1 / 3) * 3); return [1, 1 - m, 0]; }
+    const m = easeInOutCubic((s - 2 / 3) * 3);
+    return [1 - m, 0, 0];
+  }
+
+  /* ---------------- 绘制：几何母题 ---------------- */
+  function drawMotif(ext, fov, k0, rotv, ox, oy) {
+    const f = (H / 2) / Math.tan(fov * Math.PI / 180 / 2);
+    const d = f / k0;                       /* 机距随 FOV 联动 —— 主体屏幕尺寸恒定 */
+    const hx = ext[0] * 0.5, hy = ext[1] * 0.5, hz = ext[2] * 0.5;
+    const pts = [];
+    let zmin = 1e9, zmax = -1e9;
+    for (let i = 0; i < 8; i++) {
+      const c = CORNERS[i];
+      const r = rot3([c[0] * hx, c[1] * hy, c[2] * hz], rotv[0], rotv[1], rotv[2]);
+      const zc = d - r[2];
+      const s = f / Math.max(zc, 0.05);
+      pts.push([CX + r[0] * s + ox, CY - r[1] * s + oy, zc]);
+      if (zc < zmin) zmin = zc;
+      if (zc > zmax) zmax = zc;
+    }
+    const zrange = Math.max(zmax - zmin, 1e-6);
+
+    ctx.lineWidth = 7;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (let e = 0; e < EDGES.length; e++) {
+      const A = pts[EDGES[e][0]], B = pts[EDGES[e][1]];
+      const len = Math.hypot(B[0] - A[0], B[1] - A[1]);
+      if (len < 1.2) continue;
+      const zc = (A[2] + B[2]) / 2;
+      const near = clamp((zmax - zc) / zrange, 0, 1);   /* 1 = 靠近相机 */
+      ctx.strokeStyle = rgba(GEO, 0.40 + 0.60 * near);
+      ctx.beginPath();
+      ctx.moveTo(A[0], A[1]);
+      ctx.lineTo(B[0], B[1]);
+      ctx.stroke();
+    }
+
+    /* 0D 就是一个点：实心圆点 + 一圈细环（几何退化时的落位记号） */
+    const mx = Math.max(ext[0], ext[1], ext[2]);
+    const dotA = clamp(1 - mx / 0.10, 0, 1);
+    if (dotA > 0.004) {
+      const r = 30 * (k0 / K0);
+      ctx.globalAlpha = dotA;
+      ctx.fillStyle = rgba(GEO, 1);
+      ctx.beginPath();
+      ctx.arc(CX + ox, CY + oy, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = rgba(GEO, 0.5);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(CX + ox, CY + oy, r * 1.75, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  /* ---------------- 绘制：光轨（只在升维时掠过） ---------------- */
+  function drawStreaks(k, p, ox, oy) {
+    if (k > 2 || p < 0.72) return;
+    const s = easeInOutCubic((p - 0.72) / 0.28);
+    for (let i = 0; i < STREAKS.length; i++) {
+      const st = STREAKS[i];
+      const y = st.y + oy;
+      let x0, x1;
+      if (st.dir > 0) { x0 = lerp(-st.len, W, s) + ox; x1 = x0 + st.len; }
+      else { x1 = lerp(W + st.len, 0, s) + ox; x0 = x1 - st.len; }
+      const a = Math.pow(Math.sin(Math.PI * s), 0.7) * 0.9;
+      if (a <= 0.004) continue;
+      const gr = ctx.createLinearGradient(x0, 0, x1, 0);
+      gr.addColorStop(0, 'rgba(245,245,245,0)');
+      gr.addColorStop(0.5, 'rgba(245,245,245,' + a.toFixed(4) + ')');
+      gr.addColorStop(1, 'rgba(245,245,245,0)');
+      ctx.fillStyle = gr;
+      ctx.fillRect(x0, y, st.len, st.h);
+    }
+  }
+
+  /* ---------------- 绘制：注脚短句（横排一行 / 竖排一列，按维度交替） ---------------- */
+  function drawCaption(k, phrase, tick, ox, oy) {
+    const chars = Array.from(String(phrase));
+    if (!chars.length) return;
+    const n = chars.length;
+    const vertical = (k === 1 || k === 3);
+    ctx.font = '900 ' + CAP_SIZE + 'px MEBHeiHeiTi, "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = vertical ? 'middle' : 'alphabetic';
+    for (let i = 0; i < SLOTS; i++) {
+      const ch = chars[(tick + i) % n];
+      const head = (i === 0);
+      ctx.fillStyle = head ? rgba(TXT, 1) : DIMTXT;
+      if (vertical) {
+        ctx.fillText(ch, V_X + ox, V_Y + i * CAP_ADV_V + CAP_SIZE * 0.5 + oy);
+      } else {
+        ctx.fillText(ch, H_X + i * CAP_ADV + ox, H_Y + oy);
+      }
+    }
+  }
+
+  /* ---------------- 绘制：右下角维度指示器（几何符号，不写字） ---------------- */
+  function drawIndicator(k, ox, oy) {
+    const gap = 56, s = 15;
+    for (let i = 0; i < 4; i++) {
+      const cx = IND_R - (3 - i) * gap + ox;
+      const cy = IND_Y + oy;
+      const on = (i === k);
+      const col = on ? 'rgba(245,245,245,1)' : 'rgba(245,245,245,0.26)';
+      ctx.strokeStyle = col;
+      ctx.fillStyle = col;
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      if (i === 0) {
+        ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2); ctx.fill();
+      } else if (i === 1) {
+        ctx.beginPath(); ctx.moveTo(cx - s - 2, cy); ctx.lineTo(cx + s + 2, cy); ctx.stroke();
+      } else if (i === 2) {
+        ctx.strokeRect(cx - s, cy - s, s * 2, s * 2);
+      } else {
+        ctx.strokeRect(cx - s, cy - s, s * 2, s * 2);
+        ctx.beginPath();
+        ctx.moveTo(cx - s, cy - s); ctx.lineTo(cx + s, cy + s);
+        ctx.stroke();
+      }
+    }
+  }
+
+  /* ---------------- 主渲染：纯函数，只吃 t ---------------- */
+  function render(t) {
+    t = clamp(t, 0, TOTAL);
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = BG;
+    ctx.fillRect(0, 0, W, H);
+
+    const u = clamp(t / TOTAL, 0, 1);
+    const gAll = u * SEGS * CYCLES;
+    const cyc = Math.floor(gAll / SEGS);
+    const g = gAll - cyc * SEGS;             /* 0..4，一轮之内的段相位 */
+    const k = Math.min(SEGS - 1, Math.floor(g));
+    const p = clamp(g - k, 0, 1);            /* 段内相位 0..1 */
+
+    /* 换维度瞬间整幅画面抖一下：纯时间函数的衰减振荡 */
+    const shakeAmp = 9;
+    const shX = snap0(shakeAmp * Math.exp(-11 * p) * Math.sin(112 * p));
+    const shY = snap0(shakeAmp * 0.7 * Math.exp(-11 * p) * Math.sin(97 * p + 1.1));
+
+    /* 同一世界里的缓慢漂移（保证每帧都有肉眼可见的位移） */
+    const dx = snap0(22 * Math.sin(Math.PI * p) * Math.cos(2 * Math.PI * p));
+    const dy = snap0(13 * Math.sin(Math.PI * p) * Math.sin(2 * Math.PI * p));
+    const ox = dx + shX, oy = dy + shY;
+
+    /* 镜头：FOV 走滑动变焦，机距反向联动，主体屏幕尺寸恒定 */
+    const fov = fovAt(k, p);
+    const breath = 1 + 0.09 * Math.sin(2 * Math.PI * (g / SEGS) + 1.0);
+    const k0 = K0 * breath;
+
+    /* 旋转：一轮来回摆，g=0 与 g=4 姿态相同（点态无朝向，首尾仍逐像素一致） */
+    const rotv = [
+      0.26 * Math.sin(Math.PI * g),
+      0.55 * Math.sin(Math.PI * g / 2),
+      0.10 * Math.sin(Math.PI * g / 2 + 0.8)
+    ];
+
+    const ext = extAt(k, p);
+    const tick = Math.floor(p * TICKS_PER_SEG) % Math.max(1, Array.from(WORDS[k]).length);
+
+    drawStreaks(k, p, ox, oy);
+    drawMotif(ext, fov, k0, rotv, ox, oy);
+    drawCaption(k, WORDS[k], tick, ox, oy);
+    drawIndicator(k, ox, oy);
+  }
+
+  /* ---------------- 时间轴：只有一条补间，推进 {t} ---------------- */
+  const stage = document.getElementById('stage');
+  stage.setAttribute('data-duration', String(TOTAL));
+  const st = { t: 0 };
+  const tl = gsap.timeline({ paused: true });
+  tl.fromTo(st, { t: 0 }, {
+    t: TOTAL, duration: TOTAL, ease: 'none',
+    onUpdate: function () { render(st.t); }
+  }, 0);
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 自带逐帧定位出口 */
+  window.__seekTo = function (t) {
+    if (typeof t !== 'number' || !isFinite(t)) return;
+    const tt = clamp(t, 0, TOTAL);
+    try { tl.pause(); tl.time(0, false); tl.time(tt, false); } catch (e) { }
+    render(tt);
+  };
+  window.__flashDim = {
+    render: render, total: TOTAL, seg: SEG, cycles: CYCLES,
+    bpm: BPM, tick: TICK, words: WORDS, redTarget: RED_TO_WORD ? 'word' : 'shape'
+  };
+
+  const first = function () {
+    const q = /(?:^|[?&])t=([\d.]+)/.exec(location.search);
+    if (q) { render(parseFloat(q[1])); return; }
+    render(0);
+  };
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(first).catch(first);
+  } else { first(); }
+})();
+</script>
+</body>
+</html>

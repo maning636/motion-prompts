@@ -1,0 +1,12 @@
+{
+  "title": "GPU 集群拓扑",
+  "subtitle": "72 节点状态监控概览",
+  "total": 72,
+  "active": 58,
+  "idle": 10,
+  "error": 4,
+  "cols": 12,
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

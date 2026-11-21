@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#2EC4B6"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.0}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>手绘折纸飞机</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-trail { position: absolute; left: 0; top: 0; width: 480px; height: 270px; }
+  /* 机头锚在自己的坐标原点：飞到哪里机头就在哪里 */
+  .p-plane { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"accent":"#2EC4B6","duration":3.0};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || FALLBACK.duration;
+
+  /* 时间轴先建先注册：排在任何可能抛异常的代码之前。
+     注册之后再抛错，预览至少还能拿到一条已注册的时间轴（症状可读），
+     注册之前抛错则整条组件没有时间轴，画面全黑且毫无线索。 */
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  /* ── 飞行轨迹（贝塞尔），拖尾就是沿它撒的一串虚点 ───────── */
+  const X0 = 36, Y0 = 206, CX = 248, CY = 264, X1 = 440, Y1 = 74;
+  const D = 'M ' + X0 + ' ' + Y0 + ' Q ' + CX + ' ' + CY + ' ' + X1 + ' ' + Y1;
+
+  const trail = put('div', 'p-trail');
+  trail.innerHTML =
+    '<svg width="480" height="270" viewBox="0 0 480 270">' +
+    '<path id="p-route" d="' + D + '" fill="none" stroke="none" stroke-width="1"/>' +
+    '</svg>';
+  const route = trail.querySelector('#p-route');
+  const len = route.getTotalLength ? route.getTotalLength() : 420;
+
+  /* 拖尾点用 createElementNS 建，不走 SVG 元素的 innerHTML：
+     那条路在不同引擎上行为不一致，建不出来时是静默的，
+     画面上只表现为「拖尾不见了」。 */
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = trail.querySelector('svg');
+  const N = 18;
+  const dots = [];
+  const g = document.createElementNS(NS, 'g');
+  svg.appendChild(g);
+  for (let i = 0; i < N; i++) {
+    const p = route.getPointAtLength(len * (i / (N - 1)));
+    const c = document.createElementNS(NS, 'circle');
+    c.setAttribute('cx', p.x.toFixed(1));
+    c.setAttribute('cy', p.y.toFixed(1));
+    c.setAttribute('r', (1.6 + 1.8 * (i / (N - 1))).toFixed(2));
+    /* 拖尾点用**浅色**：机身本来就是 #FFFDF5 的米白，深墨点画在
+       深色画面上等于看不见，整条弧线读不出来。浅色拖尾与机身同源，
+       在深色画面上一眼能看出「飞过的轨迹」。 */
+    c.setAttribute('fill', '#FFF8EE');
+    c.setAttribute('opacity', '0');
+    g.appendChild(c);
+    dots.push(c);
+  }
+
+  /* ── 折纸飞机 ───────────────────────────────────────────── */
+  const plane = put('div', 'p-plane');
+  plane.innerHTML =
+    '<svg width="48" height="32" viewBox="0 0 48 32" style="position:absolute;left:-24px;top:-16px">' +
+    '<path d="M 44 16 L 4 4 L 13 28 L 20 18 Z" fill="#FFFDF5" stroke="#241C18" ' +
+    'stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<path d="M 20 18 L 44 16" fill="none" stroke="#241C18" stroke-width="2.2" stroke-linecap="round"/>' +
+    '<path d="M 13 28 L 20 18" fill="none" stroke="#241C18" stroke-width="2.2" stroke-linecap="round"/>' +
+    '<path d="M 4 4 L 20 18 L 44 16" fill="none" stroke="#241C18" stroke-width="1.8" ' +
+    'stroke-linecap="round" opacity=".5"/>' +
+    '</svg>';
+
+  /* ── 飞行是时间的纯函数 ───────────────────────────────────
+     位置取 getPointAtLength，角度取切线，拖尾按同一进度开，
+     三者共用一个 p，所以飞机永远在拖尾的头。
+     整段烘成 GSAP 关键帧：onUpdate 回调在 seek 时根本不触发，
+     靠它驱动的元素会停在起飞那一帧。
+
+     ⚠️ 收尾不能是空的：旧版飞完之后把飞机甩到 (528, -34) 并淡出，
+     画布 480×270，于是 t > 2.55s 之后画面上什么都没有——
+     而定格帧正好落在这一段，素材池里这条的封面是纯黑的。
+     现在飞完停在一个**看得见的**位置（右侧画面内），保持轻微飘动，
+     并把常驻弧线留着，t = 总时长那一帧也非空。 */
+  const T_FLY = 2.1;
+  function clamp01(x) { return x <= 0 ? 0 : (x >= 1 ? 1 : x); }
+  function lerp(a, b, c) { return a + (b - a) * c; }
+  function easeInOut(p) { return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; }
+  function easeInv(p) {                       // easeInOut 的反函数：进度 → 时刻比例
+    if (p <= 0) return 0;
+    if (p >= 1) return 1;
+    return p < 0.5 ? Math.pow(p / 4, 1 / 3) : 1 - Math.pow(2 * (1 - p), 1 / 3) / 2;
+  }
+  const ptAt = function (l) { return route.getPointAtLength(Math.max(0, Math.min(len, l))); };
+  function angAt(l) {
+    const a = ptAt(l - 4), b = ptAt(l + 4);
+    return Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+  }
+  const endP = ptAt(len), endA = angAt(len);
+
+  /* 停泊点：落在画布右上方，仍在 480×270 之内（留 26px 安全边），
+     飞机图标向四周各撑 26px，所以中心不能更靠边。 */
+  const PARK_X = 424, PARK_Y = 96;
+
+  /* 机身：位置/角度/透明度整段烘关键帧 */
+  const FLY_END = Math.max(T_FLY + .3, dur);
+  /* 别跟上面撒拖尾点那个 N 撞名：同一个作用域里 const 重名是 SyntaxError，
+     整个脚本不执行，画面上表现为「整条组件是空的」，而且没有任何报错提示。 */
+  const NK = Math.round(FLY_END / (1 / 60)) + 1;
+  const kfPlane = [];
+  for (let i = 0; i < NK; i++) {
+    const t = FLY_END * (i / (NK - 1));
+    let px, py, an, op = 1;
+    if (t < T_FLY) {
+      const q = ptAt(len * easeInOut(clamp01(t / T_FLY)));
+      px = q.x; py = q.y; an = angAt(len * easeInOut(clamp01(t / T_FLY)));
+    } else {
+      /* 飞完之后不是飞出去消失，而是**滑到右侧停住**：
+         0.42s 减速滑行到停泊点，再叠加一小段持续的飘动/摇摆，
+         保证从 t = T_FLY 到 t = 总时长，画面上始终有东西。 */
+      const c = easeInOut(clamp01((t - T_FLY) / .42));
+      px = lerp(endP.x, PARK_X, c);
+      py = lerp(endP.y, PARK_Y, c);
+      an = lerp(endA, -14, c);
+      const s = t - (T_FLY + .42);          // 停稳之后的持续时间
+      px += 5.5 * Math.sin(s * 2.3);         // 上下飘
+      py += 3.4 * Math.sin(s * 1.7 + 1.1);   // 前后飘
+      an += 6.0 * Math.sin(s * 2.9);         // 轻微摇摆，像还悬着
+    }
+    /* 机身摆动：越高频越低幅，飞起来才有抖 */
+    const shake = 6.5 * Math.sin(t * 8.2) * Math.exp(-0.22 * t);
+    kfPlane.push({ x: px, y: py, rotate: (t < T_FLY ? an + shake : an), opacity: op });
+  }
+  tl.to(plane, { keyframes: kfPlane, duration: FLY_END, ease: 'none' }, 0);
+
+  /* 拖尾：每个点按「飞机飞到它的进度」的时刻点亮、再淡下去。
+     用普通 tween，不用每帧回调。淡到 .42 而不是 0——
+     飞机走掉之后整条弧线还留着，像划过的轨迹，
+     这样 t = 总时长那一帧画面上也仍然有东西。 */
+  dots.forEach(function (dot, i) {
+    const s = i / (dots.length - 1);
+    const tOn = T_FLY * easeInv(s);
+    const tOff = T_FLY * easeInv(Math.min(1, s + 1.6));
+    const tUp = Math.max(.04, T_FLY * easeInv(Math.min(1, s + 0.05)) - tOn);
+    const down = Math.max(.08, tOff - tOn - tUp);
+    tl.fromTo(dot, { opacity: 0 }, { opacity: .9, duration: tUp, ease: 'none' }, tOn);
+    tl.to(dot, { opacity: .42, duration: down, ease: 'power1.out' }, tOn + tUp);
+  });
+
+  tl.to(trail, { opacity: .85, duration: .4, ease: 'power1.out' }, T_FLY + .1);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

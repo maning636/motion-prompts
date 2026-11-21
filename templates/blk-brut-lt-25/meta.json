@@ -1,0 +1,16 @@
+{
+ "name": "进度条贴片",
+ "description": "白底长条内一道匀速生长的填充条，填充右端跟一枚 3px 黑边游标方块同步平移，百分比整数跳到设定值后两层反向微位移",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "progress-bar",
+  "playhead",
+  "blue"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "长视频、课程、直播回放，需要一条贴在画面底部的细长进度读数时"
+}

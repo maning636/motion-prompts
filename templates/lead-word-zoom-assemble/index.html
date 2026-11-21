@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"eyebrow","type":"string","label":"顶部小标","default":"HEADLINE"},
+  {"id":"leadWord","type":"string","label":"领头词","default":"AI"},
+  {"id":"restTokens","type":"string","label":"其余词（换行或空格分隔）","default":"正在\n重塑\n每个\n行业"},
+  {"id":"hint","type":"string","label":"底部注释","default":"lead word  ·  zoom  ·  assemble"},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+
+      /* ---------- 装饰底：网格点 + 十字准星 ---------- */
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.045) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity: .55;
+      }
+      .reticle{
+        position:absolute; left:50%; top:50%; transform: translate(-50%, -50%);
+        width: 920px; height: 920px; pointer-events:none; opacity:0;
+        border: 1px dashed rgba(244,239,231,.10);
+        border-radius: 50%;
+      }
+      .reticle::before, .reticle::after{
+        content:""; position:absolute; left:50%; top:50%; transform: translate(-50%,-50%);
+        background: rgba(244,239,231,.16);
+      }
+      .reticle::before{ width: 24px; height: 1px; }
+      .reticle::after { height: 24px; width: 1px; }
+
+      /* ---------- 顶部 eyebrow ---------- */
+      .eyebrow{
+        position:absolute; top: 56px; left: 96px; right: 96px;
+        display:flex; align-items:center; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.22em; text-transform:uppercase;
+        color: #8A8A85;
+      }
+      .eyebrow .acc{
+        display:inline-flex; align-items:center; gap:10px;
+        padding: 7px 14px; border:1px solid #2A2A2E; border-radius:999px;
+        color: var(--foreground, #F4EFE7);
+      }
+      .eyebrow .acc b{ color: var(--accent, #00FF00); letter-spacing:.18em; font-weight:700; }
+
+      /* ---------- 中段舞台 ---------- */
+      .stage{
+        position:absolute; inset:0;
+        display:flex; align-items:center; justify-content:center;
+      }
+      /* 完整句式：从领头词起，整体水平排好（用 inline-flex 让前后词接在 lead 旁）。
+         lead 起始在屏幕正中并巨大；rest 行各自独立绝对定位到自己的「位」。       */
+      .sentence{
+        position:relative;
+        display:flex; align-items:baseline; justify-content:center; gap: 28px;
+        flex-wrap: nowrap; max-width: 1700px;
+        min-height: 360px;
+      }
+
+      /* 领头词：初始 transform-origin 屏幕中心，scale 由 GSAP 控制 */
+      .lead{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight: 700;
+        font-size: 240px; line-height: 0.95;
+        letter-spacing: -.04em;
+        color: var(--foreground, #F4EFE7);
+        text-shadow: 0 0 24px color-mix(in srgb, var(--accent, #00FF00) 35%, transparent);
+        transform-origin: 50% 50%;
+        will-change: transform, font-size, opacity;
+      }
+      .lead .halo-ring{
+        position:absolute; left:50%; top:50%;
+        transform: translate(-50%, -50%);
+        width: 380px; height: 380px; border-radius:50%;
+        border: 1.5px solid var(--accent, #00FF00);
+        opacity: 0;
+        box-shadow:
+          0 0 0 6px color-mix(in srgb, var(--accent, #00FF00) 8%, transparent),
+          0 0 36px color-mix(in srgb, var(--accent, #00FF00) 25%, transparent);
+        pointer-events:none;
+      }
+      .lead .crosshair{
+        position:absolute; left:50%; top:50%;
+        transform: translate(-50%,-50%);
+        width: 14px; height: 14px; opacity:0; pointer-events:none;
+      }
+      .lead .crosshair::before, .lead .crosshair::after{
+        content:""; position:absolute; left:50%; top:50%; transform: translate(-50%,-50%);
+        background: var(--accent, #00FF00);
+      }
+      .lead .crosshair::before{ width: 14px; height: 1.5px; }
+      .lead .crosshair::after { height: 14px; width: 1.5px; }
+
+      /* 余词：每个独立 span，靠 inline-flex + justify-content 自然排好。
+         起始 transform-origin 自己中心。                                          */
+      .rest{
+        position:relative;
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+        font-weight: 500;
+        font-size: 76px; line-height: 1;
+        letter-spacing: -.01em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 86%, transparent);
+        opacity: 0;
+        will-change: transform, opacity;
+      }
+      .rest .tick{
+        display:inline-block; width: 8px; height: 8px; border-radius:50%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 10px color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+        margin: 0 4px 18px 4px; vertical-align: middle;
+        opacity: .85;
+      }
+      .lead + .rest, .rest + .lead{ /* 余词前的小连接符由首个 rest 的 ::before 处理 */
+        margin-left: 6px;
+      }
+
+      /* 底部 hint */
+      .hint{
+        position:absolute; left:96px; right:96px; bottom:56px;
+        display:flex; align-items:center; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 18px; letter-spacing:.18em; text-transform:uppercase;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+      }
+      .hint .pct{
+        font-size: 30px; letter-spacing:-.01em; font-weight:700;
+        color: var(--accent, #00FF00);
+      }
+      .hint .pct small{
+        font-size: 14px; font-weight:500; letter-spacing:.12em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+        margin-left: 6px;
+      }
+      .hint .timeline-bar{
+        position:absolute; left:96px; right:96px; bottom: 28px; height: 2px;
+        background: rgba(244,239,231,.10);
+      }
+      .hint .timeline-bar i{
+        position:absolute; left:0; top:0; bottom:0;
+        width: 0%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="stage" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+        <div class="reticle" id="reticle"></div>
+
+        <div class="eyebrow">
+          <span class="acc"><b id="eyebrowAcc">·</b><span id="eyebrowText">HEADLINE</span></span>
+          <span>lead · zoom · assemble</span>
+        </div>
+
+        <!-- 句式容器（由 JS 生成 lead + rest 节点） -->
+        <div class="sentence" id="sentence"></div>
+
+        <!-- 底部 hint + 进度条 -->
+        <div class="hint">
+          <span id="hintLeft">lead word</span>
+          <span class="pct"><span id="pctVal">0</span><small>%</small></span>
+          <span id="hintRight">assemble</span>
+        </div>
+        <div class="timeline-bar"><i id="progBar"></i></div>
+
+      </section>
+    </div>
+    <script>
+      /* ============= 变量接线 ============= */
+      const fallback = {
+        eyebrow: "HEADLINE",
+        leadWord: "AI",
+        restTokens: "正在\n重塑\n每个\n行业",
+        hint: "lead word  ·  zoom  ·  assemble",
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const $ = (id) => document.getElementById(id);
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      /* ============= 句式构造 ============= */
+      const sentence = $("sentence");
+      const leadText = String(v.leadWord || fallback.leadWord).trim() || "AI";
+      const rawRest  = String(v.restTokens || fallback.restTokens);
+      // 同时支持换行 / 空格 / 中点分隔
+      const restList = rawRest.split(/[\n\r]+|[\s,;，；、]+/).map(s => s.trim()).filter(Boolean);
+      // 至少 1 个余词才能展现"依次就位"的节奏
+      const finalRest = restList.length ? restList : ["正在", "重塑", "行业"];
+
+      /* 领头词节点（自带 halo-ring + 准星） */
+      const leadEl = document.createElement("div");
+      leadEl.className = "lead";
+      leadEl.id = "lead";
+      leadEl.innerHTML =
+        `<span class="halo-ring" id="leadHalo"></span>` +
+        `<span class="crosshair" id="leadCross"></span>` +
+        `<span id="leadText">${escapeHtml(leadText)}</span>`;
+      sentence.appendChild(leadEl);
+
+      /* 余词节点（每个一个 .rest，绝对位置由 flex 容器水平排列） */
+      const restEls = finalRest.map((tok, i) => {
+        const el = document.createElement("div");
+        el.className = "rest";
+        el.id = "rest" + i;
+        el.dataset.idx = String(i);
+        // 第一个 rest 前加一颗 accent 圆点「强调锚点」
+        const head = (i === 0) ? `<span class="tick"></span>` : "";
+        el.innerHTML = head + `<span class="rest-token">${escapeHtml(tok)}</span>`;
+        sentence.appendChild(el);
+        return el;
+      });
+
+      /* eyebrow / hint 文案回填 */
+      $("eyebrowText").textContent = v.eyebrow || fallback.eyebrow;
+      $("eyebrowAcc").textContent  = String(v.eyebrow || fallback.eyebrow).trim().charAt(0).toUpperCase() || "·";
+      $("hintLeft").textContent    = leadText;
+      $("hintRight").textContent   = (v.hint || fallback.hint).split(/[·•]/)[0].trim() || "assemble";
+
+      /* ============= 时间线 ============= */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+      const tl = gsap.timeline({ paused: true });
+
+      /* 入场前：reticle 淡入（让准星背景先到位，给"放大定格"留参照系） */
+      tl.fromTo("#scene .reticle",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.5, ease: "power2.out" }, 0.05);
+
+      /* 1) 领头词：从屏幕中心放大到定格尺寸（240px），同时 halo 闪烁、准星出现 */
+      // 把 lead 强制从 screen center「炸」到定格位置
+      tl.fromTo("#lead",
+        { scale: 0.0, opacity: 0, letterSpacing: "0em" },
+        {
+          scale: 1.0, opacity: 1, letterSpacing: "-.04em",
+          duration: 0.55, ease: "power4.out"
+        }, 0.15);
+      // halo ring 在 lead 出现的瞬间点亮、再缓慢收敛
+      tl.fromTo("#leadHalo",
+        { opacity: 0, scale: 2.2 },
+        { opacity: 0.95, scale: 1.0, duration: 0.5, ease: "power3.out" }, 0.45);
+      tl.to("#leadHalo",
+        { opacity: 0, scale: 1.8, duration: 0.7, ease: "power2.out" }, 1.0);
+      // 准星十字出现 → 淡出
+      tl.fromTo("#leadCross",
+        { opacity: 0, scale: 0.6 },
+        { opacity: 1, scale: 1.0, duration: 0.25, ease: "power2.out" }, 0.5);
+      tl.to("#leadCross",
+        { opacity: 0, duration: 0.4, ease: "power2.out" }, 0.95);
+
+      /* 2) 余词：依次飞入就位。每个 rest 从下方 24-40px 处 + 透明度 0 → 1，错峰 0.10s */
+      const restStartAt = 1.15;        // 领头定格刚收完的下一拍
+      const restStagger = 0.10;
+      tl.fromTo("#sentence .rest",
+        { opacity: 0, y: 36, scale: 0.96 },
+        {
+          opacity: 1, y: 0, scale: 1.0,
+          duration: 0.42, ease: "power2.out",
+          stagger: restStagger
+        }, restStartAt);
+      // 第一个 rest 前的 accent 圆点做一次脉冲
+      tl.fromTo("#sentence .rest:first-child .tick",
+        { scale: 0.0 },
+        { scale: 1.0, duration: 0.35, ease: "back.out(1.8)" }, restStartAt + 0.05);
+
+      /* 3) 整体收归常速：领头词字号缩到与余词协调的尺寸（仍略大突出）。
+         通过缩 font-size + 微 scale 同步收尾。                                     */
+      const settleStart = restStartAt + restEls.length * restStagger + 0.35; // ≈ 1.9
+      tl.to("#lead", {
+        fontSize: "180px",
+        scale: 0.92,
+        duration: 0.7,
+        ease: "power3.inOut"
+      }, settleStart);
+      // 同步让其余词微微"提一档"对齐视觉重量
+      tl.to("#sentence .rest", {
+        fontSize: "82px",
+        duration: 0.7,
+        ease: "power3.inOut",
+        stagger: 0.04
+      }, settleStart + 0.05);
+      // halo 最终淡出（说明"定格"阶段结束）
+      tl.to("#leadHalo", { opacity: 0, duration: 0.4, ease: "power2.out" }, settleStart);
+
+      /* 4) 进度反馈：hint 区百分比 + 进度条随时间更新（onUpdate） */
+      const pctVal = $("pctVal");
+      const progBar = $("progBar");
+      tl.eventCallback("onUpdate", () => {
+        const t = tl.time();
+        const p = Math.max(0, Math.min(1, t / DUR));
+        const pct = Math.round(p * 100);
+        pctVal.textContent = String(pct);
+        progBar.style.width = pct + "%";
+      });
+
+      /* 5) 结尾停留：~1.2s 可读（§2.4），不要戛然而止。
+         让"assemble 完成"的句式停留约 1.2s，再做两次轻微呼吸 + 一次
+         收尾回弹，使 GSAP timeline.duration() 严格 = 6s（避免 yoyo 把
+         duration 截短）。                                                       */
+      const breatheStart = settleStart + 1.20; // ≈ 3.15 — 留 1.2s 静止可读
+      // 第一轮呼吸：0.92→0.94
+      tl.to("#lead", {
+        scale: 0.94, duration: 0.85, ease: "sine.inOut"
+      }, breatheStart);
+      // 第二轮呼吸：0.94→0.92
+      tl.to("#lead", {
+        scale: 0.92, duration: 0.85, ease: "sine.inOut"
+      }, breatheStart + 0.85);
+      // 收尾回弹：0.92→0.93（轻微修正停留态）
+      tl.to("#lead", {
+        scale: 0.93, duration: 1.20, ease: "power2.out"
+      }, breatheStart + 1.70); // ≈ 4.80 → 终点 6.00
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

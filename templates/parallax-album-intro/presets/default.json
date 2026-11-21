@@ -1,0 +1,11 @@
+{
+  "title": "JUST TALK TO IT",
+  "prompt": "左边一条固定目录；相框从右边滑入，先快后慢；背景慢半拍；四张图轮换。",
+  "items": "DESCRIBE IT,AI SCAFFOLDS,TUNE THE FEEL,SHAPE & SHIP",
+  "img1": "./placeholder-1.png",
+  "img2": "./placeholder-2.png",
+  "img3": "./placeholder-3.png",
+  "img4": "./placeholder-4.png",
+  "interval": 2.3,
+  "duration": 9.6
+}

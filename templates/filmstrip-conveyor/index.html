@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"title","type":"string","label":"主标题","default":"一条胶片里的城市演变"},
+  {"id":"subtitle","type":"string","label":"副标题","default":"十年，十帧，十个路口"},
+  {"id":"frames","type":"string","label":"胶片帧（JSON 数组，每帧 year/title/caption）","default":"[{\"year\":\"2015\",\"title\":\"起点\",\"caption\":\"第一台相机，第一段 30 秒的城市影像。\"},{\"year\":\"2016\",\"title\":\"扫街\",\"caption\":\"背双肩包，地铁口到天台，日均 8000 步。\"},{\"year\":\"2017\",\"title\":\"开号\",\"caption\":\"把整理好的稿子压成短片，第一篇 10w+。\"},{\"year\":\"2018\",\"title\":\"团队\",\"caption\":\"三个人的剪辑间，键盘声一直响到夜里十一点。\"},{\"year\":\"2019\",\"title\":\"出圈\",\"caption\":\"一支 60 秒短片冲上首页，留言板第一次挂满彩色。\"},{\"year\":\"2020\",\"title\":\"转向\",\"caption\":\"从城市转去记录小城与小镇，节奏慢了下来。\"},{\"year\":\"2021\",\"title\":\"出书\",\"caption\":\"把十年脚印收成 240 页纸，胶片终于停下来一次。\"}]"},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+
+      /* 点阵底纹 */
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity: .55;
+      }
+
+      /* ===== 顶部 eyebrow / 标题 ===== */
+      .eyebrow{
+        position:absolute; top: 56px; left: 96px; right: 96px;
+        display:flex; align-items:center; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.22em; text-transform:uppercase;
+        color: #8A8A85;
+        z-index: 6;
+      }
+      .eyebrow .acc{
+        color: var(--accent, #00FF00);
+        font-weight: 700;
+        letter-spacing:.18em;
+      }
+      .title-block{
+        position:absolute; top: 110px; left: 96px; right: 96px;
+        z-index: 6;
+      }
+      .title-block h1{
+        margin:0;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight:700;
+        font-size: 64px;
+        line-height:1.05;
+        letter-spacing:-.02em;
+        color: var(--foreground, #F4EFE7);
+      }
+      .title-block p{
+        margin: 12px 0 0;
+        font-size: 22px;
+        color: #9CA3AF;
+        letter-spacing:.04em;
+      }
+
+      /* ===== 底部脚注 / 计数器 ===== */
+      .foot-row{
+        position:absolute; left:96px; right:96px; bottom:64px;
+        display:flex; align-items:flex-end; justify-content:space-between;
+        z-index: 6;
+      }
+      .foot-left{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 18px; letter-spacing:.18em; text-transform:uppercase;
+        color: #8A8A85;
+      }
+      .foot-left .acc{ color: var(--accent, #00FF00); font-weight: 700; }
+      .counter{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 22px; letter-spacing:.06em;
+        color: #8A8A85;
+      }
+      .counter .now{
+        font-size: 96px; font-weight: 700;
+        color: var(--foreground, #F4EFE7);
+        letter-spacing:-.02em;
+        line-height:.9;
+      }
+      .counter .sep{
+        display:inline-block; width:24px; height:2px; vertical-align:middle;
+        margin: 0 14px 12px;
+        background: var(--accent, #00FF00);
+      }
+      .counter .total{
+        font-size: 36px; color: #9CA3AF; vertical-align: 22px;
+      }
+
+      /* ===== 胶片传送带主体 ===== */
+      .conveyor{
+        position:absolute;
+        left:0; right:0;
+        top: 540px;            /* 中线偏下，胶片条水平居中 */
+        height: 360px;
+        overflow: hidden;
+        z-index: 2;
+      }
+      /* 中央高亮槽（视觉锁孔，让观众知道哪一格正在被讲述） */
+      .conveyor .highlight{
+        position:absolute; left:50%; top:50%;
+        transform: translate(-50%, -50%);
+        width: 360px; height: 280px;
+        border-radius: 12px;
+        box-shadow:
+          inset 0 0 0 1.5px color-mix(in srgb, var(--accent, #00FF00) 35%, transparent),
+          0 0 0 1px rgba(0,0,0,.55),
+          0 0 60px color-mix(in srgb, var(--accent, #00FF00) 18%, transparent);
+        z-index: 5;
+        pointer-events:none;
+        opacity: 0;
+      }
+      .conveyor .pip{
+        position:absolute; left:50%; top: 50%;
+        transform: translate(-50%, calc(-50% - 200px));
+        width: 16px; height: 12px;
+        background: var(--accent, #00FF00);
+        border-radius: 2px;
+        box-shadow: 0 0 14px color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+        z-index: 6;
+        opacity: 0;
+      }
+      /* 顶部与底部的引线，把高亮槽和标题/脚注绑在一起 */
+      .conveyor .lead-top, .conveyor .lead-bot{
+        position:absolute; left:50%; width:1px; background: rgba(255,255,255,.10);
+        z-index: 4; pointer-events:none;
+      }
+      .conveyor .lead-top{ top: -160px; height: 160px; transform: translateX(-50%); }
+      .conveyor .lead-bot{ bottom: -160px; height: 160px; transform: translateX(-50%); }
+
+      /* 胶片带：一条宽到 ~3x viewport 的连续 strip，向左滚动 */
+      .strip{
+        position:absolute; top: 0; left: 0; height: 100%;
+        display:flex;
+        align-items:center;
+        will-change: transform;
+        /* 把左侧起始位置拉到中央高亮槽的左边一帧处 */
+        transform: translateX(0);
+      }
+      /* 上下两条胶片轨（含齿孔的横向长条） */
+      .strip .rail{
+        position:absolute; left: 0; right: 0;
+        height: 40px;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015) 50%, rgba(255,255,255,.04)),
+          color-mix(in srgb, var(--foreground, #F4EFE7) 4%, transparent);
+        border-top:1px solid rgba(255,255,255,.08);
+        border-bottom:1px solid rgba(255,255,255,.06);
+      }
+      .strip .rail.top{ top: 0; }
+      .strip .rail.bot{ bottom: 0; }
+
+      /* 齿孔：用 repeating-linear-gradient 打孔（视觉上传送带的齿孔横向节奏推进） */
+      .strip .rail.top::before, .strip .rail.bot::before{
+        content:"";
+        position:absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+        height: 22px;
+        background-image:
+          radial-gradient(ellipse 18px 12px at 50% 50%,
+            var(--background, #12100E) 60%,
+            transparent 62%);
+        background-size: 60px 22px;
+        background-repeat: repeat-x;
+        background-position: 30px center;
+      }
+      /* 齿孔处的外发光线（强调传送感） */
+      .strip .rail.top::after, .strip .rail.bot::after{
+        content:"";
+        position:absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+        height: 1px;
+        background: linear-gradient(90deg,
+          transparent 0,
+          color-mix(in srgb, var(--accent, #00FF00) 30%, transparent) 12%,
+          transparent 24%,
+          transparent 100%);
+        background-size: 180px 1px;
+        background-repeat: repeat-x;
+        opacity: .65;
+      }
+
+      /* 一帧胶片 */
+      .frame{
+        position:relative;
+        flex: 0 0 auto;
+        width: 360px; height: 280px;
+        margin: 0 12px;
+        border-radius: 10px;
+        background:
+          linear-gradient(160deg,
+            color-mix(in srgb, var(--foreground, #F4EFE7) 9%, transparent),
+            color-mix(in srgb, var(--foreground, #F4EFE7) 3%, transparent));
+        border: 1px solid rgba(255,255,255,.07);
+        overflow: hidden;
+        isolation: isolate;
+      }
+      /* 帧内图位：用 SVG 抽象「风景图」占位（深色剪影 + 一道光） */
+      .frame .pic{
+        position:absolute; inset: 0;
+        background:
+          radial-gradient(ellipse 60% 50% at 50% 70%,
+            color-mix(in srgb, var(--accent, #00FF00) 22%, transparent) 0%,
+            transparent 70%),
+          linear-gradient(180deg,
+            rgba(0,0,0,0) 0%,
+            rgba(0,0,0,.45) 100%);
+      }
+      /* 帧底信息 */
+      .frame .meta{
+        position:absolute; left: 18px; right: 18px; bottom: 16px;
+        display:flex; flex-direction:column; gap: 6px;
+        z-index: 2;
+      }
+      .frame .year{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 14px; letter-spacing:.22em; text-transform:uppercase;
+        color: var(--accent, #00FF00);
+        font-weight: 700;
+      }
+      .frame .ft{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 28px; font-weight: 700;
+        letter-spacing:-.01em;
+        color: var(--foreground, #F4EFE7);
+        line-height: 1.1;
+      }
+      .frame .cap{
+        font-size: 14px; line-height:1.5;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 70%, transparent);
+        display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+        overflow:hidden;
+      }
+      /* 当前聚焦帧（高亮槽那一格）的强调 */
+      .frame.active{
+        box-shadow:
+          inset 0 0 0 1.5px color-mix(in srgb, var(--accent, #00FF00) 55%, transparent),
+          0 0 30px color-mix(in srgb, var(--accent, #00FF00) 25%, transparent);
+      }
+      .frame.active .ft{ color: var(--foreground, #F4EFE7); }
+
+      /* 帧之间的「胶片分隔条」：两条细竖线代表胶片齿孔内侧的暗带 */
+      .frame::before, .frame::after{
+        content:""; position:absolute; top: 0; bottom: 0;
+        width: 1px;
+        background: rgba(255,255,255,.10);
+      }
+      .frame::before{ left: -6px; }
+      .frame::after{ right: -6px; }
+
+      /* 当前帧信息放大版（独立于 conveyor，置于其上方） */
+      .feature{
+        position:absolute; left: 50%; top: 540px;
+        transform: translate(-50%, -100%);
+        margin-top: -24px;
+        width: 480px;
+        text-align: center;
+        pointer-events:none;
+        z-index: 6;
+      }
+      .feature .f-year{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 18px; letter-spacing:.32em; text-transform:uppercase;
+        color: var(--accent, #00FF00);
+        font-weight: 700;
+      }
+      .feature .f-title{
+        margin: 10px 0 0;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 44px; font-weight: 700;
+        letter-spacing:-.01em;
+        color: var(--foreground, #F4EFE7);
+        line-height:1.1;
+      }
+      .feature .f-cap{
+        margin: 12px auto 0;
+        max-width: 460px;
+        font-size: 18px; line-height:1.55;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 70%, transparent);
+      }
+
+      /* 左下/右下的「齿孔旁路标」，呼应传送带方向 */
+      .wiper{
+        position:absolute; top: 540px; height: 360px;
+        width: 96px;
+        z-index: 3;
+        pointer-events:none;
+      }
+      .wiper.left{ left: 0;
+        background: linear-gradient(90deg,
+          var(--background, #12100E) 0%,
+          color-mix(in srgb, var(--background, #12100E) 80%, transparent) 60%,
+          transparent 100%);
+      }
+      .wiper.right{ right: 0;
+        background: linear-gradient(270deg,
+          var(--background, #12100E) 0%,
+          color-mix(in srgb, var(--background, #12100E) 80%, transparent) 60%,
+          transparent 100%);
+      }
+
+      /* 时间进度条（放在 conveyor 上方，标识滚动进度） */
+      .timeline-rail{
+        position:absolute; left:96px; right:96px; top: 510px;
+        height: 1px;
+        background: rgba(255,255,255,.08);
+        z-index: 1;
+      }
+      .timeline-rail::after{
+        content:""; position:absolute; left:0; top:-1px;
+        width: 0%; height: 3px;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+      }
+
+      /* 入场动画初始态 */
+      .title-block h1{ opacity: 0; transform: translateY(24px); }
+      .title-block p{ opacity: 0; transform: translateY(18px); }
+      .eyebrow{ opacity: 0; transform: translateY(-8px); }
+      .counter .now, .counter .sep, .counter .total{ opacity: 0; transform: translateY(14px); }
+      .foot-left{ opacity: 0; transform: translateX(-16px); }
+      .feature .f-year, .feature .f-title, .feature .f-cap{ opacity: 0; transform: translateY(12px); }
+      .conveyor .highlight, .conveyor .pip{ opacity: 0; }
+      .frame{ opacity: 0; transform: scale(0.96); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+
+        <!-- 顶部 eyebrow + 标题 -->
+        <div class="eyebrow">
+          <span><b class="acc">FILMSTRIP</b>&nbsp;&nbsp;CONVEYOR · 胶片传送</span>
+          <span id="metaRight">filmstrip · conveyor</span>
+        </div>
+        <div class="title-block">
+          <h1 id="title"></h1>
+          <p id="subtitle"></p>
+        </div>
+
+        <!-- 时间进度线 -->
+        <div class="timeline-rail" id="timelineRail"></div>
+
+        <!-- 中央高亮槽 -->
+        <div class="conveyor" id="conveyor">
+          <div class="lead-top"></div>
+          <div class="lead-bot"></div>
+          <div class="highlight" id="highlight"></div>
+          <div class="pip" id="pip"></div>
+          <!-- 胶片带（JS 注入） -->
+          <div class="strip" id="strip"></div>
+        </div>
+
+        <!-- 当前帧特征信息（浮在高亮槽上方，独立元素避免 conveyor overflow:hidden 裁剪） -->
+        <div class="feature" id="feature">
+          <div class="f-year" id="fYear">2015</div>
+          <h2 class="f-title" id="fTitle">起点</h2>
+          <p class="f-cap" id="fCap">第一台相机，第一段 30 秒的城市影像。</p>
+        </div>
+
+        <!-- 左右羽化遮罩 -->
+        <div class="wiper left"></div>
+        <div class="wiper right"></div>
+
+        <!-- 底部脚注 + 计数器 -->
+        <div class="foot-row">
+          <div class="foot-left" id="footLeft"><b class="acc">SCROLL&nbsp;→</b>&nbsp;胶片沿齿孔横向推进</div>
+          <div class="counter">
+            <span class="now" id="nowIdx">01</span><span class="sep"></span><span class="total" id="totalIdx">07</span>
+          </div>
+        </div>
+
+      </section>
+    </div>
+    <script>
+      /* ----- 变量接线 ----- */
+      const fallback = {
+        title: "一条胶片里的城市演变",
+        subtitle: "十年，十帧，十个路口",
+        frames: [
+          {year:"2015", title:"起点", caption:"第一台相机，第一段 30 秒的城市影像。"},
+          {year:"2016", title:"扫街", caption:"背双肩包，地铁口到天台，日均 8000 步。"},
+          {year:"2017", title:"开号", caption:"把整理好的稿子压成短片，第一篇 10w+。"},
+          {year:"2018", title:"团队", caption:"三个人的剪辑间，键盘声一直响到夜里十一点。"},
+          {year:"2019", title:"出圈", caption:"一支 60 秒短片冲上首页，留言板第一次挂满彩色。"},
+          {year:"2020", title:"转向", caption:"从城市转去记录小城与小镇，节奏慢了下来。"},
+          {year:"2021", title:"出书", caption:"把十年脚印收成 240 页纸，胶片终于停下来一次。"},
+        ],
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables() : fallback;
+
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      const $ = (id) => document.getElementById(id);
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      /* ----- 解析 frames 变量（容错：JSON 失败则用 fallback） ----- */
+      let frames;
+      try {
+        const parsed = JSON.parse(v.frames);
+        if (Array.isArray(parsed) && parsed.length >= 2) {
+          frames = parsed.map((f, i) => ({
+            year: String(f?.year ?? `202${i}`),
+            title: String(f?.title ?? `帧 ${i+1}`),
+            caption: String(f?.caption ?? ""),
+          }));
+        } else { frames = fallback.frames.slice(); }
+      } catch(e) { frames = fallback.frames.slice(); }
+      if (frames.length < 3) {
+        while (frames.length < 3) frames.push(fallback.frames[frames.length % fallback.frames.length]);
+      }
+
+      /* ----- 文本回填 ----- */
+      $("title").textContent    = v.title    || fallback.title;
+      $("subtitle").textContent = v.subtitle || fallback.subtitle;
+      $("totalIdx").textContent = String(frames.length).padStart(2, "0");
+
+      /* ----- 构造胶片带 DOM ----- */
+      const strip = $("strip");
+      // 为了让齿孔节奏统一：复制 frames 一份接在末尾（无缝循环动画需要）
+      const loopFrames = frames.concat(frames.slice(0, 1));
+      loopFrames.forEach((f, i) => {
+        const node = document.createElement("div");
+        node.className = "frame";
+        node.dataset.idx = String(i % frames.length);
+        node.innerHTML = `
+          <div class="pic"></div>
+          <div class="meta">
+            <span class="year">${escapeHtml(f.year)}</span>
+            <span class="ft">${escapeHtml(f.title)}</span>
+            <span class="cap">${escapeHtml(f.caption)}</span>
+          </div>`;
+        strip.appendChild(node);
+      });
+
+      /* ----- 时间线 ----- */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+      const tl = gsap.timeline({ paused: true });
+
+      // 顶部 eyebrow + 标题入场
+      tl.to(".eyebrow", { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 0.05);
+      tl.to("#title",    { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 0.15);
+      tl.to("#subtitle", { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 0.35);
+
+      // 中央高亮槽 + 顶部小三角入场
+      tl.to("#highlight", { opacity: 1, duration: 0.4, ease: "power2.out" }, 0.55);
+      tl.to("#pip",       { opacity: 1, duration: 0.4, ease: "power2.out" }, 0.65);
+
+      // 底部脚注 + 计数器入场
+      tl.to("#footLeft",          { opacity: 1, x: 0, duration: 0.45, ease: "power2.out" }, 0.55);
+      tl.to(".counter .now, .counter .sep, .counter .total",
+        { opacity: 1, y: 0, duration: 0.45, ease: "power2.out", stagger: 0.06 }, 0.65);
+
+      // 当前帧 feature 信息入场（紧贴高亮槽上方）
+      tl.to("#fYear, #fTitle, #fCap",
+        { opacity: 1, y: 0, duration: 0.5, ease: "power2.out", stagger: 0.08 }, 0.8);
+
+      // 胶片帧淡入 + 弹动（一张张轻微缩放到位）
+      tl.to(".frame",
+        { opacity: 1, scale: 1, duration: 0.5, ease: "power2.out", stagger: 0.04 },
+        0.55);
+
+      /* ----- 滚动主轴（核心）：让胶片条向左推进 ----- */
+      // 一帧（含两侧 12px margin）= 360 + 24 = 384px
+      const frameStep = 384;
+      // 一帧中心在 strip 内坐标（相对 strip left=0）：首帧 margin-left=12, 中心=12+180=192
+      // 起始 translateX：让首帧中心 = 屏幕中线 960 → startX = 960 - 192 = 768
+      const N = frames.length;
+      const startX = 960 - 192;
+      // 终点：最后一帧（N-1）的中心对齐 960
+      // 累计位移 = (N-1) * frameStep
+      const endX = startX - (N - 1) * frameStep;
+
+      // 立即设置 strip 起始位置（让第一帧一开始就对准高亮槽）
+      gsap.set(strip, { x: startX });
+
+      // 滚动主轴（4s，power1.inOut）
+      tl.to(strip, {
+        x: endX,
+        duration: 4.0,
+        ease: "power1.inOut"
+      }, 1.4);
+
+      /* ----- 高亮当前帧（onUpdate 实时计算） ----- */
+      const allFrames = strip.querySelectorAll(".frame");
+      const fYear = $("fYear"), fTitle = $("fTitle"), fCap = $("fCap");
+      const nowIdx = $("nowIdx");
+      const tlRail = $("timelineRail");
+      const railStart = 1.4, railDur = 4.0;
+      let lastIdx = -1;
+      tl.eventCallback("onUpdate", () => {
+        const t = tl.time();
+        const curX = gsap.getProperty(strip, "x") || 0;
+        // 目标帧：curX + (192 + i*384) ≈ 960
+        const targetIdx = Math.max(0, Math.min(N - 1,
+          Math.round((960 - curX - 192) / frameStep)
+        ));
+        if (targetIdx !== lastIdx) {
+          lastIdx = targetIdx;
+          allFrames.forEach((el) => el.classList.toggle("active",
+            Number(el.dataset.idx) === targetIdx));
+          const f = frames[targetIdx];
+          if (f) {
+            fYear.textContent = f.year;
+            fTitle.textContent = f.title;
+            fCap.textContent = f.caption;
+            nowIdx.textContent = String(targetIdx + 1).padStart(2, "0");
+          }
+        }
+        // 进度线
+        if (t < railStart) {
+          tlRail.style.setProperty("--p", "0%");
+        } else if (t > railStart + railDur) {
+          tlRail.style.setProperty("--p", "100%");
+        } else {
+          const p = (t - railStart) / railDur;
+          tlRail.style.setProperty("--p", (p * 100).toFixed(1) + "%");
+        }
+      });
+
+      // 进度线 ::after width 跟随 --p
+      const styleEl = document.createElement("style");
+      styleEl.textContent = "#timelineRail::after{width:var(--p,0%) !important;}";
+      document.head.appendChild(styleEl);
+
+      // 结尾：再轻微送出去一程，营造「胶片还没拍完」感
+      tl.to(strip, { x: endX - 60, duration: 0.45, ease: "power2.in" }, 5.55);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "chapters", "type": "string", "label": "章节列表（逗号分隔）", "default": "三维数据,3D 地图,时间轴,竞速图,3D 饼图"}, {"id": "current", "type": "number", "label": "当前章序号（1 起）", "default": 3}, {"id": "title", "type": "string", "label": "标题", "default": "时间轴指针"}, {"id": "sub", "type": "string", "label": "英文小标", "default": "TIMELINE · FIXED CURSOR"}, {"id": "desc", "type": "string", "label": "一句话解说", "default": "不是指针在跑，是刻度在跑——整条连续时间尺在固定光标下滑动。"}, {"id": "img1", "type": "image", "label": "演示窗画面", "default": "./placeholder-1.png"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #0E100F; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #EDF2EE; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      .corner{ position: absolute; width: 34px; height: 34px; border: 3px solid var(--ac, #00FF00); }
+      .c-tl{ left: -3px; top: -3px; border-right: none; border-bottom: none; }
+      .c-tr{ right: -3px; top: -3px; border-left: none; border-bottom: none; }
+      .c-bl{ left: -3px; bottom: -3px; border-right: none; border-top: none; }
+      .c-br{ right: -3px; bottom: -3px; border-left: none; border-top: none; }
+      .tc{ position: absolute; right: 90px; top: 84px; text-align: right; font-family: 'IBM Plex Mono', monospace;
+        font-size: 20px; letter-spacing: .22em; color: rgba(237,242,238,.5); line-height: 1.9; z-index: 6; }
+      .cnp-nav{ position: absolute; left: 50%; top: 56px; transform: translateX(-50%);
+        display: flex; align-items: flex-start; z-index: 6; }
+      .cnp-node{ display: flex; flex-direction: column; align-items: center; gap: 12px; width: 130px; }
+      .cnp-dot{ width: 56px; height: 56px; border-radius: 50%; border: 2px solid rgba(237,242,238,.3);
+        display: flex; align-items: center; justify-content: center; font-size: 20px; color: rgba(237,242,238,.6); }
+      .cnp-node.cur .cnp-dot{ background: var(--ac); border-color: var(--ac); color: #0A0C0A; font-weight: 700;
+        box-shadow: 0 0 26px color-mix(in srgb, var(--accent) 45%, transparent); }
+      .cnp-name{ font-size: 20px; color: rgba(237,242,238,.55); white-space: nowrap; }
+      .cnp-node.cur .cnp-name{ color: #EDF2EE; font-weight: 700; }
+      .cnp-line{ width: 96px; height: 2px; background: rgba(237,242,238,.18); margin-top: 27px; }
+      .cnp-ghost{ position: absolute; left: 70px; top: 200px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 300px; font-weight: 900; color: var(--ac); opacity: .13; line-height: 1; }
+      .cnp-card{ position: absolute; left: 90px; top: 480px; width: 660px; z-index: 5; }
+      .cnp-kicker{ font-size: 20px; letter-spacing: .3em; color: var(--ac); }
+      .cnp-title{ margin-top: 16px; font-size: 76px; font-weight: 900; line-height: 1.15; }
+      .cnp-sub{ margin-top: 18px; font-size: 22px; letter-spacing: .3em; color: rgba(237,242,238,.5); }
+      .cnp-desc{ margin-top: 26px; font-size: 26px; line-height: 1.7; color: rgba(237,242,238,.68); }
+      .cnp-win{ position: absolute; left: 830px; top: 280px; width: 1000px; height: 630px; z-index: 4;
+        background: #131614; border: 1px solid rgba(237,242,238,.12); }
+      .cnp-win img{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      .cnp-win::after{ content: ""; position: absolute; inset: 0;
+        background: linear-gradient(to top, rgba(10,12,10,.45), transparent 40%); }
+      .cnp-cap{ position: absolute; left: 830px; top: 234px; font-size: 20px; letter-spacing: .26em;
+        color: rgba(237,242,238,.6); z-index: 5; }
+      .cnp-cap b{ color: var(--ac); font-weight: 400; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="cnp-nav" id="nav"></div>
+      <div class="cnp-ghost" id="ghost"></div>
+      <div class="cnp-card">
+        <div class="cnp-kicker mono" id="kicker"></div>
+        <div class="cnp-title" id="title"></div>
+        <div class="cnp-sub mono" id="sub"></div>
+        <div class="cnp-desc" id="desc"></div>
+      </div>
+      <div class="cnp-cap mono" id="cap"></div>
+      <div class="cnp-win" id="win">
+        <img id="shot" alt="">
+        <span class="corner c-tl"></span><span class="corner c-tr"></span>
+        <span class="corner c-bl"></span><span class="corner c-br"></span>
+      </div>
+
+    </div>
+    <script>
+      const fallback = {"chapters": "三维数据,3D 地图,时间轴,竞速图,3D 饼图", "current": 3, "title": "时间轴指针", "sub": "TIMELINE · FIXED CURSOR", "desc": "不是指针在跑，是刻度在跑——整条连续时间尺在固定光标下滑动。", "img1": "./placeholder-1.png", "accent": "#00FF00", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      document.documentElement.style.setProperty("--ac", V.accent ?? "#00FF00");
+      const chapters = split(V.chapters);
+      const cur = Math.min(Math.max(1, Number(V.current) || 1), Math.max(chapters.length, 1));
+      const nav = $("nav");
+      chapters.forEach((c, i) => {
+        const node = document.createElement("div");
+        node.className = "cnp-node" + (i + 1 === cur ? " cur" : "");
+        node.innerHTML = '<span class="cnp-dot mono">' + String(i + 1).padStart(2, "0") + '</span><span class="cnp-name"></span>';
+        node.querySelector(".cnp-name").textContent = c;
+        nav.appendChild(node);
+        if (i < chapters.length - 1) {
+          const ln = document.createElement("i");
+          ln.className = "cnp-line";
+          nav.appendChild(ln);
+        }
+      });
+      $("ghost").textContent = String(cur).padStart(2, "0");
+      $("kicker").textContent = "CHAPTER " + String(cur).padStart(2, "0") + " / " + String(chapters.length).padStart(2, "0");
+      $("title").textContent = V.title;
+      $("sub").textContent = V.sub;
+      $("desc").textContent = V.desc;
+      $("cap").innerHTML = "<b>●</b> CHAPTER " + String(cur).padStart(2, "0") + " · LIVE DEMO";
+      if (V.img1) $("shot").src = V.img1;
+      tl.fromTo(".cnp-node", { opacity: 0, y: -18 }, { opacity: 1, y: 0, duration: 0.4, stagger: 0.08, ease: "power3.out" }, 0.2);
+      tl.fromTo(".cnp-line", { scaleX: 0, transformOrigin: "0 50%" }, { scaleX: 1, duration: 0.4, stagger: 0.08 }, 0.35);
+      tl.fromTo("#ghost", { opacity: 0 }, { opacity: 0.13, duration: 0.8 }, 0.4);
+      tl.fromTo(["#kicker", "#title", "#sub", "#desc"], { opacity: 0, y: 26 },
+        { opacity: 1, y: 0, duration: 0.55, stagger: 0.1, ease: "power3.out" }, 0.4);
+      tl.fromTo("#win", { opacity: 0, scale: 0.96, y: 24 }, { opacity: 1, scale: 1, y: 0, duration: 0.7, ease: "power3.out" }, 0.65);
+      tl.fromTo("#win .corner", { opacity: 0, scale: 0.4 }, { opacity: 1, scale: 1, duration: 0.3, stagger: 0.06, ease: "back.out(2)" }, 1.1);
+      tl.fromTo("#cap", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 1.3);
+      tl.fromTo(".cnp-node.cur .cnp-dot", { scale: 0.5 }, { scale: 1, duration: 0.5, ease: "back.out(2.2)" }, 1.2);
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

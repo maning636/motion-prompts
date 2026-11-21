@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"bgText","type":"string","label":"主标题文本","default":"城市漫游"},{"id":"accentColor","type":"color","label":"荧光高亮色","default":"#39FF85"},{"id":"bgColor","type":"color","label":"纸面底色（默认纸白）","default":"#F4F1EA"},{"id":"fontSize","type":"number","label":"主标题字号（px）","default":"64"},{"id":"motionIntensity","type":"enum","label":"动效强度","options":[{"label":"弱（微动）","value":"1"},{"label":"中（呼吸）","value":"2"},{"label":"强（摆动）","value":"3"}],"default":"2"},{"id":"stackCount","type":"number","label":"装饰条目数（2-5）","default":"3"}]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=480, height=270" />
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { width: 480px; height: 270px; overflow: hidden; background: transparent; }
+      body { font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+      /* ===== 瑞士风纸白底（族⑩书页系·瑞士风）===== */
+      #sheet {
+        position: absolute;
+        inset: 0;
+        background: var(--bc, #F4F1EA);
+        overflow: hidden;
+      }
+      /* 网格底纹：极淡的细线 + 基线 */
+      #sheet::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px);
+        background-size: 40px 30px, 40px 30px;
+        background-position: 0 0;
+        opacity: 0.55;
+        pointer-events: none;
+      }
+      /* 噪点纹理 */
+      #sheet::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.045 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+        opacity: 0.5;
+        mix-blend-mode: multiply;
+        pointer-events: none;
+      }
+
+      /* ===== 栏线层（瑞士网格核心）===== */
+      .rule {
+        position: absolute;
+        background: rgba(20,20,20,0.85);
+        transform-origin: left center;
+        will-change: transform;
+      }
+      .rule.top    { left: 14px; right: 14px; top: 22px;    height: 1px; }
+      .rule.bottom { left: 14px; right: 14px; bottom: 22px; height: 1px; }
+      .rule.left   { left: 14px;  top: 22px; bottom: 22px;  width: 1px; }
+      .rule.right  { right: 14px; top: 22px; bottom: 22px;  width: 1px; }
+      /* 中间横切细线（在主标和引号之间）*/
+      .rule.mid {
+        left: 14px; right: 14px;
+        top: 146px;
+        height: 1px;
+        background: rgba(20,20,20,0.45);
+        transform-origin: left center;
+      }
+
+      /* ===== 页眉 ===== */
+      .header {
+        position: absolute;
+        top: 8px; left: 18px; right: 18px;
+        display: flex; justify-content: space-between; align-items: center;
+        font-size: 8px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: rgba(20,20,20,0.78);
+        font-variant-numeric: tabular-nums;
+        opacity: 0;
+      }
+      .header .left { display: flex; gap: 6px; align-items: center; }
+      .header .left .dot {
+        width: 4px; height: 4px; border-radius: 50%;
+        background: var(--ac, #39FF85);
+        box-shadow: 0 0 5px var(--ac, #39FF85);
+      }
+      .header .left .vol { color: rgba(20,20,20,0.5); }
+      .header .right { display: flex; gap: 8px; align-items: baseline; }
+      .header .right .num {
+        font-size: 11px; letter-spacing: 0;
+        color: rgba(20,20,20,0.92);
+        font-weight: 700;
+      }
+      .header .right .sep { color: rgba(20,20,20,0.3); }
+
+      /* ===== 页脚 ===== */
+      .footer {
+        position: absolute;
+        bottom: 8px; left: 18px; right: 18px;
+        display: flex; justify-content: space-between; align-items: center;
+        font-size: 7.5px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: rgba(20,20,20,0.55);
+        opacity: 0;
+      }
+      .footer .left { display: flex; gap: 8px; align-items: center; }
+      .footer .arrow {
+        display: inline-block;
+        width: 18px; height: 1px;
+        background: rgba(20,20,20,0.5);
+        position: relative;
+      }
+      .footer .arrow::after {
+        content: ""; position: absolute; right: 0; top: -2px;
+        width: 5px; height: 5px;
+        border-top: 1px solid rgba(20,20,20,0.5);
+        border-right: 1px solid rgba(20,20,20,0.5);
+        transform: rotate(45deg);
+      }
+
+      /* ===== 主标题（左上区域，留出中央/右下呼吸）===== */
+      #title-block {
+        position: absolute;
+        left: 24px;
+        top: 48px;
+        max-width: 320px;
+      }
+      .kicker {
+        font-size: 9px;
+        letter-spacing: 0.32em;
+        text-transform: uppercase;
+        color: var(--ac, #39FF85);
+        opacity: 0;
+        margin-bottom: 14px;
+        font-weight: 600;
+      }
+      .main {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0 6px;
+        line-height: 0.96;
+        letter-spacing: -0.01em;
+      }
+      .main .ch {
+        display: inline-block;
+        font-size: var(--fs, 64px);
+        font-weight: 800;
+        color: rgba(20,20,20,0.96);
+        opacity: 0;
+        transform: translateY(14px);
+        will-change: transform, opacity;
+        position: relative;
+      }
+      /* 单字"墨"等单字时居中放大 */
+      .main.single .ch { font-size: calc(var(--fs, 64px) * 1.6); }
+
+      /* ===== 高亮扫入：荧光绿块 ===== */
+      .hl {
+        position: absolute;
+        left: -4px; right: -4px; top: 12%;
+        height: 78%;
+        background: var(--ac, #39FF85);
+        opacity: 0;
+        mix-blend-mode: multiply;
+        transform-origin: left center;
+        transform: scaleX(0);
+        z-index: 1;
+        pointer-events: none;
+        border-radius: 2px;
+      }
+      .main .ch.in-hl {
+        color: rgba(0,0,0,0.92);
+        mix-blend-mode: normal;
+        z-index: 2;
+        position: relative;
+        font-weight: 900;
+      }
+
+      /* ===== 副标/英文小字（右上呼吸区）===== */
+      #sub-block {
+        position: absolute;
+        right: 24px;
+        top: 48px;
+        text-align: right;
+        max-width: 200px;
+      }
+      .en-title {
+        font-size: 14px;
+        letter-spacing: 0.16em;
+        color: rgba(20,20,20,0.92);
+        opacity: 0;
+        font-weight: 700;
+        transform: translateX(10px);
+        will-change: transform, opacity;
+      }
+      .en-sub {
+        font-size: 8px;
+        letter-spacing: 0.28em;
+        color: rgba(20,20,20,0.55);
+        text-transform: uppercase;
+        margin-top: 6px;
+        opacity: 0;
+        transform: translateX(8px);
+        will-change: transform, opacity;
+      }
+
+      /* ===== 中段呼吸区：引号 + 摘自小字 ===== */
+      .pullquote {
+        position: absolute;
+        left: 28px;
+        top: 156px;
+        max-width: 200px;
+        opacity: 0;
+        will-change: transform, opacity;
+      }
+      .pullquote .q {
+        font-family: 'Times New Roman', serif;
+        font-size: 36px;
+        line-height: 0.5;
+        color: var(--ac, #39FF85);
+        font-weight: 900;
+        display: block;
+        margin-bottom: -6px;
+      }
+      .pullquote .txt {
+        font-size: 9px;
+        line-height: 1.4;
+        letter-spacing: 0.04em;
+        color: rgba(20,20,20,0.78);
+        padding-left: 4px;
+        display: block;
+        max-width: 220px;
+      }
+      .pullquote .attr {
+        display: block;
+        margin-top: 4px;
+        font-size: 7px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: rgba(20,20,20,0.45);
+      }
+
+      /* ===== 底部装饰条（stackCount 控制）===== */
+      .strips {
+        position: absolute;
+        right: 28px;
+        top: 156px;
+        max-width: 200px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        text-align: left;
+      }
+      .strip {
+        display: flex; align-items: baseline; justify-content: flex-end;
+        gap: 8px;
+        font-size: 7.5px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: rgba(20,20,20,0.7);
+        opacity: 0;
+        transform: translateY(4px);
+        will-change: transform, opacity;
+      }
+      .strip .num {
+        font-size: 7px;
+        color: rgba(20,20,20,0.35);
+        font-variant-numeric: tabular-nums;
+        min-width: 22px;
+      }
+      .strip .dot {
+        width: 4px; height: 4px; border-radius: 50%;
+        background: rgba(20,20,20,0.35);
+      }
+      .strip.highlight .num { color: var(--ac, #39FF85); }
+      .strip.highlight .dot { background: var(--ac, #39FF85); box-shadow: 0 0 4px var(--ac, #39FF85); }
+
+      /* ===== 角落 page 标记 ===== */
+      .page-mark {
+        position: absolute;
+        bottom: 38px;
+        right: 24px;
+        font-size: 9px;
+        letter-spacing: 0.18em;
+        color: rgba(20,20,20,0.5);
+        opacity: 0;
+        font-variant-numeric: tabular-nums;
+      }
+      .page-mark b {
+        color: rgba(20,20,20,0.88);
+        font-weight: 700;
+        margin-right: 4px;
+      }
+
+      /* ===== 暗色 bc 适配：bgColor 深色时切换为"暗纸"色票 ===== */
+      body.dark-mode .rule,
+      body.dark-mode .rule.mid,
+      body.dark-mode .header,
+      body.dark-mode .footer,
+      body.dark-mode .page-mark,
+      body.dark-mode .strip,
+      body.dark-mode .en-title,
+      body.dark-mode .en-sub,
+      body.dark-mode .main .ch,
+      body.dark-mode .header .right .num {
+        color: rgba(245,241,232,0.92);
+        background-color: rgba(245,241,232,0.7);
+      }
+      body.dark-mode .rule { background: rgba(245,241,232,0.7); }
+      body.dark-mode .rule.mid { background: rgba(245,241,232,0.4); }
+      body.dark-mode .main .ch { color: rgba(245,241,232,0.96); }
+      body.dark-mode .main .ch.in-hl { color: rgba(20,20,20,0.96); }
+      body.dark-mode .en-title { color: rgba(245,241,232,0.86); }
+      body.dark-mode .en-sub { color: rgba(245,241,235,0.5); }
+      body.dark-mode .header { color: rgba(245,241,232,0.78); }
+      body.dark-mode .header .right .num { color: rgba(245,241,232,0.95); }
+      body.dark-mode .footer { color: rgba(245,241,232,0.55); }
+      body.dark-mode .page-mark { color: rgba(245,241,232,0.45); }
+      body.dark-mode .page-mark b { color: rgba(245,241,232,0.85); }
+      body.dark-mode .strip { color: rgba(245,241,232,0.7); }
+      body.dark-mode .strip .num { color: rgba(245,241,232,0.35); }
+      body.dark-mode .strip .dot { background: rgba(245,241,232,0.35); }
+      body.dark-mode #sheet::before {
+        background-image:
+          linear-gradient(to right, rgba(245,241,232,0.05) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(245,241,232,0.04) 1px, transparent 1px);
+      }
+      body.dark-mode .hl {
+        mix-blend-mode: screen;
+        opacity: 0.85;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="sheet">
+      <div class="rule top"></div>
+      <div class="rule bottom"></div>
+      <div class="rule left"></div>
+      <div class="rule right"></div>
+      <div class="rule mid"></div>
+
+      <div class="header">
+        <div class="left"><span class="dot"></span><span>VOL.15</span><span class="vol">URBAN DRIFT</span></div>
+        <div class="right"><span class="sep">№</span><span class="num">047</span></div>
+      </div>
+
+      <div id="title-block">
+        <div class="kicker" id="kicker">FEATURE · NO.047</div>
+        <div class="main" id="main"></div>
+      </div>
+
+      <div id="sub-block">
+        <div class="en-title" id="en-title">CITY WALK</div>
+        <div class="en-sub">URBAN DRIFT · ISSUE 047</div>
+      </div>
+
+      <div class="pullquote" id="pullquote">
+        <span class="q">"</span>
+        <span class="txt">在拐角处偶遇的下午,比一杯冷萃更长。</span>
+        <span class="attr">— EXCERPT · 04 / 12</span>
+      </div>
+
+      <div class="strips" id="strips"></div>
+
+      <div class="page-mark"><b>PG.</b>01 / 04</div>
+    </div>
+
+  <script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+  <script>
+    (() => {
+      const fallback = {
+        bgText: "城市漫游",
+        accentColor: "#39FF85",
+        bgColor: "#F4F1EA",
+        fontSize: "64",
+        motionIntensity: "2",
+        stackCount: "3"
+      };
+      const v = (window.__hyperframes && window.__hyperframes.getVariables)
+        ? window.__hyperframes.getVariables() : fallback;
+
+      const tc = v.accentColor || "#39FF85";
+      // bgColor 默认 #1A2E1A 是 catalog 沿用的旧版深绿——视为"瑞士风纸白信号"
+      // （族⑩气质固定为纸白底，避免开箱即深色失族）
+      const _rawBc = v.bgColor || "#F4F1EA";
+      const bc = (_rawBc.toLowerCase() === "#1a2e1a") ? "#F4F1EA" : _rawBc;
+      const fs = Math.max(28, Math.min(96, parseFloat(v.fontSize) || 64));
+      const intensity = Math.max(1, Math.min(3, parseInt(v.motionIntensity) || 2));
+      const stackCount = Math.max(2, Math.min(5, parseInt(v.stackCount) || 3));
+      // bgText 默认 "墨" 是 catalog 沿用的旧版单字——升级为"城市漫游"瑞士风主标
+      const _rawBgText = v.bgText || "城市漫游";
+      const bgText = (_rawBgText === "墨" || !_rawBgText) ? "城市漫游" : _rawBgText.toString().slice(0, 8);
+
+      document.documentElement.style.setProperty('--ac', tc);
+      document.documentElement.style.setProperty('--bc', bc);
+      document.documentElement.style.setProperty('--fs', fs + 'px');
+
+      // 检测 bgColor 明暗（决定纸白 vs 暗纸）
+      function hexToRgb(h) {
+        const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h || '');
+        return m ? [parseInt(m[1],16), parseInt(m[2],16), parseInt(m[3],16)] : [26,26,26];
+      }
+      const rgb = hexToRgb(bc);
+      const luminance = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+      const isDark = luminance < 0.5;
+      if (isDark) {
+        document.body.classList.add('dark-mode');
+      }
+
+      // 主标题逐字渲染
+      const mainEl = document.getElementById('main');
+      const chars = Array.from(bgText.replace(/\s+/g, ''));
+      if (chars.length === 1) mainEl.classList.add('single');
+      const charEls = [];
+      chars.forEach((ch, i) => {
+        const s = document.createElement('span');
+        s.className = 'ch';
+        s.textContent = ch;
+        // 高亮用叠层：默认最后一个字作为高亮目标（最右）
+        if (i === chars.length - 1) {
+          const hl = document.createElement('span');
+          hl.className = 'hl';
+          s.appendChild(hl);
+        }
+        mainEl.appendChild(s);
+        charEls.push(s);
+      });
+
+      // 装饰条目（stackCount 控制）
+      const stripData = [
+        { k: '01', t: '晨光 / MORNING 06:30',          hl: true  },
+        { k: '02', t: '巷弄 / ALLEY ROUTE 2.4KM',       hl: false },
+        { k: '03', t: '街角 / CORNER CAFÉ 14:20',       hl: false },
+        { k: '04', t: '归途 / NIGHT BACK 21:08',         hl: false },
+        { k: '05', t: '尾声 / EPILOGUE 22:40',           hl: false },
+      ];
+      const stripsEl = document.getElementById('strips');
+      const stripEls = [];
+      for (let i = 0; i < stackCount; i++) {
+        const d = stripData[i] || stripData[i % stripData.length];
+        const el = document.createElement('div');
+        el.className = 'strip' + (d.hl ? ' highlight' : '');
+        el.innerHTML = '<span>' + d.t + '</span><span class="dot"></span><span class="num">' + d.k + '</span>';
+        stripsEl.appendChild(el);
+        stripEls.push(el);
+      }
+
+      // DOM 节点
+      const sheet = document.getElementById('sheet');
+      const rules = document.querySelectorAll('.rule');
+      const ruleTop = document.querySelector('.rule.top');
+      const ruleBottom = document.querySelector('.rule.bottom');
+      const ruleLeft = document.querySelector('.rule.left');
+      const ruleRight = document.querySelector('.rule.right');
+      const ruleMid = document.querySelector('.rule.mid');
+      const header = document.querySelector('.header');
+      const footer = document.querySelector('.footer');
+      const pageMark = document.querySelector('.page-mark');
+      const kicker = document.getElementById('kicker');
+      const enTitle = document.getElementById('en-title');
+      const enSub = document.querySelector('.en-sub');
+      const pullquote = document.getElementById('pullquote');
+
+      // 动效参数（呼吸段固定在 1.45–2.35s，保证单圈闭合于 3.20s）
+      let breatheAmp, breatheRot;
+      if (intensity === 1)      { breatheAmp = 0.012; breatheRot = 0.3; }
+      else if (intensity === 3) { breatheAmp = 0.028; breatheRot = 0.8; }
+      else                       { breatheAmp = 0.018; breatheRot = 0.5; }
+
+      // 初始态（不要 set 清零导致 getComputedStyle 陷阱；用 gsap.set 配合直接属性记录）
+      const initialState = {
+        sheet:  { opacity: 1 },
+        header: { opacity: 0, y: -4 },
+        footer: { opacity: 0, y: 4 },
+        pageMark: { opacity: 0 },
+        ruleTop:    { scaleX: 0 },
+        ruleBottom: { scaleX: 0 },
+        ruleLeft:   { scaleY: 0 },
+        ruleRight:  { scaleY: 0 },
+        ruleMid:    { scaleX: 0 },
+        kicker:   { opacity: 0, x: -8 },
+        chars:    { opacity: 0, y: 14 },
+        enTitle:  { opacity: 0, x: 10 },
+        enSub:    { opacity: 0, x: 8 },
+        pullquote: { opacity: 0, y: 8 },
+        strips:   { opacity: 0, y: 4 },
+      };
+
+      function resetState() {
+        gsap.set(sheet, initialState.sheet);
+        gsap.set(header, initialState.header);
+        gsap.set(footer, initialState.footer);
+        gsap.set(pageMark, initialState.pageMark);
+        gsap.set(ruleTop, initialState.ruleTop);
+        gsap.set(ruleBottom, initialState.ruleBottom);
+        gsap.set(ruleLeft, initialState.ruleLeft);
+        gsap.set(ruleRight, initialState.ruleRight);
+        gsap.set(ruleMid, initialState.ruleMid);
+        gsap.set(kicker, initialState.kicker);
+        gsap.set(charEls, initialState.chars);
+        gsap.set(enTitle, initialState.enTitle);
+        gsap.set(enSub, initialState.enSub);
+        gsap.set(pullquote, initialState.pullquote);
+        gsap.set(stripEls, initialState.strips);
+        // 还原高亮块
+        charEls.forEach(c => {
+          const hl = c.querySelector('.hl');
+          if (hl) gsap.set(hl, { scaleX: 0, opacity: 0 });
+          c.classList.remove('in-hl');
+        });
+      }
+
+      // 高亮目标字（默认最后一字）
+      const hlChar = charEls[charEls.length - 1];
+      const hlBlock = hlChar ? hlChar.querySelector('.hl') : null;
+
+      function runLoop() {
+        const tl = gsap.timeline();
+          // 注册到 window.__timelines：云渲染的 settle/逐帧定位靠它驱动时间轴。
+          // 组件此前全部没注册，导致渲染停在第 0 帧（主体初始 opacity:0 → 整层空）。
+          // gsap 时间轴就地 mutate，先存引用即可，后续 tl.to() 作用在同一对象上。
+          window.__timelines = window.__timelines || {};
+          window.__timelines.main = tl;
+
+        // ─── 预备 0.0–0.45s：栏线生长 + 页眉/页脚 ───
+        tl.to(sheet, { opacity: 1, duration: 0.1 }, 0);
+        tl.to(ruleTop,    { scaleX: 1, duration: 0.42, ease: 'power2.out' }, 0.02);
+        tl.to(ruleBottom, { scaleX: 1, duration: 0.42, ease: 'power2.out' }, 0.06);
+        tl.to(ruleLeft,   { scaleY: 1, duration: 0.42, ease: 'power2.out' }, 0.10);
+        tl.to(ruleRight,  { scaleY: 1, duration: 0.42, ease: 'power2.out' }, 0.14);
+        tl.to(ruleMid,    { scaleX: 1, duration: 0.36, ease: 'power2.inOut' }, 0.22);
+
+        tl.to(header, { opacity: 1, y: 0, duration: 0.34, ease: 'power2.out' }, 0.18);
+        tl.to(footer, { opacity: 1, y: 0, duration: 0.34, ease: 'power2.out' }, 0.22);
+        tl.to(pageMark, { opacity: 1, duration: 0.34, ease: 'power2.out' }, 0.30);
+
+        // ─── 主体 0.45–1.1s：大字错落浮入 + 副标 ───
+        tl.to(kicker, { opacity: 1, x: 0, duration: 0.32, ease: 'power2.out' }, 0.45);
+
+        const charBaseT = 0.55;
+        charEls.forEach((c, i) => {
+          tl.to(c, {
+            opacity: 1, y: 0, duration: 0.40, ease: 'power3.out'
+          }, charBaseT + i * 0.06);
+        });
+
+        tl.to(enTitle, { opacity: 1, x: 0, duration: 0.36, ease: 'power2.out' }, 0.72);
+        tl.to(enSub,   { opacity: 1, x: 0, duration: 0.36, ease: 'power2.out' }, 0.82);
+        tl.to(pullquote, { opacity: 1, y: 0, duration: 0.50, ease: 'power2.out' }, 0.92);
+
+        // ─── 主体延续 1.05–1.55s：荧光绿高亮扫过最后一个字 ───
+        if (hlBlock && hlChar) {
+          tl.call(() => { hlChar.classList.add('in-hl'); }, [], 1.05);
+          tl.fromTo(hlBlock,
+            { scaleX: 0, opacity: 1, transformOrigin: 'left center' },
+            { scaleX: 1, duration: 0.46, ease: 'power2.inOut' },
+            1.10
+          );
+          tl.to(hlBlock, { opacity: 0.55, duration: 0.30, ease: 'power2.out' }, 1.56);
+        }
+
+        // ─── 装饰条 1.05–1.55s：错落浮入（1.5s 时全到位）───
+        stripEls.forEach((s, i) => {
+          tl.to(s, { opacity: 1, y: 0, duration: 0.22, ease: 'power2.out' }, 1.05 + i * 0.05);
+        });
+
+        // ─── 呼吸循环 1.45–2.35s（安静一拍）───
+        tl.to(charEls, {
+          y: -breatheAmp * 100 * 0.04,
+          duration: 0.45,
+          ease: 'sine.inOut',
+          stagger: 0.04
+        }, 1.45);
+
+        tl.to(charEls, {
+          y: 0,
+          duration: 0.45,
+          ease: 'sine.inOut',
+          stagger: 0.04
+        }, 1.90);
+
+        // 栏线呼吸（轻微 scaleY 脉动）
+        tl.to([ruleLeft, ruleRight], {
+          scaleY: 0.985,
+          duration: 0.45,
+          ease: 'sine.inOut'
+        }, 1.45);
+        tl.to([ruleLeft, ruleRight], {
+          scaleY: 1,
+          duration: 0.45,
+          ease: 'sine.inOut'
+        }, 1.90);
+
+        // ─── 收尾 2.95–3.20s：呼出 + 复位循环 ───
+        tl.to(stripEls, { opacity: 0, y: 4, duration: 0.22, ease: 'power2.in' }, 2.95);
+        if (hlBlock) tl.to(hlBlock, { opacity: 0, scaleX: 0, duration: 0.22, ease: 'power2.in' }, 3.00);
+        tl.call(() => { if (hlChar) hlChar.classList.remove('in-hl'); }, [], 3.18);
+        tl.call(resetState, [], 3.20);
+
+        return tl;
+      }
+
+      // 总时长 = 收尾 3.20s（reset 在 3.20 处）—— 严格 < 4s
+      const master = gsap.timeline({ repeat: -1, delay: 0.15 });
+      master.add(runLoop());
+      master.duration(3.20);
+    })();
+  </script>
+  </body>
+</html>

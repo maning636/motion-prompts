@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"pack","name":"规格包","type":"enum","label":"规格包（配色 / 字体 / 曲线）","options":[{"label":"暗色科技","value":"dark"},{"label":"奶油贴纸","value":"cream"},{"label":"单色克制","value":"mono"},{"label":"夜航","value":"night"}],"default":"night"},{"id":"video1","name":"实拍素材","type":"string","label":"中间那段实拍（样例 视频 neutral-01.mp4（未随仓分发），留空用内置画面）","default":""},{"id":"brushTxt","name":"手写体大字","type":"string","label":"手写体卡 大字","default":"慢一点"},{"id":"brushMark","name":"手写体副字","type":"string","label":"手写体卡 副字","default":"TAKE YOUR TIME"},{"id":"ty","name":"尾卡大字","type":"string","label":"尾卡 Thank You","default":"Thank You"},{"id":"who","name":"尾卡署名","type":"string","label":"尾卡署名","default":"@nightwalk · 每周三更"},{"id":"stamp","name":"长镜角标","type":"string","label":"实拍段角标","default":"TAKE 04 · 3.5S"},{"id":"watermark","name":"底部水印","type":"string","label":"底部中央水印","default":"@nightwalk"}]'>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="三张纯排版大字卡顶住前段，中间插一段 3.5s 实拍长镜换气，再用米色手写体卡和 Thank You 收尾——不需要素材也能用。">
+<title>排版卡穿插 · 卡与实拍换气</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<link rel="stylesheet" href="../_lib/packs.css">
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script>
+<!-- packs.js 必须排在 blocks.js **之后**：blocks.js 结尾是 global.BBlocks = BB，
+     会把它整个替换掉。谁先加载谁的东西就没了，表现是 B.pack is not a function。 -->
+<script src="../_lib/packs.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<style>
+  /* 底色和字色**必须来自规格包**，不能写死。
+     写死 #000 + #F4F1EA 的时候，四个包里只有 dark / night 正常：
+     cream 的 --pk-fg 是 #2A2118、mono 是 #14140F，两个都是**深字**，
+     压在这个写死的黑底上 → 标题、标签、说明全糊掉。
+     而写死字面量色的元素（比如 rgba(244,241,234,.82)）反而还看得见，
+     画面上就成了一半能看一半不能看——比全黑更难认。
+     一共 33 条模板中招（混剪 5 + 认知 22 + 节拍 6）。
+
+     注意区分两层契约（packs.css 顶部注释里写过）：
+       --pk-bg / --pk-fg      = 包自带底板，舞台自己用它
+       --pk-*-media           = 压在用户素材上的那一层
+     这里改的是前者。 */
+  html,body{margin:0;padding:0;background:var(--pk-bg,#000)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--pk-bg,#000);
+        color:var(--pk-fg,#F4F1EA);font-family:"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+        -webkit-font-smoothing:antialiased}
+  /* 统一安全区：混剪里所有贴边元素都从 72/88 起，不贴 0 */
+  
+  /* 素材位：用 CSS 画一个「像镜头」的抽象画面。
+     真视频在当前渲染管线里不播（compose.html 不处理 <video>），
+     预览会全黑——所以默认走 CSS，逻辑才看得见。 */
+  .shot{position:absolute;inset:0;overflow:hidden;opacity:0}
+  .shot .sky{position:absolute;inset:-12%;background:
+      linear-gradient(180deg,var(--c1) 0%,var(--c2) 52%,var(--c3) 100%)}
+  .shot .glow{position:absolute;left:56%;top:26%;width:340px;height:340px;border-radius:50%;
+      background:radial-gradient(circle,var(--c4) 0%,rgba(0,0,0,0) 68%);filter:blur(12px)}
+  .shot .haze{position:absolute;left:-10%;right:-10%;top:52%;height:26%;
+      background:linear-gradient(180deg,rgba(0,0,0,0),var(--c3) 78%,rgba(0,0,0,0));opacity:.55}
+  .shot .ridge{position:absolute;left:-8%;right:-8%;bottom:0;height:46%;
+      background:linear-gradient(180deg,var(--c5),var(--c6))}
+  .shot .ridge.r1{clip-path:polygon(0 44%,13% 27%,26% 41%,40% 19%,55% 37%,69% 24%,85% 40%,100% 26%,100% 100%,0 100%)}
+  .shot .ridge.r2{height:28%;opacity:.92;
+      clip-path:polygon(0 58%,12% 40%,25% 57%,38% 35%,52% 55%,66% 37%,80% 53%,100% 39%,100% 100%,0 100%)}
+  .shot .grain{position:absolute;inset:0;opacity:.10;background-image:
+      repeating-linear-gradient(0deg,rgba(255,255,255,.10) 0 1px,rgba(0,0,0,0) 1px 3px),
+      repeating-linear-gradient(90deg,rgba(0,0,0,.10) 0 1px,rgba(0,0,0,0) 1px 4px)}
+  .shot .vig{position:absolute;inset:0;box-shadow:inset 0 0 260px 80px rgba(0,0,0,.52)}
+  .shot video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+  .shot.live .sky,.shot.live .glow,.shot.live .haze,
+  .shot.live .ridge,.shot.live .grain{display:none}
+  .shot.live video{display:block}
+
+  /* 底部中央水印：v5 就是这个位置。
+     它全程压在实拍上（只有米色手写卡那几秒例外），
+     所以基准色用 --pk-muted-media；写死 rgba(244,241,234,.42) 的话
+     它在四个包里各不相同，等于脱离规格包的管辖。 */
+  .wm{position:absolute;left:0;right:0;bottom:64px;z-index:60;opacity:0;text-align:center;
+      font-family:ui-monospace,Consolas,monospace;font-size:20px;font-weight:700;
+      letter-spacing:.30em;color:var(--pk-muted-media)}
+  /* 米色手写卡那几秒的深色水印：**另起一层**而不是补间 color。
+     GSAP 不能把 var(--pk-muted-media) 当颜色补间目标——
+     tl.to('.wm', {color:'var(--x)'}) 会被当成非法值，四张卡渲出来颜色一模一样。
+     而补间到一个写死的浅色又等于脱离规格包。两层叠着、只交叉淡入淡出，
+     既跨包正确，又没有这个坑。 */
+  .wmd{color:rgba(23,19,16,.52);opacity:0}
+
+  /* 排版卡：整屏纯色 + 大字，几何遮罩压在大字后面 */
+  .card{position:absolute;inset:0;z-index:20;opacity:0;display:flex;
+      flex-direction:column;align-items:center;justify-content:center}
+  .card .geom{position:absolute;pointer-events:none}
+  .card .g-circle{width:640px;height:640px;border-radius:50%;
+      border:3px solid var(--ac);opacity:.42}
+  .card .g-band{width:1400px;height:300px;background:var(--ac);opacity:.20;transform:rotate(-9deg)}
+  .card .g-dots{width:640px;height:640px;opacity:.40;background-image:
+      radial-gradient(circle,var(--ac) 0 5px,rgba(0,0,0,0) 6px);
+      background-size:60px 60px;background-position:center}
+  .card .cw{position:relative;display:flex;flex-direction:column;align-items:center;gap:26px;
+      width:1728px;text-align:center}
+  .card .big{display:block;width:100%;font-size:210px;font-weight:900;line-height:1;
+      letter-spacing:.06em;color:#F4F1EA;text-indent:.06em}
+  .card .sub{display:block;width:100%;font-size:32px;font-weight:600;letter-spacing:.24em;
+      color:var(--ac)}
+  .card .rule{width:0;height:3px;background:var(--ac)}
+
+  /* 实拍长镜上的小字标。
+     这一行字是坐在用户素材上的（.shot / data-media-layer），
+     素材亮度未知，所以只能用 *-media 安全值：
+     原来写死 #F4F1EA，mono 包下 --pk-fg 会被换成深色而这里是浅色资产，
+     等于完全脱离了包的管辖。 */
+  .stamp{position:absolute;left:0;right:0;bottom:150px;z-index:30;opacity:0;text-align:center}
+  .stamp span{display:inline-block;padding:14px 34px;border:1px solid var(--pk-muted-media);
+      font-family:ui-monospace,Consolas,monospace;font-size:22px;font-weight:700;
+      letter-spacing:.26em;color:var(--pk-fg-media);text-indent:.26em}
+
+  /* 手写体卡：整屏反过来用一档米色，是全片唯一的亮场 */
+  .brush{position:absolute;inset:0;z-index:30;opacity:0;background:#F2EDE3;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:38px}
+  .brush .txt{display:block;width:1560px;text-align:center;font-size:168px;font-weight:700;
+      line-height:1.16;color:#171310;letter-spacing:.10em;text-indent:.10em;
+      font-family:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif}
+  .brush .mark{display:block;width:900px;text-align:center;font-size:26px;font-weight:600;
+      letter-spacing:.30em;color:#8A5A22;text-indent:.30em}
+  .brush .stroke{width:0;height:6px;background:#8A5A22;border-radius:3px;opacity:.85}
+
+  /* 尾卡。做成居中面板而不是满屏：舞台本身就是黑的，看着没差别；
+     但 settle 按可见面积挑定格帧，满屏容器白拿一屏，
+     缩略图就会停在 Thank You 上——那不是这个模板的辨识点，
+     米色手写卡才是。 */
+  .end{position:absolute;left:50%;top:50%;width:1700px;height:520px;margin:-260px 0 0 -850px;
+      z-index:40;opacity:0;border:1px solid rgba(244,241,234,.10);border-radius:28px;
+      background:rgba(244,241,234,.025);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:38px}
+  /* 尾卡。#s0 在 tb 处就被 tl.set 关掉了，尾卡是压在**包底色**上的，
+     所以里面这几行用 --pk-*，不是 --pk-*-media。 */
+  .end .ty{display:block;width:1600px;text-align:center;font-size:148px;font-weight:900;
+      line-height:1.04;letter-spacing:.01em;color:var(--pk-fg)}
+  .end .line{width:0;height:2px;background:var(--pk-muted)}
+  .end .who{display:block;width:1200px;text-align:center;font-family:ui-monospace,Consolas,monospace;
+      font-size:24px;font-weight:700;letter-spacing:.32em;color:var(--pk-muted);text-indent:.32em}
+
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <div class="shot" id="s0" data-media-layer style="--c1:#1A1A1E;--c2:#4A4A52;--c3:#6E6E78;--c4:#B8B8C0;--c5:#222228;--c6:#0E0E12"><span class="sky"></span><span class="glow"></span><span class="haze"></span><span class="ridge r1"></span><span class="ridge r2"></span><span class="grain"></span><span class="vig"></span><video id="v0" muted playsinline preload="auto"></video></div>
+  
+  <div class="card" id="c0" style="background:#0F1319;--ac:#E8A048">
+    <div class="geom g-circle" data-o=".42"></div>
+    <div class="cw">
+      <span class="big" id="b0" data-fit-max="210" data-fit-min="96">SLOW</span>
+      <div class="rule" id="r0"></div>
+      <span class="sub" id="u0" data-fit-max="32" data-fit-min="18">镜头要慢下来</span>
+    </div>
+  </div>
+
+  <div class="card" id="c1" style="background:#1A0E0C;--ac:#C2503A">
+    <div class="geom g-band" data-o=".22"></div>
+    <div class="cw">
+      <span class="big" id="b1" data-fit-max="210" data-fit-min="96">DOWN</span>
+      <div class="rule" id="r1"></div>
+      <span class="sub" id="u1" data-fit-max="32" data-fit-min="18">一次只讲一件事</span>
+    </div>
+  </div>
+
+  <div class="card" id="c2" style="background:#0D1418;--ac:#6FA8C4">
+    <div class="geom g-dots" data-o=".38"></div>
+    <div class="cw">
+      <span class="big" id="b2" data-fit-max="210" data-fit-min="96">WAIT</span>
+      <div class="rule" id="r2"></div>
+      <span class="sub" id="u2" data-fit-max="32" data-fit-min="18">留白也是内容</span>
+    </div>
+  </div>
+
+  <div class="stamp"><span id="stamp">TAKE 04 · 3.5S</span></div>
+  <div class="brush">
+    <span class="txt" id="brushTxt" data-fit-max="168" data-fit-min="72">慢一点</span>
+    <span class="stroke"></span>
+    <span class="mark" id="brushMark">TAKE YOUR TIME</span>
+  </div>
+  <div class="end">
+    <span class="ty" id="ty" data-fit-max="148" data-fit-min="64">Thank You</span>
+    <div class="line" id="eline"></div>
+    <span class="who" id="who">@nightwalk</span>
+  </div>
+  <div class="wm" id="wm">@nightwalk</div>
+  <div class="wm wmd" id="wmd" aria-hidden="true">@nightwalk</div>
+
+</div>
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+  var tl = B.tl();
+  /* 规格包：先定风格，再建任何元素。
+     画面素材的配色**不跟着包走**——那是"底片"，用户自己的东西不能被模板改色；
+     跟着包走的只有 UI 层（字色、强调色、描边、圆角、曲线）。这个边界必须守住。 */
+  B.pack(v.pack);
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  function q(s) { return document.querySelector(s); }
+  /* 素材位接真视频：留空就继续用 CSS 画面 */
+  function live(n, src) {
+    if (!src) return;
+    var s = document.getElementById('s' + n), e = document.getElementById('v' + n);
+    if (!s || !e) return;
+    s.classList.add('live'); e.src = src;
+    e.play().catch(function () {});
+  }
+  /* 景别缓推：v1/v3 里画面始终在极慢地动，这是「像镜头」的关键 */
+  function push(n, at, dur, from, to, ease) {
+    var s = q('#s' + n + ' .sky'), g = q('#s' + n + ' .glow'), r = q('#s' + n + ' .r2');
+    if (s) tl.fromTo(s, { scale: from, y: '0%' },
+      { scale: to, y: '-2%', duration: dur, ease: ease || 'none' }, at);
+    if (g) tl.fromTo(g, { xPercent: -4, opacity: .8 },
+      { xPercent: 5, opacity: 1, duration: dur, ease: 'none' }, at);
+    if (r) tl.fromTo(r, { xPercent: 0 },
+      { xPercent: -2.5, duration: dur, ease: 'none' }, at);
+  }
+  /* clip-path 形状插值。
+     两个坑都在这里踩过：
+       1. GSAP 各版本对 clipPath 字符串补间的处理不一致，所以不直接补间它，
+          改成补间一个 {t:0→1} 的代理对象，onUpdate 里自己算 8 个点；
+       2. **from 必须是编译期常量，不能从元素当前状态读。**
+          settle 会把时间轴来回扫；一旦回退越过一个已完成的补间，
+          GSAP 会把它按 ratio 0 重渲——onUpdate 拿到的就是起点，
+          形状会「弹回矩形」。写成常量后，形状是 t 的纯函数，
+          停在任何一帧算出来都一样。
+     相邻两段的 from 必须等于上一段的 to，这条由 Python 侧保证。 */
+  function polyStr(pts) {
+    return 'polygon(' + pts.map(function (p) {
+      return p[0].toFixed(2) + '% ' + p[1].toFixed(2) + '%'; }).join(',') + ')';
+  }
+  function morph(el, from, to, at, dur, ease) {
+    if (!el || !to || !from || from.length !== to.length) return;
+    var st = { t: 0 };
+    tl.to(st, { t: 1, duration: dur == null ? .7 : dur, ease: ease || 'power2.inOut',
+      onUpdate: function () {
+        el.style.clipPath = polyStr(from.map(function (p, i) {
+          return [p[0] + (to[i][0] - p[0]) * st.t,
+                  p[1] + (to[i][1] - p[1]) * st.t];
+        }));
+      } }, at);
+  }
+  set('wm', v.watermark); set('wmd', v.watermark); set('who', v.who); set('stamp', v.stamp);
+  set('brushTxt', v.brushTxt); set('brushMark', v.brushMark); set('ty', v.ty);
+  live(0, v.video1);
+
+  var N = 3, CD = 0.9, FD = 3.5;
+  var tEnd = 10.2;
+
+  /* 底部中央水印：全程不动，是这一条的时间地标 */
+  tl.set('#wm', { opacity: 1 }, 0);
+
+  /* 三张排版卡：字弹一下、遮罩同时张开，卡与卡之间直切 */
+  for (var i = 0; i < N; i++) {
+    (function (k) {
+      var at = k * CD;
+      tl.set('#c' + k, { opacity: 1 }, at);
+      if (k > 0) tl.set('#c' + (k - 1), { opacity: 0 }, at);
+      var g = q('#c' + k + ' .geom');
+      if (g) tl.fromTo(g, { scale: .82, opacity: 0 },
+          { scale: 1, opacity: g.getAttribute('data-o') || .4,
+           duration: .55, ease: 'power3.out' }, at);
+      tl.fromTo('#b' + k, { opacity: 0, y: 44, scale: .96 },
+          { opacity: 1, y: 0, scale: 1, duration: .5, ease: 'power3.out' }, at);
+      tl.fromTo('#r' + k, { width: 0 },
+          { width: 200, duration: .45, ease: 'power3.out' }, at + .22);
+      tl.fromTo('#u' + k, { opacity: 0, y: 12 },
+          { opacity: 1, y: 0, duration: .4, ease: 'power2.out' }, at + .3);
+    })(i);
+  }
+
+  /* 实拍长镜：全片唯一一段「什么都不设计」的地方，让人喘一口 */
+  var ts = N * CD;
+  tl.set('#s0', { opacity: 1 }, ts);
+  for (i = 0; i < N; i++) tl.set('#c' + i, { opacity: 0 }, ts);
+  push(0, ts, FD, 1.01, 1.06);
+  /* 注意 .stamp 才是带 opacity:0 的那层，#stamp 是里面的字——
+     早先补间打在了内层 span 上，外层永远不动，角标就从来没出现过。 */
+  tl.fromTo('.stamp', { opacity: 0, y: 16 },
+      { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, ts + .3);
+
+  /* 手写体卡：反色一记，让人从快节奏里出来 */
+  var tb = ts + FD;
+  tl.set('#s0', { opacity: 0 }, tb);
+  tl.set('.stamp', { opacity: 0 }, tb);
+  tl.to('.brush', { opacity: 1, duration: .3, ease: 'power2.inOut' }, tb);
+  /* 米色手写卡那几秒，水印压在**满屏不透明米色板**上（.brush 是它的兄弟，
+     画在下面），所以换成深色那一层 .wmd。
+     这里用 tl.set 瞬时切换、不做交叉淡化：两层文字在 0.3 秒里同时半透明地
+     压在正在淡入的米色板上，不管哪个包对比度都会塌一次——
+     那是转场本身的性质，不是缺陷。瞬时换就没有这个窗口。
+     退场时也不把浅色那一层换回来：板子已经走了，水印紧接着就该退场
+     （te+.12 本来就会整体淡出），多换回来一次只是多一个出错窗口。 */
+  tl.set('.wm', { opacity: 0 }, tb);
+  tl.set('.wmd', { opacity: 1 }, tb);
+  tl.fromTo('#brushTxt', { opacity: 0, y: 46, scale: .97 },
+      { opacity: 1, y: 0, scale: 1, duration: .8, ease: 'power3.out' }, tb + .12);
+  tl.fromTo('.brush .stroke', { width: 0 },
+      { width: 840, duration: .7, ease: 'power3.inOut' }, tb + .5);
+  tl.fromTo('#brushMark', { opacity: 0, y: 10 },
+      { opacity: 1, y: 0, duration: .45, ease: 'power2.out' }, tb + .62);
+
+  /* 尾卡：水印退场，让位给尾卡自己的署名 */
+  var te = tb + 2.0;
+  tl.to('.brush', { opacity: 0, duration: .3, ease: 'power2.inOut' }, te);
+  tl.to('.wmd', { opacity: 0, duration: .3, ease: 'power2.inOut' }, te);  tl.to('.wm', { opacity: 0, duration: .3, ease: 'power2.inOut' }, te + .12);
+  tl.to('.end', { opacity: 1, duration: .35, ease: 'power2.out' }, te + .12);
+  tl.fromTo('#ty', { opacity: 0, y: 30 },
+      { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, te + .22);
+  tl.fromTo('#eline', { width: 0 }, { width: 420, duration: .6, ease: 'power3.out' }, te + .4);
+  tl.fromTo('#who', { opacity: 0, y: 12 },
+      { opacity: 1, y: 0, duration: .45, ease: 'power2.out' }, te + .56);
+
+  B.hold(tl, tEnd, .5);
+  B.fitAll();
+
+})();
+</script>
+</body>
+</html>

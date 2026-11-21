@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"title","name":"主标题","type":"string","label":"主标题（中文大字，两行）","default":"三人成团"},{"id":"lineB","name":"主标题第二行","type":"string","label":"主标题第二行（中文大字）","default":"一个人也能拼"},{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（mono + 大字距）","default":"GROUP / 拼单价"},{"id":"st1","name":"贴纸 1","type":"string","label":"第一枚贴纸文案","default":"24 小时内成团"},{"id":"st2","name":"贴纸 2","type":"string","label":"第二枚贴纸文案","default":"不成功自动退"},{"id":"st3","name":"贴纸 3","type":"string","label":"第三枚贴纸文案","default":"库存独立锁定"},{"id":"price","name":"拼单价","type":"number","label":"每人拼单价（元）","default":39.9},{"id":"people","name":"成团人数","type":"number","label":"成团人数（人）","default":3},{"id":"note","name":"底部说明","type":"string","label":"价格条下方的说明（一行 mono）","default":"口径：同一 SKU · 满 3 人自动成团"},{"id":"accent","name":"强调色","type":"color","label":"强调色（价格条底 / 斜纹带）","default":"#2FD07A"},{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–6）","default":5.5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="贴纸风拼单价卡：上方两行中文大标题，中部三枚胶囊贴纸加一枚裸字符重音，下方整块反白价格条压着拼单价与成团人数">
+<title>拼单价贴纸 · 三人成团一个人也能拼</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --accent:#2FD07A;
+  }
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--paper);color:var(--ink);font-family:var(--sans);
+    display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+  /* 顶部大标题区：两行 900 中文大字，字距恒 0，交给 B.fit() 收口 */
+  .hd{flex:0 0 auto;padding:52px 88px 0;border-bottom:var(--bw) solid var(--ink)}
+  .hd .eb{display:block;white-space:nowrap;font-family:var(--mono);font-weight:700;
+    font-size:26px;letter-spacing:.14em;color:var(--mute);margin-bottom:18px}
+  .hd .ln{display:block;white-space:nowrap;font-weight:900;font-size:120px;
+    line-height:1.04;letter-spacing:0}
+  .hd .ln.b{margin-top:6px}
+
+  /* 贴纸群：三枚胶囊 + 一枚裸字符重音，一排只允许有一个裸字符件（§3.11） */
+  .sticks{flex:0 0 auto;display:flex;align-items:center;gap:22px;
+    padding:36px 88px;min-width:0}
+  .st{flex:0 1 auto;min-width:0;max-width:520px;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;padding:12px 28px;font-size:30px;font-weight:700;
+    border-radius:9999px;border:var(--bw) solid var(--ink);
+    background:var(--pink);color:var(--ink);box-shadow:4px 4px 0 var(--ink)}
+  .st.g{background:var(--green)}
+  .st.b{background:var(--yellow)}
+  /* 裸字符：文字硬投影，不带底、不带边、不带影（§3.8 标准写法） */
+  .star{flex:0 0 auto;font-size:76px;line-height:1;font-weight:900;
+    color:var(--blue);text-shadow:2px 2px 0 var(--ink)}
+
+  /* 底部反白价格条：一块整底色，不叠蒙版（基因 10） */
+  .plate{flex:1 1 auto;min-height:0;display:flex;align-items:center;gap:40px;
+    padding:0 88px;background:var(--ink);color:var(--white);
+    border-top:var(--bw) solid var(--ink);overflow:hidden}
+  .people{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:8px;width:210px;height:210px;
+    background:var(--accent);color:var(--ink);border:var(--bw) solid var(--white);
+    border-radius:4px;box-shadow:8px 8px 0 var(--white)}
+  .people .n{font-family:var(--mono);font-weight:900;font-size:104px;line-height:1;
+    letter-spacing:0;font-variant-numeric:tabular-nums}
+  .people .u{font-size:26px;font-weight:700;letter-spacing:0}
+  .price{flex:0 0 auto;display:flex;align-items:baseline;gap:16px;min-width:0}
+  .cur{font-family:var(--mono);font-weight:900;font-size:72px;line-height:1;color:var(--accent)}
+  .num{display:block;white-space:nowrap;font-family:var(--mono);font-weight:900;
+    font-size:216px;line-height:.92;letter-spacing:0;color:var(--accent);
+    font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+  .side{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:14px;
+    align-items:flex-end}
+  .side .lab{white-space:nowrap;font-size:32px;font-weight:700;letter-spacing:0;
+    max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .side .note{white-space:nowrap;font-family:var(--mono);font-weight:700;font-size:24px;
+    letter-spacing:.08em;color:var(--yellow);max-width:100%;overflow:hidden;
+    text-overflow:ellipsis}
+
+  .stripe{flex:0 0 auto;height:20px;border-top:var(--bw) solid var(--ink);
+    background:repeating-linear-gradient(-45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+
+  @media (prefers-reduced-motion: reduce){
+    .anim{transition-duration:.01ms !important;animation-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="hd anim" id="hd">
+    <span class="eb anim" id="eyebrow" data-fit-max="26" data-fit-min="16">GROUP / 拼单价</span>
+    <div class="ln anim" id="title" data-fit-max="120" data-fit-min="56">三人成团</div>
+    <div class="ln b anim" id="lineB" data-fit-max="120" data-fit-min="56">一个人也能拼</div>
+  </div>
+
+  <div class="sticks anim" id="sticks">
+    <span class="st anim" id="st1" data-fit-max="30" data-fit-min="17">24 小时内成团</span>
+    <span class="st g anim" id="st2" data-fit-max="30" data-fit-min="17">不成功自动退</span>
+    <span class="st b anim" id="st3" data-fit-max="30" data-fit-min="17">库存独立锁定</span>
+    <span class="star anim" id="star" aria-hidden="true">★</span>
+  </div>
+
+  <div class="plate anim" id="plate">
+    <div class="people anim" id="peopleBox">
+      <span class="n" id="people">3</span>
+      <span class="u">人成团</span>
+    </div>
+    <div class="price">
+      <span class="cur">¥</span>
+      <span class="num anim" id="num" data-fit-max="216" data-fit-min="96">39.9</span>
+    </div>
+    <div class="side">
+      <span class="lab anim" id="lab">每人拼单价</span>
+      <span class="note anim" id="note" data-fit-max="24" data-fit-min="15">口径：同一 SKU · 满 3 人自动成团</span>
+    </div>
+  </div>
+
+  <div class="stripe anim" id="stripe"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  ['eyebrow', 'title', 'lineB', 'st1', 'st2', 'st3', 'note', 'lab']
+    .forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+
+  var price = Number(v.price), ppl = Number(v.people);
+  if (!isFinite(price)) price = 0;
+  if (!isFinite(ppl)) ppl = 1;
+  ppl = Math.max(2, Math.round(ppl));
+  set('num', price % 1 === 0 ? String(price) : price.toFixed(2));
+  set('people', String(ppl));
+
+  B.fitAll();
+  var tl = B.tl();
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (reduce) {
+    gsap.set('.anim', { x: 0, y: 0, scale: 1, scaleX: 1, rotate: 0 });
+    tl.fromTo('#hd',     { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, 0);
+    tl.fromTo('#sticks', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .15);
+    tl.fromTo('#plate',  { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .35);
+    tl.fromTo('#stripe', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, .5);
+    B.hold(tl, 1.2, 1.1);
+    return;
+  }
+
+  var INK = '#0F0F0F', WHT = '#FFFFFF';
+  function slam(sel, at, dx, dy, d) {
+    tl.fromTo(sel, { x: dx, y: dy },
+      { x: 0, y: 0, duration: d, ease: 'power4.out' }, at);
+  }
+  /* 深底上的方块阴影换成白（§7.2 规则 B：阴影色随承载底色走） */
+  function shadowBounce(sel, rest, at) {
+    var off = parseInt(rest, 10);
+    tl.set(sel, { boxShadow: off + 'px ' + (off + 3) + 'px 0 ' + WHT, immediateRender: false }, at);
+    tl.to(sel, { boxShadow: rest, duration: 0.04, ease: 'steps(2)' }, at + 0.04);
+  }
+
+  slam('#hd',      0.00,   0, -34, 0.24);
+  slam('#eyebrow', 0.12, -24, -20, 0.22);
+  slam('#title',   0.24, -28, -28, 0.26);
+  slam('#lineB',   0.40, -28, -28, 0.26);
+  /* 贴纸依次拍入，错峰 0.1s；阴影只在档位间 steps 跳，不做连续缩放 */
+  slam('#st1',     0.64, -28, -28, 0.24);
+  slam('#st2',     0.74, -28, -28, 0.24);
+  slam('#st3',     0.84, -28, -28, 0.24);
+  slam('#star',    0.94, -28, -28, 0.24);
+  slam('#plate',   1.06,   0,  36, 0.28);
+  slam('#peopleBox',1.24, -28,  -28, 0.26);
+  shadowBounce('#peopleBox', '8px 8px 0 ' + WHT, 1.52);
+  slam('#num',     1.40,   0,  -28, 0.26);
+  slam('#lab',     1.56,  24,  -20, 0.22);
+  slam('#note',    1.62,  24,  -20, 0.22);
+  slam('#stripe',  1.74,   0,   24, 0.24);
+  tl.fromTo('#stripe', { backgroundPositionX: '0px' },
+    { backgroundPositionX: '60px', duration: 1.2, ease: 'none' }, 1.98);
+
+  var introEnd = 3.18;
+  var total = Math.min(6, Math.max(5, Number(v.duration) || 5.5));
+  B.hold(tl, introEnd, Math.max(0.6, total - introEnd));
+})();
+</script>
+</body></html>

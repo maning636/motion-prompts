@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "targetTitle", "type": "string", "label": "凝视卡标题", "default": "自动发布"}, {"id": "targetText", "type": "string", "label": "凝视卡描述", "default": "一次配置，全平台定时发"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#flow{ position:absolute; top:360px; left:0; height:360px; }
+.fc{ position:absolute; top:0; width:340px; height:360px; border-radius:18px; background:#15151C;
+  border:1px solid rgba(255,255,255,.09); padding:26px; }
+.fc .pt{ height:18px; width:55%; border-radius:9px; background:rgba(255,255,255,.22); margin-bottom:16px; }
+.fc .pl{ height:12px; border-radius:6px; background:rgba(255,255,255,.11); margin-bottom:10px; }
+.fc.hot{ background:#1B1B26; border-color:var(--accent); }
+.fc.hot .pt{ background:var(--accent); }
+.fct{ position:absolute; left:26px; bottom:66px; font-size:36px; color:var(--fg); }
+.fcx{ position:absolute; left:26px; bottom:28px; font-size:21px; color:rgba(255,255,255,.6); }
+#wrap{ position:absolute; inset:0; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+<div id="wrap"><div id="flow"><div class="fc" style="left:120px"><div class="pt"></div><div class="pl"></div><div class="pl" style="width:66%"></div></div><div class="fc" style="left:540px"><div class="pt"></div><div class="pl"></div><div class="pl" style="width:66%"></div></div><div class="fc" style="left:960px"><div class="pt"></div><div class="pl"></div><div class="pl" style="width:66%"></div></div><div class="fc hot" style="left:1380px"><div class="pt"></div><div class="pl"></div><div class="fct" id="tt"></div><div class="fcx" id="tx"></div></div><div class="fc" style="left:1800px"><div class="pt"></div><div class="pl"></div><div class="pl" style="width:66%"></div></div><div class="fc" style="left:2220px"><div class="pt"></div><div class="pl"></div><div class="pl" style="width:66%"></div></div></div></div>
+    </div>
+    <script>
+      const FB = {"targetTitle": "自动发布", "targetText": "一次配置，全平台定时发", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#tt').textContent=v.targetTitle||'';$('#tx').textContent=v.targetText||'';
+// 帧号 remap 直译：快(10.6px/f)→慢窗凝视(1px/f，≥10x反差)→快；blur 联动速率
+// 目标卡(i=3)中心 120+3*420+170=1550，居中需 flow x=-590；慢窗跨 -560..-620
+const flow=$('#flow'), wrap=$('#wrap');
+tl.set(wrap,{filter:'blur(2px)'},0);
+tl.to(flow,{x:-370,duration:F(35),ease:'none'},0);            // 快
+tl.to(wrap,{filter:'blur(0px)',duration:F(4)},F(33));         // 慢窗前摘 blur
+tl.to(flow,{x:-560,duration:F(25),ease:'none'},F(35));
+tl.to(flow,{x:-620,duration:F(35),ease:'none'},F(60));        // 慢窗凝视（目标过屏心）
+tl.to(wrap,{filter:'blur(2px)',duration:F(4)},F(93));         // 出慢窗挂 blur
+tl.to(flow,{x:-1150,duration:F(50),ease:'none'},F(95));       // 快
+tl.to(wrap,{filter:'blur(0px)',duration:F(6)},F(143));
+tl.to({},{duration:F(7)},F(143));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

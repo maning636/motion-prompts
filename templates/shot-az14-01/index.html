@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#stagewrap{ position:absolute; inset:0; }
+#stage{ position:absolute; inset:0; perspective:1600px; perspective-origin:50% 46%; }
+#base{ position:absolute; left:460px; top:230px; width:1000px; height:620px; border-radius:18px;
+  background:#000; opacity:0; }
+#page{ position:absolute; left:460px; top:230px; width:1000px; height:620px;
+  background:#11141C; border:1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+  border-radius:18px; will-change:transform; }
+.comp{ position:absolute; border-radius:10px; background:#1B2030;
+  border:1px solid color-mix(in srgb, var(--fg) 14%, transparent); will-change:transform,filter,box-shadow; }
+#cTop{ left:0; top:0; width:1000px; height:64px; border-radius:18px 18px 0 0; background:#232A3D; }
+#cSide{ left:0; top:64px; width:220px; height:556px; }
+#cChart{ left:248px; top:92px; width:452px; height:300px; }
+#cStat{ left:724px; top:92px; width:252px; height:300px; background:color-mix(in srgb, var(--accent) 22%, #1B2030); }
+#cList{ left:248px; top:416px; width:728px; height:176px; }
+.lab{ position:absolute; left:14px; top:12px; font-size:15px; opacity:.5; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+#cap{ position:absolute; left:0; right:0; top:118px; text-align:center; font-size:28px;
+  letter-spacing:6px; opacity:.5; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5.0" data-width="1920" data-height="1080">
+
+<div id="stagewrap">
+  <div id="cap">WHAT'S INSIDE · 组成拆解</div>
+  <div id="stage">
+    <div id="base"></div>
+    <div id="page">
+      <div class="comp" id="cTop"><div class="lab">顶栏</div></div>
+      <div class="comp" id="cSide"><div class="lab">侧栏</div></div>
+      <div class="comp" id="cChart"><div class="lab">图表</div></div>
+      <div class="comp" id="cStat"><div class="lab">KPI</div></div>
+      <div class="comp" id="cList"><div class="lab">列表</div></div>
+    </div>
+  </div>
+</div>
+
+    </div>
+    <script>
+      const FB = {"accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+const page=$('#page');
+// 整页 3D 倾斜（单元素 transform + 父级 perspective，不用 preserve-3d 嵌套）
+tl.fromTo(page,{rotateX:0,rotateY:0,scale:1},
+  {rotateX:18,rotateY:-12,scale:0.76,duration:F(12),ease:'power2.out'},0);
+tl.to('#base',{opacity:0.22,duration:F(8)},F(12));
+tl.to('#base',{opacity:0,duration:F(12)},F(86));
+const comps=[
+  {el:$('#cTop'),z:60},{el:$('#cSide'),z:120},{el:$('#cChart'),z:180},
+  {el:$('#cStat'),z:250},{el:$('#cList'),z:320},
+];
+function backOut(p,c){return 1+(c+1)*Math.pow(p-1,3)+c*Math.pow(p-1,2);}
+function cl(x){return Math.max(0,Math.min(1,x));}
+const EX0=12, EXD=14, RE0=84, RED=12, SH0=108;
+const sim={f:0};
+function paint(){
+  const f=sim.f;
+  comps.forEach((c,i)=>{
+    const es=EX0+3*i, rs=RE0+3*(comps.length-1-i); // 炸开错峰 3f，合体逆序
+    let d;
+    if(f<rs){ d=f<es?0:backOut(cl((f-es)/EXD),1.7); }
+    else{ const p=cl((f-rs)/RED); d=1-p*p; }
+    d=Math.max(0,d);
+    const z=c.z;
+    c.el.style.transform='translate('+(-0.30*z*d).toFixed(1)+'px,'+(-0.42*z*d).toFixed(1)+'px) scale('+(1+z*d/1600).toFixed(4)+')';
+    c.el.style.filter='brightness('+(1-0.28*d*z/320).toFixed(3)+')';
+    c.el.style.boxShadow='0 '+(40*d*z/320).toFixed(1)+'px '+(70*d*z/320).toFixed(1)+'px rgba(0,0,0,'+(0.5*d).toFixed(3)+')';
+  });
+  // 合体落锤：13px 指数衰减震屏
+  const sf=f-SH0;
+  const a=sf>=0?13*Math.exp(-sf/0.8):0;
+  $('#stagewrap').style.transform='translate('+(a*Math.sin(sf*5.2)).toFixed(1)+'px,'+(a*0.7*Math.cos(sf*4.4)).toFixed(1)+'px)';
+}
+paint();
+tl.to(sim,{f:150,duration:F(150),ease:'none',onUpdate:paint},0);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"label","name":"控件文案","type":"string","label":"控件说明文案","default":"导出菜单"},{"id":"items","name":"菜单项","type":"string","label":"四个菜单项（逗号分隔）","default":"导出 MP4,导出 MOV,仅导出音频,取消"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.0}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>菜单级联展开</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-halo { position: absolute; inset: 0;
+    background: radial-gradient(58% 70% at 50% 52%,
+      rgba(0,0,0,.56) 0%, rgba(0,0,0,.30) 54%, rgba(0,0,0,0) 84%); }
+  .p-label { position: absolute; font-size: 11px; font-weight: 700; letter-spacing: .18em;
+    color: rgba(255,248,238,.6); white-space: nowrap; }
+  /* 菜单堆起来的投影：只有软晕，不是一块面板底板 */
+  .p-stack { position: absolute; left: 150px; top: 112px; width: 180px; height: 120px;
+    opacity: 0; border-radius: 16px; transform-origin: 50% 0;
+    background: radial-gradient(62% 62% at 50% 62%,
+      rgba(0,0,0,.55) 0%, rgba(0,0,0,0) 76%); }
+  .p-btn { position: absolute; left: 152px; top: 72px; width: 176px; height: 34px;
+    border-radius: 17px; background: rgba(255,248,238,.11);
+    border: 2px solid rgba(255,248,238,.3); display: flex; align-items: center;
+    justify-content: center; }
+  .p-btn-tx { font-size: 13px; font-weight: 800; color: #FFF8EE; white-space: nowrap; }
+  .p-caret { position: absolute; right: 12px; top: 10px; width: 12px; height: 12px;
+    font-size: 11px; line-height: 12px; text-align: center;
+    color: rgba(255,248,238,.72); }
+  .p-item { position: absolute; left: 156px; width: 168px; height: 30px; border-radius: 8px;
+    background: rgba(255,248,238,.1); border: 1.5px solid rgba(255,248,238,.18);
+    box-shadow: 0 5px 14px rgba(0,0,0,.28);
+    display: flex; align-items: center; padding: 0 12px; }
+  .p-item-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ac);
+    flex: 0 0 auto; margin-right: 9px; }
+  .p-item-tx { font-size: 12px; font-weight: 600; color: rgba(255,248,238,.86);
+    white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"label":"导出菜单","items":"导出 MP4,导出 MOV,仅导出音频,取消","accent":"#FF6B35","duration":3.0};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || 3.0;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  const fits = [];
+  function fit(list) { fits.push.apply(fits, list); }
+  function runFit() {
+    fits.forEach((f) => {
+      const el = f.el;
+      el.style.fontSize = f.max + 'px';
+      const avail = f.box || el.clientWidth;
+      const ws = el.style.whiteSpace;
+      el.style.whiteSpace = 'nowrap';
+      const natural = el.scrollWidth;
+      el.style.whiteSpace = ws;
+      if (natural > avail) {
+        el.style.fontSize = Math.max(f.min, Math.floor(f.max * avail / natural)) + 'px';
+      }
+    });
+  }
+  function list4(s, fb) {
+    const a = String(s == null ? '' : s).split(/[,，|]/);
+    const out = [];
+    for (let i = 0; i < 4; i++) {
+      const t = (a[i] || '').trim();
+      out.push(t || fb[i]);
+    }
+    return out;
+  }
+
+  put('div', 'p-halo');
+  const label = put('div', 'p-label', 'left:152px; top:40px;', v.label || FALLBACK.label);
+  const stack = put('div', 'p-stack');
+  const btn = put('div', 'p-btn');
+  const btnTx = put('div', 'p-btn-tx', '', '导出设置', btn);
+  const caret = put('div', 'p-caret', '', '▾', btn);
+
+  const names = list4(v.items, list4(FALLBACK.items, ['导出 MP4', '导出 MOV', '仅导出音频', '取消']));
+  const items = [];
+  names.forEach(function (s, i) {
+    const it = put('div', 'p-item', 'top:' + (118 + i * 26) + 'px;');
+    put('div', 'p-item-dot', '', null, it);
+    put('div', 'p-item-tx', '', s, it);
+    items.push(it);
+  });
+
+  fit([{ el: label, max: 11, min: 9, box: 176 },
+       { el: btnTx, max: 13, min: 10, box: 130 }]);
+  items.forEach(function (it) {
+    fits.push({ el: it.lastChild, max: 12, min: 9, box: 126 });
+  });
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  const T0 = 0.76, STEP = 0.11, FALL = 0.3;
+  tl.fromTo(label, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .3 }, .04);
+  tl.fromTo(btn, { opacity: 0, scale: .74 },
+    { opacity: 1, scale: 1, duration: .38, ease: 'back.out(2.2)' }, .06);
+  /* 箭头翻上去 = 菜单开了 */
+  tl.to(caret, { rotate: 180, duration: .28, ease: 'back.out(2)' }, .62);
+  /* 级联：逐条下落，间距小于行高 → 自然叠在一起 */
+  items.forEach(function (it, i) {
+    tl.fromTo(it, { y: -28, opacity: 0, scaleY: .55, rotate: i % 2 ? 2.4 : -2.4 },
+      { y: 0, opacity: 1, scaleY: 1, rotate: 0, duration: FALL, ease: 'back.out(2.2)' },
+      T0 + i * STEP);
+    tl.to(it, { scaleY: .9, scaleX: 1.03, duration: .09, yoyo: true, repeat: 1, ease: 'power2.inOut' },
+      T0 + i * STEP + FALL);
+  });
+  tl.fromTo(stack, { opacity: 0, scaleY: .5 },
+    { opacity: 1, scaleY: 1, duration: .42, ease: 'power2.out' }, T0 + 0.1);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  runFit();
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

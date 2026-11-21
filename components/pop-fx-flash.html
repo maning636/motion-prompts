@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"text","name":"文案","type":"string","label":"主文案","default":"咔嚓！"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":2.4}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>双闪屏</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-tint { position: absolute; inset: 0; background: rgba(12, 12, 18, .55); opacity: .9; }
+  .p-halo { position: absolute; inset: 0;
+    background: radial-gradient(70% 80% at 50% 50%, rgba(0,0,0,.48) 0%, rgba(0,0,0,.24) 54%, rgba(0,0,0,0) 84%); }
+  .p-wordrow { position: absolute; left: 0; right: 0; top: 92px; display: flex; justify-content: center; }
+  .p-word { display: inline-block; white-space: nowrap; font-size: 66px; font-weight: 900;
+    line-height: 1.06; color: var(--fg); -webkit-text-stroke: 3px var(--ink);
+    text-shadow: 6px 6px 0 rgba(0,0,0,.85); }
+  .p-bot { position: absolute; left: 50%; top: 182px; margin-left: -20px; width: 40px; height: 36px;
+    background: var(--ac); border: 3px solid var(--ink); border-radius: 7px 7px 4px 4px; }
+  .p-bot::before, .p-bot::after { content: ''; position: absolute; top: 8px; width: 7px; height: 9px;
+    background: var(--ink); border-radius: 50%; }
+  .p-bot::before { left: 7px; }
+  .p-bot::after { right: 7px; }
+  .p-bot i { position: absolute; left: 10px; bottom: 5px; width: 20px; height: 9px;
+    border-bottom: 3px solid var(--ink); border-radius: 0 0 12px 12px; }
+  .p-blade { position: absolute; left: 240px; top: 135px; width: 420px; height: 26px; margin: -13px 0 0 -210px;
+    opacity: 0; transform-origin: 50% 50%;
+    background: linear-gradient(90deg, rgba(255,255,255,0), #FFFFFF 50%, rgba(255,255,255,0)); }
+  .p-leak { position: absolute; left: -40%; top: 0; width: 70%; height: 100%; opacity: 0;
+    background: linear-gradient(100deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.75) 46%, rgba(255,255,255,0) 100%);
+    will-change: transform, opacity; }
+  .p-white { position: absolute; inset: 0; background: #FFFFFF; opacity: 0; pointer-events: none; }
+  .p-dip { position: absolute; inset: 0; background: rgba(8, 8, 14, 1); opacity: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"咔嚓！","accent":"#FF6B35","duration":2.4};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  const dur = parseFloat(v.duration) || 2.4;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--fg', '#FFF8EE');
+  root.style.setProperty('--ink', '#1B1B24');
+  const text = String(v.text == null ? FALLBACK.text : v.text);
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, tx, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (tx != null) el.textContent = tx;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  const tint = put('div', 'p-tint');
+  put('div', 'p-halo');
+
+  const bot = put('div', 'p-bot');
+  put('i', '', '', null, bot);
+  const row = put('div', 'p-wordrow');
+  const word = put('div', 'p-word', '', text, row);
+
+  const blades = [];
+  for (let i = 0; i < 4; i++) {
+    const b = put('div', 'p-blade', 'transform:rotate(' + (i * 45) + 'deg);');
+    blades.push(b);
+  }
+  const leak = put('div', 'p-leak');
+  const dip = put('div', 'p-dip');
+  const white = put('div', 'p-white');
+
+  function fitText(el, maxPx, avail, minPx) {
+    el.style.fontSize = maxPx + 'px';
+    el.style.whiteSpace = 'nowrap';
+    const natural = el.scrollWidth;
+    if (natural > avail && natural > 0) {
+      el.style.fontSize = Math.max(minPx, Math.floor(maxPx * avail / natural)) + 'px';
+    }
+  }
+  fitText(word, 66, 400, 22);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+  tl.fromTo(word, { scale: .2, opacity: 0 },
+    { scale: 1, opacity: 1, duration: .34, ease: 'power4.out' }, .02);
+  tl.fromTo(bot, { y: -52, scale: 1.2, opacity: 0 },
+    { y: 0, scale: 1, opacity: 1, duration: .3, ease: 'power4.in' }, .04);
+  tl.to(bot, { scaleY: .82, scaleX: 1.08, duration: .1, yoyo: true, repeat: 1, ease: 'power2.out' }, .34);
+
+  /* 两次白闪，快慢明显不同：
+     第一下是快门（0.11s、sigma 0.03，极窄），第二下是余闪（0.36s、sigma 0.095，宽得多）。
+     都是高斯函数，直接吃绝对时间 t，回扫必得同一帧。 */
+  const flash = (t) => {
+    const a = Math.exp(-Math.pow((t - .11) / .030, 2));
+    const b = .78 * Math.exp(-Math.pow((t - .36) / .095, 2));
+    return Math.min(1, a + b);
+  };
+  /* 曝光回落：第二下之后画面不是立刻恢复正常，而是慢慢收曝光再松开 */
+  const settle = (t) => (t <= .36 ? 0 : .30 * Math.exp(-(t - .36) * 2.1));
+
+  const P = { t: 0 };
+  const paint = (t) => {
+    const F = flash(t);
+    const S = settle(t);
+    white.style.opacity = Math.min(1, F * .92 + S * .18).toFixed(3);
+    /* 自动曝光在两次闪光之间会被「打黑」一下，这是真实相机行为 */
+    dip.style.opacity = Math.max(0, .22 * (1 - F) * Math.min(1, t / .18) * (t > .36 ? 1 : .7)).toFixed(3);
+    for (let i = 0; i < blades.length; i++) {
+      blades[i].style.opacity = (F * .42).toFixed(3);
+      blades[i].style.transform = 'rotate(' + (i * 45 + t * 9).toFixed(2) + 'deg) scaleX(' + (1 + F * .55).toFixed(3) + ')';
+    }
+    /* 漏光斜条只在第二次慢闪里横扫一次 */
+    const lk = Math.max(0, Math.min(1, (t - .34) / .52));
+    leak.style.transform = 'translate3d(' + (lk * 620).toFixed(1) + 'px,0,0)';
+    leak.style.opacity = (lk < 1 ? .55 * Math.sin(Math.PI * lk) : 0).toFixed(3);
+    tint.style.opacity = (0.9 - S * .5).toFixed(3);
+    word.style.filter = 'brightness(' + (1 + F * .7).toFixed(2) + ')';
+    bot.style.filter = 'brightness(' + (1 + F * .6).toFixed(2) + ')';
+  };
+  tl.fromTo(P, { t: 0 }, {
+    t: dur, duration: dur, ease: 'none',
+    onUpdate() { paint(P.t); }
+  }, 0);
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+  paint(0);
+})();
+</script>
+</body>
+</html>

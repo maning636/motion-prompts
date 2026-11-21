@@ -1,0 +1,13 @@
+{
+  "id": "split-compare-slider",
+  "name": "分屏对比滑杆",
+  "description": "左右分屏对比叙事，中间竖向滑杆从起始位置缓慢滑向终点位置，两侧方案错峰入场，强调对比。",
+  "category": "对比叙事",
+  "tags": ["对比叙事", "分屏", "滑杆", "方案对比"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-05T00:00:00.000Z"
+}

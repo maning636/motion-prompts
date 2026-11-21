@@ -1,0 +1,13 @@
+{
+  "id": "sc2-keystroke2-01",
+  "name": "纸感打字代码块",
+  "series": "sc2",
+  "createdAt": "2026-08-16T08:00:00.000Z",
+  "energy": "中",
+  "suggestedDuration": 6,
+  "knownPitfalls": [
+    "cmd 超过约 40 字符时打字窗被压到上限 2s，每字符不足 2 帧会糊成整行刷出，需缩短命令",
+    "results 行数超过 4 行会溢出 640px 卡高；单行过长已开 pre-wrap，但折行会推高卡片",
+    "光标是恒亮方块不闪烁，不要在 CSS 里给它加 blink 动画"
+  ]
+}

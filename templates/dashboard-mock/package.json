@@ -1,0 +1,7 @@
+{
+  "name": "dashboard-mock",
+  "private": true,
+  "scripts": {
+    "render": "cd ../.. && npm run render -- dashboard-mock"
+  }
+}

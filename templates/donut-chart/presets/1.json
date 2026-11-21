@@ -1,0 +1,10 @@
+{
+  "title": "用户设备分布",
+  "labels": "Desktop,Mobile,Tablet,Other",
+  "values": "52,35,9,4",
+  "centerNumber": "52%",
+  "centerLabel": "Desktop",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

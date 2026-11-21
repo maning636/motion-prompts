@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-CN" data-audit-offcanvas="扫描亮条在画布下方 y=547 循环上扫，是故障扫描带的设计" data-composition-variables='[{"id":"text","name":"文案","type":"string","label":"主文案","default":"信号中断"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"accent2","name":"次强调色","type":"color","label":"色散副色","default":"#2EC4B6"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":2.6}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>RGB 故障闪切</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    /* 透明底：这层是氛围挂件，底下是用户自己的实拍 */
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-tint { position: absolute; inset: 0; background: rgba(12, 12, 18, .52); }
+  .p-halo { position: absolute; inset: 0;
+    background: radial-gradient(72% 82% at 50% 50%, rgba(0,0,0,.55) 0%, rgba(0,0,0,.30) 54%, rgba(0,0,0,0) 84%); }
+  .p-botwrap { position: absolute; left: 50%; top: 178px; width: 42px; height: 38px;
+    margin-left: -21px; will-change: transform; }
+  .p-bot { position: relative; width: 42px; height: 38px;
+    background: var(--ac); border: 3px solid var(--ink); border-radius: 7px 7px 4px 4px; }
+  .p-bot::before, .p-bot::after { content: ''; position: absolute; top: 9px; width: 7px; height: 9px;
+    background: var(--ink); border-radius: 50%; }
+  .p-bot::before { left: 8px; }
+  .p-bot::after { right: 8px; }
+  .p-bot i { position: absolute; left: 11px; bottom: 6px; width: 20px; height: 8px;
+    border-bottom: 3px solid var(--ink); border-radius: 0 0 12px 12px; }
+  .p-wordrow { position: absolute; left: 0; right: 0; top: 62px; display: flex;
+    justify-content: center; align-items: flex-start; }
+  .p-word { display: inline-block; white-space: nowrap; font-size: 58px; font-weight: 900;
+    line-height: 1.06; letter-spacing: .01em; color: var(--fg);
+    -webkit-text-stroke: 2px var(--ink);
+    text-shadow: 5px 5px 0 rgba(0,0,0,.85); }
+  .p-ghost { position: absolute; left: 0; right: 0; top: 62px; display: flex; justify-content: center;
+    pointer-events: none; mix-blend-mode: screen; }
+  .p-ghost span { display: inline-block; white-space: nowrap; font-size: 58px; font-weight: 900;
+    line-height: 1.06; letter-spacing: .01em; opacity: .92; }
+  .p-ghost.p-r span { color: #FF2A2A; }
+  .p-ghost.p-c span { color: #14E0E0; }
+  .p-band { position: absolute; left: -40px; width: 560px; will-change: transform, opacity; }
+  .p-scan { position: absolute; inset: 0; opacity: 0; pointer-events: none;
+    background: repeating-linear-gradient(180deg, rgba(0,0,0,.55) 0px, rgba(0,0,0,.55) 1px,
+      rgba(255,255,255,0) 1px, rgba(255,255,255,0) 3px); }
+  .p-scanbar { position: absolute; left: 0; width: 480px; height: 34px; opacity: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.30) 55%, rgba(255,255,255,0) 100%);
+    will-change: transform, opacity; }
+  .p-edge { position: absolute; inset: 0; opacity: 0; pointer-events: none;
+    box-shadow: inset 0 0 0 4px rgba(255,255,255,.5); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"信号中断","accent":"#FF6B35","accent2":"#2EC4B6","duration":2.6};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  const dur = parseFloat(v.duration) || 2.6;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--ac2', v.accent2 || FALLBACK.accent2);
+  root.style.setProperty('--fg', '#FFF8EE');
+  root.style.setProperty('--ink', '#1B1B24');
+  const text = String(v.text == null ? FALLBACK.text : v.text);
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, tx, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (tx != null) el.textContent = tx;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  put('div', 'p-tint');
+  put('div', 'p-halo');
+
+  /* 锚点：一个居中的小方块角色 + 一行可读文案。
+     特效必须挂在能辨识的东西上，否则用户拿到的是一条「无处可施」的素材。 */
+  const botWrap = put('div', 'p-botwrap');
+  const bot = put('div', 'p-bot', '', null, botWrap);
+  put('i', '', '', null, bot);
+  const botEye = put('i', '', '', null, bot);
+
+  const gR = put('div', 'p-ghost p-r');
+  put('span', '', '', text, gR);
+  const gC = put('div', 'p-ghost p-c');
+  put('span', '', '', text, gC);
+  const row = put('div', 'p-wordrow');
+  const word = put('div', 'p-word', '', text, row);
+
+  /* 逐行错位用的横向色条，数量固定、位置固定——靠索引推导，不靠随机 */
+  const BANDS = 9;
+  const bands = [];
+  const PAL = ['var(--ac)', 'var(--ac2)', '#FFFFFF', 'var(--ac)', 'var(--ac2)'];
+  for (let i = 0; i < BANDS; i++) {
+    const top = 8 + i * 30;
+    const h = 6 + (i * 13) % 8;
+    const b = put('div', 'p-band',
+      'top:' + top + 'px;height:' + h + 'px;background:' + PAL[i % PAL.length] + ';');
+    bands.push(b);
+  }
+  const scan = put('div', 'p-scan');
+  const scanbar = put('div', 'p-scanbar');
+  const edge = put('div', 'p-edge');
+
+  /* 文字溢出防护：量的是不折行时的自然宽度。
+     元素本身是 flex 子项、宽度随内容，所以 scrollWidth 就是真实字宽。 */
+  function fitText(el, maxPx, avail, minPx) {
+    el.style.fontSize = maxPx + 'px';
+    el.style.whiteSpace = 'nowrap';
+    const natural = el.scrollWidth;
+    if (natural > avail && natural > 0) {
+      el.style.fontSize = Math.max(minPx, Math.floor(maxPx * avail / natural)) + 'px';
+    }
+    return el;
+  }
+  fitText(word, 58, 430, 20);
+  fitText(gR.querySelector('span'), parseFloat(word.style.fontSize) || 58, 430, 20);
+  fitText(gC.querySelector('span'), parseFloat(word.style.fontSize) || 58, 430, 20);
+
+  /* ── 故障量 A(t)：纯函数，只吃绝对时间 t ──────────────────────────────
+     阶梯式：把故障切成 7 段，段内恒定、段间跳变，这样才有「数字信号被打断」
+     的顿挫感而不是平滑呼吸。收口处 A→0，画面快速回正。 */
+  const G0 = .07, G1 = .54, SEGS = 7;
+  const amp = (t) => {
+    if (t <= G0 || t >= G1) return 0;
+    const u = (t - G0) / (G1 - G0);
+    const step = Math.floor(u * SEGS);
+    const spike = (step % 2 === 0) ? 1 : .45;
+    return spike * (1 - u * .82);
+  };
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 角色：故障时被抖散、缩一下再稳住 */
+  tl.fromTo(bot, { scale: .3, opacity: 0 }, { scale: 1, opacity: 1, duration: .26, ease: 'back.out(2.6)' }, 0);
+  tl.fromTo(botEye, { opacity: 0 }, { opacity: 1, duration: .18, ease: 'none' }, .3);
+
+  const P = { t: 0 };
+  const paint = (t) => {
+    const A = amp(t);
+    const seg = Math.floor((t - G0) * 34);
+    for (let i = 0; i < BANDS; i++) {
+      const ph = ((i * 37) % 7) / 7;
+      const j = Math.sin(seg * 2.3 + i * 1.7);
+      const dx = A * (12 + 26 * ph) * j;
+      const dy = A * 2.4 * Math.sin(i * 2.1 + seg);
+      bands[i].style.transform = 'translate3d(' + dx.toFixed(2) + 'px,' + dy.toFixed(2) + 'px,0)';
+      bands[i].style.opacity = (A * (.10 + .30 * ph)).toFixed(3);
+    }
+    const sp = A * 9.5;
+    gR.style.transform = 'translate(' + (-sp).toFixed(2) + 'px,' + (A * 1.6).toFixed(2) + 'px)';
+    gC.style.transform = 'translate(' + sp.toFixed(2) + 'px,' + (-A * 1.6).toFixed(2) + 'px)';
+    gR.style.opacity = (A * .95).toFixed(3);
+    gC.style.opacity = (A * .95).toFixed(3);
+    word.style.opacity = (1 - A * .18).toFixed(3);
+    bot.style.filter = A > .04 ? 'saturate(' + (1 + A * 1.4).toFixed(2) + ') brightness(' + (1 + A * .22).toFixed(2) + ')' : 'none';
+    const jx = A * 5 * Math.sin(seg * 1.9);
+    const jy = A * 3 * Math.cos(seg * 2.7);
+    botWrap.style.transform = 'translate3d(' + jx.toFixed(2) + 'px,' + jy.toFixed(2) + 'px,0)';
+    scan.style.opacity = (A * .72).toFixed(3);
+    edge.style.opacity = (A * .55).toFixed(3);
+    /* 扫描亮条自己走一遍，是纯匀速，不受故障包络影响 */
+    const u = t / 1.55;
+    const y = -40 + u * 350;
+    scanbar.style.transform = 'translate3d(0,' + y.toFixed(2) + 'px,0)';
+    scanbar.style.opacity = (t < 1.75 ? .55 * Math.sin(Math.PI * Math.min(1, u)) : 0).toFixed(3);
+  };
+  tl.fromTo(P, { t: 0 }, {
+    t: dur, duration: dur, ease: 'none',
+    onUpdate() { paint(P.t); }
+  }, 0);
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+  paint(0);
+})();
+</script>
+</body>
+</html>

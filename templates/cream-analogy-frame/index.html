@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"tagA","type":"string","label":"左侧标签","default":"陌生概念"},{"id":"conceptA","type":"string","label":"左侧概念","default":"RAG"},{"id":"descA","type":"string","label":"左侧解释","default":"检索增强生成"},{"id":"tagB","type":"string","label":"右侧标签","default":"熟悉概念"},{"id":"conceptB","type":"string","label":"右侧概念","default":"开卷考试"},{"id":"descB","type":"string","label":"右侧解释","default":"可以翻书查资料的考试"},{"id":"dimension","type":"string","label":"类比成立维度","default":"先查资料，再回答"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      /* ===== 奶油纸面贴纸工作台 · 设计令牌（见 design-systems/sticker-workbench/DESIGN.md） =====
+         Canvas #F5F0E6 / Paper #FFFDF7 / Ink #1D1D20 / InkSoft #4D4A48 / LineSoft #C9C0B2
+         Blue #3E7BF2 / Pink #F13B88 / Orange #FF9F1C / Lime #B9E833 / Violet #B99AF7 / Shadow #2A292B */
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden;
+        font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden;
+        background: var(--background, #F5F0E6); color: var(--foreground, #1D1D20); }
+      /* 全片固定 Ink 外框 10px */
+      .outer-frame{ position: absolute; inset: 0; border: 10px solid #1D1D20; pointer-events: none; z-index: 40; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; font-weight: 700; }
+      .fredoka{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; }
+
+      /* 顶部角标：Fredoka 英文短标签 + mono 编号 */
+      .corner-tag{ position: absolute; top: 74px; left: 120px; z-index: 30;
+        background: #FFFDF7; border: 4px solid #1D1D20; border-radius: 8px;
+        box-shadow: 10px 10px 0 #2A292B; padding: 14px 22px; transform: rotate(-2deg); }
+      .corner-tag span{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; font-weight: 700;
+        font-size: 24px; letter-spacing: 0.06em; text-transform: uppercase; }
+      .corner-index{ position: absolute; top: 84px; right: 120px; z-index: 30;
+        font-size: 20px; color: #4D4A48; }
+
+      /* 主场景：左右双卡 + 中间对照关系 */
+      .scene{ position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+        gap: 120px; padding: 0 120px; }
+      .card{ position: relative; width: 660px; background: #FFFDF7; border: 4px solid #1D1D20;
+        border-radius: 10px; box-shadow: 10px 10px 0 #2A292B; padding: 88px 56px 56px; }
+      .card .tag{ position: absolute; top: -26px; left: 40px; padding: 10px 20px;
+        border: 4px solid #1D1D20; border-radius: 8px; box-shadow: 6px 6px 0 #2A292B;
+        font-size: 28px; font-weight: 800; line-height: 1.1; color: #1D1D20; }
+      .card-a .tag{ background: #3E7BF2; color: #FFFDF7; transform: rotate(-2deg); }
+      .card-b .tag{ background: #F13B88; color: #FFFDF7; transform: rotate(2deg); }
+      .card .title{ font-size: 64px; font-weight: 900; line-height: 1.12; letter-spacing: 0; margin-bottom: 20px; }
+      .card .desc{ font-size: 30px; font-weight: 700; line-height: 1.35; color: #4D4A48; }
+
+      /* 对照关系层：Ink 主轴 + Line Soft 虚线辅助（无箭头，坐标/对照语法） */
+      .relation{ position: relative; width: 200px; height: 260px; flex: none; }
+      .relation svg{ position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; z-index: 1; }
+      .badge{ position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;
+        width: 96px; height: 96px; border-radius: 50%; background: #FFFDF7;
+        border: 4px solid #1D1D20; box-shadow: 8px 8px 0 #2A292B;
+        display: flex; align-items: center; justify-content: center; }
+      .badge span{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif;
+        font-size: 52px; font-weight: 700; line-height: 1; }
+      .lime-dot{ position: absolute; left: 50%; top: 18px; transform: translateX(-50%); z-index: 2;
+        width: 22px; height: 22px; border-radius: 50%; background: #B9E833;
+        border: 4px solid #1D1D20; }
+      .relation .link-note{ position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+        font-size: 20px; color: #4D4A48; white-space: nowrap; }
+
+      /* 底部维度便签：避开 168px 底部预留与字幕区 */
+      .hint-sticker{ position: absolute; left: 50%; bottom: 220px; transform: translateX(-50%) rotate(-1deg);
+        background: #FFFDF7; border: 4px solid #1D1D20; border-radius: 8px;
+        box-shadow: 10px 10px 0 #2A292B; padding: 18px 34px; z-index: 20; }
+      .hint-sticker .hint-label{ display: inline-block; background: #B9E833; border: 3px solid #1D1D20;
+        border-radius: 6px; padding: 4px 12px; font-size: 24px; font-weight: 800; margin-right: 16px; }
+      .hint-sticker .hint-text{ font-size: 30px; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="outer-frame" id="frame"></div>
+      <div class="corner-tag" id="cornerTag"><span>Analogy</span></div>
+      <div class="corner-index mono" id="cornerIndex">01 / ANALOGY</div>
+
+      <section class="scene" data-start="0" data-duration="6" data-track-index="1">
+        <article class="card card-a" id="cardA">
+          <span class="tag" id="tagA"></span>
+          <h2 class="title" id="titleA"></h2>
+          <p class="desc" id="descA"></p>
+        </article>
+
+        <div class="relation" id="relation">
+          <svg viewBox="0 0 200 260" fill="none">
+            <line id="axisMain" x1="0" y1="130" x2="200" y2="130"
+              stroke="#1D1D20" stroke-width="4" stroke-dasharray="200" stroke-dashoffset="200" />
+            <line id="axisAux" x1="100" y1="34" x2="100" y2="226"
+              stroke="#C9C0B2" stroke-width="3" stroke-dasharray="8 10" opacity="0" />
+          </svg>
+          <div class="lime-dot" id="limeDot"></div>
+          <div class="badge" id="badge"><span>≈</span></div>
+          <div class="link-note mono" id="linkNote">SAME LOGIC</div>
+        </div>
+
+        <article class="card card-b" id="cardB">
+          <span class="tag" id="tagB"></span>
+          <h2 class="title" id="titleB"></h2>
+          <p class="desc" id="descB"></p>
+        </article>
+      </section>
+
+      <div class="hint-sticker" id="hintSticker">
+        <span class="hint-label">成立维度</span><span class="hint-text" id="hintText"></span>
+      </div>
+    </div>
+    <script>
+      const fallback = { tagA: "陌生概念", conceptA: "RAG", descA: "检索增强生成",
+        tagB: "熟悉概念", conceptB: "开卷考试", descB: "可以翻书查资料的考试",
+        dimension: "先查资料，再回答" };
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.getElementById("tagA").textContent = v.tagA;
+      document.getElementById("titleA").textContent = v.conceptA;
+      document.getElementById("descA").textContent = v.descA;
+      document.getElementById("tagB").textContent = v.tagB;
+      document.getElementById("titleB").textContent = v.conceptB;
+      document.getElementById("descB").textContent = v.descB;
+      document.getElementById("hintText").textContent = v.dimension;
+
+      /* 动效：贴纸落桌。输入从左入，对照从右入，关系线待两侧落位后绘制，Lime 最后锁定。 */
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const SPRING = "back.out(1.4)";
+      tl.fromTo("#frame", { opacity: 0 }, { opacity: 1, duration: 0.18 }, 0);
+      tl.fromTo(["#cornerTag", "#cornerIndex"], { opacity: 0 }, { opacity: 1, duration: 0.18 }, 0);
+      tl.fromTo("#cardA", { opacity: 0, x: -64, scale: 0.86 }, { opacity: 1, x: 0, scale: 1, duration: 0.4, ease: SPRING }, 0.2);
+      tl.fromTo("#cardA .tag", { opacity: 0, scale: 0.76 }, { opacity: 1, scale: 1, duration: 0.28, ease: SPRING }, 0.42);
+      tl.fromTo("#cardB", { opacity: 0, x: 64, scale: 0.86 }, { opacity: 1, x: 0, scale: 1, duration: 0.4, ease: SPRING }, 0.5);
+      tl.fromTo("#cardB .tag", { opacity: 0, scale: 0.76 }, { opacity: 1, scale: 1, duration: 0.28, ease: SPRING }, 0.72);
+      /* 对照主轴：两卡落位后沿阅读方向绘制（无箭头，对照语法） */
+      tl.fromTo("#axisMain", { strokeDashoffset: 200 }, { strokeDashoffset: 0, duration: 0.5, ease: "power2.inOut" }, 1.05);
+      tl.to("#axisAux", { opacity: 1, duration: 0.3 }, 1.35);
+      tl.fromTo("#badge", { opacity: 0, scale: 0.76 }, { opacity: 1, scale: 1, duration: 0.28, ease: SPRING }, 1.4);
+      tl.fromTo("#limeDot", { opacity: 0, scale: 0.5 }, { opacity: 1, scale: 1.12, duration: 0.14, ease: "power2.out" }, 1.6);
+      tl.to("#limeDot", { scale: 1, duration: 0.12, ease: "power2.inOut" }, 1.74);
+      tl.fromTo("#linkNote", { opacity: 0 }, { opacity: 1, duration: 0.2 }, 1.8);
+      tl.fromTo("#hintSticker", { opacity: 0, y: 24, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.34, ease: SPRING }, 2.0);
+      tl.to(".scene", { opacity: 0, duration: 0.28, ease: "power2.in" }, 5.5);
+      tl.to(["#hintSticker", "#cornerTag", "#cornerIndex"], { opacity: 0, duration: 0.28 }, 5.5);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

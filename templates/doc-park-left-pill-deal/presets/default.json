@@ -1,0 +1,15 @@
+{
+  "docKicker": "SOURCE · DOC",
+  "docTitle": "季度经营复盘",
+  "docMeta": "2026 Q2 · 内部资料",
+  "docLines": "营收同比 +18.4%，用户基数扩至 3.6M\nAI 协作流已覆盖 78% 常规任务\n交付周期由 12 天压缩至 4 天\n团队满意度提升 21 个百分点",
+  "pillKicker": "VERDICT",
+  "pillTitle": "结论：继续加大 AI 投入",
+  "pillSub": "建议下季度预算 +35%",
+  "dealKicker": "DEAL",
+  "dealAmount": "¥ 12.8M",
+  "dealNote": "签约 · 2026-08-19",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

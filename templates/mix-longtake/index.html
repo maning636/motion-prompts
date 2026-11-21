@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"pack","name":"规格包","type":"enum","label":"规格包（配色 / 字体 / 曲线）","options":[{"label":"暗色科技","value":"dark"},{"label":"奶油贴纸","value":"cream"},{"label":"单色克制","value":"mono"},{"label":"夜航","value":"night"}],"default":"night"},{"id":"video1","name":"素材","type":"string","label":"素材路径（留空用内置画面）","default":""},{"id":"kicker","name":"眉标","type":"string","label":"左下眉标（英文小字）","default":"ON THE ROAD"},{"id":"place","name":"地点","type":"string","label":"左下地点","default":"黄昏高架"},{"id":"slate","name":"场记","type":"string","label":"右上角场记条","default":"TAKE 01 / 8.0S"}]'>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="不切的一镜到底：黑场淡入 + 全程缓推 + 左下锁字。素材库里唯一一档「什么都不做」的开场。">
+<title>单镜头长镜 · 开场缓推</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<link rel="stylesheet" href="../_lib/packs.css">
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script>
+<!-- packs.js 必须排在 blocks.js **之后**：blocks.js 结尾是 global.BBlocks = BB，
+     会把它整个替换掉。谁先加载谁的东西就没了，表现是 B.pack is not a function。 -->
+<script src="../_lib/packs.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<style>
+  /* 底色和字色**必须来自规格包**，不能写死。
+     写死 #000 + #F4F1EA 的时候，四个包里只有 dark / night 正常：
+     cream 的 --pk-fg 是 #2A2118、mono 是 #14140F，两个都是**深字**，
+     压在这个写死的黑底上 → 标题、标签、说明全糊掉。
+     而写死字面量色的元素（比如 rgba(244,241,234,.82)）反而还看得见，
+     画面上就成了一半能看一半不能看——比全黑更难认。
+     一共 33 条模板中招（混剪 5 + 认知 22 + 节拍 6）。
+
+     注意区分两层契约（packs.css 顶部注释里写过）：
+       --pk-bg / --pk-fg      = 包自带底板，舞台自己用它
+       --pk-*-media           = 压在用户素材上的那一层
+     这里改的是前者。 */
+  html,body{margin:0;padding:0;background:var(--pk-bg,#000)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--pk-bg,#000);
+        color:var(--pk-fg,#F4F1EA);font-family:"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+        -webkit-font-smoothing:antialiased}
+  /* 统一安全区：混剪里所有贴边元素都从 72/88 起，不贴 0 */
+  
+  /* 素材位：用 CSS 画一个「像镜头」的抽象画面。
+     真视频在当前渲染管线里不播（compose.html 不处理 <video>），
+     预览会全黑——所以默认走 CSS，逻辑才看得见。 */
+  .shot{position:absolute;inset:0;overflow:hidden;opacity:0}
+  .shot .sky{position:absolute;inset:-12%;background:
+      linear-gradient(180deg,var(--c1) 0%,var(--c2) 52%,var(--c3) 100%)}
+  .shot .glow{position:absolute;left:56%;top:26%;width:340px;height:340px;border-radius:50%;
+      background:radial-gradient(circle,var(--c4) 0%,rgba(0,0,0,0) 68%);filter:blur(12px)}
+  .shot .haze{position:absolute;left:-10%;right:-10%;top:52%;height:26%;
+      background:linear-gradient(180deg,rgba(0,0,0,0),var(--c3) 78%,rgba(0,0,0,0));opacity:.55}
+  .shot .ridge{position:absolute;left:-8%;right:-8%;bottom:0;height:46%;
+      background:linear-gradient(180deg,var(--c5),var(--c6))}
+  .shot .ridge.r1{clip-path:polygon(0 44%,13% 27%,26% 41%,40% 19%,55% 37%,69% 24%,85% 40%,100% 26%,100% 100%,0 100%)}
+  .shot .ridge.r2{height:28%;opacity:.92;
+      clip-path:polygon(0 58%,12% 40%,25% 57%,38% 35%,52% 55%,66% 37%,80% 53%,100% 39%,100% 100%,0 100%)}
+  .shot .grain{position:absolute;inset:0;opacity:.10;background-image:
+      repeating-linear-gradient(0deg,rgba(255,255,255,.10) 0 1px,rgba(0,0,0,0) 1px 3px),
+      repeating-linear-gradient(90deg,rgba(0,0,0,.10) 0 1px,rgba(0,0,0,0) 1px 4px)}
+  .shot .vig{position:absolute;inset:0;box-shadow:inset 0 0 260px 80px rgba(0,0,0,.52)}
+  .shot video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+  .shot.live .sky,.shot.live .glow,.shot.live .haze,
+  .shot.live .ridge,.shot.live .grain{display:none}
+  .shot.live video{display:block}
+
+  /* 注意这里引用的是 --pk-*-media 而不是 --pk-*：
+     这一层的字压在**用户的素材**上，素材多亮我们不知道，
+     所以只能用包里预置的"压在素材上安全"的那组值。
+     （第一版直接用 --pk-fg，cream / mono 两个浅底包一换上来，
+      夜景素材上的「黄昏高架」四个字直接看不见——prototype 实测。）*/
+  /* 四角取景框：电影感靠它，不靠加字 */
+  .brk{position:absolute;width:0;height:0;z-index:12;opacity:0;
+      border:0 solid var(--pk-line, rgba(244,241,234,.46))}
+  .b-tl{left:72px;top:60px;border-top-width:2px;border-left-width:2px}
+  .b-tr{right:72px;top:60px;border-top-width:2px;border-right-width:2px}
+  .b-bl{left:72px;bottom:60px;border-bottom-width:2px;border-left-width:2px}
+  .b-br{right:72px;bottom:60px;border-bottom-width:2px;border-right-width:2px}
+  .slate{position:absolute;right:164px;top:86px;z-index:12;opacity:0;
+      font-family:var(--pk-mono, ui-monospace);font-size:20px;font-weight:600;
+      letter-spacing:.22em;color:var(--pk-fg-media);opacity:0;
+      text-shadow:0 2px 12px rgba(0,0,0,.8);white-space:nowrap}
+  /* 锁字：容器给死宽度，B.fit 才有东西可量，字一长就缩而不是溢出 */
+  .lockup{position:absolute;left:96px;bottom:104px;z-index:12;width:1180px;opacity:0}
+  .lockup .kicker{font-family:var(--pk-mono, ui-monospace);font-size:22px;font-weight:700;
+      letter-spacing:.30em;color:var(--pk-accent-media);display:block;margin-bottom:14px;
+      text-shadow:0 2px 12px rgba(0,0,0,.8)}
+  .lockup .place{font-family:var(--pk-font);font-size:64px;font-weight:900;letter-spacing:.01em;
+      line-height:1.08;color:var(--pk-fg-media);display:block;width:100%;
+      text-shadow:0 4px 26px rgba(0,0,0,.78)}
+  .rule{position:absolute;left:96px;bottom:86px;width:0;height:3px;z-index:12;
+      background:var(--pk-accent-media)}
+
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <div class="shot" id="s0" data-media-layer style="--c1:#0B1220;--c2:#1B2A44;--c3:#3C4A63;--c4:#C97A2B;--c5:#141C2C;--c6:#0A0F1A"><span class="sky"></span><span class="glow"></span><span class="haze"></span><span class="ridge r1"></span><span class="ridge r2"></span><span class="grain"></span><span class="vig"></span><video id="v0" muted playsinline preload="auto"></video></div>
+  <div class="b-tl brk"></div><div class="b-tr brk"></div>
+  <div class="b-bl brk"></div><div class="b-br brk"></div>
+  <span class="slate" id="slate">TAKE 01 / 8.0S</span>
+  <div class="lockup" id="lk">
+    <span class="kicker" id="kicker">ON THE ROAD</span>
+    <span class="place" id="place" data-fit-max="64" data-fit-min="34">黄昏高架</span>
+  </div>
+  <div class="rule" id="rule"></div>
+
+</div>
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+  var tl = B.tl();
+  /* 规格包：先定风格，再建任何元素。
+     画面素材的配色**不跟着包走**——那是"底片"，用户自己的东西不能被模板改色；
+     跟着包走的只有 UI 层（字色、强调色、描边、圆角、曲线）。这个边界必须守住。 */
+  B.pack(v.pack);
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  function q(s) { return document.querySelector(s); }
+  /* 素材位接真视频：留空就继续用 CSS 画面 */
+  function live(n, src) {
+    if (!src) return;
+    var s = document.getElementById('s' + n), e = document.getElementById('v' + n);
+    if (!s || !e) return;
+    s.classList.add('live'); e.src = src;
+    e.play().catch(function () {});
+  }
+  /* 景别缓推：v1/v3 里画面始终在极慢地动，这是「像镜头」的关键 */
+  function push(n, at, dur, from, to, ease) {
+    var s = q('#s' + n + ' .sky'), g = q('#s' + n + ' .glow'), r = q('#s' + n + ' .r2');
+    if (s) tl.fromTo(s, { scale: from, y: '0%' },
+      { scale: to, y: '-2%', duration: dur, ease: ease || 'none' }, at);
+    if (g) tl.fromTo(g, { xPercent: -4, opacity: .8 },
+      { xPercent: 5, opacity: 1, duration: dur, ease: 'none' }, at);
+    if (r) tl.fromTo(r, { xPercent: 0 },
+      { xPercent: -2.5, duration: dur, ease: 'none' }, at);
+  }
+  /* clip-path 形状插值。
+     两个坑都在这里踩过：
+       1. GSAP 各版本对 clipPath 字符串补间的处理不一致，所以不直接补间它，
+          改成补间一个 {t:0→1} 的代理对象，onUpdate 里自己算 8 个点；
+       2. **from 必须是编译期常量，不能从元素当前状态读。**
+          settle 会把时间轴来回扫；一旦回退越过一个已完成的补间，
+          GSAP 会把它按 ratio 0 重渲——onUpdate 拿到的就是起点，
+          形状会「弹回矩形」。写成常量后，形状是 t 的纯函数，
+          停在任何一帧算出来都一样。
+     相邻两段的 from 必须等于上一段的 to，这条由 Python 侧保证。 */
+  function polyStr(pts) {
+    return 'polygon(' + pts.map(function (p) {
+      return p[0].toFixed(2) + '% ' + p[1].toFixed(2) + '%'; }).join(',') + ')';
+  }
+  function morph(el, from, to, at, dur, ease) {
+    if (!el || !to || !from || from.length !== to.length) return;
+    var st = { t: 0 };
+    tl.to(st, { t: 1, duration: dur == null ? .7 : dur, ease: ease || 'power2.inOut',
+      onUpdate: function () {
+        el.style.clipPath = polyStr(from.map(function (p, i) {
+          return [p[0] + (to[i][0] - p[0]) * st.t,
+                  p[1] + (to[i][1] - p[1]) * st.t];
+        }));
+      } }, at);
+  }
+  set('kicker', v.kicker); set('place', v.place); set('slate', v.slate);
+  live(0, v.video1);
+
+  /* 0.0-0.6 从纯黑淡起来：v1 就是这么开的。
+     注意这里淡的是素材位本身，**不是盖一层满屏黑再淡黑**——
+     settle 取「可见面积最大」的一帧，满屏黑层的面积恒等于一屏，
+     叠在同样满屏的素材上会让 t=0 的面积最大，渲出来就是一张纯黑预览。
+     改成素材位自己淡入：t=0 时全片几乎没有可见面积，settle 自然往后落。 */
+  tl.fromTo('#s0', { opacity: 0 }, { opacity: 1, duration: .6, ease: 'power2.inOut' }, 0);
+
+  /* 全程缓推 1.00 → 1.07：机位在动，但慢到看不出来是「动」 */
+  push(0, 0, 8, 1.00, 1.07);
+
+  /* 取景框在 0.9s 张开 */
+  tl.to('.b-tl', { width: 62, height: 62, opacity: 1, duration: .7, ease: 'power3.out' }, .9);
+  tl.to('.b-tr', { width: 62, height: 62, opacity: 1, duration: .7, ease: 'power3.out' }, 1.0);
+  tl.to('.b-bl', { width: 62, height: 62, opacity: 1, duration: .7, ease: 'power3.out' }, 1.1);
+  tl.to('.b-br', { width: 62, height: 62, opacity: 1, duration: .7, ease: 'power3.out' }, 1.2);
+
+  /* 锁字在 1.5s 才进——先让观众看两秒画面再上字 */
+  tl.fromTo('.slate', { opacity: 0, x: 14 },
+      { opacity: 1, x: 0, duration: .6, ease: 'power2.out' }, 1.2);
+  tl.fromTo('#lk', { opacity: 0, y: 26 },
+      { opacity: 1, y: 0, duration: .8, ease: 'power3.out' }, 1.5);
+  tl.fromTo('#rule', { width: 0 },
+      { width: 300, duration: .9, ease: 'power3.out' }, 1.72);
+
+  B.hold(tl, 8, .5);
+  B.fitAll();
+
+})();
+</script>
+</body>
+</html>

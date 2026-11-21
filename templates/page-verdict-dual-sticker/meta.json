@@ -1,0 +1,13 @@
+{
+  "id": "page-verdict-dual-sticker",
+  "name": "结论双卡+关键词横幅+贴纸压缝",
+  "series": "page",
+  "createdAt": "2026-08-16T08:00:00.000Z",
+  "energy": "高",
+  "suggestedDuration": 6,
+  "knownPitfalls": [
+    "leftBody/rightBody 建议 30 字以内，黑卡文字更长会先溢出卡片下缘",
+    "sticker 文字建议 2-4 字，超过 4 字会顶出圆形贴纸边界",
+    "贴纸落点固定在双卡与横幅接缝（页面中轴），改卡或横幅位置要同步改贴纸 top/left"
+  ]
+}

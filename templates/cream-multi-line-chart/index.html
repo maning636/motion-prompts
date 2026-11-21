@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "图表标题", "default": "模型能力演进"}, {"id": "subtitle", "type": "string", "label": "副标题", "default": "多模型评分趋势对比"}, {"id": "labels", "type": "string", "label": "X 轴标签（逗号分隔）", "default": "2023,2024 Q1,2024 Q3,2025"}, {"id": "series1Label", "type": "string", "label": "系列 1 名称", "default": "GPT-4"}, {"id": "series1Values", "type": "string", "label": "系列 1 数值", "default": "65,78,85,91"}, {"id": "series2Label", "type": "string", "label": "系列 2 名称", "default": "Claude"}, {"id": "series2Values", "type": "string", "label": "系列 2 数值", "default": "60,72,80,87"}, {"id": "series3Label", "type": "string", "label": "系列 3 名称", "default": "Gemini"}, {"id": "series3Values", "type": "string", "label": "系列 3 数值", "default": "55,68,75,84"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      /* ===== 奶油纸面贴纸工作台 · 设计令牌（见 design-systems/sticker-workbench/DESIGN.md） ===== */
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden;
+        font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden;
+        background: var(--background, #F5F0E6); color: var(--foreground, #1D1D20); }
+      .outer-frame{ position: absolute; inset: 0; border: 10px solid #1D1D20; pointer-events: none; z-index: 40; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; font-weight: 700; }
+      .fredoka{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; }
+      .corner-tag{ position: absolute; top: 74px; left: 120px; z-index: 30;
+        background: #FFFDF7; border: 4px solid #1D1D20; border-radius: 8px;
+        box-shadow: 10px 10px 0 #2A292B; padding: 14px 22px; transform: rotate(-2deg); }
+      .corner-tag span{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; font-weight: 700;
+        font-size: 24px; letter-spacing: 0.06em; text-transform: uppercase; }
+      .corner-index{ position: absolute; top: 84px; right: 120px; z-index: 30;
+        font-size: 20px; color: #4D4A48; }
+      .scene{ position: absolute; inset: 0; }
+      .panel{ background: #FFFDF7; border: 4px solid #1D1D20; border-radius: 10px;
+        box-shadow: 10px 10px 0 #2A292B; }
+      .chip{ display: inline-block; padding: 8px 20px; border: 4px solid #1D1D20; border-radius: 8px;
+        box-shadow: 6px 6px 0 #2A292B; font-size: 26px; font-weight: 800; line-height: 1.1; }
+      .chip-blue{ background: #3E7BF2; color: #FFFDF7; }
+      .chip-pink{ background: #F13B88; color: #FFFDF7; }
+      .chip-orange{ background: #FF9F1C; color: #1D1D20; }
+      .chip-lime{ background: #B9E833; color: #1D1D20; }
+      .chip-violet{ background: #B99AF7; color: #1D1D20; }
+      .chip-paper{ background: #FFFDF7; color: #1D1D20; }
+      .ttl{ font-size: 52px; font-weight: 900; line-height: 1.2; }
+      .sub{ font-size: 30px; font-weight: 700; line-height: 1.35; color: #4D4A48; }
+      .num{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; font-weight: 700; }
+      .title-center{ position: absolute; top: 200px; left: 0; width: 100%; text-align: center; z-index: 20; }
+      .sub-center{ position: absolute; top: 286px; left: 0; width: 100%; text-align: center; z-index: 20; }
+
+      .chart-card{ position: absolute; left: 240px; right: 240px; top: 270px; bottom: 220px; padding: 40px; }
+      .lstage{ position: relative; width: 100%; height: 100%; }
+      .lstage svg{ position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+      .llab{ position: absolute; transform: translateX(-50%); font-size: 22px; font-weight: 800; }
+      .lleg{ position: absolute; top: -64px; font-size: 20px; padding: 6px 14px; }
+      .lpoint{ position: absolute; transform: translate(-50%, -50%); z-index: 5; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="outer-frame" id="frame"></div>
+      <div class="corner-tag" id="cornerTag"><span>MULTI LINE CHART</span></div>
+      <div class="corner-index mono" id="cornerIndex">02 / CHART</div>
+      <svg width="0" height="0" style="position:absolute"><defs>
+        <marker id="arrowHead" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto">
+          <path d="M1 1 L11 6 L1 11 Z" fill="#1D1D20" />
+        </marker>
+      </defs></svg>
+      <section class="scene" id="rootScene" data-start="0" data-duration="6" data-track-index="1">
+        <h2 class="ttl title-center" id="lTitle"></h2>
+        <p class="sub sub-center" id="lSub"></p>
+        <div class="panel chart-card" id="lCard"><div class="lstage" id="lStage"></div></div>
+      </section>
+    </div>
+    <script>
+      const FB = {"title": "模型能力演进", "subtitle": "多模型评分趋势对比", "labels": "2023,2024 Q1,2024 Q3,2025", "series1Label": "GPT-4", "series1Values": "65,78,85,91", "series2Label": "Claude", "series2Values": "60,72,80,87", "series3Label": "Gemini", "series3Values": "55,68,75,84"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $ = (id) => document.getElementById(id);
+      const T = (id, val) => { const el = $(id); if (el) el.textContent = val; };
+      const SP = (s) => String(s ?? '').split(',').map(x => x.trim()).filter(Boolean);
+      const SPN = (s) => SP(s).map(Number);
+      const scene = () => $('rootScene');
+      function el(tag, cls, parent, text){ const e = document.createElement(tag);
+        if (cls) e.className = cls; if (text != null) e.textContent = text;
+        (parent || scene()).appendChild(e); return e; }
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const SPRING = "back.out(1.4)";
+      function pop(sel, at, dx){ tl.fromTo(sel, { opacity: 0, x: dx || 0, scale: 0.88 },
+        { opacity: 1, x: 0, scale: 1, duration: 0.38, ease: SPRING }, at); }
+      function fade(sel, at){ tl.fromTo(sel, { opacity: 0 }, { opacity: 1, duration: 0.24 }, at); }
+      function drawArrow(line, at){ const len = line.getAttribute('stroke-dasharray');
+        tl.set(line, { attr: { "marker-end": "url(#arrowHead)" } }, at);
+        tl.fromTo(line, { strokeDashoffset: len }, { strokeDashoffset: 0, duration: 0.4, ease: "power2.inOut" }, at); }
+      tl.fromTo("#frame", { opacity: 0 }, { opacity: 1, duration: 0.18 }, 0);
+      tl.fromTo(["#cornerTag", "#cornerIndex"], { opacity: 0 }, { opacity: 1, duration: 0.18 }, 0);
+      T("lTitle", v.title || ""); T("lSub", v.subtitle || ""); if (!v.subtitle) $("lSub").style.display = "none";
+      const stage = $("lStage");
+      const NS = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(NS, "svg");
+      svg.setAttribute("viewBox", "0 0 1000 420"); svg.setAttribute("preserveAspectRatio", "none");
+      stage.appendChild(svg);
+      function axis() { const l = document.createElementNS(NS, "line");
+        l.setAttribute("x1", 20); l.setAttribute("y1", 400); l.setAttribute("x2", 990); l.setAttribute("y2", 400);
+        l.setAttribute("stroke", "#1D1D20"); l.setAttribute("stroke-width", 4); svg.appendChild(l); }
+      function poly(vals, color, fill) {
+        const mx = Math.max(...vals, 1), n = vals.length;
+        const pts = vals.map((val, i) => [30 + i * (950 / Math.max(n - 1, 1)), 400 - val / mx * 360]);
+        let elx;
+        if (fill) { elx = document.createElementNS(NS, "polygon");
+          elx.setAttribute("points", "30,400 " + pts.map(p => p.join(",")).join(" ") + " " + pts[pts.length - 1][0] + ",400");
+          elx.setAttribute("fill", color); elx.setAttribute("opacity", 0.18); svg.appendChild(elx); }
+        const pl = document.createElementNS(NS, "polyline");
+        pl.setAttribute("points", pts.map(p => p.join(",")).join(" "));
+        pl.setAttribute("fill", "none"); pl.setAttribute("stroke", color); pl.setAttribute("stroke-width", 5);
+        pl.setAttribute("stroke-linecap", "round"); pl.setAttribute("stroke-linejoin", "round");
+        svg.appendChild(pl);
+        const len = pl.getTotalLength ? pl.getTotalLength() : 2000;
+        pl.setAttribute("stroke-dasharray", len); pl.setAttribute("stroke-dashoffset", len);
+        return { pl, pts, len };
+      }
+      axis();
+      const labels = SP(v.labels);
+      const series = [[v.series1Label, SPN(v.series1Values), "#3E7BF2", "chip-blue"], [v.series2Label, SPN(v.series2Values), "#F13B88", "chip-pink"], [v.series3Label, SPN(v.series3Values), "#FF9F1C", "chip-orange"]];
+      labels.forEach((lb, i) => { const x = 3 + i * (95 / Math.max(labels.length - 1, 1));
+        el("div", "llab", stage, lb).style.cssText = "left:" + x + "%;bottom:-34px"; });
+      series.forEach(([nm, vals, color, cls], i) => {
+        const lg = el("span", "chip lleg " + cls, stage, nm); lg.style.right = (i * 230) + "px";
+        const { pl, len } = poly(vals, color, false);
+        tl.to(pl, { strokeDashoffset: 0, duration: 0.9, ease: "power2.inOut" }, 0.5 + i * 0.45); });
+      tl.fromTo("#lCard", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.4, ease: SPRING }, 0.15);
+      tl.to("#rootScene", { opacity: 0, duration: 0.28, ease: "power2.in" }, 5.5);
+      tl.to(["#cornerTag", "#cornerIndex"], { opacity: 0, duration: 0.28 }, 5.5);
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

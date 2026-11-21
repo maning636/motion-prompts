@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"eyebrow","type":"string","label":"角标","default":"认知纠偏 · 02"},{"id":"leftText","type":"string","label":"左侧短句A","default":"叙事能力"},{"id":"symbol","type":"string","label":"关系符号（如 ≠ ⇒ × ∴ →）","default":"≠"},{"id":"rightText","type":"string","label":"右侧短句B","default":"讲故事"},{"id":"caption","type":"string","label":"底部字幕","default":"口播字幕位置 · 画面底部灰字一行"},{"id":"accent","type":"color","label":"符号绿","default":"#22c55e"},{"id":"duration","type":"number","label":"总时长(秒)","default":6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+*{ box-sizing: border-box; }
+html, body{ margin:0; width:1920px; height:1080px; overflow:hidden; background: var(--background, #F5F0E6); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #F5F0E6); color: var(--foreground, #1D1D20);
+  font-family:'Noto Sans SC','PingFang SC',sans-serif; }
+.frame{ position:absolute; inset:0; border:10px solid #1D1D20; pointer-events:none; z-index:9; }
+.scene{ position:absolute; inset:0; }
+.chip{ position:absolute; left:110px; top:88px; display:inline-flex; align-items:center; padding:8px 20px;
+  border:4px solid #1D1D20; border-radius:999px; font-family:'Fredoka','Noto Sans SC',sans-serif;
+  font-weight:700; font-size:24px; letter-spacing:.06em; white-space:nowrap;
+  box-shadow:5px 5px 0 #2A292B; color:#1D1D20; }
+.row{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:56px;
+  padding:0 130px; }
+.side{ max-width:560px; background:#FFFDF7; border:4px solid #1D1D20; border-radius:14px;
+  box-shadow:10px 10px 0 #2A292B; padding:36px 48px; text-align:center;
+  font-weight:800; font-size:58px; line-height:1.25; color:#1D1D20; word-break:break-all; }
+.side .stape{ position:absolute; left:50%; top:-19px; width:120px; height:32px; margin-left:-60px;
+  border:3px solid #1D1D20; border-radius:4px; }
+.sidewrap{ position:relative; }
+.symstage{ position:relative; flex:0 0 auto; width:560px; height:560px;
+  display:flex; align-items:center; justify-content:center; }
+.symring{ position:absolute; inset:30px; border:6px solid #1D1D20; border-radius:50%;
+  background:#FFFDF7; box-shadow:10px 10px 0 #2A292B; }
+.symrot{ position:relative; transform:rotate(-3deg); }
+.sym{ display:block; font-family:'Noto Sans SC','PingFang SC',sans-serif; font-weight:900;
+  line-height:1; text-align:center; }
+.caption{ position:absolute; left:50%; bottom:56px; transform:translateX(-50%); max-width:1360px;
+  font-size:30px; font-weight:700; color:#4D4A48; text-align:center; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene" data-start="0" data-duration="6" data-track-index="1">
+        <div class="frame"></div>
+        <span class="chip" id="eyebrow"></span>
+
+        <div class="row">
+          <div class="sidewrap" id="leftwrap">
+            <div class="side" id="leftcard"><span class="stape" id="ltape"></span><span id="lefttext"></span></div>
+          </div>
+          <div class="symstage">
+            <div class="symring" id="symring"></div>
+            <div class="symrot"><span class="sym" id="sym">≠</span></div>
+          </div>
+          <div class="sidewrap" id="rightwrap">
+            <div class="side" id="rightcard"><span class="stape" id="rtape"></span><span id="righttext"></span></div>
+          </div>
+        </div>
+
+        <div class="caption" id="caption"></div>
+      </section>
+    </div>
+    <script>
+      const fallback = {"eyebrow":"认知纠偏 · 02","leftText":"叙事能力","symbol":"≠","rightText":"讲故事","caption":"口播字幕位置 · 画面底部灰字一行","accent":"#22c55e","duration":6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.documentElement.style.setProperty("--accent", v.accent ?? "#22c55e");
+      const $ = (id) => document.getElementById(id);
+      const accent = v.accent ?? "#22c55e";
+      const dur = Math.max(1, Number(v.duration) || 6);
+      $("root").setAttribute("data-duration", dur);
+      $("scene").setAttribute("data-duration", dur);
+
+      $("eyebrow").textContent = v.eyebrow ?? "认知纠偏";
+      $("eyebrow").style.background = accent;
+      $("lefttext").textContent = v.leftText ?? "";
+      $("righttext").textContent = v.rightText ?? "";
+      $("caption").textContent = v.caption ?? "";
+      $("ltape").style.background = accent; $("ltape").style.opacity = "0.55";
+      $("rtape").style.background = accent; $("rtape").style.opacity = "0.55";
+
+      // 符号是视觉主角：按字符数自适应字号
+      const symText = String(v.symbol ?? "≠");
+      const sym = $("sym");
+      sym.textContent = symText;
+      const len = [...symText].length;
+      sym.style.fontSize = (len <= 1 ? 400 : len === 2 ? 300 : 210) + "px";
+      sym.style.color = accent;
+
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      tl.fromTo("#eyebrow", { scale: 0 }, { scale: 1, duration: 0.28, ease: "back.out(2.2)" }, 0.15);
+      tl.fromTo("#leftcard", { x: -90, opacity: 0 },
+        { x: 0, opacity: 1, duration: 0.45, ease: "back.out(1.5)" }, 0.3);
+      tl.fromTo("#rightcard", { x: 90, opacity: 0 },
+        { x: 0, opacity: 1, duration: 0.45, ease: "back.out(1.5)" }, 0.3);
+      tl.fromTo(".stape", { scale: 0 }, { scale: 1, duration: 0.28, ease: "back.out(2.5)", stagger: 0.08 }, 0.65);
+      tl.fromTo("#symring", { scale: 0.6, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.4, ease: "back.out(1.8)" }, 0.75);
+      tl.fromTo("#sym", { scale: 0, rotation: -14 },
+        { scale: 1, rotation: 0, duration: 0.7, ease: "elastic.out(1, 0.55)" }, 0.85);
+      tl.to("#sym", { scale: 1.07, duration: 0.16, ease: "power1.out" }, 1.8);
+      tl.to("#sym", { scale: 1, duration: 0.22, ease: "power2.inOut" }, 1.96);
+      tl.fromTo("#caption", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 1.6);
+      // 动效段约 2.2s 演完，剩余时长定格等剪辑切镜
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

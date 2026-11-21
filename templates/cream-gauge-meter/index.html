@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "系统健康度"}, {"id": "subtitle", "type": "string", "label": "副标题", "default": "实时可用性评分"}, {"id": "value", "type": "number", "label": "当前值", "default": 87}, {"id": "min", "type": "number", "label": "最小值", "default": 0}, {"id": "max", "type": "number", "label": "最大值", "default": 100}, {"id": "unit", "type": "string", "label": "单位", "default": "%"}, {"id": "labelLow", "type": "string", "label": "低分区标签", "default": "低"}, {"id": "labelMid", "type": "string", "label": "中分区标签", "default": "中"}, {"id": "labelHigh", "type": "string", "label": "高分区标签", "default": "高"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      /* ===== 奶油纸面贴纸工作台 · 设计令牌（见 design-systems/sticker-workbench/DESIGN.md） ===== */
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden;
+        font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden;
+        background: var(--background, #F5F0E6); color: var(--foreground, #1D1D20); }
+      .outer-frame{ position: absolute; inset: 0; border: 10px solid #1D1D20; pointer-events: none; z-index: 40; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; font-weight: 700; }
+      .fredoka{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; }
+      .corner-tag{ position: absolute; top: 74px; left: 120px; z-index: 30;
+        background: #FFFDF7; border: 4px solid #1D1D20; border-radius: 8px;
+        box-shadow: 10px 10px 0 #2A292B; padding: 14px 22px; transform: rotate(-2deg); }
+      .corner-tag span{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; font-weight: 700;
+        font-size: 24px; letter-spacing: 0.06em; text-transform: uppercase; }
+      .corner-index{ position: absolute; top: 84px; right: 120px; z-index: 30;
+        font-size: 20px; color: #4D4A48; }
+      .scene{ position: absolute; inset: 0; }
+      .panel{ background: #FFFDF7; border: 4px solid #1D1D20; border-radius: 10px;
+        box-shadow: 10px 10px 0 #2A292B; }
+      .chip{ display: inline-block; padding: 8px 20px; border: 4px solid #1D1D20; border-radius: 8px;
+        box-shadow: 6px 6px 0 #2A292B; font-size: 26px; font-weight: 800; line-height: 1.1; }
+      .chip-blue{ background: #3E7BF2; color: #FFFDF7; }
+      .chip-pink{ background: #F13B88; color: #FFFDF7; }
+      .chip-orange{ background: #FF9F1C; color: #1D1D20; }
+      .chip-lime{ background: #B9E833; color: #1D1D20; }
+      .chip-violet{ background: #B99AF7; color: #1D1D20; }
+      .chip-paper{ background: #FFFDF7; color: #1D1D20; }
+      .ttl{ font-size: 52px; font-weight: 900; line-height: 1.2; }
+      .sub{ font-size: 30px; font-weight: 700; line-height: 1.35; color: #4D4A48; }
+      .num{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; font-weight: 700; }
+      .title-center{ position: absolute; top: 200px; left: 0; width: 100%; text-align: center; z-index: 20; }
+      .sub-center{ position: absolute; top: 286px; left: 0; width: 100%; text-align: center; z-index: 20; }
+
+      .gwrap2{ position: absolute; inset: 0; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; padding-top: 80px; }
+      .gbox{ position: relative; width: 720px; height: 400px; }
+      .gbox svg{ width: 100%; height: 100%; overflow: visible; }
+      .gval{ position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); text-align: center; }
+      .gval .gv{ font-size: 110px; line-height: 1; }
+      .gval .gu{ font-size: 36px; font-weight: 900; }
+      .gzones{ display: flex; gap: 30px; margin-top: 30px; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="outer-frame" id="frame"></div>
+      <div class="corner-tag" id="cornerTag"><span>GAUGE METER</span></div>
+      <div class="corner-index mono" id="cornerIndex">01 / GAUGE</div>
+      <svg width="0" height="0" style="position:absolute"><defs>
+        <marker id="arrowHead" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto">
+          <path d="M1 1 L11 6 L1 11 Z" fill="#1D1D20" />
+        </marker>
+      </defs></svg>
+      <section class="scene" id="rootScene" data-start="0" data-duration="6" data-track-index="1">
+        <h2 class="ttl title-center" id="gaTitle"></h2>
+        <p class="sub sub-center" id="gaSub"></p>
+        <div class="gwrap2"><div class="gbox"><svg viewBox="0 0 360 200" id="gaSvg"></svg>
+          <div class="gval"><span class="num gv" id="gaVal"></span> <span class="gu" id="gaUnit"></span></div>
+        </div><div class="gzones" id="gaZones"></div></div>
+      </section>
+    </div>
+    <script>
+      const FB = {"title": "系统健康度", "subtitle": "实时可用性评分", "value": 87, "min": 0, "max": 100, "unit": "%", "labelLow": "低", "labelMid": "中", "labelHigh": "高"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $ = (id) => document.getElementById(id);
+      const T = (id, val) => { const el = $(id); if (el) el.textContent = val; };
+      const SP = (s) => String(s ?? '').split(',').map(x => x.trim()).filter(Boolean);
+      const SPN = (s) => SP(s).map(Number);
+      const scene = () => $('rootScene');
+      function el(tag, cls, parent, text){ const e = document.createElement(tag);
+        if (cls) e.className = cls; if (text != null) e.textContent = text;
+        (parent || scene()).appendChild(e); return e; }
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const SPRING = "back.out(1.4)";
+      function pop(sel, at, dx){ tl.fromTo(sel, { opacity: 0, x: dx || 0, scale: 0.88 },
+        { opacity: 1, x: 0, scale: 1, duration: 0.38, ease: SPRING }, at); }
+      function fade(sel, at){ tl.fromTo(sel, { opacity: 0 }, { opacity: 1, duration: 0.24 }, at); }
+      function drawArrow(line, at){ const len = line.getAttribute('stroke-dasharray');
+        tl.set(line, { attr: { "marker-end": "url(#arrowHead)" } }, at);
+        tl.fromTo(line, { strokeDashoffset: len }, { strokeDashoffset: 0, duration: 0.4, ease: "power2.inOut" }, at); }
+      tl.fromTo("#frame", { opacity: 0 }, { opacity: 1, duration: 0.18 }, 0);
+      tl.fromTo(["#cornerTag", "#cornerIndex"], { opacity: 0 }, { opacity: 1, duration: 0.18 }, 0);
+      T("gaTitle", v.title || ""); T("gaSub", v.subtitle || ""); if (!v.subtitle) $("gaSub").style.display = "none";
+      const svg = $("gaSvg"), NS = "http://www.w3.org/2000/svg";
+      const val = Number(v.value) || 0, mn = Number(v.min) || 0, mx = Number(v.max) || 100;
+      const frac = Math.min(1, Math.max(0, (val - mn) / (mx - mn || 1)));
+      function arc(a0, a1, color) { const c = document.createElementNS(NS, "path");
+        const r = 150, cx = 180, cy = 190;
+        const x0 = cx + r * Math.cos(Math.PI * (1 - a0)), y0 = cy - r * Math.sin(Math.PI * (1 - a0));
+        const x1 = cx + r * Math.cos(Math.PI * (1 - a1)), y1 = cy - r * Math.sin(Math.PI * (1 - a1));
+        c.setAttribute("d", "M " + x0 + " " + y0 + " A " + r + " " + r + " 0 0 1 " + x1 + " " + y1);
+        c.setAttribute("fill", "none"); c.setAttribute("stroke", color);
+        c.setAttribute("stroke-width", 26); c.setAttribute("stroke-linecap", "round");
+        svg.appendChild(c); return c; }
+      arc(0, 1, "#C9C0B2");
+      const fg = arc(0, Math.max(frac, 0.02), frac > 0.66 ? "#FF9F1C" : frac > 0.33 ? "#3E7BF2" : "#B9E833");
+      const len = fg.getTotalLength(); fg.setAttribute("stroke-dasharray", len);
+      fg.setAttribute("stroke-dashoffset", len);
+      tl.to(fg, { strokeDashoffset: 0, duration: 1.1, ease: "power2.inOut" }, 0.5);
+      T("gaVal", v.value); T("gaUnit", v.unit);
+      [[v.labelLow, "chip-lime"], [v.labelMid, "chip-blue"], [v.labelHigh, "chip-orange"]].forEach(([z, cls], i) => {
+        const c = el("span", "chip " + cls, $("gaZones"), z);
+        tl.fromTo(c, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.28, ease: SPRING }, 1.4 + i * 0.18); });
+      tl.fromTo(".gval", { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.4, ease: SPRING }, 1.2);
+      tl.to("#rootScene", { opacity: 0, duration: 0.28, ease: "power2.in" }, 5.5);
+      tl.to(["#cornerTag", "#cornerIndex"], { opacity: 0, duration: 0.28 }, 5.5);
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

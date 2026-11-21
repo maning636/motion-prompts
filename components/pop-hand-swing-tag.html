@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"text","name":"吊牌文字","type":"string","label":"吊牌上的字","default":"待办"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.2}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>手绘吊牌摇摆</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  /* 悬挂点固定在 (240,24)，整块只绕它转 */
+  .p-swing { position: absolute; left: 0; top: 0; width: 480px; height: 270px;
+    transform-origin: 240px 24px; }
+  .p-nail { position: absolute; left: 236px; top: 20px; width: 8px; height: 8px;
+    border-radius: 50%; background: #241C18; }
+  .p-rope { position: absolute; left: 239px; top: 24px; width: 2px; height: 94px;
+    background: #241C18; }
+  .p-tag { position: absolute; left: 197px; top: 118px; width: 86px; height: 54px;
+    background: #FFFDF5; border: 3px solid #241C18; border-radius: 7px;
+    box-shadow: 3px 4px 0 rgba(36, 28, 24, .85);
+    transform-origin: 50% 0%; display: flex; align-items: center; justify-content: center; }
+  .p-tag-t { font-size: 16px; font-weight: 800; color: #241C18; white-space: nowrap; }
+  .p-eye { position: absolute; left: 38px; top: -6px; width: 10px; height: 10px;
+    border-radius: 50%; background: #FFFDF5; border: 2.5px solid #241C18; }
+  .p-tag-band { position: absolute; left: 0; top: 30px; width: 100%; height: 3px;
+    background: var(--ac); opacity: .8; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"待办","accent":"#FF6B35","duration":3.2};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || FALLBACK.duration;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  function fit(el, avail, maxPx, minPx) {
+    const prev = el.style.whiteSpace;
+    el.style.whiteSpace = 'nowrap';
+    const nat = el.scrollWidth;
+    el.style.whiteSpace = prev;
+    if (nat > avail && nat > 0) {
+      el.style.fontSize = Math.max(minPx, Math.floor(maxPx * avail / nat)) + 'px';
+    }
+  }
+
+  put('div', 'p-nail', '', null, stage);
+
+  const swing = put('div', 'p-swing');
+  put('div', 'p-rope', '', null, swing);
+  const tag = put('div', 'p-tag', '', null, swing);
+  const eye = put('div', 'p-eye', '', null, tag);
+  put('div', 'p-tag-band', '', null, tag);
+  const tt = put('div', 'p-tag-t', '', String(v.text || FALLBACK.text), tag);
+  fit(tt, 66, 16, 9);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* ── 钟摆：阻尼衰减正弦，纯函数 ───────────────────────────
+     θ(t) = A·e^(-λt)·cos(ωt)，给定 t 就知道该摆到哪。
+     用 repeat/back 关键帧去近似钟摆，波形是错的（那是对称的正弦，
+     不是带惯性的摆），而且参数一改就得重调。
+     函数算完烘成 GSAP 关键帧：渲染器来回扫时间轴扫到哪一帧
+     都是那一帧该有的角度（onUpdate 回调在 seek 时根本不触发）。 */
+  const T0 = 0.1, A = 27, A2 = 7, L = 1.5, W = 6.6;
+  function theta(t) {
+    const u = t - T0;
+    if (u <= 0) return A;
+    return A * Math.exp(-L * u) * Math.cos(W * u);
+  }
+  /* 牌子自身比绳子慢半拍：相位滞后 → 甩起来才像有质量的牌子 */
+  function lag(t) {
+    const u = t - T0;
+    if (u <= 0) return 0;
+    return A2 * Math.exp(-L * 1.1 * u) * Math.cos(W * u - 0.85);
+  }
+  const SWING_END = Math.max(.6, dur - 0.05);
+  const N = Math.round(SWING_END / (1 / 50)) + 1;
+  const kfSwing = [], kfTag = [];
+  for (let i = 0; i < N; i++) {
+    const t = SWING_END * (i / (N - 1));
+    kfSwing.push({ rotate: theta(t) });
+    kfTag.push({ rotate: lag(t) });
+  }
+  tl.to(swing, { keyframes: kfSwing, duration: SWING_END, ease: 'none' }, 0);
+  tl.to(tag, { keyframes: kfTag, duration: SWING_END, ease: 'none' }, 0);
+
+  /* 落定后吊牌轻轻提一下，表示它还在动 */
+  tl.fromTo(eye, { scale: 1 }, { scale: 1.3, duration: .12, ease: 'power2.out', yoyo: true, repeat: 1 }, T0 + .9);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

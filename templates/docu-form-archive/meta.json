@@ -1,0 +1,16 @@
+{
+  "id": "docu-form-archive",
+  "name": "纪录片 B19 档案卷宗",
+  "description": "档案标签卡片 · 皮影档案族 · docu-form 01",
+  "series": "docu",
+  "category": "纪录片皮影",
+  "tags": [
+    "纪录片皮影",
+    "档案模板",
+    "docu-form-archive-label"
+  ],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "createdAt": "2026-08-30T00:00:00.000Z"
+}

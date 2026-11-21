@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"eyebrow","type":"string","label":"眉标","default":"SCENE SWEEP · 转场"},
+  {"id":"oldTitle","type":"string","label":"旧场景标题","default":"旧场景 · 上一拍"},
+  {"id":"oldSubtitle","type":"string","label":"旧场景副标题","default":"信息 A · 已成过去"},
+  {"id":"oldPoints","type":"string","label":"旧场景要点（换行分隔）","default":"语境已搭建\n情绪已铺好\n主角已登场"},
+  {"id":"newTitle","type":"string","label":"新场景标题","default":"新场景 · 下一拍"},
+  {"id":"newSubtitle","type":"string","label":"新场景副标题","default":"信息 B · 即将揭晓"},
+  {"id":"newPoints","type":"string","label":"新场景要点（换行分隔）","default":"视角切换\n焦点转移\n结论高亮"},
+  {"id":"linePosition","type":"number","label":"分隔线最终位置（0=顶,100=底）","default":50},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity: .55;
+      }
+
+      /* ---- 旧 / 新两个场景层 ---- */
+      .scene{
+        position:absolute; inset:0;
+        padding: 96px 96px 120px;
+        display:flex; flex-direction:column; justify-content:flex-start;
+      }
+      .scene.old{
+        opacity: 0;
+        clip-path: inset(0 0 0 0);
+      }
+      .scene.new{
+        opacity: 0;
+        transform: translateY(28px);
+        clip-path: inset(0 0 0 0);
+      }
+
+      .chip{
+        display:inline-flex; align-items:center; gap:10px;
+        padding: 7px 16px; border:1px solid #2A2A2E; border-radius:999px;
+        font-size:18px; letter-spacing:.16em; color:#9CA3AF; text-transform:uppercase;
+        white-space: nowrap;
+      }
+      .chip b{ color: var(--accent, #00FF00); font-weight:700; letter-spacing:.05em; }
+      .old .chip{ align-self:flex-start; }
+      .new .chip{ align-self:flex-start; }
+
+      .title{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight:700; letter-spacing:-.02em;
+        font-size: 86px; line-height: 1.05;
+        margin: 22px 0 18px;
+      }
+      .old .title{
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 78%, transparent);
+      }
+      .new .title{
+        color: var(--foreground, #F4EFE7);
+      }
+
+      .subtitle{
+        margin: 0 0 18px;
+        font-size: 26px; line-height: 1.4;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 72%, transparent);
+      }
+
+      .points{
+        list-style:none; padding:0; margin: 18px 0 0;
+        display:flex; flex-direction:column; gap: 14px;
+      }
+      .points li{
+        display:flex; gap: 14px; align-items:flex-start;
+        font-size: 26px; line-height: 1.45;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 82%, transparent);
+        opacity: 0;
+      }
+      .points li .num{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 14px; letter-spacing:.12em;
+        color: #6B6B66; margin-top: 6px; min-width: 26px;
+      }
+      .new .points li::before{
+        content:""; flex:none; margin-top: 14px;
+        width: 18px; height: 2px;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+      }
+      .new .points li .num{ color: var(--accent, #00FF00); }
+      .old .points li::before{
+        content:""; flex:none; margin-top: 14px;
+        width: 18px; height: 2px;
+        background: #6B6B66;
+      }
+
+      /* ---- 横扫细线（carrier line） ---- */
+      .carry-track{
+        position:absolute; inset:0;
+        pointer-events:none;
+        overflow:hidden;
+      }
+      .carry-line{
+        position:absolute;
+        left: -320px;
+        top: 50%;
+        width: 320px;
+        height: 3px;
+        background: var(--accent, #00FF00);
+        box-shadow:
+          0 0 12px color-mix(in srgb, var(--accent, #00FF00) 65%, transparent),
+          0 0 28px color-mix(in srgb, var(--accent, #00FF00) 35%, transparent);
+        border-radius: 2px;
+        transform: translateY(-50%);
+        will-change: left, width, top, opacity;
+      }
+      /* 横扫时线尾部的拖尾 */
+      .carry-line::before{
+        content:"";
+        position:absolute; right:100%; top:50%; transform:translateY(-50%);
+        width: 280px; height: 1px;
+        background: linear-gradient(270deg,
+          color-mix(in srgb, var(--accent, #00FF00) 50%, transparent) 0%,
+          transparent 100%);
+      }
+      /* 横扫时线头部的小亮点 */
+      .carry-line::after{
+        content:"";
+        position:absolute; left:100%; top:50%; transform:translate(-100%, -50%);
+        width: 14px; height: 14px; border-radius:50%;
+        background: var(--accent, #00FF00);
+        box-shadow:
+          0 0 14px color-mix(in srgb, var(--accent, #00FF00) 80%, transparent),
+          0 0 36px color-mix(in srgb, var(--accent, #00FF00) 50%, transparent);
+      }
+
+      /* ---- 装饰分隔线（停在新场景下方的水平线） ---- */
+      .decor-line{
+        position:absolute;
+        left: 0; right: 0;
+        top: 50%;
+        height: 2px;
+        background: var(--accent, #00FF00);
+        opacity: 0;
+        transform: translateY(-50%);
+        box-shadow:
+          0 0 10px color-mix(in srgb, var(--accent, #00FF00) 45%, transparent);
+        will-change: opacity, top;
+      }
+      .decor-line::before, .decor-line::after{
+        content:"";
+        position:absolute; top:50%; transform:translateY(-50%);
+        width: 64px; height: 1px;
+        background: color-mix(in srgb, var(--accent, #00FF00) 35%, transparent);
+      }
+      .decor-line::before{ left: 0; }
+      .decor-line::after{ right: 0; }
+
+      /* 装饰线两端的点 */
+      .decor-cap{
+        position:absolute;
+        width: 12px; height: 12px; border-radius:50%;
+        background: var(--accent, #00FF00);
+        top: 50%;
+        transform: translateY(-50%) scale(0);
+        box-shadow: 0 0 14px color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+        will-change: left, transform;
+      }
+      .decor-cap.left{ left: -6px; }
+      .decor-cap.right{ right: -6px; }
+
+      /* ---- 时码 / TC（点缀信息） ---- */
+      .tc{
+        position:absolute;
+        bottom: 56px; right: 96px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing: .22em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 45%, transparent);
+        opacity: 0;
+      }
+
+      .eyebrow-row{
+        position:absolute;
+        top: 56px; left: 96px; right: 96px;
+        display:flex; align-items:baseline; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.22em; text-transform:uppercase;
+        color: #8A8A85;
+      }
+      .eyebrow-row .acc{
+        color: var(--accent, #00FF00);
+        font-weight: 700; letter-spacing:.18em;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+
+        <div class="eyebrow-row">
+          <span><b class="acc">SWEEP</b>&nbsp;&nbsp;CARRY TRANSITION</span>
+          <span id="eyebrow">scene text</span>
+        </div>
+
+        <!-- 旧场景 -->
+        <div class="scene old" id="oldScene">
+          <span class="chip" id="chipOld"><b>A</b><span>OUTGOING</span></span>
+          <h2 class="title" id="titleOld">old title</h2>
+          <p class="subtitle" id="subtitleOld">old subtitle</p>
+          <ul class="points" id="pointsOld">
+            <li><span class="num">01</span><span>p1</span></li>
+            <li><span class="num">02</span><span>p2</span></li>
+            <li><span class="num">03</span><span>p3</span></li>
+          </ul>
+        </div>
+
+        <!-- 新场景 -->
+        <div class="scene new" id="newScene">
+          <span class="chip" id="chipNew"><b>B</b><span>INCOMING</span></span>
+          <h2 class="title" id="titleNew">new title</h2>
+          <p class="subtitle" id="subtitleNew">new subtitle</p>
+          <ul class="points" id="pointsNew">
+            <li><span class="num">01</span><span>n1</span></li>
+            <li><span class="num">02</span><span>n2</span></li>
+            <li><span class="num">03</span><span>n3</span></li>
+          </ul>
+        </div>
+
+        <!-- 横扫线 + 装饰分隔 + 时码 -->
+        <div class="carry-track">
+          <div class="carry-line" id="carryLine"></div>
+        </div>
+        <div class="decor-line" id="decorLine"></div>
+        <div class="decor-cap left" id="decorCapL"></div>
+        <div class="decor-cap right" id="decorCapR"></div>
+
+        <div class="tc" id="tc">00:00:00:00</div>
+
+      </section>
+    </div>
+    <script>
+      /* ----- 变量接线 ----- */
+      const fallback = {
+        eyebrow: "SCENE SWEEP · 转场",
+        oldTitle: "旧场景 · 上一拍",
+        oldSubtitle: "信息 A · 已成过去",
+        oldPoints: "语境已搭建\n情绪已铺好\n主角已登场",
+        newTitle: "新场景 · 下一拍",
+        newSubtitle: "信息 B · 即将揭晓",
+        newPoints: "视角切换\n焦点转移\n结论高亮",
+        linePosition: 50,
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      const $ = (id) => document.querySelector(String(id).startsWith("#") ? id : "#" + id);
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      /* ----- 内容回填 ----- */
+      $("eyebrow").textContent = v.eyebrow || fallback.eyebrow;
+      $("titleOld").textContent = v.oldTitle || fallback.oldTitle;
+      $("subtitleOld").textContent = v.oldSubtitle || fallback.oldSubtitle;
+      $("titleNew").textContent = v.newTitle || fallback.newTitle;
+      $("subtitleNew").textContent = v.newSubtitle || fallback.newSubtitle;
+
+      const setPoints = (hostId, raw) => {
+        const ul = $(hostId);
+        if (!ul) return;
+        const lines = String(raw ?? "").split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        const maxN = Math.min(Math.max(lines.length, 1), 4);
+        const padded = lines.slice(0, maxN);
+        while (padded.length < 4) padded.push("");
+        ul.innerHTML = padded.map((t, i) =>
+          `<li><span class="num">${String(i+1).padStart(2,"0")}</span><span>${escapeHtml(t)}</span></li>`
+        ).join("");
+      };
+      setPoints("pointsOld", v.oldPoints || fallback.oldPoints);
+      setPoints("pointsNew", v.newPoints || fallback.newPoints);
+
+      /* ----- 分隔线最终位置（linePosition 0..100 → top 百分比） ----- */
+      const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+      const decorPct = clamp(Number(v.linePosition ?? fallback.linePosition), 0, 100);
+      const decorTopPct = (108 - 60) * (decorPct / 100) + 30; // 30..1008（安全边距内）
+      $("#decorLine").style.top = decorTopPct + "px";
+      $("#decorCapL").style.top = decorTopPct + "px";
+      $("#decorCapR").style.top = decorTopPct + "px";
+
+      /* ----- 时间线 ----- */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+      const tl = gsap.timeline({ paused: true });
+
+      // 1) 旧场景入场：0.0–0.7s
+      tl.fromTo("#oldScene",
+        { opacity: 0, y: 28 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 0.05);
+      tl.fromTo("#pointsOld li",
+        { opacity: 0, x: -16 },
+        { opacity: 1, x: 0, duration: 0.4, ease: "power2.out", stagger: 0.08 }, 0.25);
+
+      // 2) 发光线从左切入横贯：1.2–2.2s（cover ~58% of viewport width sweep）
+      tl.fromTo("#carryLine",
+        { left: "-320px" },
+        { left: "2240px", duration: 1.05, ease: "power2.inOut" }, 1.2);
+
+      // 3) 旧内容在线到时淡出 + 被切除：1.6–2.4s（clip-path 从 0% → 100% 由右往左切）
+      tl.to("#oldScene",
+        { opacity: 0, duration: 0.55, ease: "power2.in" }, 1.65);
+      tl.to("#oldScene",
+        { clipPath: "inset(0 0 0 100%)", duration: 0.55, ease: "power3.in" }, 1.65);
+
+      // 4) 新内容随线切入：2.2–3.0s（线扫到中线左右时开始入场）
+      tl.fromTo("#newScene",
+        { opacity: 0, y: 28 },
+        { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 2.25);
+      tl.fromTo("#pointsNew li",
+        { opacity: 0, x: 16 },
+        { opacity: 1, x: 0, duration: 0.4, ease: "power2.out", stagger: 0.08 }, 2.45);
+
+      // 5) 线停止横贯，变成分隔装饰线：2.7–3.4s
+      //    横扫线隐藏，decorLine 出现并"长出"
+      tl.to("#carryLine",
+        { opacity: 0, duration: 0.2, ease: "power2.in" }, 2.85);
+      tl.fromTo("#decorLine",
+        { opacity: 0, scaleX: 0 },
+        { opacity: 1, scaleX: 1, duration: 0.55, ease: "power3.out",
+          transformOrigin: "50% 50%" }, 3.0);
+      // 端点圆点
+      tl.fromTo("#decorCapL, #decorCapR",
+        { scale: 0 },
+        { scale: 1, duration: 0.4, ease: "back.out(1.6)", stagger: 0.05 }, 3.45);
+
+      // 6) 装饰线轻微呼吸 + tc 浮现：3.6–5.2s
+      tl.to("#decorLine",
+        { opacity: 0.65, duration: 1.1, ease: "sine.inOut", yoyo: true, repeat: 1 }, 3.6);
+      tl.fromTo("#tc",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.5, ease: "power2.out" }, 4.0);
+
+      // 7) 结尾：3.9s 后开始 tc 实时刷新（与 timeline.time 同步）
+      const tcStart = 4.0;
+      tl.eventCallback("onUpdate", () => {
+        const t = tl.time();
+        if (t < tcStart) return;
+        const total = Math.max(0, t);
+        const hh = Math.floor(total / 3600);
+        const mm = Math.floor((total % 3600) / 60);
+        const ss = Math.floor(total % 60);
+        const ff = Math.floor((total - Math.floor(total)) * 24);
+        $("#tc").textContent =
+          String(hh).padStart(2,"0") + ":" +
+          String(mm).padStart(2,"0") + ":" +
+          String(ss).padStart(2,"0") + ":" +
+          String(ff).padStart(2,"0");
+      });
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

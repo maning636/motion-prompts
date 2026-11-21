@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "card1", "type": "string", "label": "中景卡1", "default": "实时协作"}, {"id": "card2", "type": "string", "label": "中景卡2", "default": "版本历史"}, {"id": "card3", "type": "string", "label": "中景卡3", "default": "权限管理"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+.dlayer{ position:absolute; left:0; top:0; height:1080px; }
+#dBg{ width:2800px; filter:blur(2px) saturate(.92); opacity:.85; }
+#dBg .pg{ position:absolute; left:0; top:0; width:2800px; height:1080px; background:#0E0E14; }
+#dBg i{ display:block; height:16px; border-radius:8px; background:rgba(255,255,255,.09); margin:34px 120px; }
+#dMid{ width:2600px; }
+.mcard{ position:absolute; top:280px; width:560px; height:520px; border-radius:24px; background:#17171F;
+  border:1px solid rgba(255,255,255,.14); padding:40px; box-shadow:0 34px 100px rgba(0,0,0,.55); }
+.mcard h3{ font-size:44px; color:var(--fg); margin-bottom:28px; }
+.mcard b{ display:block; height:150px; border-radius:14px; background:linear-gradient(135deg,color-mix(in srgb, var(--accent) 30%, transparent),color-mix(in srgb, var(--accent) 5%, transparent)); margin-bottom:26px; }
+.mcard i{ display:block; height:14px; border-radius:7px; background:rgba(255,255,255,.16); margin-bottom:14px; }
+#dFg{ width:3000px; filter:blur(3px); pointer-events:none; }
+.fg1{ position:absolute; border-radius:30px; background:color-mix(in srgb, var(--accent) 13%, transparent); border:1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4.5" data-width="1920" data-height="1080">
+<div class="dlayer" id="dBg"><div class="pg"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><div class="dlayer" id="dMid"><div class="mcard" style="left:300px"><h3 id="t1"></h3><b></b><i></i><i style="width:72%"></i><i style="width:55%"></i></div><div class="mcard" style="left:1020px"><h3 id="t2"></h3><b></b><i></i><i style="width:72%"></i><i style="width:55%"></i></div><div class="mcard" style="left:1740px"><h3 id="t3"></h3><b></b><i></i><i style="width:72%"></i><i style="width:55%"></i></div></div><div class="dlayer" id="dFg"><div class="fg1" style="left:150px;top:120px;width:340px;height:200px"></div><div class="fg1" style="left:1150px;top:760px;width:420px;height:230px"></div><div class="fg1" style="left:2250px;top:180px;width:300px;height:300px;border-radius:50%"></div></div>
+    </div>
+    <script>
+      const FB = {"card1": "实时协作", "card2": "版本历史", "card3": "权限管理", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#t1').textContent=v.card1||'';$('#t2').textContent=v.card2||'';$('#t3').textContent=v.card3||'';
+// 同一 drive 位移 × 层系数 0.35/0.7/1.4（梯度≥2倍才可辨）
+// 中景总行程 620×0.7=434px，落定时首卡整张骑到画布左边缘外 134px，
+// 「实时协作」标题的字形被切掉 93px（只剩 30%）。整排上收：行首 300px、行尾 2300px，
+// 在 1920 画布里本来就放不下，首卡必须走出去一点，但要让它的字留进来：
+// 位移收到 460×0.7=322px，首卡标题左侧还剩 18px 余量。
+const drv={x:0};
+const apply=()=>{ gsap.set('#dBg',{x:drv.x*0.35}); gsap.set('#dMid',{x:drv.x*0.7}); gsap.set('#dFg',{x:drv.x*1.4}); };
+apply();
+tl.to(drv,{x:-460,duration:F(100),ease:'power1.inOut',onUpdate:apply},F(6));
+tl.to({},{duration:F(29)},F(106)); // 真静止
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

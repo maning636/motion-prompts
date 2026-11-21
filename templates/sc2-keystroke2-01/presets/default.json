@@ -1,0 +1,7 @@
+{
+  "kicker": "TERMINAL · 敲一行试试",
+  "cmd": "hyperframes render --preset default",
+  "results": "✓ 解析变量 9 项 · 0.12s;✓ 渲染 180 帧 @1080p · 41.6s;✓ 输出 renders/default.mp4",
+  "accent": "#00FF00",
+  "duration": 6
+}

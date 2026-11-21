@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（栏目标签，不是钩子）","default":"一个误区"},
+{"id":"title","name":"钩子句","type":"string","label":"钩子句（≤12 字）","default":"你以为的省钱方式"},
+{"id":"oldLabel","name":"前标签","type":"string","label":"前标签（2–4 字）","default":"大家都以为"},
+{"id":"oldText","name":"旧句","type":"string","label":"旧句（≤12 字，48px 的实际上限）","default":"便宜就是省钱"},
+{"id":"newLabel","name":"后标签","type":"string","label":"后标签（2–4 字）","default":"其实"},
+{"id":"newText","name":"新句","type":"string","label":"新句（≤12 字，48px 的实际上限）","default":"用得住才省钱"},
+{"id":"accent","name":"强调色","type":"color","label":"强调色（凸点亮起色 / 斜纹带 / 页脚计数）","default":"#FFD429"},
+{"id":"brickColor","name":"配色包","type":"enum","label":"配色包（块面轮转顺序）","default":"mixed","options":[{"value":"yellow","label":"暖黄主调"},{"value":"pink","label":"桃粉主调"},{"value":"green","label":"薄荷主调"},{"value":"blue","label":"靛蓝主调"},{"value":"mixed","label":"四色轮转"}]},
+{"id":"entry","name":"入场母题","type":"enum","label":"入场母题（新句块从哪个方向进）","default":"swap","options":[{"value":"swap","label":"自右撞入"},{"value":"slam","label":"自上直落"},{"value":"pushup","label":"自下顶出"}]},
+{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–6）","default":5.5},
+{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}],"hidden":true}
+]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>左右对撞抽换</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 积木风 · 短视频引流 · 左右对撞抽换
+     720×360 旧句块先自左沿轨道推入中场落位（式 5），半拍后新句块自右沿撞进来（式 7 对撞）、
+     旧句块被顶得向左退场，新句落定瞬间 2 联凸点硬切。两块落同一格位，位移量分别由
+     leftOf() / rightOf() 现算；entry 切新句入向，旧句恒向左退，抽走即 opacity:0 硬切。
+     块宽只用 120/240/480/720，块高只用 120/240/360/480；普通块恒 8px 硬影，
+     承重件 10px；相邻块用 margin -3px 合流成单线缝；凸点是内联 SVG circle。 */
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --mod:240px; --mod-h:120px; --shadow:#0F0F0F; --background:var(--paper); --accent:#FFD429;
+  }
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--background);color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased}
+  /* 纸面网点：全族唯一允许的 rgba 例外，必须铺满 #stage */
+  .blk-noise{background-image:radial-gradient(rgba(15,15,15,.12) 1px,transparent 1px);
+    background-size:10px 10px}
+  .sh-s{box-shadow:4px 4px 0 var(--shadow)}
+  .sh-l{box-shadow:8px 8px 0 var(--shadow)}
+  .sh-xl{box-shadow:10px 10px 0 var(--shadow)}
+
+  /* 桌沿铭牌：贴在桌面之外，不许浮在块上面 */
+  .promo{position:absolute;left:0;top:0;width:1920px;height:56px;display:flex;
+    align-items:center;justify-content:space-between;padding:0 72px;
+    background:var(--ink);color:var(--white);font-family:var(--mono);
+    font-size:24px;font-weight:700;letter-spacing:.14em}
+  .promo .pc{color:var(--accent)}
+  .foot{position:absolute;left:0;bottom:0;width:1920px;height:64px;display:flex;
+    align-items:center;justify-content:space-between;padding:0 72px;
+    background:var(--ink);color:var(--white);font-family:var(--mono);
+    font-size:26px;font-weight:700;letter-spacing:.1em}
+  .foot em{font-style:normal;color:var(--accent)}
+  /* 斜纹带：全族唯一合法渐变，周期 10+10=20px */
+  .divline{position:absolute;left:0;bottom:64px;width:1920px;height:20px;
+    border-top:3px solid var(--ink);border-bottom:3px solid var(--ink);
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+
+  .head{position:absolute;left:240px;top:180px;width:1440px;display:flex;
+    flex-direction:column;gap:12px}
+  .head .eb{font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:.14em;
+    color:var(--ink);white-space:nowrap}
+  .head .ti{font-size:52px;font-weight:900;line-height:1.2;letter-spacing:0;
+    color:var(--ink);white-space:nowrap}
+
+  /* 格位上方 2 联凸点：新句落定瞬间硬切亮起 */
+  .studbar{position:absolute;left:870px;top:340px;width:180px;height:60px}
+  .studbar svg{width:180px;height:60px;display:block}
+
+  /* 同一格位 (600,400,720×360) 叠放两块：都留在文档流，不切 display */
+  .blk{position:absolute;left:600px;top:400px;width:720px;min-width:0;height:360px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;
+    padding:0 36px;box-sizing:border-box;
+    border:var(--bw) solid var(--ink);border-radius:4px;box-shadow:10px 10px 0 var(--shadow)}
+  .blk .lb{flex:0 0 auto;padding:8px 20px;border:var(--bw) solid var(--ink);
+    border-radius:9999px;font-family:var(--mono);font-size:26px;font-weight:700;
+    letter-spacing:.14em;white-space:nowrap}
+  .blk .tx{flex:0 1 auto;min-width:0;font-size:48px;font-weight:900;line-height:1.2;
+    letter-spacing:0;white-space:nowrap}
+  /* 旧句块：白底墨字；新句块：彩色底，标签白底墨字 */
+  #oldBlk{background:var(--white);color:var(--ink)}
+  #oldBlk .lb{background:var(--ink);color:var(--white)}
+  #newBlk .lb{background:var(--white);color:var(--ink)}
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="promo">
+    <span class="pc">BRICK / 积木风</span>
+    <span>短视频引流 · 对撞抽换</span>
+  </div>
+
+  <div class="head" id="head">
+    <span class="eb" id="eyebrow" data-fit-max="30" data-fit-min="16">一个误区</span>
+    <h1 class="ti" id="title" data-fit-max="52" data-fit-min="26">你以为的省钱方式</h1>
+  </div>
+
+  <div class="studbar" id="studbar"><svg width="180" height="60" viewBox="0 0 180 60" fill="none" aria-hidden="true"><circle class="sc" id="c1" cx="60" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/><circle class="sc" id="c2" cx="180" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/></svg></div>
+
+  <div class="blk" id="oldBlk">
+    <span class="lb" id="oldLabel" data-fit-max="26" data-fit-min="14">大家都以为</span>
+    <span class="tx" id="oldText" data-fit-max="48" data-fit-min="24">便宜就是省钱</span>
+  </div>
+
+  <div class="blk" id="newBlk">
+    <span class="lb" id="newLabel" data-fit-max="26" data-fit-min="14">其实</span>
+    <span class="tx" id="newText" data-fit-max="48" data-fit-min="24">用得住才省钱</span>
+  </div>
+
+  <div class="divline"></div>
+  <div class="foot">
+    <span>HOOK / 短视频引流</span>
+    <span id="meta">格位 1 · 整块 2 · 凸点 2</span>
+  </div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+['eyebrow', 'title', 'oldLabel', 'oldText', 'newLabel', 'newText'].forEach(function (k) { set(k, v[k]); });
+
+  var rs = document.documentElement.style;
+  if (v.accent) rs.setProperty('--accent', v.accent);
+  var ACC = v.accent || '#FFD429';
+
+  /* 配色包：yellow → pink → blue → green 是全族轮转序，同屏不重色 */
+  var PACK = {
+    yellow: ['#FFD429', '#FF5FA2', '#3D7BFF', '#2FD07A'],
+    pink:   ['#FF5FA2', '#FFD429', '#2FD07A', '#3D7BFF'],
+    green:  ['#2FD07A', '#3D7BFF', '#FFD429', '#FF5FA2'],
+    blue:   ['#3D7BFF', '#2FD07A', '#FF5FA2', '#FFD429'],
+    mixed:  ['#FFD429', '#FF5FA2', '#3D7BFF', '#2FD07A']
+  };
+  /* 明度判定：亮底压墨字、暗底压白字，不造灰色阶 */
+  function inkOn(hex) {
+    var h = String(hex || '').replace('#', '');
+    if (h.length !== 6) return '#0F0F0F';
+    var f = function (c) { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    var L = 0.2126 * f(parseInt(h.slice(0, 2), 16)) +
+            0.7152 * f(parseInt(h.slice(2, 4), 16)) +
+            0.0722 * f(parseInt(h.slice(4, 6), 16));
+    return L > 0.42 ? '#0F0F0F' : '#FFFFFF';
+  }
+  var pack = PACK[v.brickColor] || PACK.mixed;
+  var newBlk = document.getElementById('newBlk');
+  if (newBlk) newBlk.style.background = pack[0];
+  var newTx = document.getElementById('newText');
+  if (newTx) newTx.style.color = inkOn(pack[0]);
+
+  var studs = [].slice.call(document.querySelectorAll('#studbar .sc'));
+  var meta = document.getElementById('meta');
+  if (meta) meta.innerHTML = '格位 <em>1</em> · 整块 <em>2</em> · 凸点 <em>' + studs.length + '</em>';
+
+  /* reduce 短路：这一行必须逐字节保持不变，QC 工具靠字符串匹配把它替换成常量 true */
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：对撞全部撤掉，直接给新句块终态——旧句块留在文档流但硬切为不可见，绝不切 display */
+    gsap.set('#head', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#studbar', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#oldBlk', { x: 0, y: 0, opacity: 0 });
+    gsap.set('#newBlk', { x: 0, y: 0, opacity: 1 });
+    gsap.set(studs, { attr: { fill: ACC } });
+    tl.fromTo('#head', { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .50, ease: 'power3.out' }, 0);
+    tl.fromTo('#newBlk', { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .55, ease: 'power3.out' }, .16);
+    tl.fromTo('#studbar', { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .45, ease: 'power3.out' }, .32);
+    B.hold(tl, 1.15, 1.05);
+    return;
+  }
+
+  var SHADOW = '8px 8px 0 #0F0F0F';
+  var stageRect = document.getElementById('stage').getBoundingClientRect();
+  var promoEl = document.querySelector('.promo');
+  var CEIL = promoEl ? Math.round(promoEl.getBoundingClientRect().bottom - stageRect.top) : 0;
+
+  /* 起跳点一律现算，保证任何一帧都不越框；onUpdate 里绝不做 DOM 测量 */
+  function topOf(sel) {
+    var e = document.querySelector(sel);
+    return e ? Math.round(e.getBoundingClientRect().top - stageRect.top) : 0;
+  }
+  function bottomOf(sel) {
+    var e = document.querySelector(sel);
+    return e ? Math.round(stageRect.bottom - e.getBoundingClientRect().bottom) : 0;
+  }
+  function leftOf(sel) {
+    var e = document.querySelector(sel);
+    return e ? Math.round(stageRect.left - e.getBoundingClientRect().left) : 0;
+  }
+  function rightOf(sel) {
+    var e = document.querySelector(sel);
+    return e ? Math.round(stageRect.right - e.getBoundingClientRect().right) : 0;
+  }
+  function fromCeil(sel) { return CEIL - topOf(sel); }
+
+  /* 式 1/2/4/6 通用落位：单轴直落或顶出，零 overshoot，落定沿 Y 多压 3px 打 2 帧再回原档 */
+  function slam(sel, at, from, dur, shadow) {
+    var S = shadow || SHADOW;
+    var d = dur || 0.24;
+    var p = String(S).split(' ');
+    var press = p[0] + ' ' + (parseFloat(p[1]) + 3) + 'px 0 ' + p.slice(3).join(' ');
+    tl.fromTo(sel, { x: from.x || 0, y: from.y || 0 },
+      { x: 0, y: 0, duration: d, ease: 'power4.out' }, at);
+    tl.set(sel, { boxShadow: press, immediateRender: false }, at + d);
+    tl.to(sel, { boxShadow: S, duration: 0.04, ease: 'steps(2)' }, at + d + 0.04);
+    return at + d + 0.04;
+  }
+  /* 式 8 凸点扫描：单枚间隔 ≥0.12s，fill 硬切，不补间 */
+  function scanStuds(list, at, mode) {
+    if (mode === 'none' || !list.length) return;
+    list.forEach(function (c, i) {
+      tl.set(c, { attr: { fill: ACC }, immediateRender: false },
+        mode === 'top' ? at : at + i * 0.12);
+    });
+  }
+
+  slam('#head', 0.00, { x: 0, y: fromCeil('#head') }, 0.26);
+
+  /* 式 5 轨道推入：旧句块自左沿推进格位（位移量 leftOf 现算） */
+  slam('#oldBlk', 0.30, { x: leftOf('#oldBlk'), y: 0 }, 0.26, '10px 10px 0 #0F0F0F');
+
+  /* 式 7 对撞：新句块自右沿撞进同一格位（位移量 rightOf 现算），旧句块被顶得向左退场；
+     entry 切新句入向（自右撞入 / 自上直落 / 自下顶出），旧句恒向左退 */
+  var ENTRY = v.entry || 'swap';
+  var NEWFROM = ENTRY === 'slam' ? { x: 0, y: fromCeil('#newBlk') }
+    : ENTRY === 'pushup' ? { x: 0, y: 120 }
+    : { x: rightOf('#newBlk'), y: 0 };
+  slam('#newBlk', 1.02, NEWFROM, 0.26, '10px 10px 0 #0F0F0F');
+  tl.to('#oldBlk', { x: -300, duration: 0.22, ease: 'power3.in' }, 1.08);
+  tl.set('#oldBlk', { opacity: 0, immediateRender: false }, 1.30);
+
+  /* 新句落定瞬间 2 联凸点逐枚硬切 */
+  scanStuds(studs, 1.40, 'scan');
+
+  var introEnd = tl.duration();
+  var TOTAL = Math.min(6, Math.max(5, Number(v.duration) || 5.5));
+  var holdAt = Math.min(introEnd, TOTAL - 0.8);
+  B.hold(tl, holdAt, Math.max(0.8, TOTAL - holdAt));
+})();
+</script>
+</body></html>

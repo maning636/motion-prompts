@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"title","type":"string","label":"主标题","default":"卡片扇形展开"},
+  {"id":"subtitle","type":"string","label":"副标题","default":"从叠 stack 到横排，错峰入场 + 末位高亮"},
+  {"id":"cardCount","type":"number","label":"卡片数量（4-7）","default":5},
+  {"id":"cardLabels","type":"string","label":"卡片标题（竖线分隔，例：方案A|方案B|方案C|方案D|方案E）","default":"方案A|方案B|方案C|方案D|方案E"},
+  {"id":"cardValues","type":"string","label":"卡片副值（竖线分隔，例：32%|48%|56%|72%|89%）","default":"32%|48%|56%|72%|89%"},
+  {"id":"fanSpan","type":"number","label":"扇形展开跨度（度，40-140）","default":90},
+  {"id":"staggerSec","type":"number","label":"错峰间隔（秒，0.04-0.18）","default":0.09},
+  {"id":"highlightLast","type":"enum","label":"末位高亮","default":"true","options":[{"value":"true","label":"高亮"},{"value":"false","label":"不高亮"}]},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.045) 1px, transparent 1.5px);
+        background-size: 56px 56px;
+      }
+
+      /* ---------- 顶头 eyebrow ---------- */
+      .eyebrow{
+        position:absolute; top: 56px; left: 96px; right: 96px;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.22em; text-transform:uppercase;
+        color: #8A8A85;
+      }
+      .eyebrow .acc{ color: var(--accent, #00FF00); font-weight: 700; letter-spacing:.18em; }
+
+      /* ---------- 标题区 ---------- */
+      .hd{
+        position:absolute; top: 100px; left: 96px; right: 96px;
+        z-index: 2;
+      }
+      .hd h1{
+        margin:0;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight: 700; letter-spacing:-.02em;
+        font-size: 56px; line-height: 1.1;
+        color: var(--foreground, #F4EFE7);
+      }
+      .hd p{
+        margin: 8px 0 0;
+        font-size: 22px; letter-spacing:.04em;
+        color: #9CA3AF;
+      }
+
+      /* ---------- 舞台 ---------- */
+      .stage{
+        position:absolute; inset: 0;
+      }
+
+      /* ---------- 卡片扇形舞台（中心枢轴在画面中下方） ---------- */
+      .fanstage{
+        position:absolute;
+        left: 0; right: 0; top: 240px; bottom: 0;
+        perspective: 1600px;
+        pointer-events:none;
+      }
+      .fanorigin{
+        position:absolute; left: 50%; bottom: 260px;
+        transform: translateX(-50%);
+        width: 0; height: 0;
+      }
+      /* 卡片：扇形基态叠在中心，scale 略小、旋转 0；动效后展开到各自角度 */
+      .fcard{
+        position:absolute;
+        /* 由 GSAP.set 写入 left/top（基于 .fanorigin 锚点） */
+        left: 0; top: 0;
+        width: 200px; height: 260px;
+        border-radius: 14px;
+        background:
+          linear-gradient(180deg,
+            color-mix(in srgb, var(--foreground, #F4EFE7) 8%, transparent),
+            color-mix(in srgb, var(--foreground, #F4EFE7) 2%, transparent));
+        border: 1px solid color-mix(in srgb, var(--foreground, #F4EFE7) 14%, transparent);
+        box-shadow:
+          0 16px 36px rgba(0,0,0,.45),
+          0 0 0 1px rgba(0,0,0,.35) inset;
+        /* 旋转中心改为几何中心，避免端部卡片旋转后底部下沉 */
+        transform-origin: 50% 50%;
+        will-change: transform, opacity;
+        display:flex; flex-direction:column; justify-content:flex-end;
+        padding: 18px 18px 20px;
+        opacity: 0;
+      }
+      .fcard .cardhead{
+        display:flex; align-items:center; gap:10px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 12px; letter-spacing:.18em; text-transform:uppercase;
+        color: #8A8A85;
+      }
+      .fcard .cardhead .dot{
+        width: 7px; height: 7px; border-radius: 50%;
+        background: color-mix(in srgb, var(--foreground, #F4EFE7) 40%, transparent);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--foreground, #F4EFE7) 25%, transparent);
+      }
+      .fcard .cardlab{
+        margin: 14px 0 6px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 24px; font-weight: 700; letter-spacing:-.01em;
+        color: var(--foreground, #F4EFE7);
+      }
+      .fcard .cardval{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 48px; font-weight: 700; letter-spacing:-.02em;
+        color: var(--foreground, #F4EFE7);
+        line-height: 1;
+      }
+
+      /* 末位高亮卡片：accent 边框 + accent 数值色 + 发光 */
+      .fcard.hot{
+        border-color: color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+        box-shadow:
+          0 16px 40px rgba(0,0,0,.5),
+          0 0 0 1px color-mix(in srgb, var(--accent, #00FF00) 35%, transparent) inset,
+          0 0 32px color-mix(in srgb, var(--accent, #00FF00) 35%, transparent);
+      }
+      .fcard.hot .cardhead{ color: var(--accent, #00FF00); }
+      .fcard.hot .cardhead .dot{
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 12px var(--accent, #00FF00);
+      }
+      .fcard.hot .cardval{
+        color: var(--accent, #00FF00);
+        text-shadow: 0 0 14px color-mix(in srgb, var(--accent, #00FF00) 45%, transparent);
+      }
+
+      /* 基态：所有卡片叠在中心，旋转 0、scale 略小 —— 由 GSAP.set 接管 */
+
+      /* 扇形展开：用 CSS 变量记录每张卡的目标极坐标（GSAP 读取） */
+      .fcard{
+        --fx: 0px;
+        --fr: 0deg;
+        --fy: 0px;
+      }
+
+      /* 底部连接弧（扇形枢轴视觉提示，淡色细线） */
+      .arc{
+        position:absolute; left: 50%; bottom: 260px;
+        transform: translateX(-50%);
+        width: 1600px; height: 220px;
+        pointer-events:none; opacity: 0;
+      }
+      .arc::before{
+        content:""; position:absolute; left: 50%; top: 100%;
+        width: 16px; height: 16px; border-radius: 50%;
+        background: color-mix(in srgb, var(--accent, #00FF00) 35%, transparent);
+        box-shadow: 0 0 14px color-mix(in srgb, var(--accent, #00FF00) 50%, transparent);
+        transform: translate(-50%, -50%);
+      }
+      .arc .pivotline{
+        position:absolute; left: 50%; top: 100%;
+        width: 1px; height: 0; transform: translateX(-50%);
+        background: linear-gradient(180deg,
+          color-mix(in srgb, var(--accent, #00FF00) 35%, transparent),
+          transparent);
+      }
+
+      /* 脚注 chip 行 */
+      .footnote{
+        position:absolute; bottom: 56px; left: 96px; right: 96px;
+        display:flex; align-items:center; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 18px; letter-spacing:.06em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+      }
+      .footnote .pct{
+        font-size: 30px; font-weight:700;
+        color: var(--accent, #00FF00);
+        letter-spacing: -.01em;
+      }
+      .footnote .pct small{
+        font-size: 14px; font-weight:500;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+        margin-left: 6px;
+      }
+
+      /* 序号 chip 装饰：叠态下显示在最上层卡的右上角 */
+      .badge{
+        position:absolute; left: 50%; bottom: 60px;
+        margin-left: 86px; margin-bottom: 158px;
+        width: 38px; height: 38px; border-radius: 50%;
+        border: 1.5px solid color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+        background: var(--background, #12100E);
+        display:grid; place-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; font-weight: 700;
+        color: var(--accent, #00FF00);
+        opacity: 0;
+      }
+
+      /* 高亮卡片微动：呼吸 */
+      @keyframes hotPulse {
+        0%, 100% { box-shadow:
+          0 16px 40px rgba(0,0,0,.5),
+          0 0 0 1px color-mix(in srgb, var(--accent, #00FF00) 35%, transparent) inset,
+          0 0 26px color-mix(in srgb, var(--accent, #00FF00) 30%, transparent); }
+        50% { box-shadow:
+          0 16px 40px rgba(0,0,0,.5),
+          0 0 0 1px color-mix(in srgb, var(--accent, #00FF00) 45%, transparent) inset,
+          0 0 44px color-mix(in srgb, var(--accent, #00FF00) 55%, transparent); }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="stage" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+
+        <div class="eyebrow">
+          <span><b class="acc">FAN</b>&nbsp;&nbsp;STACK&nbsp;→&nbsp;ROW</span>
+          <span>stack · fan · out</span>
+        </div>
+
+        <div class="hd">
+          <h1 id="title"></h1>
+          <p id="subtitle"></p>
+        </div>
+
+        <!-- 扇形舞台：原点在画面中下方，cards 在此基础上扇形展开 -->
+        <div class="fanstage" id="fanstage">
+          <div class="fanorigin" id="fanorigin"></div>
+          <!-- 弧形枢轴提示（折叠态时显示一线 + 一圆点，展开后淡出） -->
+          <div class="arc" id="arc">
+            <div class="pivotline"></div>
+          </div>
+          <!-- 卡片（JS 动态生成） -->
+          <div id="cardHost"></div>
+        </div>
+
+        <!-- 脚注：左名 + 数量 + 右名 -->
+        <div class="footnote">
+          <span id="footLeft">STACK</span>
+          <span class="pct"><span id="pctVal">0</span><small>CARDS</small></span>
+          <span id="footRight">FAN&nbsp;OUT</span>
+        </div>
+
+      </section>
+    </div>
+    <script>
+      /* ----- 变量接线 ----- */
+      const fallback = {
+        title: "卡片扇形展开",
+        subtitle: "从叠 stack 到横排，错峰入场 + 末位高亮",
+        cardCount: 5,
+        cardLabels: "方案A|方案B|方案C|方案D|方案E",
+        cardValues: "32%|48%|56%|72%|89%",
+        fanSpan: 90,
+        staggerSec: 0.09,
+        highlightLast: "true",
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const $ = (id) => document.getElementById(id);
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      /* ----- 内容回填 ----- */
+      $("title").textContent    = v.title    || fallback.title;
+      $("subtitle").textContent = v.subtitle || fallback.subtitle;
+
+      /* ----- 解析卡片数据 ----- */
+      const splitPipe = (s) => String(s ?? "").split("|").map((x) => x.trim()).filter(Boolean);
+      const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, Number(x) || 0));
+
+      const rawCount = clamp(v.cardCount ?? fallback.cardCount, 4, 7);
+      const labelsRaw = splitPipe(v.cardLabels || fallback.cardLabels);
+      const valuesRaw = splitPipe(v.cardValues || fallback.cardValues);
+      const N = Math.min(Math.max(rawCount, 4), 7);
+      const labels = labelsRaw.slice(0, N);
+      const values = valuesRaw.slice(0, N);
+      while (labels.length < N) labels.push("方案" + (labels.length + 1));
+      while (values.length < N) values.push("—");
+
+      const fanSpan = clamp(v.fanSpan ?? fallback.fanSpan, 40, 140);
+      const stagger = clamp(v.staggerSec ?? fallback.staggerSec, 0.04, 0.18);
+      const highlightLast = (String(v.highlightLast ?? fallback.highlightLast).toLowerCase() !== "false");
+
+      /* ----- 生成卡片 DOM ----- */
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+      const cardHost = $("cardHost");
+      const cards = [];
+      for (let i = 0; i < N; i++) {
+        const el = document.createElement("div");
+        el.className = "fcard" + (highlightLast && i === N - 1 ? " hot" : "");
+        el.id = "card" + i;
+        el.innerHTML = `
+          <div class="cardhead"><span class="dot"></span><span>${String(i + 1).padStart(2, "0")}</span></div>
+          <div class="cardlab">${escapeHtml(labels[i])}</div>
+          <div class="cardval">${escapeHtml(values[i])}</div>
+        `;
+        cardHost.appendChild(el);
+        cards.push(el);
+      }
+
+      /* ----- 几何：先把每张卡定位在 .fanorigin 处（中心对齐 origin），旋转中心 50% 50% -----
+         fanstage 是 absolute（top:240px），卡片 left/top 是相对 fanstage 偏移。
+         fanorigin.getBoundingClientRect() 返回 viewport 坐标；
+         offsetParent 是 .fanstage，其在 viewport 中 top=240px。
+      */
+      const originRect = $("fanorigin").getBoundingClientRect();
+      const originXView = originRect.left + originRect.width / 2;
+      const originYView = originRect.top + originRect.height / 2;
+      const stageRect = $("fanstage").getBoundingClientRect();
+      // 卡片 left/top = origin_viewport - stage_viewport - 卡片尺寸一半
+      cards.forEach((el) => {
+        el.style.left = (originXView - stageRect.left - 100) + "px";
+        el.style.top  = (originYView - stageRect.top  - 130) + "px";
+      });
+      const ARC_R_X = 420;   // 弧半径 x 方向（横展距离）
+      const ARC_R_Y = 0;     // 扇形为水平弧，y 偏移为 0
+      const ARC_LIFT_Y = -48; // 整排上抬一点，离原点稍上
+      cards.forEach((el, i) => {
+        const t = N === 1 ? 0.5 : i / (N - 1); // 0..1
+        const angDeg = -fanSpan / 2 + fanSpan * t; // 左右对称
+        const angRad = angDeg * Math.PI / 180;
+        const x = ARC_R_X * Math.sin(angRad);
+        const y = ARC_R_Y + ARC_LIFT_Y * Math.cos(t * Math.PI);
+        el.style.setProperty("--fx", x.toFixed(1) + "px");
+        el.style.setProperty("--fr", angDeg.toFixed(1) + "deg");
+        el.style.setProperty("--fy", y.toFixed(1) + "px");
+      });
+
+      /* ----- 脚注联动 ----- */
+      const pctVal = $("pctVal");
+      pctVal.textContent = "0";
+
+      /* ----- 时间线 ----- */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+      const tl = gsap.timeline({ paused: true });
+
+      // 入场：标题 + eyebrow 错峰下落
+      tl.fromTo(".eyebrow",
+        { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 0.05);
+      tl.fromTo(".hd",
+        { opacity: 0, y: 18 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 0.15);
+
+      // 弧形枢轴提示先淡入（折叠态下作为视觉中心）
+      tl.fromTo("#arc",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.3, ease: "power2.out" }, 0.35);
+      tl.fromTo("#arc .pivotline",
+        { height: 0 },
+        { height: 130, duration: 0.35, ease: "power2.out" }, 0.45);
+
+      // 卡片初始淡入（叠态）：先把折叠基态写入 GSAP 控制的 transform（清掉 CSS class 干扰）
+      // GSAP set 会覆盖 CSS 的 transform: translate(...).rotate(...).scale(.86)
+      // 起点统一为 (0,0,rotate0,scale.86)
+      cards.forEach((el) => {
+        gsap.set(el, { x: 0, y: 0, rotation: 0, scale: 0.86, opacity: 0, transformOrigin: "50% 50%" });
+      });
+      tl.to(cards, {
+        opacity: 1,
+        duration: 0.35,
+        ease: "power2.out",
+        stagger: 0.04
+      }, 0.55);
+
+      // 错峰扇形展开：GSAP 直接驱动每张卡的 transform
+      // 不依赖 CSS class，因为 GSAP 写 inline transform 会盖 CSS。
+      // 起点 = 折叠态（fx=0, fr=0, fy=0, scale=.86）；
+      // 终点 = 各自的极坐标落位 + 微 y 弹后稳定。
+      cards.forEach((el, i) => {
+        const targetX = parseFloat(el.style.getPropertyValue("--fx")) || 0;
+        const targetR = parseFloat(el.style.getPropertyValue("--fr")) || 0;
+        const targetY = parseFloat(el.style.getPropertyValue("--fy")) || 0;
+        // 起点已是 (0,0,0,.86,opacity1) —— 这里直接 to 到目标
+        tl.to(el, {
+          x: targetX,
+          y: targetY - 8,
+          rotation: targetR,
+          scale: 1,
+          duration: 0.55,
+          ease: "power3.out",
+        }, 1.0 + i * stagger);
+        tl.to(el, {
+          y: targetY,
+          duration: 0.32,
+          ease: "back.out(1.6)",
+        }, 1.0 + i * stagger + 0.55);
+      });
+
+      // 弧形枢轴淡出（任务完成，枢轴可隐）
+      tl.to("#arc", { opacity: 0, duration: 0.4, ease: "power2.out" }, 1.4);
+
+      // 末位高亮卡片：呼吸（仅当 highlightLast=true 且末位存在）
+      if (highlightLast && cards.length) {
+        const hot = cards[cards.length - 1];
+        tl.to(hot, {
+          scale: 1.05,
+          duration: 1.2,
+          ease: "sine.inOut",
+          yoyo: true,
+          repeat: 1
+        }, 2.8);
+        tl.to(hot, {
+          scale: 1.0,
+          duration: 0.5,
+          ease: "power2.out"
+        }, 5.2);
+      }
+
+      // 脚注数字 0 -> N（随拆合曲线同步）
+      const fanStart = 1.0, fanEnd = 1.0 + (N - 1) * stagger + 0.05;
+      tl.eventCallback("onUpdate", () => {
+        const t = tl.time();
+        if (t < fanStart) pctVal.textContent = "0";
+        else if (t > fanEnd) pctVal.textContent = String(N);
+        else {
+          const p = (t - fanStart) / (fanEnd - fanStart);
+          pctVal.textContent = String(Math.round(N * p));
+        }
+      });
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

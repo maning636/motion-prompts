@@ -1,0 +1,18 @@
+{
+  "id": "blk-rank-bricks",
+  "name": "积木排行 · TOP5",
+  "description": "积木社 neo-brutalist 配方：五行排行榜，横向积木条按占比生长、数值同步滚动（1920×1080）",
+  "category": "数据可视化",
+  "series": "blk",
+  "slot": "blk-rank",
+  "tags": [
+    "积木社",
+    "neo-brutalist",
+    "排行榜",
+    "对比",
+    "blk-rank-bricks"
+  ],
+  "duration": 5,
+  "size": "1920×1080",
+  "status": "ready"
+}

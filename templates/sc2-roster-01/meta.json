@@ -1,0 +1,14 @@
+{
+  "id": "sc2-roster-01",
+  "name": "列表逐行显影",
+  "series": "sc2",
+  "createdAt": "2026-08-16T08:00:00.000Z",
+  "energy": "低",
+  "suggestedDuration": 6,
+  "knownPitfalls": [
+    "行数 1-6 行自适配但 >5 行 stagger 0.55s 会顶到收尾，超 5 行需同步压缩 stagger",
+    "hlRow 越界会被钳到 1..N；高亮绿块在文字显影完成后再 scaleX 扫入，别提前",
+    "全程漂移的 fromTo 与面板入场的 fromTo 都动 y：入场 tween 先跑完，漂移从 0.6s 接续，两条别重叠起步",
+    "时间轴末尾必须盖过 data-duration：hyperframes 渲染超出时间轴的帧是空白"
+  ]
+}

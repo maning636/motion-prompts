@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+{"id":"mark","name":"落款方块文字","type":"string","label":"52×52 方块里的两个字符（英文缩写）","default":"BB"},
+{"id":"cn","name":"中文名","type":"string","label":"中文名（2–4 字）","default":"积木社"},
+{"id":"en","name":"英文名","type":"string","label":"英文名（mono，全大写）","default":"BLOCKBRUT"},
+{"id":"slogan","name":"标语","type":"string","label":"标语（一行，8–12 字）","default":"不圆滑，不好惹，好记"},
+{"id":"year","name":"年份区间","type":"string","label":"年份区间（mono，用 — 连接）","default":"2017 — 2026"},
+{"id":"t1","name":"标签 1","type":"string","label":"底部标签 1（mono）","default":"TEMPLATES"},
+{"id":"t2","name":"标签 2","type":"string","label":"底部标签 2（mono）","default":"MOTION"},
+{"id":"t3","name":"标签 3","type":"string","label":"底部标签 3（mono）","default":"BRUTAL"},
+{"id":"note","name":"注脚","type":"string","label":"底部 mono 注脚","default":"一条规矩一个动作 · 攒够 100 条开一次长更"},
+{"id":"accent","name":"强调色","type":"color","label":"强调色（方块 + 斜纹带）","default":"#FFD429"},
+{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–8）","default":5.5},
+{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>品牌落款卡 · 积木社 BLOCKBRUT</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 字号阶梯 = 风格规范基因 8 的 76/48/24/17/13/11 在 1920×1080 画布上等比放大 2.0，即 152/96/48/34/26/22。 */
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --accent:#FFD429;
+  }
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--paper);color:var(--ink);font-family:var(--sans);
+    display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+  .sh-s{box-shadow:4px 4px 0 var(--ink)}
+  .sh-m{box-shadow:6px 6px 0 var(--ink)}
+
+  .stripe{flex:0 0 auto;height:20px;border-top:var(--bw) solid var(--ink);
+    border-bottom:var(--bw) solid var(--ink);
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+
+  .hd{flex:0 0 auto;display:flex;align-items:center;gap:22px;padding:44px 88px 0}
+  .hd .rule{flex:1 1 auto;border-top:var(--bw) solid var(--ink)}
+  .enl{font-family:var(--mono);font-weight:700;font-size:22px;letter-spacing:.14em;
+    color:var(--mute);white-space:nowrap;flex:0 1 auto;min-width:0;
+    overflow:hidden;text-overflow:ellipsis}
+
+  /* 落款主区：logo 方块 + 中文名 + 标语，三行居中堆叠 */
+  .center{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:26px;padding:24px 88px 0}
+  .lockup{display:flex;align-items:center;gap:26px}
+  /* Logo 方块：52×52，强调色底 + 3px 黑边 + sh-s（§3.14） */
+  .mark{flex:0 0 auto;width:52px;height:52px;display:flex;align-items:center;
+    justify-content:center;background:var(--accent);color:var(--ink);
+    border:var(--bw) solid var(--ink);border-radius:4px;box-shadow:4px 4px 0 var(--ink);
+    font-family:var(--mono);font-weight:700;font-size:22px}
+  .names{display:flex;align-items:baseline;gap:18px}
+  .cn{display:block;white-space:nowrap;font-weight:900;font-size:76px;line-height:1.1;
+    letter-spacing:0}
+  .en{display:block;white-space:nowrap;font-family:var(--mono);font-weight:700;
+    font-size:30px;letter-spacing:.14em;color:var(--mute)}
+  /* 中文标语：块级 + nowrap，交给 B.fit() 按容器实测缩放，字距 0 */
+  .slogan{display:block;white-space:nowrap;font-weight:900;font-size:118px;line-height:1.14;
+    letter-spacing:0;text-align:center;padding-right:24px}
+  /* 区间 pill：凡是时间范围都用它，`—` 是参考页写法，不要换成 ~ 或 至（§3.12） */
+  .year{display:inline-block;font-family:var(--mono);font-weight:700;font-size:22px;
+    letter-spacing:.10em;padding:8px 20px;border-radius:9999px;white-space:nowrap;
+    background:var(--white);color:var(--ink);border:var(--bw) solid var(--ink);
+    box-shadow:4px 4px 0 var(--ink)}
+
+  .foot{flex:0 0 auto;display:flex;align-items:center;gap:20px;padding:0 88px 42px}
+  .tag{display:inline-block;font-family:var(--mono);font-weight:700;font-size:22px;
+    letter-spacing:.10em;padding:8px 20px;border-radius:9999px;white-space:nowrap;
+    background:var(--accent);color:var(--ink);border:var(--bw) solid var(--ink);
+    box-shadow:4px 4px 0 var(--ink)}
+  .tag.t2{background:var(--white)}
+  .tag.t3{background:var(--pink)}
+  .note{margin-left:auto;font-family:var(--mono);font-weight:700;font-size:22px;
+    letter-spacing:.10em;color:var(--mute);white-space:nowrap;min-width:0;
+    overflow:hidden;text-overflow:ellipsis}
+
+  @media (prefers-reduced-motion: reduce){
+    .anim{transition-duration:.01ms !important;animation-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="stripe anim" id="stripeA"></div>
+
+  <div class="hd anim" id="hd">
+    <span class="rule anim" id="ruleTop"></span>
+    <span class="enl anim" id="enl" data-fit-max="22" data-fit-min="14">SIGN OFF / 落款</span>
+  </div>
+
+  <div class="center anim" id="center">
+    <div class="lockup anim" id="lockup">
+      <div class="mark anim" id="mark">BB</div>
+      <div class="names anim" id="names">
+        <span class="cn anim" id="cn" data-fit-max="76" data-fit-min="38">积木社</span>
+        <span class="en anim" id="en" data-fit-max="30" data-fit-min="16">BLOCKBRUT</span>
+      </div>
+    </div>
+    <div class="slogan anim" id="slogan" data-fit-max="118" data-fit-min="58">不圆滑，不好惹，好记</div>
+    <span class="year anim" id="year" data-fit-max="22" data-fit-min="14">2017 — 2026</span>
+  </div>
+
+  <div class="foot anim" id="foot">
+    <span class="tag anim" id="t1" data-fit-max="22" data-fit-min="14">TEMPLATES</span>
+    <span class="tag t2 anim" id="t2" data-fit-max="22" data-fit-min="14">MOTION</span>
+    <span class="tag t3 anim" id="t3" data-fit-max="22" data-fit-min="14">BRUTAL</span>
+    <span class="note anim" id="note" data-fit-max="22" data-fit-min="14">一条规矩一个动作 · 攒够 100 条开一次长更</span>
+  </div>
+
+  <div class="stripe anim" id="stripeB"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  ['mark', 'cn', 'en', 'enl', 'slogan', 'year', 't1', 't2', 't3', 'note']
+    .forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+
+  B.fitAll();
+  var tl = B.tl();
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (reduce) {
+    gsap.set('.anim', { x: 0, y: 0, scaleX: 1, scale: 1, rotate: 0 });
+    tl.fromTo('#stripeA', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0);
+    tl.fromTo('#hd',      { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.55, ease: 'power3.out' }, 0.12);
+    tl.fromTo('#center',  { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' }, 0.28);
+    tl.fromTo('#foot',    { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.55, ease: 'power3.out' }, 0.46);
+    tl.fromTo('#stripeB', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.6);
+    B.hold(tl, 1.2, 1.1);
+    return;
+  }
+
+  function slam(sel, at, dx, dy, d) {
+    tl.fromTo(sel, { x: dx, y: dy },
+      { x: 0, y: 0, duration: d, ease: 'power4.out' }, at);
+  }
+  var INK = '#0F0F0F';
+  function press(sel, at) {
+    tl.set(sel, { boxShadow: '4px 7px 0 ' + INK, immediateRender: false }, at);
+    tl.to(sel, { boxShadow: '4px 4px 0 ' + INK, duration: 0.04, ease: 'steps(2)' }, at + 0.04);
+  }
+
+  /* 模 7 分格揭示：上下两条斜纹带各自从一端逐格推出 */
+  tl.fromTo('#stripeA', { clipPath: 'inset(0 100% 0 0)' },
+    { clipPath: 'inset(0 0% 0 0%)', duration: 0.34, ease: 'steps(8)' }, 0);
+  tl.fromTo('#ruleTop', { scaleX: 0, transformOrigin: 'left center' },
+    { scaleX: 1, duration: 0.28, ease: 'power4.out' }, 0.12);
+  slam('#enl', 0.16, 28, -20, 0.22);
+
+  slam('#center', 0.26,   0, -24, 0.28);
+  slam('#lockup', 0.40,   0, -20, 0.26);
+  slam('#mark',   0.52, -28, -28, 0.24);
+  press('#mark', 0.76);
+  slam('#cn',     0.62, -28, -28, 0.26);
+  slam('#en',     0.72,   0, -16, 0.22);
+  slam('#slogan', 0.92,   0, -34, 0.28);
+  slam('#year',   1.20,   0, -20, 0.24);
+
+  slam('#foot', 1.52, 0, 24, 0.26);
+  slam('#t1',   1.64, -28, -28, 0.24);
+  press('#t1', 1.88);
+  slam('#t2',   1.74, -28, -28, 0.24);
+  press('#t2', 1.98);
+  slam('#t3',   1.84, -28, -28, 0.24);
+  press('#t3', 2.08);
+  slam('#note', 2.00, 0, -16, 0.22);
+
+  /* 模 7 分格揭示：底部斜纹带从左逐格推出 */
+  tl.fromTo('#stripeB', { clipPath: 'inset(0 100% 0 0)' },
+    { clipPath: 'inset(0 0% 0 0%)', duration: 0.34, ease: 'steps(8)' }, 2.24);
+  /* 模 6：斜纹带匀速滚动，位移取 20px 整周期，ease:none */
+  tl.fromTo('.stripe', { backgroundPositionX: '0px' },
+    { backgroundPositionX: '40px', duration: 1.1, ease: 'none' }, 2.58);
+
+  var introEnd = 3.68;
+  var total = Math.min(8, Math.max(5, Number(v.duration) || 5.5));
+  B.hold(tl, introEnd, Math.max(0.6, total - introEnd));
+})();
+</script>
+</body></html>

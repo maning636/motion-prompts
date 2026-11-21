@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"label","name":"控件文案","type":"string","label":"控件说明文案","default":"自动吸附"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.2}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>开关拨动</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-halo { position: absolute; inset: 0;
+    background: radial-gradient(58% 70% at 50% 56%,
+      rgba(0,0,0,.56) 0%, rgba(0,0,0,.30) 54%, rgba(0,0,0,0) 84%); }
+  .p-label { position: absolute; font-size: 11px; font-weight: 700; letter-spacing: .18em;
+    color: rgba(255,248,238,.6); white-space: nowrap; }
+  .p-pill { position: absolute; left: 164px; top: 126px; width: 128px; height: 60px;
+    border-radius: 30px; background: rgba(255,248,238,.13);
+    border: 2px solid rgba(255,248,238,.3); }
+  /* 通电态单独一层：用 opacity 切换，颜色仍走 --ac，用户换强调色也跟着变 */
+  .p-pill-on { position: absolute; left: -2px; top: -2px; width: 128px; height: 60px;
+    border-radius: 30px; opacity: 0; background: rgba(255,201,60,.16);
+    border: 2px solid var(--ac); }
+  .p-word { position: absolute; top: 147px; height: 18px; display: flex;
+    align-items: center; justify-content: center; font-size: 13px; font-weight: 800;
+    letter-spacing: .1em; color: rgba(255,248,238,.72); white-space: nowrap; }
+  /* perspective 挂在位移层上，rotateY 挂在内层圆钮上——两者互不覆盖 */
+  .p-knobwrap { position: absolute; left: 170px; top: 132px; width: 48px; height: 48px;
+    perspective: 360px; }
+  .p-knob { position: absolute; left: 0; top: 0; width: 48px; height: 48px;
+    border-radius: 50%; background: var(--ac); border: 3px solid #FFF8EE;
+    box-shadow: 0 3px 9px rgba(0,0,0,.42); transform-style: preserve-3d; }
+  .p-knob-dot { position: absolute; left: 12px; top: 21px; width: 6px; height: 6px;
+    border-radius: 50%; background: #FFF8EE; }
+  .p-arc { position: absolute; left: 148px; top: 44px; width: 152px; height: 120px;
+    overflow: visible; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"label":"自动吸附","accent":"#FF6B35","duration":3.2};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || 3.2;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  const fits = [];
+  function fit(list) { fits.push.apply(fits, list); }
+  function runFit() {
+    fits.forEach((f) => {
+      const el = f.el;
+      el.style.fontSize = f.max + 'px';
+      const avail = f.box || el.clientWidth;
+      const ws = el.style.whiteSpace;
+      el.style.whiteSpace = 'nowrap';
+      const natural = el.scrollWidth;
+      el.style.whiteSpace = ws;
+      if (natural > avail) {
+        el.style.fontSize = Math.max(f.min, Math.floor(f.max * avail / natural)) + 'px';
+      }
+    });
+  }
+
+  put('div', 'p-halo');
+  const label = put('div', 'p-label', 'left:164px; top:208px;', v.label || FALLBACK.label);
+
+  /* 拖尾弧线：SVG path，按真实路径长度做 dash 生长 */
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'p-arc');
+  svg.setAttribute('viewBox', '0 0 152 120');
+  stage.appendChild(svg);
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M 46 106 Q 80 4 114 106');
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke', 'var(--ac)');
+  path.setAttribute('stroke-width', '5');
+  path.setAttribute('stroke-linecap', 'round');
+  svg.appendChild(path);
+  const arcLen = path.getTotalLength();
+  path.style.strokeDasharray = arcLen + ' ' + arcLen;
+  path.style.strokeDashoffset = arcLen;
+  path.style.opacity = 0;
+
+  const pill = put('div', 'p-pill');
+  put('div', 'p-pill-on', '', null, pill);
+  const wordOn  = put('div', 'p-word', 'left:238px; width:44px;', 'ON');
+  const wordOff = put('div', 'p-word', 'left:170px; width:44px; opacity:0;', 'OFF');
+  const knobWrap = put('div', 'p-knobwrap');
+  const knob = put('div', 'p-knob');
+  put('div', 'p-knob-dot', '', null, knob);
+
+  fit([{ el: label, max: 11, min: 9, box: 128 }]);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  const T_FLIP = 1.06, FLIP = 0.36;
+  tl.fromTo(label, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .3 }, .06);
+  tl.fromTo(pill, { opacity: 0, scale: .7 },
+    { opacity: 1, scale: 1, duration: .4, ease: 'back.out(2.2)' }, 0);
+  tl.fromTo(wordOn, { opacity: 0 }, { opacity: 1, duration: .22 }, .3);
+  tl.fromTo(knob, { scale: 0 }, { scale: 1, duration: .38, ease: 'back.out(2.6)' }, .24);
+  /* 按下：圆钮压扁一点点 */
+  tl.to(knob, { scaleY: .84, scaleX: 1.06, duration: .12, ease: 'power2.in' }, .82);
+  /* 松手 → 3D 翻转 + 平移 */
+  tl.to(knob, { scaleY: 1, scaleX: 1, duration: .16, ease: 'power2.out' }, T_FLIP - 0.04);
+  tl.to(knobWrap, { x: 68, duration: FLIP, ease: 'power3.inOut' }, T_FLIP);
+  tl.fromTo(knob, { rotateY: 0 }, { rotateY: 180, duration: FLIP, ease: 'power2.inOut' },
+    T_FLIP);
+  /* ON/OFF 交叉切换：翻到 90° 时换字最合理 */
+  tl.to(wordOn, { opacity: 0, duration: .13 }, T_FLIP + 0.11);
+  tl.to(wordOff, { opacity: 1, duration: .13 }, T_FLIP + 0.15);
+  tl.to('.p-pill-on', { opacity: 1, duration: .24, ease: 'power2.out' }, T_FLIP + 0.04);
+  /* 拖尾弧线随拨动生长，拨完淡出 */
+  tl.fromTo(path, { opacity: 0 }, { opacity: .95, duration: .1 }, T_FLIP);
+  tl.fromTo(path, { strokeDashoffset: arcLen },
+    { strokeDashoffset: 0, duration: FLIP, ease: 'power2.out' }, T_FLIP);
+  tl.to(path, { opacity: 0, duration: .3 }, T_FLIP + FLIP + 0.12);
+  /* 落位小回弹 */
+  tl.to(knob, { scale: 1.14, duration: .13, ease: 'power2.out' }, T_FLIP + FLIP);
+  tl.to(knob, { scale: 1, duration: .34, ease: 'elastic.out(1,.5)' }, T_FLIP + FLIP + 0.13);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  runFit();
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

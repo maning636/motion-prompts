@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+{"id":"eyebrow","name":"词块一","type":"string","label":"词块一 / 眉标（≤6 字）","default":"拆条讲"},
+{"id":"titleA","name":"词块二","type":"string","label":"词块二（≤6 字）","default":"先拆块"},
+{"id":"titleB","name":"词块三","type":"string","label":"词块三（≤6 字）","default":"再拼装"},
+{"id":"sub","name":"主张句","type":"string","label":"主张句（落定后顶出来的那一块，8–20 字）","default":"复杂的事拆成块，就不再复杂了"},
+{"id":"accent","name":"强调色","type":"color","label":"强调色（斜纹带 / 凸点亮起色 / 页脚计数色）","default":"#FFD429"},
+{"id":"brickColor","name":"配色包","type":"enum","label":"配色包（三块词面的轮转顺序）","default":"mixed","options":[{"value":"yellow","label":"暖黄主调"},{"value":"pink","label":"桃粉主调"},{"value":"green","label":"薄荷主调"},{"value":"blue","label":"靛蓝主调"},{"value":"mixed","label":"四色轮转"}]},
+{"id":"entry","name":"入场母题","type":"enum","label":"入场母题（词块从哪个方向进）","default":"slam","options":[{"value":"slam","label":"直落砸入"},{"value":"pushup","label":"自下顶起"},{"value":"rail","label":"左轨推入"}]},
+{"id":"studMode","name":"凸点","type":"enum","label":"凸点阵（不显示 / 整排同时亮 / 逐枚硬切）","default":"scan","options":[{"value":"none","label":"不显示"},{"value":"top","label":"整排同时亮"},{"value":"scan","label":"逐枚硬切"}]},
+{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–6）","default":5.5},
+{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}
+]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>三块砸落大字</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 积木风 · 知识口播 · 砸落大字
+     三块词块单轴砸进画面 → 第三块落定把主张块顶出来 → 主张块下方凸点阵逐枚硬切。
+     token 照抄风格规范 §1.1；--mod / --mod-h 是本族唯一的自造模数 token。
+     块宽只用 480（词块）/ 720（主张块），块高只用 120 / 240，间距只用 24。 */
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --mod:240px; --mod-h:120px; --shadow:#0F0F0F; --background:var(--paper); --accent:#FFD429;
+  }
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--background);color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased}
+  /* 桌面网点铺满整张 stage，否则「桌面上摆块」的物理感不成立 */
+  .blk-noise{background-image:radial-gradient(rgba(15,15,15,.12) 1px,transparent 1px);
+    background-size:10px 10px}
+  /* 阴影自写，不吃 blocks.css 的 --sh-l(10px)。普通块恒 8px，承重件 10px，X 恒等于 Y。 */
+  .sh-s{box-shadow:4px 4px 0 var(--shadow)}
+  .sh-l{box-shadow:8px 8px 0 var(--shadow)}
+  .sh-xl{box-shadow:10px 10px 0 var(--shadow)}
+  .brick{border:var(--bw) solid var(--ink);border-radius:4px}
+
+  /* 桌沿铭牌：贴在桌面之外（stage 顶部通栏），复刻原件 .promo 的语义 */
+  .promo{position:absolute;left:0;top:0;width:1920px;height:56px;display:flex;
+    align-items:center;justify-content:space-between;padding:0 72px;
+    background:var(--ink);color:var(--white);font-family:var(--mono);
+    font-size:24px;font-weight:700;letter-spacing:.14em}
+  .promo .pc{color:var(--accent)}
+
+  /* 三块词块：480×120，共边用 margin-left:-3px 合成单线缝 */
+  .chips{position:absolute;left:216px;top:240px;width:1434px;height:120px}
+  .chip{position:absolute;top:0;height:120px;width:480px;padding:0 28px;display:flex;
+    align-items:center;justify-content:center;box-shadow:8px 8px 0 var(--shadow)}
+  .chip.c1{left:0}
+  .chip.c2{left:480px;margin-left:-3px}
+  .chip.c3{left:957px;margin-left:-3px}
+  /* 不写 overflow:hidden：字身盒比 line-height 盒高时会算成「纵向裁切」。
+     横向由 B.fitAll() 按容器宽收口，收不住时出框审计会报出来。 */
+  .chip .tx{font-weight:900;line-height:1;letter-spacing:0;white-space:nowrap}
+  .chip.c1 .tx{font-family:var(--mono);font-size:36px;font-weight:700;letter-spacing:.14em}
+  .chip.c2 .tx,.chip.c3 .tx{font-size:64px}
+
+  /* 主张块：720×240 承重件，sh-xl(10px) */
+  .key{position:absolute;left:600px;top:480px;width:720px;height:240px;
+    display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
+    padding:24px 32px;background:var(--white);box-shadow:10px 10px 0 var(--shadow)}
+  .key .cap{display:flex;align-items:center;gap:16px;margin-bottom:14px}
+  .key .cap b{display:block;width:52px;height:52px;background:var(--white);color:var(--ink);
+    font-family:var(--mono);font-size:24px;font-weight:700;letter-spacing:0;
+    display:flex;align-items:center;justify-content:center;border:3px solid var(--ink);
+    border-radius:4px;box-shadow:4px 4px 0 var(--shadow)}
+  .key .cap span{font-family:var(--mono);font-size:26px;font-weight:700;
+    letter-spacing:.14em;color:var(--ink)}
+  .key .tx{font-size:52px;font-weight:900;line-height:1.16;letter-spacing:0;
+    color:var(--ink);white-space:nowrap}
+
+  /* 凸点阵：直径 44px，中心距 120px。width/height 必须同时写，只写 viewBox 会被撑到 300px */
+  .studbar{position:absolute;left:780px;top:760px;width:360px;height:60px}
+
+  .foot{position:absolute;left:0;bottom:0;width:1920px;height:64px;display:flex;
+    align-items:center;justify-content:space-between;padding:0 72px;
+    background:var(--ink);color:var(--white);font-family:var(--mono);
+    font-size:26px;font-weight:700;letter-spacing:.1em}
+  .foot em{font-style:normal;color:var(--accent)}
+  .stripe{position:absolute;left:0;bottom:64px;width:1920px;height:20px;
+    border-top:3px solid var(--ink);border-bottom:3px solid var(--ink);
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="promo">
+    <span class="pc">BRICK / 积木风</span>
+    <span>开场钩子 · 三块砸落大字</span>
+  </div>
+
+  <div class="chips">
+    <div class="chip c1" id="chip1"><span class="tx" id="eyebrow" data-fit-max="36" data-fit-min="18">拆条讲</span></div>
+    <div class="chip c2" id="chip2"><span class="tx" id="titleA" data-fit-max="64" data-fit-min="26">先拆块</span></div>
+    <div class="chip c3" id="chip3"><span class="tx" id="titleB" data-fit-max="64" data-fit-min="26">再拼装</span></div>
+  </div>
+
+  <div class="key" id="key">
+    <div class="cap"><b id="capno">03</b><span>主张 / CLAIM</span></div>
+    <p class="tx" id="sub" data-fit-max="52" data-fit-min="24">复杂的事拆成块，就不再复杂了</p>
+  </div>
+
+  <div class="studbar" id="studbar">
+    <svg width="360" height="60" viewBox="0 0 360 60" fill="none" aria-hidden="true">
+      <circle class="sc" id="sc0" cx="60"  cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+      <circle class="sc" id="sc1" cx="180" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+      <circle class="sc" id="sc2" cx="300" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+    </svg>
+  </div>
+
+  <div class="stripe"></div>
+  <div class="foot">
+    <span>KB / 知识口播</span>
+    <span id="meta">词块 3 · 主张字数 0 · 凸点 3</span>
+  </div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+  ['eyebrow', 'titleA', 'titleB', 'sub'].forEach(function (k) { set(k, v[k]); });
+
+  var rs = document.documentElement.style;
+  if (v.accent) rs.setProperty('--accent', v.accent);
+  var ACC = v.accent || '#FFD429';
+
+  /* 配色包：块面轮转顺序。单色档只上第一、三块，第二块退成白块（白块不占彩色块名额）。 */
+  var PACK = {
+    yellow: ['#FFD429', '#FFFFFF', '#FF5FA2'],
+    pink:   ['#FF5FA2', '#FFFFFF', '#3D7BFF'],
+    green:  ['#2FD07A', '#FFFFFF', '#FFD429'],
+    blue:   ['#3D7BFF', '#FFFFFF', '#2FD07A'],
+    mixed:  ['#FFD429', '#FF5FA2', '#3D7BFF']
+  };
+  /* 字色按底色相对亮度现算，不靠手写 if 表 */
+  function inkOn(hex) {
+    var h = String(hex || '').replace('#', '');
+    if (h.length !== 6) return '#0F0F0F';
+    var f = function (c) { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    var L = 0.2126 * f(parseInt(h.slice(0, 2), 16)) +
+            0.7152 * f(parseInt(h.slice(2, 4), 16)) +
+            0.0722 * f(parseInt(h.slice(4, 6), 16));
+    return L > 0.42 ? '#0F0F0F' : '#FFFFFF';
+  }
+  var pack = PACK[v.brickColor] || PACK.mixed;
+  var CHIPS = ['chip1', 'chip2', 'chip3'];
+  CHIPS.forEach(function (id, i) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.style.background = pack[i];
+    el.querySelector('.tx').style.color = inkOn(pack[i]);
+  });
+
+  /* 派生量：编号块 / 词块数 / 主张字数 / 凸点枚数全部现算，用户不填结论 */
+  var capno = document.getElementById('capno');
+  if (capno) capno.textContent = (CHIPS.length < 10 ? '0' : '') + CHIPS.length;
+  var studs = [].slice.call(document.querySelectorAll('#studbar .sc'));
+  var chars = [v.titleA, v.titleB].reduce(function (a, s) {
+    return a + String(s == null ? '' : s).replace(/\s+/g, '').length;
+  }, 0);
+  var meta = document.getElementById('meta');
+  if (meta) {
+    meta.innerHTML = '词块 <em>' + CHIPS.length + '</em> · 主张字数 <em>' + chars +
+      '</em> · 凸点 <em>' + studs.length + '</em>';
+  }
+
+  /* studMode：none 整排撤掉 / top 整排同亮 / scan 逐枚硬切 */
+  var studMode = v.studMode || 'scan';
+  var studbar = document.getElementById('studbar');
+  if (studMode === 'none' && studbar) studbar.style.display = 'none';
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：直落 / 压影 / 逐枚硬切全撤掉，只留终态 + ≤8px 微位移淡入（规范 §13.5） */
+    gsap.set('#chips', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#key', { x: 0, y: 0, opacity: 1, boxShadow: '10px 10px 0 #0F0F0F' });
+    gsap.set('#studbar', { x: 0, y: 0, opacity: 1 });
+    if (studs.length) gsap.set(studs, { attr: { fill: ACC } });
+    tl.fromTo('#chips',   { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .55, ease: 'power3.out' }, 0);
+    tl.fromTo('#key',     { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .60, ease: 'power3.out' }, .16);
+    tl.fromTo('#studbar', { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .50, ease: 'power3.out' }, .30);
+    B.hold(tl, 1.15, 1.05);
+    return;
+  }
+
+  var SHADOW = '8px 8px 0 #0F0F0F';
+
+  /* 入场起点按实测盒子现算：正好贴画布的边（上沿 / 左沿 / 下沿），
+     既保留「从画外砸进来」的读感，又保证任何时刻都不越框。
+     距离在建时间轴之前量一次，onUpdate 里不做任何 DOM 测量。 */
+  var stageRect = document.getElementById('stage').getBoundingClientRect();
+  var promoEl = document.querySelector('.promo');
+  var CEIL = promoEl ? Math.round(promoEl.getBoundingClientRect().bottom - stageRect.top) : 0;
+  function fromEdge(sel, m) {
+    var el = document.querySelector(sel);
+    if (!el) return { x: 0, y: 0 };
+    var r = el.getBoundingClientRect();
+    if (m === 'pushup') return { x: 0, y: Math.round(stageRect.bottom - r.bottom) };
+    if (m === 'rail')   return { x: Math.round(stageRect.left - r.left), y: 0 };
+    return { x: 0, y: CEIL - Math.round(r.top - stageRect.top) };
+  }
+
+  /* 式 1 砸落：单轴直落 power4.out ≤0.26s，落定压 2 帧（阴影沿 Y 多压 3px）再回原档 */
+  function slam(sel, at, from, dur) {
+    var d = dur || 0.26;
+    tl.fromTo(sel, from, { x: 0, y: 0, duration: d, ease: 'power4.out' }, at);
+    tl.set(sel, { boxShadow: '8px 11px 0 #0F0F0F', immediateRender: false }, at + d);
+    tl.to(sel, { boxShadow: SHADOW, duration: 0.04, ease: 'steps(2)' }, at + d + 0.04);
+  }
+
+  /* entry 三档只换「从哪一侧进」，落位与压影节奏完全一致 */
+  var mode = v.entry || 'slam';
+  slam('#chip1', 0.00, fromEdge('#chip1', mode));
+  slam('#chip2', 0.55, fromEdge('#chip2', mode));
+  slam('#chip3', 1.10, fromEdge('#chip3', mode));
+
+  /* 第三块落定 → 主张块自下顶出（式 4），承重件用 sh-xl */
+  tl.fromTo('#key', { y: 160 }, { y: 0, duration: 0.26, ease: 'power4.out' }, 1.78);
+  tl.set('#key', { boxShadow: '10px 13px 0 #0F0F0F', immediateRender: false }, 2.04);
+  tl.to('#key', { boxShadow: '10px 10px 0 #0F0F0F', duration: 0.04, ease: 'steps(2)' }, 2.08);
+
+  /* 主张块下方凸点阵：式 8 硬切，单枚间隔 ≥0.12s */
+  if (studMode !== 'none' && studs.length) {
+    tl.set(studs, { attr: { fill: '#FFFFFF' }, immediateRender: false }, 2.20);
+    if (studMode === 'top') {
+      tl.set(studs, { attr: { fill: ACC }, immediateRender: false }, 2.24);
+    } else {
+      studs.forEach(function (c, i) {
+        tl.set(c, { attr: { fill: ACC }, immediateRender: false }, 2.24 + i * 0.14);
+      });
+    }
+  }
+
+  var introEnd = tl.duration();
+  var TOTAL = Math.min(6, Math.max(5, Number(v.duration) || 5.5));
+  var holdAt = Math.min(introEnd, TOTAL - 0.8);
+  B.hold(tl, holdAt, Math.max(0.8, TOTAL - holdAt));
+})();
+</script>
+</body></html>

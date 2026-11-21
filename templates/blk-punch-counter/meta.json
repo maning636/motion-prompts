@@ -1,0 +1,12 @@
+{
+  "id": "blk-punch-counter",
+  "name": "积木大数 · 项目战绩",
+  "description": "积木社 neo-brutalist 配方：左大数字积木砸落 + 右侧三块指标依次弹入，硬阴影按压落定（1920×1080）",
+  "category": "数据可视化",
+  "series": "blk",
+  "slot": "blk-counter",
+  "tags": ["积木社","neo-brutalist","大数字","计数器","blk-punch-counter"],
+  "duration": 5,
+  "size": "1920×1080",
+  "status": "ready"
+}

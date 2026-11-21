@@ -1,0 +1,7 @@
+{
+  "command": "npx hyperframes render --preset default",
+  "dashTitle": "渲染完成 · 3 个成片",
+  "accent": "#00FF00",
+  "background": "#0A0A0F",
+  "foreground": "#F4F4F2"
+}

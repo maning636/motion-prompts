@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"text","name":"心里的话","type":"string","label":"气泡里的一句话","default":"这段好像有点长"},{"id":"accent","name":"气泡色","type":"color","label":"气泡 / 圆点填充色","default":"#FFF8EE"},{"id":"color","name":"字色","type":"color","label":"气泡里的文字颜色","default":"#241C18"},{"id":"edge","name":"描边色","type":"color","label":"硬边 / 虚线深色","default":"#241C18"},{"id":"fontSize","name":"字号","type":"number","label":"字号 px（超出气泡自动缩）","default":25},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.0}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>思考气泡</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    /* 透明底：这层是挂件，底下是用户自己的实拍 */
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+
+  /* 思考气泡本体。左右拉满 + 居中，不用 left:50%+translateX(-50%)：
+     那样容器是 shrink-to-fit，可用宽度只剩半屏，量宽度会失真。 */
+  .p-main {
+    position: absolute; left: 56px; right: 56px; top: 24px;
+    padding: 17px 18px; border-radius: 26px; text-align: center;
+    background: var(--ac, #FFF8EE);
+    box-shadow: 4px 5px 0 var(--edge, #241C18);
+    transform-origin: 16% 118%;
+  }
+  .p-tx {
+    display: inline-block; white-space: nowrap;
+    font-size: var(--fs, 25px); font-weight: 800; line-height: 1.24;
+    letter-spacing: .01em; color: var(--fg, #241C18);
+    -webkit-font-smoothing: antialiased;
+  }
+  /* 思考泡的尾迹：圆的，由大到小往左下排 */
+  .p-dot {
+    position: absolute; border-radius: 50%; opacity: 0;
+    background: var(--ac, #FFF8EE);
+    box-shadow: 3px 3px 0 var(--edge, #241C18);
+  }
+  /* 虚线连接段：角度在 JS 里按两点算好写进 transform，这里只留给补间动 scaleX */
+  .p-link {
+    position: absolute; height: 0; opacity: 0;
+    border-top: 2px dashed var(--edge, #241C18);
+    transform-origin: 0 50%;
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"这段好像有点长","accent":"#FFF8EE","color":"#241C18","edge":"#241C18","fontSize":25,"duration":3.0};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--fg', v.color || FALLBACK.color);
+  root.style.setProperty('--edge', v.edge || FALLBACK.edge);
+  const dur = parseFloat(v.duration) || 3.0;
+  const fs = parseFloat(v.fontSize) || 25;
+  root.style.setProperty('--fs', fs + 'px');
+  const text = String(v.text == null ? FALLBACK.text : v.text);
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text_, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text_ != null) el.textContent = text_;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  const main = put('div', 'p-main', '');
+  const label = put('span', 'p-tx', '', text, main);
+
+  /* 圆点：由大到小往左下排。坐标是排死的，不随文案高度漂。
+     气泡底边大约在 y=104，尾迹从那里一路排到 (74,214)。 */
+  const DOTS = [{ d: 30, x: 152, y: 132 }, { d: 21, x: 118, y: 164 },
+                { d: 14, x: 92, y: 190 }, { d: 9, x: 72, y: 210 }];
+  const dots = DOTS.map(function (o) {
+    return put('div', 'p-dot', 'left:' + (o.x - o.d / 2) + 'px;top:' + (o.y - o.d / 2) +
+      'px;width:' + o.d + 'px;height:' + o.d + 'px;', null, stage);
+  });
+  /* 虚线连接：气泡底 → 点1，点1 → 点2，点2 → 点3 */
+  const LINKS = [[178, 100, 156, 124], [140, 146, 122, 158], [104, 174, 94, 185]];
+  const links = LINKS.map(function (p) {
+    const dx = p[2] - p[0], dy = p[3] - p[1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+    const el = put('div', 'p-link', 'left:' + p[0] + 'px;top:' + p[1] + 'px;width:' +
+      Math.round(len) + 'px;transform:rotate(' + ang.toFixed(2) + 'deg);', null, stage);
+    return el;
+  });
+
+  const tl = gsap.timeline({ paused: true });
+  /* 注册：云渲染的 settle / 逐帧定位靠 window.__timelines 驱动时间轴 */
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 收口：量字，超宽就缩字号（inline-block + nowrap，量到的就是自然宽） */
+  (function fit() {
+    root.style.setProperty('--fs', fs + 'px');
+    const natural = label.scrollWidth;
+    const avail = 330;
+    if (natural > avail) {
+      root.style.setProperty('--fs', Math.max(12, Math.floor(fs * avail / natural)) + 'px');
+    }
+  })();
+
+  // 气泡本体先鼓出来
+  tl.fromTo(main, { scale: .32, rotation: -14, opacity: 0 },
+    { scale: 1, rotation: -3, opacity: 1, duration: .44, ease: 'back.out(2.2)',
+      immediateRender: false }, 0);
+  tl.fromTo(label, { opacity: 0, y: 7 },
+    { opacity: 1, y: 0, duration: .24, ease: 'power2.out', immediateRender: false }, .14);
+
+  // 虚线先长出来，圆点再一颗颗跟上
+  links.forEach(function (lk, i) {
+    tl.fromTo(lk, { scaleX: 0, opacity: .9 },
+      { scaleX: 1, opacity: .9, duration: .2, ease: 'power2.out',
+        immediateRender: false }, .4 + i * .13);
+  });
+  dots.forEach(function (dt, i) {
+    const at = .44 + i * .15;
+    tl.fromTo(dt, { scale: 0, y: 12, opacity: 0 },
+      { scale: 1, y: 0, opacity: 1, duration: .3, ease: 'back.out(2.6)',
+        immediateRender: false }, at);
+    // 各自不同周期的轻微浮动，定住之后还活着
+    const per = .62 + i * .13;
+    let rep = Math.floor((dur - .3 - (at + .32)) / (per * 2));
+    if (rep > 4) rep = 4;
+    tl.to(dt, { y: -3.5, duration: per, yoyo: true, repeat: rep,
+      ease: 'sine.inOut' }, at + .32);
+  });
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"label","name":"控件文案","type":"string","label":"控件说明文案","default":"画面亮度"},{"id":"fromVal","name":"起始值","type":"number","label":"起始数值","default":20},{"id":"toVal","name":"结束值","type":"number","label":"结束数值","default":85},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.4}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>旋钮调节</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-halo { position: absolute; inset: 0;
+    background: radial-gradient(58% 70% at 50% 48%,
+      rgba(0,0,0,.56) 0%, rgba(0,0,0,.30) 54%, rgba(0,0,0,0) 84%); }
+  .p-label { position: absolute; font-size: 11px; font-weight: 700; letter-spacing: .18em;
+    color: rgba(255,248,238,.6); white-space: nowrap; }
+  /* 刻度分三层：外层定位+旋转（只写一次），中层交给 GSAP 做入场缩放，
+     内层才是画出来的条。同一个元素不能既手写 transform 又让 GSAP 接管。 */
+  .p-tickwrap { position: absolute; width: 0; height: 0; }
+  .p-tick { position: absolute; left: -1.5px; top: -6px; width: 3px; height: 12px; }
+  .p-tick-b { position: absolute; left: 0; top: 0; width: 3px; height: 12px;
+    border-radius: 2px; background: rgba(255,248,238,.26); }
+  .p-tick-on { position: absolute; left: 0; top: 0; width: 3px; height: 12px;
+    border-radius: 2px; opacity: 0; background: var(--ac); }
+  .p-body { position: absolute; left: 190px; top: 84px; width: 100px; height: 100px;
+    border-radius: 50%; background: rgba(255,248,238,.1);
+    border: 2.5px solid rgba(255,248,238,.34); }
+  .p-body-on { position: absolute; left: -2.5px; top: -2.5px; width: 100px; height: 100px;
+    border-radius: 50%; opacity: 0; border: 2.5px solid var(--ac);
+    box-shadow: 0 0 18px rgba(255,107,53,.35); }
+  .p-face { position: absolute; left: 240px; top: 134px; width: 0; height: 0; }
+  .p-face-in { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+  .p-ptr { position: absolute; left: -2.5px; top: -37px; width: 5px; height: 27px;
+    border-radius: 3px; background: var(--ac); }
+  .p-hub { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px;
+    border-radius: 50%; background: #FFF8EE; }
+  .p-val { position: absolute; left: 190px; top: 206px; width: 100px; text-align: center;
+    font-size: 25px; font-weight: 900; color: #FFF8EE;
+    font-variant-numeric: tabular-nums; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"label":"画面亮度","fromVal":20,"toVal":85,"accent":"#FF6B35","duration":3.4};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || 3.4;
+  const V0 = parseFloat(v.fromVal);
+  const V1 = parseFloat(v.toVal);
+  const v0 = isNaN(V0) ? 20 : V0;
+  const v1 = isNaN(V1) ? 85 : V1;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  const fits = [];
+  function fit(list) { fits.push.apply(fits, list); }
+  function runFit() {
+    fits.forEach((f) => {
+      const el = f.el;
+      el.style.fontSize = f.max + 'px';
+      const avail = f.box || el.clientWidth;
+      const ws = el.style.whiteSpace;
+      el.style.whiteSpace = 'nowrap';
+      const natural = el.scrollWidth;
+      el.style.whiteSpace = ws;
+      if (natural > avail) {
+        el.style.fontSize = Math.max(f.min, Math.floor(f.max * avail / natural)) + 'px';
+      }
+    });
+  }
+
+  put('div', 'p-halo');
+  const label = put('div', 'p-label', 'left:190px; top:26px;', v.label || FALLBACK.label);
+  const body = put('div', 'p-body');
+  const bodyOn = put('div', 'p-body-on', '', null, body);
+
+  /* 9 根刻度沿 -135° → 135° 的弧排开，位置角度由三角函数算，不含随机 */
+  const CX = 240, CY = 134, R = 74, A0 = -135, A1 = 135, N = 9;
+  const lit = [];
+  for (let i = 0; i < N; i++) {
+    const a = A0 + (A1 - A0) * (i / (N - 1));
+    const rad = a * Math.PI / 180;
+    const cx = CX + R * Math.sin(rad);
+    const cy = CY - R * Math.cos(rad);
+    const wrap = put('div', 'p-tickwrap',
+      'left:' + cx.toFixed(2) + 'px; top:' + cy.toFixed(2) + 'px;' +
+      ' transform: rotate(' + a.toFixed(2) + 'deg);');
+    const tk = put('div', 'p-tick', '', null, wrap);
+    put('div', 'p-tick-b', '', null, tk);
+    lit.push(put('div', 'p-tick-on', '', null, tk));
+  }
+  const face = put('div', 'p-face');
+  const faceIn = put('div', 'p-face-in', '', null, face);
+  put('div', 'p-ptr', '', null, faceIn);
+  put('div', 'p-hub', '', null, faceIn);
+  const valEl = put('div', 'p-val', '', String(v0));
+
+  fit([{ el: label, max: 11, min: 9, box: 140 },
+       { el: valEl, max: 25, min: 16, box: 100 }]);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 指针角度、刻度点亮、数值读同一个 p，不会出现「数到了刻度还没亮」 */
+  const T0 = 0.66, T1 = 2.3;
+  const clamp01 = (x) => x < 0 ? 0 : (x > 1 ? 1 : x);
+  const outBack = (x) => { const c1 = 1.5, c3 = 2.5, u = x - 1; return 1 + c3 * u * u * u + c1 * u * u; };
+  function paint() {
+    const t = tl.time();
+    const k = clamp01((t - T0) / (T1 - T0));
+    const p = outBack(k);
+    const ang = A0 + (A1 - A0) * p;
+    face.style.transform = 'rotate(' + ang.toFixed(2) + 'deg)';
+    for (let i = 0; i < N; i++) {
+      lit[i].style.opacity = clamp01((k * (N - 1) - i) * 1.7).toFixed(3);
+    }
+    const txt = String(Math.round(v0 + (v1 - v0) * k));
+    if (valEl.textContent !== txt) valEl.textContent = txt;
+    bodyOn.style.opacity = clamp01((k - 0.45) * 2.4).toFixed(3);
+    valEl.style.opacity = clamp01(t / 0.22).toFixed(3);
+  }
+  tl.to({}, { duration: dur, onUpdate: paint }, 0);
+
+  tl.fromTo(label, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .3 }, .04);
+  tl.fromTo(body, { opacity: 0, scale: .72 },
+    { opacity: 1, scale: 1, duration: .42, ease: 'back.out(2.2)' }, .1);
+  tl.fromTo(faceIn, { opacity: 0, scale: .6 },
+    { opacity: 1, scale: 1, duration: .36, ease: 'back.out(2.4)' }, .22);
+  tl.fromTo('.p-tick', { opacity: 0, scale: .4 },
+    { opacity: 1, scale: 1, duration: .3, ease: 'back.out(2)', stagger: .045 }, .14);
+  /* 拧到底轻轻一顿（缩放只动 faceIn，旋转是 paint 独占的） */
+  tl.to(faceIn, { scale: 1.1, duration: .12, ease: 'power2.out' }, T1 - 0.06);
+  tl.to(faceIn, { scale: 1, duration: .36, ease: 'elastic.out(1,.5)' }, T1 + 0.06);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  runFit();
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

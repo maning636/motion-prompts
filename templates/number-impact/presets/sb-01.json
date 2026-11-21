@@ -1,0 +1,10 @@
+{
+  "hero": "设",
+  "label": "真正做设计的时间",
+  "value": 20,
+  "unit": "%",
+  "caption": "找素材1h · 对齐规范1h · 改稿3h",
+  "accent": "#22c55e",
+  "foreground": "#F4EFE7",
+  "exportMode": "mp4"
+}

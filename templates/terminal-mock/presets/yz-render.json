@@ -1,0 +1,10 @@
+{
+  "windowTitle": "本地渲染 · 一键出片",
+  "command": "render --preset 成片标准",
+  "output": "✓ 尺寸 1920×1080\n✓ 帧率 30fps\n✓ 时长 按配音自动对齐\n✓ 渲染完成 → 第3屏.mp4",
+  "meta": "本地完成 · 不用你动手 · 没有水印",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7",
+  "duration": 4.8
+}

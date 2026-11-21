@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "lines", "name": "每屏一句", "type": "string", "label": "每屏一句（用 | 分行，一屏只讲一句）", "default": "今天只讲一件事|把手写的东西变成能跑的代码"}, {"id": "keywords", "name": "关键词", "type": "string", "label": "每屏的关键词（与上面一一对应，用 | 分隔，可留空）", "default": "一件事|代码"}, {"id": "accent", "name": "强调色", "type": "color", "label": "关键词的颜色", "default": "#1F6FEB"}, {"id": "align", "name": "正文对齐", "type": "enum", "label": "正文对齐方式", "options": [{"label": "左对齐", "value": "left"}, {"label": "居中", "value": "center"}], "default": "left"}, {"id": "pageDur", "name": "每屏秒数", "type": "number", "label": "每屏停留（秒）", "default": 2.4}, {"id": "duration", "name": "总时长", "type": "number", "label": "总时长（秒，0 = 按屏数自动）", "default": 0}, {"id": "safeArea", "name": "安全区", "type": "boolean", "label": "留短视频安全区", "default": true}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1080, height=1920" />
+<title>动态排版长片·竖屏逐句</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: #FFFFFF;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+  #stage { position: relative; width: 1080px; height: 1920px; overflow: hidden; background: #FFFFFF; }
+  #cv { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+</style>
+</head>
+<body>
+<div id="stage" data-composition-id="main" data-start="0" data-duration="4.8"
+     data-width="1080" data-height="1920">
+  <canvas id="cv" width="1080" height="1920"></canvas>
+</div>
+<script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  /* ---------------------------------------------------------------
+     动态排版长片 · 竖屏逐句
+     来源：GitHub GaoFei2025-0314/opus5.5_video 的 V 系列方法论 +
+           rickyhu20/opus-code-animation 类型 8（Remotion 动态排版长片）
+     差异：竖屏 1080x1920（motion 的 typo 族是横屏一屏三行）、
+           纯白底近黑（motion 是米白底 + 橙强调）、
+           取消 "// 03" 段落编号（改右下角页码点阵）、
+           关键词跨屏接力 = 匹配剪辑（motion 完全没有）。
+     硬规则：画面只由时间 t 决定（纯函数），逐帧 seek 不打架。
+     --------------------------------------------------------------- */
+
+  const FALLBACK = {
+    lines: '今天只讲一件事|把手写的东西变成能跑的代码',
+    keywords: '一件事|代码',
+    accent: '#1F6FEB',
+    align: 'left',
+    pageDur: 2.4,
+    duration: 0,
+    safeArea: true
+  };
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+
+  const W = 1080, H = 1920;
+  const BG = '#FFFFFF';
+  const INK = '#0C0C0C';
+  const DOT_OFF = '#DCDCDC';
+
+  const pick = (val, fb) => (val === undefined || val === null || val === '') ? fb : val;
+  const splitPipe = (s) => String(s).split(/[|｜]/).map(x => x.trim());
+
+  const LINES = splitPipe(pick(v.lines, FALLBACK.lines)).filter(x => x.length > 0);
+  const KEYWORDS = splitPipe(pick(v.keywords, FALLBACK.keywords));
+  const ACCENT = String(pick(v.accent, FALLBACK.accent)).trim() || FALLBACK.accent;
+  const ALIGN = String(pick(v.align, FALLBACK.align)).toLowerCase() === 'center' ? 'center' : 'left';
+  const SAFE = (v.safeArea === undefined || v.safeArea === null || v.safeArea === '')
+    ? true
+    : !(v.safeArea === false || v.safeArea === 'false' || v.safeArea === 0 || v.safeArea === '0');
+
+  let PAGE = parseFloat(pick(v.pageDur, FALLBACK.pageDur));
+  if (!isFinite(PAGE) || PAGE <= 0.2) PAGE = FALLBACK.pageDur;
+  let DUR = parseFloat(pick(v.duration, FALLBACK.duration));
+  if (!isFinite(DUR) || DUR < 0) DUR = 0;
+
+  const N = Math.max(1, LINES.length);
+  if (DUR > 0) PAGE = DUR / N;
+  const TOTAL = N * PAGE;
+
+  /* 版面常量 */
+  const MX = SAFE ? 96 : 72;          /* 左右边距 */
+  const CW = W - 2 * MX;              /* 正文可用宽 */
+  const KW_Y = 620;                   /* 关键词行的垂直中心 */
+  const SEN_Y = 1080;                 /* 正文块垂直中心 */
+  const DOT_Y = 1620;                 /* 页码点阵 */
+  const BODY_SIZE = 84;
+  const KW_SIZE = 168;
+  const ENTER = 0.5;                  /* 关键词弹入时长 */
+  const EXIT_AT = PAGE - 0.2;         /* 关键词开始退场 */
+  const EXIT_DUR = 0.45;
+  const RULE_H = 5;                   /* 阅读进度线厚度 */
+  const RULE_GAP = 62;                /* 进度线离正文底部的距离 */
+
+  const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+  const easeOutCubic = (x) => { x = clamp(x, 0, 1); return 1 - Math.pow(1 - x, 3); };
+  const easeInCubic = (x) => { x = clamp(x, 0, 1); return x * x * x; };
+
+  /* 刷出缓动留一条线性速度底线。
+     纯 easeOutCubic 的尾段速度掉到 0，逐帧采样时会连续好几帧像素完全一样 ——
+     实测 typo-long-01 有 8 段静止、最长 6 帧。混一点线性进去，尾段仍在推进。 */
+  const EASE_MIX = 0.34;
+  const brushEase = (x) => {
+    x = clamp(x, 0, 1);
+    return EASE_MIX * x + (1 - EASE_MIX) * (1 - Math.pow(1 - x, 3));
+  };
+
+  const canvas = document.getElementById('cv');
+  const ctx = canvas.getContext('2d');
+  const FONT_BODY = '700 ' + BODY_SIZE + 'px MiSans, "Microsoft YaHei", sans-serif';
+  const FONT_KW_BASE = '900 ' + KW_SIZE + 'px MEBHeiHeiTi, "Microsoft YaHei", sans-serif';
+
+  /* 中文按字断行，英文按词断行 */
+  function tokenize(s) {
+    const out = [];
+    let buf = '';
+    for (const ch of String(s)) {
+      if (/[\x00-\x7F]/.test(ch)) { buf += ch; }
+      else { if (buf) { out.push(buf); buf = ''; } out.push(ch); }
+    }
+    if (buf) out.push(buf);
+    return out;
+  }
+  function wrap(text, maxW, font) {
+    ctx.font = font;
+    const rows = [];
+    let cur = '';
+    for (const tk of tokenize(text)) {
+      if (ctx.measureText(tk).width > maxW) {
+        /* 单个超长词（纯 ASCII 长串）硬断 */
+        let piece = '';
+        for (const ch of tk) {
+          if (piece && ctx.measureText(piece + ch).width > maxW) { rows.push(piece); piece = ch; }
+          else piece += ch;
+        }
+        if (cur) { rows.push(cur); cur = ''; }
+        if (piece) cur = piece;
+        continue;
+      }
+      const test = cur + tk;
+      if (cur && ctx.measureText(test).width > maxW) { rows.push(cur); cur = tk; }
+      else cur = test;
+    }
+    if (cur) rows.push(cur);
+    return rows.length ? rows : [''];
+  }
+  function kwFont(text) {
+    ctx.font = FONT_KW_BASE;
+    const w = ctx.measureText(text).width;
+    if (w <= CW) return FONT_KW_BASE;
+    const size = Math.max(64, Math.floor(KW_SIZE * (CW / w)));
+    return '900 ' + size + 'px MEBHeiHeiTi, "Microsoft YaHei", sans-serif';
+  }
+
+  /* 正文：遮罩从左往右刷出，逐行错落（源禁「所有元素一起淡入」）。
+     首行从 local=-0.30 起刷 —— 第 0 帧第一行就已经有内容，
+     避免「首帧整页空白」被空白片护栏当成空白片。 */
+  function drawSentence(i, local) {
+    const text = LINES[i];
+    if (!text) return;
+    const rows = wrap(text, CW, FONT_BODY);
+    const lh = BODY_SIZE * 1.42;
+    const y0 = SEN_Y - (rows.length - 1) * lh / 2;
+    ctx.font = FONT_BODY;
+    ctx.fillStyle = INK;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = ALIGN === 'center' ? 'center' : 'left';
+    const x = ALIGN === 'center' ? W / 2 : MX;
+    for (let k = 0; k < rows.length; k++) {
+      const m = brushEase((local - (-0.30 + k * 0.16)) / 0.52);
+      if (m <= 0.001) continue;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, W * m, H);
+      ctx.clip();
+      ctx.fillText(rows[k], x, y0 + k * lh);
+      ctx.restore();
+    }
+  }
+
+  /* 阅读进度线：贴在这一屏正文下方，随本屏时间线性生长。
+     它承担两件事：
+     ① 「这一句讲到哪了」的语义；
+     ② 让「正文刷完之后」的那段静止时间继续有可见变化 ——
+        纯 easeOut 刷出在尾段会连续几帧像素完全一样（实测 8 段静止）。
+     线性生长 → 每一帧的线长都不同。 */
+  function drawRule(i, local) {
+    const rows = wrap(LINES[i] || '', CW, FONT_BODY);
+    const lh = BODY_SIZE * 1.42;
+    const y0 = SEN_Y - (rows.length - 1) * lh / 2;
+    const bottom = y0 + Math.max(0, rows.length - 1) * lh;
+    const y = bottom + RULE_GAP;
+    const p = clamp(local / PAGE, 0, 1);
+    ctx.fillStyle = '#E4E4E4';
+    ctx.fillRect(MX, y, CW, RULE_H);
+    ctx.fillStyle = ACCENT;
+    ctx.fillRect(MX, y, CW * p, RULE_H);
+  }
+
+  /* 关键词：弹入 → 停住 → 飞走。
+     飞走段跨过切屏点，下一屏的关键词同时弹入 —— 这就是匹配剪辑：
+     共享元素（关键词）跨屏延续，画面上从不硬切消失。
+     悬浮用**绝对时间**算，跨切屏连续不跳。 */
+  function drawKeyword(i, local, tAbs) {
+    const kw = KEYWORDS[i];
+    if (!kw) return;
+    const float = 7 * Math.sin(2 * Math.PI * tAbs / 3.0);
+    let y = KW_Y, scale = 1, alpha = 1;
+    if (local < ENTER) {
+      const e = easeOutCubic(local / ENTER);
+      y = KW_Y + 64 * (1 - e) + float;
+      scale = 0.94 + 0.06 * e + 0.03 * Math.sin(Math.PI * e);
+    } else if (local < EXIT_AT) {
+      y = KW_Y + float;
+      scale = 1 + 0.012 * Math.exp(-7 * (local - ENTER));
+    } else {
+      const e = easeInCubic((local - EXIT_AT) / EXIT_DUR);
+      y = KW_Y - 320 * e + float;
+      scale = 1 - 0.32 * e;
+      alpha = 1 - e;
+    }
+    if (alpha <= 0.002) return;
+    ctx.save();
+    ctx.translate(W / 2, y);
+    ctx.scale(scale, scale);
+    ctx.globalAlpha = alpha;
+    ctx.font = kwFont(kw);
+    ctx.fillStyle = ACCENT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(kw, 0, 0);
+    ctx.restore();
+  }
+
+  /* 顶部进度轨：整片的推进位置。也是画面上唯一连续变化的大结构件。 */
+  function drawRail(t) {
+    const y = 262;
+    ctx.fillStyle = '#ECECEC';
+    ctx.fillRect(MX, y, CW, 3);
+    ctx.fillStyle = ACCENT;
+    ctx.fillRect(MX, y, CW * clamp(t / TOTAL, 0, 1), 3);
+  }
+
+  /* 右下角页码点阵（替代 motion 的 "// 03" 段落编号） */
+  function drawDots(idx) {
+    const gap = 22, r = 5;
+    const x0 = W - MX - (N * gap - (gap - r * 2)) + r;
+    for (let i = 0; i < N; i++) {
+      ctx.beginPath();
+      ctx.arc(x0 + i * gap, DOT_Y, r, 0, Math.PI * 2);
+      ctx.fillStyle = (i === idx) ? ACCENT : DOT_OFF;
+      ctx.fill();
+    }
+  }
+
+  /* 画面是时间的纯函数：给定 t，输出唯一一帧 */
+  function render(t) {
+    t = clamp(t, 0, TOTAL);
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = BG;
+    ctx.fillRect(0, 0, W, H);
+
+    const idx = Math.min(N - 1, Math.floor(t / PAGE));
+    const local = t - idx * PAGE;
+
+    drawSentence(idx, local);
+    if (idx > 0) drawKeyword(idx - 1, local + PAGE, t);   /* 上一屏关键词退场（跨切屏点） */
+    drawKeyword(idx, local, t);
+    drawRule(idx, local);
+    drawDots(idx);
+    drawRail(t);
+  }
+
+  /* 整片只有一条补间：推进 {t:0}，onUpdate 把画面算出来 */
+  const stage = document.getElementById('stage');
+  stage.setAttribute('data-duration', String(TOTAL));
+  const st = { t: 0 };
+  const tl = gsap.timeline({ paused: true });
+  tl.fromTo(st, { t: 0 }, {
+    t: TOTAL, duration: TOTAL, ease: 'none',
+    onUpdate: function () { render(st.t); }
+  }, 0);
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 自带 __seekTo：逐帧定位的兜底（不依赖 compose 注入那套） */
+  window.__seekTo = function (t) {
+    if (typeof t !== 'number' || !isFinite(t)) return;
+    const tt = clamp(t, 0, TOTAL);
+    try { tl.pause(); tl.time(0, false); tl.time(tt, false); } catch (e) { }
+    render(tt);
+  };
+  window.__typoLong = { render: render, total: TOTAL, pages: N, pageDur: PAGE };
+
+  const first = function () {
+    const q = /(?:^|[?&])t=([\d.]+)/.exec(location.search);
+    if (q) { render(parseFloat(q[1])); return; }
+    render(0);
+  };
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(first).catch(first);
+  } else { first(); }
+})();
+</script>
+</body>
+</html>

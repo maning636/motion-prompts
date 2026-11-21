@@ -1,0 +1,8 @@
+{
+  "title": "说感受，剩下的让它改",
+  "bubbles": "背景推得再慢一点,相框落位再稳一点,切换的间隔拉长一点",
+  "changes": "背景速度 DURATION|1.40|1.78;相框缓动 EASE|POWER2.OUT|EXPO.OUT;切换间隔 INTERVAL|1.90|2.30",
+  "side": "第一版只要能动就行，剩下的我看着给反馈——来回两三轮就顺了。",
+  "accent": "#00FF00",
+  "duration": 6
+}

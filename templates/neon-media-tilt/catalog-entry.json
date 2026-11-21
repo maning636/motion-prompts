@@ -1,0 +1,39 @@
+{
+  "id": "neon-media-tilt",
+  "name": "荧光绿斜角媒体展示框",
+  "description": "文档或录屏斜角动画展示框：3D 透视倾斜飞入后保持微斜角定格，荧光绿描边外发光，下方淡入说明文字，支持背景图与媒体图双素材槽，分屏合成用。",
+  "category": "透明叠加",
+  "tags": [
+    "媒体展示",
+    "斜角动画",
+    "文档展示",
+    "录屏",
+    "叠加"
+  ],
+  "duration": 6,
+  "slot": "overlay",
+  "when": "口播需要把文档、截图或录屏以斜角动画形式展示在左半屏或右半屏、配合讲解画面分屏合成时",
+  "assets": [
+    {
+      "id": "imgBg",
+      "type": "image",
+      "label": "背景图"
+    },
+    {
+      "id": "imgMedia",
+      "type": "image",
+      "label": "媒体图"
+    }
+  ],
+  "path": "templates/neon-media-tilt",
+  "size": "1920×1080",
+  "formats": [
+    "mp4"
+  ],
+  "defaultFormat": "mp4",
+  "preview": "https://maning789link.top/hub/renders/neon-media-tilt/sample.webm",
+  "status": "ready",
+  "tier": "free",
+  "no": null,
+  "series": "shot"
+}

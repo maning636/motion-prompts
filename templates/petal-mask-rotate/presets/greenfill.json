@@ -1,0 +1,11 @@
+{
+  "img1": "./assets/_gf0.png",
+  "img2": "./assets/_gf1.png",
+  "title": "林间晨光",
+  "enTitle": "SUMMER · 01",
+  "desc": "光穿过叶隙落在车把上,整座森林都在轻轻呼吸。",
+  "sign": "夏日 · 未至",
+  "petals": 8,
+  "spinDur": 2,
+  "duration": 6
+}

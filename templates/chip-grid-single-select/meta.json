@@ -1,0 +1,13 @@
+{
+  "id": "chip-grid-single-select",
+  "name": "芯片网格单选",
+  "description": "芯片/标签网格中单项依次亮起，最终选中项高亮放大，其余压暗，展示单选决策结果。",
+  "category": "data-motion",
+  "tags": ["chip", "grid", "single-select", "decision", "scan", "highlight", "gsap"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-20T00:00:00.000Z"
+}

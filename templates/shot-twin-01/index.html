@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "cardTitle", "type": "string", "label": "主卡标题", "default": "一条口播文案"}, {"id": "cardSub", "type": "string", "label": "主卡副标", "default": "批量衍生 7 个平台版本"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#stage{ position:absolute; inset:0; perspective:1300px; }
+#grp{ position:absolute; left:660px; top:330px; width:600px; height:380px; transform-style:preserve-3d; }
+.cl{ position:absolute; left:0; top:0; width:600px; height:380px; border-radius:20px; background:#16161F;
+  border:1px solid rgba(255,255,255,.14); padding:36px; box-shadow:0 24px 70px rgba(0,0,0,.5); }
+.cl .ct{ font-size:40px; color:var(--fg); margin-bottom:18px; }
+.cl .cs{ font-size:24px; color:rgba(255,255,255,.55); margin-bottom:30px; }
+.cl i{ display:block; height:13px; border-radius:7px; background:rgba(255,255,255,.15); margin-bottom:13px; }
+#main{ border-color:var(--accent); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4.5" data-width="1920" data-height="1080">
+<div id="stage"><div id="grp"><div class="cl" id="c0"><div class="ct"></div><div class="cs"></div><i></i><i style="width:72%"></i><i style="width:55%"></i></div><div class="cl" id="c1"><div class="ct"></div><div class="cs"></div><i></i><i style="width:72%"></i><i style="width:55%"></i></div><div class="cl" id="c2"><div class="ct"></div><div class="cs"></div><i></i><i style="width:72%"></i><i style="width:55%"></i></div><div class="cl" id="c3"><div class="ct"></div><div class="cs"></div><i></i><i style="width:72%"></i><i style="width:55%"></i></div><div class="cl" id="c4"><div class="ct"></div><div class="cs"></div><i></i><i style="width:72%"></i><i style="width:55%"></i></div><div class="cl" id="c5"><div class="ct"></div><div class="cs"></div><i></i><i style="width:72%"></i><i style="width:55%"></i></div><div class="cl" id="c6"><div class="ct"></div><div class="cs"></div><i></i><i style="width:72%"></i><i style="width:55%"></i></div><div class="cl" id="main"><div class="ct" id="mt"></div><div class="cs" id="ms"></div><i></i><i style="width:72%%"></i><i style="width:55%%"></i></div></div></div>
+    </div>
+    <script>
+      const FB = {"cardTitle": "一条口播文案", "cardSub": "批量衍生 7 个平台版本", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#mt').textContent=v.cardTitle||'';$('#ms').textContent=v.cardSub||'';
+document.querySelectorAll('.cl .ct').forEach(e=>{ if(e.id!=='mt') e.textContent=v.cardTitle||''; });
+document.querySelectorAll('.cl .cs').forEach(e=>{ if(e.id!=='ms') e.textContent=v.cardSub||''; });
+// 整队侧视 16°
+tl.set('#grp',{rotationY:16},0);
+// 排开：7 分身错峰 1.6f 弹出，斜向 dx=64i dy=-34i，透明度 100%→20%
+for(let i=1;i<=7;i++){
+  tl.fromTo('#c'+(i-1),{x:0,y:0,opacity:0},
+    {x:64*i,y:-34*i,opacity:1-i*0.114,duration:F(18),ease:'back.out(1.4)'},F(10+i*1.6));
+}
+// 停一拍（~25f）让观众数清
+// 吸回：全体同步 ease-in 10f
+for(let i=1;i<=7;i++){
+  tl.to('#c'+(i-1),{x:0,y:0,opacity:0,duration:F(10),ease:'power2.in'},F(75));
+}
+// 合体弹跳：单脉冲 1.08x
+tl.to('#main',{scale:1.08,duration:F(4),ease:'power2.out'},F(85));
+tl.to('#main',{scale:1,duration:F(8),ease:'elastic.out(1,0.5)'},F(89));
+tl.to({},{duration:F(38)},F(97)); // 真静止
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

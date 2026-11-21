@@ -1,0 +1,847 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "pages", "name": "每页一句", "type": "string", "label": "每页一句（用 | 分页，每页 ≤16 字）", "default": "他按下了按钮|灯亮了起来|他笑了"}, {"id": "panels", "name": "每页分格数", "type": "number", "label": "每页分格数（1-4）", "default": 3}, {"id": "sfx", "name": "拟声词", "type": "string", "label": "拟声词（逗号分隔，按页对应，数量 ≤ 页数）", "default": "啪,叮"}, {"id": "redLine", "name": "红句", "type": "string", "label": "最重要的一句（必须是 pages 里的一句，只有它会被染红）", "default": "灯亮了起来"}, {"id": "avatar", "name": "主角形态", "type": "enum", "label": "主角头像形态（四型）", "options": [{"label": "正面", "value": "front"}, {"label": "侧面", "value": "side"}, {"label": "背面", "value": "back"}, {"label": "剪影", "value": "silhouette"}], "default": "front"}, {"id": "eyes", "name": "眼型", "type": "enum", "label": "主角眼型（四型，最后一格加情绪强调符号）", "options": [{"label": "圆点眼", "value": "dot"}, {"label": "眯眼", "value": "narrow"}, {"label": "怒眼", "value": "angry"}, {"label": "喊叫", "value": "shout"}], "default": "dot"}, {"id": "dateTag", "name": "日期签", "type": "text", "label": "日期签（≤12 字）", "default": "2026.11.15"}, {"id": "accent", "name": "强调色", "type": "color", "label": "强调色（只给红句 + 页角章 + 拟声字描边）", "default": "#C81E1E"}, {"id": "duration", "name": "总时长", "type": "number", "label": "总时长（秒，0 = 按页数自动）", "default": 0}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<title>漫画 · 分格读页</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: #F6F4F0;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #F6F4F0; }
+  #cv { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+</style>
+</head>
+<body>
+<div id="stage" data-composition-id="main" data-start="0" data-duration="8.4"
+     data-width="1920" data-height="1080">
+  <canvas id="cv" width="1920" height="1080"></canvas>
+</div>
+<script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  /* ---------------------------------------------------------------
+     漫画 · 分格读页（横屏 1920x1080）
+     来源：GitHub GaoFei2025-0314/opus5.5_video 的 V12（漫画 · 分格读页）
+     镜头链：露空分格 → 推到第一格 → 印出内容 → 气泡弹出/拟声字落下 →
+             平移下一格 → 拉远看全页 → 绕左边翻页（带阴影）
+     差异化（对 motion 的 comic-01/02/03）：
+       印章 = 页角小方章（不砸不震屏），拟声字 = 网点底 + 白描边 + 红描边 +
+       轻微旋转 + 落拍落下（无放射线），翻页 = 梯形收窄 + 曲线卷边 + 平面阴影带，
+       并新增气泡 / 旁白框 / 日期签 / 主角头像（漫画族原本一个都没有）。
+     硬规则：画面只由时间 t 决定（纯函数），逐帧 seek 不打架。
+     --------------------------------------------------------------- */
+
+  const FALLBACK = {
+    pages: '他按下了按钮|灯亮了起来|他笑了',
+    panels: 3,
+    sfx: '啪,叮',
+    redLine: '灯亮了起来',
+    avatar: 'front',
+    eyes: 'dot',
+    dateTag: '2026.11.15',
+    accent: '#C81E1E',
+    duration: 0
+  };
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+
+  const W = 1920, H = 1080;
+  const PAPER = '#F6F4F0';
+  const SHEET_BG = '#FFFFFF';
+  const PAPER_DOT = 'rgba(20,20,20,0.34)';
+  const INK = '#141414';
+
+  const pick = (val, fb) => (val === undefined || val === null || val === '') ? fb : val;
+  const splitPipe = (s) => String(s).split(/[|｜]/).map(x => x.trim()).filter(x => x.length > 0);
+  const splitComma = (s) => String(s).split(/[,，、]/).map(x => x.trim()).filter(x => x.length > 0);
+
+  /* ---------------- 槽位 ---------------- */
+  let PAGES = splitPipe(pick(v.pages, FALLBACK.pages));
+  if (!PAGES.length) PAGES = FALLBACK.pages.split('|');
+  const M = PAGES.length;
+
+  let PN = parseFloat(pick(v.panels, FALLBACK.panels));
+  if (!isFinite(PN)) PN = FALLBACK.panels;
+  PN = Math.max(1, Math.min(4, Math.round(PN)));
+
+  const SFX = splitComma(pick(v.sfx, FALLBACK.sfx));
+  const REDLINE = String(pick(v.redLine, FALLBACK.redLine)).trim();
+  const RED_HIT = PAGES.some(p => p === REDLINE);
+
+  const AVATARS = ['front', 'side', 'back', 'silhouette'];
+  const EYES = ['dot', 'narrow', 'angry', 'shout'];
+  const AVATAR = AVATARS.indexOf(String(pick(v.avatar, FALLBACK.avatar)).trim().toLowerCase()) >= 0
+    ? String(pick(v.avatar, FALLBACK.avatar)).trim().toLowerCase() : 'front';
+  const EYE = EYES.indexOf(String(pick(v.eyes, FALLBACK.eyes)).trim().toLowerCase()) >= 0
+    ? String(pick(v.eyes, FALLBACK.eyes)).trim().toLowerCase() : 'dot';
+  const DATE_TEXT = String(pick(v.dateTag, FALLBACK.dateTag)).trim() || FALLBACK.dateTag;
+  const ACCENT = String(pick(v.accent, FALLBACK.accent)).trim() || FALLBACK.accent;
+
+  let DUR = parseFloat(pick(v.duration, FALLBACK.duration));
+  if (!isFinite(DUR) || DUR < 0) DUR = 0;
+  const PAGE = DUR > 0 ? DUR / M : 2.8;
+  const TOTAL = PAGE * M;
+
+  /* ---------------- 版面常量（纸页本地坐标：左上角 0,0） ---------------- */
+  const SX = 120, SY = 40, SW = 1680, SH = 1000;   /* 纸页在满页镜头下的屏幕位置 */
+  const GX = 26, GY = 132, GW = 1628, GH = 792;    /* 分格区 */
+  const GUT = 18, BW = 6;                          /* 格间距 / 格线宽 */
+
+  const REVEAL_END = 0.09;   /* 露空分格 */
+  const PANEL_END = 0.80;    /* 分格读完 */
+  const PULL_END = 0.86;     /* 拉远看全页 */
+  const TURN_START = 0.86;   /* 绕左边翻页 */
+
+  const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+  const easeOutCubic = (x) => { x = clamp(x, 0, 1); return 1 - Math.pow(1 - x, 3); };
+  const easeInOutCubic = (x) => { x = clamp(x, 0, 1); return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+  const easeOutBack = (x) => { x = clamp(x, 0, 1); const s = 1.35; return 1 + (s + 1) * Math.pow(x - 1, 3) + s * Math.pow(x - 1, 2); };
+
+  const canvas = document.getElementById('cv');
+  const ctx = canvas.getContext('2d');
+  const turnCv = document.createElement('canvas');
+  turnCv.width = W; turnCv.height = H;
+  const turnCtx = turnCv.getContext('2d');
+
+  const FONT_T = (px, w) => w + ' ' + px + 'px MiSans, "PingFang SC", "Microsoft YaHei", sans-serif';
+  const FONT_H = (px, w) => w + ' ' + px + 'px MEBHeiHeiTi, "PingFang SC", "Microsoft YaHei", sans-serif';
+
+  /* ---------------- 分格排布 ---------------- */
+  function layoutPanels(n) {
+    const rows = (n === 1) ? [1] : (n === 2) ? [1, 1] : (n === 3) ? [1, 2] : [2, 2];
+    const availH = GH - (rows.length - 1) * GUT;
+    const out = [];
+    let y = GY;
+    for (let ri = 0; ri < rows.length; ri++) {
+      const cnt = rows[ri];
+      const h = (n === 3) ? availH * (ri === 0 ? 0.46 : 0.54) : availH / rows.length;
+      const w = (GW - (cnt - 1) * GUT) / cnt;
+      for (let ci = 0; ci < cnt; ci++) out.push({ x: GX + ci * (w + GUT), y: y, w: w, h: h });
+      y += h + GUT;
+    }
+    return out;
+  }
+  const PANELS = layoutPanels(PN);
+
+  /* 主角在格内的站位（左右交替） */
+  function avatarPos(i, r) {
+    return {
+      x: r.x + (i % 2 === 0 ? 0.30 : 0.70) * r.w,
+      y: r.y + r.h * 0.50,
+      r: clamp(r.h * 0.19, 38, 92)
+    };
+  }
+  function panelFocus(i) {
+    const r = PANELS[i];
+    const a = avatarPos(i, r);
+    /* 推到「整格几乎入画」：不过分贴近，保留格内空间 */
+    return { s: Math.min(Math.max(W / r.w, H / r.h) * 0.9, 2.45), x: a.x, y: a.y };
+  }
+  const FULL = { s: 1, x: SW / 2, y: SH / 2 };
+
+  /* ---------------- 镜头 ---------------- */
+  function camera(u) {
+    let s, x, y;
+    if (u <= REVEAL_END) {
+      s = FULL.s; x = FULL.x; y = FULL.y;
+    } else if (u < PANEL_END) {
+      const slot = (PANEL_END - REVEAL_END) / PN;
+      const i = Math.min(PN - 1, Math.floor((u - REVEAL_END) / slot));
+      const vv = clamp((u - REVEAL_END - i * slot) / slot, 0, 1);
+      const cur = panelFocus(i);
+      const prev = (i === 0) ? FULL : panelFocus(i - 1);
+      const e = easeInOutCubic(vv);
+      s = prev.s + (cur.s - prev.s) * e;
+      x = prev.x + (cur.x - prev.x) * e;
+      y = prev.y + (cur.y - prev.y) * e;
+    } else if (u < PULL_END) {
+      const last = panelFocus(PN - 1);
+      const e = easeInOutCubic((u - PANEL_END) / (PULL_END - PANEL_END));
+      s = last.s + (FULL.s - last.s) * e;
+      x = last.x + (FULL.x - last.x) * e;
+      y = last.y + (FULL.y - last.y) * e;
+    } else {
+      s = FULL.s; x = FULL.x; y = FULL.y;
+    }
+    return { s: s, x: x, y: y };
+  }
+
+  /* 呼吸位移：保证任意两帧都有可见差异（纯时间函数） */
+  function drift(t) {
+    return {
+      dx: 17 * Math.sin(2 * Math.PI * t / 8.3) + 8 * Math.sin(2 * Math.PI * t / 3.7 + 1.1),
+      dy: 11 * Math.sin(2 * Math.PI * t / 6.1 + 0.5) + 5 * Math.sin(2 * Math.PI * t / 2.9 + 2.2),
+      ds: 1 + 0.004 * Math.sin(2 * Math.PI * t / 6.5)
+    };
+  }
+
+  /* ---------------- 网点 ---------------- */
+  /* 固定格点 + 相位流动：ox/oy 是纯时间函数，绝不用随机数 */
+  function halftone(g, x, y, w, h, gap, r, ox, oy) {
+    if (w <= 0 || h <= 0) return;
+    g.beginPath();
+    let row = 0;
+    const startY = y - (((oy % gap) + gap) % gap);
+    for (let yy = startY; yy < y + h + gap; yy += gap, row++) {
+      const off = (row % 2 === 0) ? 0 : gap / 2;
+      const startX = x - ((((ox + off) % gap) + gap) % gap);
+      for (let xx = startX; xx < x + w + gap; xx += gap) {
+        g.moveTo(xx + r, yy);
+        g.arc(xx, yy, r, 0, Math.PI * 2);
+      }
+    }
+    g.fill();
+  }
+
+  /* ---------------- 文字排版 ---------------- */
+  function tokenize(s) {
+    const out = []; let buf = '';
+    for (const ch of String(s)) {
+      if (/[\x00-\x7F]/.test(ch)) { buf += ch; }
+      else { if (buf) { out.push(buf); buf = ''; } out.push(ch); }
+    }
+    if (buf) out.push(buf);
+    return out;
+  }
+  function wrapText(g, text, maxW, font) {
+    g.font = font;
+    const rows = []; let cur = '';
+    for (const tk of tokenize(text)) {
+      if (g.measureText(tk).width > maxW) {
+        let piece = '';
+        for (const ch of tk) {
+          if (piece && g.measureText(piece + ch).width > maxW) { rows.push(piece); piece = ch; }
+          else piece += ch;
+        }
+        if (cur) { rows.push(cur); cur = ''; }
+        if (piece) cur = piece;
+        continue;
+      }
+      const test = cur + tk;
+      if (cur && g.measureText(test).width > maxW) { rows.push(cur); cur = tk; }
+      else cur = test;
+    }
+    if (cur) rows.push(cur);
+    return rows.length ? rows : [''];
+  }
+
+  /* ---------------- 主角头像：形态四型 × 眼型四型 ---------------- */
+  function drawEyes(g, ex, ey, er, type, col) {
+    g.fillStyle = col; g.strokeStyle = col;
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    if (type === 'dot') {
+      [-1, 1].forEach(s => {
+        g.beginPath(); g.arc(ex + s * er * 1.0, ey, er * 0.26, 0, Math.PI * 2); g.fill();
+      });
+    } else if (type === 'narrow') {
+      [-1, 1].forEach(s => {
+        g.lineWidth = er * 0.26;
+        g.beginPath();
+        g.moveTo(ex + s * er * 1.0 - er * 0.4, ey);
+        g.quadraticCurveTo(ex + s * er * 1.0, ey - er * 0.24, ex + s * er * 1.0 + er * 0.4, ey);
+        g.stroke();
+      });
+    } else if (type === 'angry') {
+      [-1, 1].forEach(s => {
+        g.beginPath(); g.arc(ex + s * er * 1.0, ey + er * 0.1, er * 0.24, 0, Math.PI * 2); g.fill();
+        g.lineWidth = er * 0.32;
+        g.beginPath();
+        g.moveTo(ex + s * er * 1.0 - s * er * 0.48, ey - er * 0.66);
+        g.lineTo(ex + s * er * 1.0 + s * er * 0.46, ey - er * 0.34);
+        g.stroke();
+      });
+    } else {
+      [-1, 1].forEach(s => {
+        g.beginPath();
+        g.ellipse(ex + s * er * 1.0, ey, er * 0.42, er * 0.5, 0, 0, Math.PI * 2);
+        g.fill();
+      });
+    }
+  }
+
+  function drawMouth(g, ex, ey, er, type, col, isLast) {
+    g.fillStyle = col; g.strokeStyle = col; g.lineCap = 'round';
+    if (type === 'shout') {
+      g.beginPath();
+      g.ellipse(ex, ey + er * 1.05, er * 0.42, er * 0.52, 0, 0, Math.PI * 2);
+      g.fill();
+      g.save();
+      g.beginPath();
+      g.ellipse(ex, ey + er * 1.05, er * 0.42, er * 0.52, 0, 0, Math.PI * 2);
+      g.clip();
+      g.fillStyle = '#FFFFFF';
+      g.fillRect(ex - er * 0.42, ey + er * 0.72, er * 0.84, er * 0.16);
+      g.restore();
+    } else {
+      g.lineWidth = er * 0.18;
+      g.beginPath();
+      g.moveTo(ex - er * 0.34, ey + er * 0.95);
+      g.quadraticCurveTo(ex, ey + er * 1.18, ex + er * 0.34, ey + er * 0.95);
+      g.stroke();
+    }
+    if (!isLast) return;
+    /* 最后一格的情绪强调符号 */
+    if (type === 'shout') {
+      g.lineWidth = er * 0.2;
+      g.beginPath(); g.moveTo(ex + er * 1.9, ey - er * 1.5); g.lineTo(ex + er * 1.9, ey - er * 0.9); g.stroke();
+      g.beginPath(); g.arc(ex + er * 1.9, ey - er * 0.72, er * 0.13, 0, Math.PI * 2); g.fill();
+    } else if (type === 'angry') {
+      g.lineWidth = er * 0.12;
+      for (let k = 0; k < 3; k++) {
+        const a = -0.9 + k * 0.35;
+        g.beginPath();
+        g.moveTo(ex + Math.cos(a) * er * 1.5, ey + Math.sin(a) * er * 1.5);
+        g.lineTo(ex + Math.cos(a) * er * 2.05, ey + Math.sin(a) * er * 2.05);
+        g.stroke();
+      }
+    } else if (type === 'narrow') {
+      g.beginPath();
+      g.moveTo(ex + er * 1.9, ey - er * 1.35);
+      g.quadraticCurveTo(ex + er * 2.3, ey - er * 0.6, ex + er * 1.9, ey - er * 0.2);
+      g.quadraticCurveTo(ex + er * 1.62, ey - er * 0.8, ex + er * 1.9, ey - er * 1.35);
+      g.closePath(); g.fill();
+    }
+  }
+
+  /* 形态：front 正面 / side 侧面 / back 背面 / silhouette 剪影 */
+  function drawAvatar(g, ax, ay, r, isLast) {
+    const sil = (AVATAR === 'silhouette');
+    g.save();
+    g.translate(ax, ay);
+    /* 躯干（肩线 + 脖子） */
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(-r * 1.0, r * 2.0);
+    g.lineTo(-r * 0.74, r * 0.86);
+    g.quadraticCurveTo(-r * 0.52, r * 0.52, 0, r * 0.5);
+    g.quadraticCurveTo(r * 0.52, r * 0.52, r * 0.74, r * 0.86);
+    g.lineTo(r * 1.0, r * 2.0);
+    g.closePath();
+    if (sil) { g.fillStyle = INK; g.fill(); }
+    else { g.fillStyle = SHEET_BG; g.strokeStyle = INK; g.lineWidth = r * 0.1; g.fill(); g.stroke(); }
+
+    if (sil) {
+      /* 剪影：整颗头是黑块，眼/嘴用纸色留白 */
+      g.fillStyle = INK;
+      g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.fill();
+      drawEyes(g, 0, r * 0.04, r * 0.6, EYE, SHEET_BG);
+      drawMouth(g, 0, r * 0.04, r * 0.6, EYE, SHEET_BG, isLast);
+      g.restore();
+      return;
+    }
+
+    if (AVATAR === 'front') {
+      /* 脸 */
+      g.fillStyle = SHEET_BG; g.strokeStyle = INK; g.lineWidth = r * 0.1;
+      g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.fill(); g.stroke();
+      /* 头发：顶部发盖 + 一撮斜刘海 */
+      g.fillStyle = INK;
+      g.beginPath();
+      g.arc(0, 0, r, Math.PI * 1.05, Math.PI * 1.95);
+      g.closePath(); g.fill();
+      g.beginPath();
+      g.moveTo(-r * 0.99, -r * 0.16);
+      g.quadraticCurveTo(-r * 0.62, -r * 0.62, -r * 0.18, -r * 0.14);
+      g.closePath(); g.fill();
+      /* 耳朵（在脸之后，露出脸外沿） */
+      g.fillStyle = SHEET_BG; g.strokeStyle = INK; g.lineWidth = r * 0.09;
+      [-1, 1].forEach(s => {
+        g.beginPath(); g.arc(s * r * 1.05, r * 0.12, r * 0.17, 0, Math.PI * 2); g.fill(); g.stroke();
+      });
+      drawEyes(g, 0, r * 0.06, r * 0.6, EYE, INK);
+      drawMouth(g, 0, r * 0.06, r * 0.6, EYE, INK, isLast);
+    } else if (AVATAR === 'side') {
+      g.fillStyle = SHEET_BG; g.strokeStyle = INK; g.lineWidth = r * 0.1;
+      g.beginPath(); g.arc(-r * 0.14, 0, r * 0.92, 0, Math.PI * 2); g.fill(); g.stroke();
+      /* 鼻子 */
+      g.beginPath();
+      g.moveTo(r * 0.62, -r * 0.12); g.lineTo(r * 1.02, r * 0.08); g.lineTo(r * 0.6, r * 0.26);
+      g.closePath(); g.fill(); g.stroke();
+      /* 耳朵 */
+      g.beginPath(); g.arc(-r * 0.44, r * 0.08, r * 0.17, 0, Math.PI * 2); g.fill(); g.stroke();
+      /* 头发 */
+      g.fillStyle = INK;
+      g.beginPath();
+      g.arc(-r * 0.14, 0, r * 0.92, Math.PI * 1.06, Math.PI * 1.96);
+      g.closePath(); g.fill();
+      g.beginPath();
+      g.moveTo(-r * 0.2, -r * 0.68);
+      g.quadraticCurveTo(r * 0.42, -r * 0.62, r * 0.3, -r * 0.1);
+      g.closePath(); g.fill();
+      drawEyes(g, r * 0.16, r * 0.06, r * 0.54, EYE, INK);
+      drawMouth(g, r * 0.16, r * 0.06, r * 0.54, EYE, INK, isLast);
+    } else {
+      /* 背面：整个后脑勺是黑发，看不到脸 */
+      g.fillStyle = INK;
+      g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = INK; g.lineWidth = r * 0.1;
+      g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.stroke();
+      g.strokeStyle = SHEET_BG; g.lineWidth = r * 0.07;
+      g.beginPath(); g.arc(0, -r * 0.04, r * 0.9, 0, Math.PI * 2); g.stroke();
+      g.strokeStyle = INK;
+      g.beginPath();
+      g.moveTo(-r * 0.32, r * 0.5); g.lineTo(-r * 0.26, r * 0.92);
+      g.moveTo(r * 0.32, r * 0.5); g.lineTo(r * 0.26, r * 0.92);
+      g.stroke();
+      if (isLast && EYE === 'shout') {
+        g.fillStyle = SHEET_BG;
+        g.beginPath(); g.arc(r * 0.6, -r * 0.52, r * 0.12, 0, Math.PI * 2); g.fill();
+      }
+    }
+    g.restore();
+  }
+
+  /* ---------------- 道具（每格一个矢量小景，尺寸跟着主角走） ---------------- */
+  function drawProp(g, kind, px, baseY, unit) {
+    g.strokeStyle = INK; g.fillStyle = SHEET_BG; g.lineWidth = Math.max(3, unit * 0.07);
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    if (kind === 0) {
+      /* 门 */
+      g.beginPath(); g.rect(px - unit * 0.42, baseY - unit * 1.9, unit * 0.84, unit * 1.9); g.fill(); g.stroke();
+      g.beginPath(); g.rect(px - unit * 0.26, baseY - unit * 1.62, unit * 0.52, unit * 0.5); g.stroke();
+      g.beginPath(); g.arc(px + unit * 0.22, baseY - unit * 0.8, unit * 0.07, 0, Math.PI * 2); g.fill();
+    } else if (kind === 1) {
+      /* 台灯 */
+      g.beginPath();
+      g.moveTo(px - unit * 0.52, baseY - unit * 1.15); g.lineTo(px + unit * 0.52, baseY - unit * 1.15);
+      g.lineTo(px + unit * 0.28, baseY - unit * 1.6); g.lineTo(px - unit * 0.28, baseY - unit * 1.6);
+      g.closePath(); g.fill(); g.stroke();
+      g.beginPath(); g.moveTo(px, baseY - unit * 1.15); g.lineTo(px, baseY - unit * 0.42); g.stroke();
+      g.beginPath(); g.rect(px - unit * 0.42, baseY - unit * 0.42, unit * 0.84, unit * 0.42); g.fill(); g.stroke();
+    } else if (kind === 2) {
+      /* 木箱 */
+      g.beginPath(); g.rect(px - unit * 0.55, baseY - unit * 0.9, unit * 1.1, unit * 0.9); g.fill(); g.stroke();
+      g.beginPath();
+      g.moveTo(px - unit * 0.55, baseY - unit * 0.9); g.lineTo(px + unit * 0.55, baseY);
+      g.moveTo(px + unit * 0.55, baseY - unit * 0.9); g.lineTo(px - unit * 0.55, baseY);
+      g.stroke();
+    } else {
+      /* 盆栽 */
+      g.beginPath();
+      g.moveTo(px - unit * 0.4, baseY - unit * 0.55); g.lineTo(px + unit * 0.4, baseY - unit * 0.55);
+      g.lineTo(px + unit * 0.28, baseY); g.lineTo(px - unit * 0.28, baseY);
+      g.closePath(); g.fill(); g.stroke();
+      for (let k = -1; k <= 1; k++) {
+        g.beginPath();
+        g.ellipse(px + k * unit * 0.34, baseY - unit * 0.95 - (k === 0 ? unit * 0.3 : 0),
+          unit * 0.28, unit * 0.2, k * 0.5, 0, Math.PI * 2);
+        g.fill(); g.stroke();
+      }
+    }
+  }
+
+  /* ---------------- 气泡（白底 + 黑描边） ---------------- */
+  function drawBubble(g, r, text, progress, isRed) {
+    if (progress <= 0.005) return;
+    const maxW = r.w * 0.62;
+    let size = 44, rows = [], tw = 0;
+    for (; size >= 24; size -= 2) {
+      rows = wrapText(g, text, maxW, FONT_T(size, '700'));
+      tw = 0;
+      for (const row of rows) tw = Math.max(tw, g.measureText(row).width);
+      if (tw <= maxW) break;
+    }
+    const lineH = size * 1.24;
+    const bw = tw + 58, bh = rows.length * lineH + size * 0.72;
+    const bx = r.x + r.w * 0.52, by = r.y + r.h * 0.25;
+    const sc = 0.5 + 0.5 * easeOutBack(progress);
+    g.save();
+    g.translate(bx, by); g.scale(sc, sc); g.translate(-bx, -by);
+    /* 尾巴 */
+    g.fillStyle = SHEET_BG; g.strokeStyle = INK; g.lineWidth = 5; g.lineJoin = 'round';
+    g.beginPath();
+    g.moveTo(bx - bw * 0.2, by + bh * 0.36);
+    g.lineTo(bx - bw * 0.38, by + bh * 0.98);
+    g.lineTo(bx + bw * 0.02, by + bh * 0.4);
+    g.closePath(); g.fill(); g.stroke();
+    /* 泡体 */
+    g.beginPath();
+    g.ellipse(bx, by, bw / 2, bh / 2, 0, 0, Math.PI * 2);
+    g.fill(); g.stroke();
+    /* 字 */
+    g.font = FONT_T(size, '700');
+    g.fillStyle = isRed ? ACCENT : INK;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const y0 = by - (rows.length - 1) * lineH / 2;
+    for (let k = 0; k < rows.length; k++) g.fillText(rows[k], bx, y0 + k * lineH);
+    g.restore();
+  }
+
+  /* ---------------- 拟声字（字身网点 + 白描边 + 红描边 + 轻旋转 + 落拍落下） ---------------- */
+  const sfxCache = {};
+  function buildSfx(word, size) {
+    const key = word + '|' + size;
+    if (sfxCache[key]) return sfxCache[key];
+    const font = FONT_H(size, '900');
+    ctx.font = font;
+    const tw = ctx.measureText(word).width;
+    const pad = Math.ceil(size * 0.9);
+    const w = Math.ceil(tw + pad * 2), h = Math.ceil(size * 2.4);
+    /* 1) 白色字形当遮罩 */
+    const mk = document.createElement('canvas');
+    mk.width = w; mk.height = h;
+    const mg = mk.getContext('2d');
+    mg.font = font; mg.textAlign = 'center'; mg.textBaseline = 'middle';
+    mg.fillStyle = '#FFFFFF';
+    mg.fillText(word, w / 2, h / 2);
+    /* 2) source-atop：网点只落在字形里，字形外保持透明 */
+    mg.globalCompositeOperation = 'source-atop';
+    mg.fillStyle = 'rgba(20,20,20,0.95)';
+    const gap = Math.max(4, size * 0.08), r = gap * 0.45;
+    mg.beginPath();
+    for (let yy = 0; yy < h + gap; yy += gap) {
+      for (let xx = 0; xx < w + gap; xx += gap) {
+        mg.moveTo(xx + r, yy);
+        mg.arc(xx, yy, r, 0, Math.PI * 2);
+      }
+    }
+    mg.fill();
+    mg.globalCompositeOperation = 'source-over';
+    /* 3) 合成：红描边 -> 白描边 -> 网点字身 */
+    const full = document.createElement('canvas');
+    full.width = w; full.height = h;
+    const fg = full.getContext('2d');
+    fg.font = font; fg.textAlign = 'center'; fg.textBaseline = 'middle';
+    fg.lineJoin = 'round'; fg.miterLimit = 2;
+    fg.strokeStyle = ACCENT; fg.lineWidth = size * 0.15; fg.strokeText(word, w / 2, h / 2);
+    fg.strokeStyle = '#FFFFFF'; fg.lineWidth = size * 0.06; fg.strokeText(word, w / 2, h / 2);
+    fg.drawImage(mk, 0, 0);
+    const out = { c: full, w: w, h: h };
+    sfxCache[key] = out;
+    return out;
+  }
+
+  function drawSfx(g, r, word, progress) {
+    if (!word || progress <= 0.005) return;
+    const p = clamp(progress, 0, 1);
+    const drop = (1 - easeOutCubic(p)) * 230;
+    const rot = -0.15 + 0.06 * (1 - p);
+    const sc = 0.82 + 0.18 * easeOutCubic(p);
+    let size = Math.min(80, r.h * 0.21);
+    ctx.font = FONT_H(size, '900');
+    let tw = ctx.measureText(word).width;
+    const need = tw + size * 1.8;
+    if (need > r.w * 0.72) {
+      size = Math.max(24, Math.floor(size * (r.w * 0.72) / need));
+      ctx.font = FONT_H(size, '900');
+      tw = ctx.measureText(word).width;
+    }
+    const asset = buildSfx(word, size);
+    const x = r.x + r.w * 0.68, y = r.y + r.h * 0.28;
+    g.save();
+    g.translate(x, y - drop); g.rotate(rot); g.scale(sc, sc);
+    g.drawImage(asset.c, -asset.w / 2, -asset.h / 2);
+    g.restore();
+  }
+
+  /* ---------------- 页面零件 ---------------- */
+  function drawCaption(g, pageIdx) {
+    const txt = '第 ' + (pageIdx + 1) + ' 页 / 共 ' + M + ' 页';
+    g.font = FONT_T(30, '700');
+    const w = g.measureText(txt).width + 46;
+    g.fillStyle = INK;
+    g.fillRect(GX, 22, w, 60);
+    g.fillStyle = SHEET_BG;
+    g.textAlign = 'left'; g.textBaseline = 'middle';
+    g.fillText(txt, GX + 23, 53);
+  }
+
+  function drawDateTag(g) {
+    g.save();
+    g.translate(SW - 176, 52);
+    g.rotate(-0.07);
+    g.font = FONT_T(30, '700');
+    const w = Math.max(150, g.measureText(DATE_TEXT).width + 44);
+    g.fillStyle = SHEET_BG; g.strokeStyle = INK; g.lineWidth = 4;
+    g.fillRect(-w / 2, -27, w, 54);
+    g.strokeRect(-w / 2, -27, w, 54);
+    g.fillStyle = INK;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(DATE_TEXT, 0, 1);
+    g.restore();
+  }
+
+  function drawStamp(g, pageIdx, alpha, scale) {
+    if (alpha <= 0.005) return;
+    g.save();
+    g.translate(SW - 44, SH - 40);
+    g.rotate(-0.13);
+    g.scale(scale, scale);
+    g.globalAlpha = alpha;
+    g.strokeStyle = ACCENT; g.lineWidth = 5;
+    g.strokeRect(-48, -48, 96, 96);
+    g.lineWidth = 2;
+    g.strokeRect(-38, -38, 76, 76);
+    g.fillStyle = ACCENT;
+    g.font = FONT_H(32, '900');
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText((pageIdx + 1) + '/' + M, 0, 2);
+    g.restore();
+    g.globalAlpha = 1;
+  }
+
+  /* ---------------- 一格内容 ---------------- */
+  function drawPanelContent(g, i, r, printP, t, isLast) {
+    const wipe = r.w * printP;
+    if (wipe <= 0.6) return;
+    const phase = t * 9;
+    const pulse = 1 + 0.05 * Math.sin(2 * Math.PI * t / 3.3 + i * 0.7);
+    const horizon = r.y + r.h * 0.66;
+    g.save();
+    g.beginPath();
+    g.rect(r.x, r.y, wipe, r.h);
+    g.clip();
+    /* 天空网点（疏） */
+    g.fillStyle = 'rgba(20,20,20,0.30)';
+    halftone(g, r.x, r.y, wipe, horizon - r.y, 17, 1.9 * pulse, phase, phase * 0.6);
+    /* 地面网点（密） */
+    g.fillStyle = 'rgba(20,20,20,0.52)';
+    halftone(g, r.x, horizon, wipe, r.y + r.h - horizon, 13, 2.4 * pulse, phase * 1.1, phase * 0.7);
+    /* 地平线 */
+    g.strokeStyle = INK; g.lineWidth = 5;
+    g.beginPath(); g.moveTo(r.x, horizon); g.lineTo(r.x + wipe, horizon); g.stroke();
+    /* 道具（第 1 格放远端，避免压住气泡） */
+    const a = avatarPos(i, r);
+    const side = (i % 2 === 0) ? 1 : -1;
+    const px = (i === 0) ? (r.x + r.w * 0.87) : (a.x + side * r.w * 0.26);
+    drawProp(g, i % 4, px, horizon, a.r * 1.7);
+    /* 主角 */
+    drawAvatar(g, a.x, a.y, a.r, isLast);
+    g.restore();
+  }
+
+  /* ---------------- 一页 ---------------- */
+  function drawPage(g, pageIdx, u, t, noBreath) {
+    const cam = camera(u);
+    const df = noBreath ? { dx: 0, dy: 0, ds: 1 } : drift(t);
+    g.save();
+    g.translate(W / 2 + df.dx, H / 2 + df.dy);
+    g.scale(cam.s * df.ds, cam.s * df.ds);
+    g.translate(-cam.x, -cam.y);
+    /* 纸页投影 + 纸页 */
+    g.fillStyle = '#D9D5CD';
+    g.fillRect(8, 10, SW, SH);
+    g.fillStyle = SHEET_BG;
+    g.fillRect(0, 0, SW, SH);
+    /* 格内容 */
+    const slot = (PANEL_END - REVEAL_END) / PN;
+    for (let i = 0; i < PN; i++) {
+      const st = REVEAL_END + i * slot;
+      const vv = clamp((u - st) / slot, 0, 1);
+      const printP = clamp((vv - 0.10) / 0.38, 0, 1);
+      drawPanelContent(g, i, PANELS[i], printP, t, i === PN - 1);
+    }
+    /* 格线 */
+    g.strokeStyle = INK;
+    g.globalAlpha = 0.45 + 0.55 * clamp(u / REVEAL_END, 0, 1);
+    g.lineWidth = BW;
+    for (const r of PANELS) g.strokeRect(r.x, r.y, r.w, r.h);
+    g.globalAlpha = 1;
+    /* 气泡（第一格） */
+    const st0 = REVEAL_END;
+    const v0 = clamp((u - st0) / slot, 0, 1);
+    const bubbleP = clamp((v0 - 0.50) / 0.22, 0, 1);
+    drawBubble(g, PANELS[0], PAGES[pageIdx] || '', bubbleP, PAGES[pageIdx] === REDLINE);
+    /* 拟声字（最后一格） */
+    const stL = REVEAL_END + (PN - 1) * slot;
+    const vL = clamp((u - stL) / slot, 0, 1);
+    const sfxP = clamp((vL - 0.50) / 0.25, 0, 1);
+    drawSfx(g, PANELS[PN - 1], SFX[pageIdx] || '', sfxP);
+    /* 旁白框 / 日期签 / 页角章 */
+    drawCaption(g, pageIdx);
+    drawDateTag(g);
+    const stampP = clamp((u - (PULL_END + 0.01)) / 0.08, 0, 1);
+    drawStamp(g, pageIdx, 0.25 + 0.75 * stampP, 0.9 + 0.1 * easeOutCubic(stampP));
+    /* 纸页外框 */
+    g.strokeStyle = INK; g.lineWidth = 8;
+    g.strokeRect(0, 0, SW, SH);
+    g.restore();
+  }
+
+  /* ---------------- 翻页（绕左边：梯形收窄 + 曲线卷边 + 平面阴影带） ---------------- */
+  function drawTurn(g, p) {
+    const theta = (Math.PI / 2) * p;
+    const cs = Math.cos(theta);
+    const bulge = 68 * Math.sin(Math.PI * p);
+    const lift = 34 * Math.sin(Math.PI * p);
+    const n = 64;
+    const edges = [];
+    for (let j = 0; j <= n; j++) {
+      const uu = j / n;
+      /* 前缘抬起（页面离开纸面的感觉） */
+      const dy = (uu > 0.7) ? -lift * ((uu - 0.7) / 0.3) : 0;
+      edges.push({
+        x: SX + uu * SW * cs + bulge * uu * uu,
+        y: SY + dy
+      });
+    }
+    /* 落在下一页上的阴影带（平面色块，不用渐变） */
+    const lead = edges[n].x;
+    const sa = 0.18 * (1 - p);
+    if (sa > 0.004) {
+      g.fillStyle = 'rgba(20,20,20,' + sa.toFixed(3) + ')';
+      g.fillRect(lead, SY, 96, SH);
+      g.fillStyle = 'rgba(20,20,20,' + (sa * 0.55).toFixed(3) + ')';
+      g.fillRect(lead + 96, SY, 70, SH);
+    }
+    /* 卷起的旧页（条带形变：横向收窄成梯形 + 曲线卷边） */
+    for (let j = 0; j < n; j++) {
+      const x0 = edges[j].x, x1 = edges[j + 1].x;
+      const sx0 = SX + (j / n) * SW, sx1 = SX + ((j + 1) / n) * SW;
+      const w = x1 - x0;
+      if (w <= 0.25) continue;
+      g.drawImage(turnCv, sx0, SY, sx1 - sx0, SH, x0, edges[j].y, w, SH);
+    }
+    /* 旧页整体压暗（平涂） */
+    g.fillStyle = 'rgba(20,20,20,' + (0.26 * p).toFixed(3) + ')';
+    g.beginPath();
+    g.moveTo(edges[0].x, edges[0].y);
+    for (let j = 1; j <= n; j++) g.lineTo(edges[j].x, edges[j].y);
+    for (let j = n; j >= 0; j--) g.lineTo(edges[j].x, edges[j].y + SH);
+    g.closePath();
+    g.fill();
+    /* 卷边阴影 */
+    if (cs > 0.02) {
+      g.fillStyle = 'rgba(20,20,20,' + (0.3 * p).toFixed(3) + ')';
+      g.fillRect(Math.max(SX, lead - 46), SY, 46, SH);
+    }
+  }
+
+  /* ---------------- 画面（纯函数） ---------------- */
+  function render(t) {
+    t = clamp(t, 0, TOTAL);
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, W, H);
+    /* 纸底网点（只画纸页之外的边距，相位随 t 流动） */
+    const phase = t * 9;
+    const pulse = 1 + 0.05 * Math.sin(2 * Math.PI * t / 3.3);
+    ctx.fillStyle = PAPER_DOT;
+    halftone(ctx, 0, 0, W, SY, 15, 2.1 * pulse, phase, phase * 0.6);
+    halftone(ctx, 0, SY + SH, W, H - (SY + SH), 15, 2.1 * pulse, phase, phase * 0.6);
+    halftone(ctx, 0, SY, SX, SH, 15, 2.1 * pulse, phase, phase * 0.6);
+    halftone(ctx, SX + SW, SY, W - (SX + SW), SH, 15, 2.1 * pulse, phase, phase * 0.6);
+
+    const pi = Math.min(M - 1, Math.floor(t / PAGE));
+    const u = clamp((t - pi * PAGE) / PAGE, 0, 1);
+    const last = (pi === M - 1);
+
+    if (!last && u >= TURN_START) {
+      const p = (u - TURN_START) / (1 - TURN_START);
+      /* 底下露出下一页（未印内容的空分格） */
+      drawPage(ctx, pi + 1, 0, t, true);
+      /* 旧页先离屏渲染，再做条带形变 */
+      turnCtx.clearRect(0, 0, W, H);
+      drawPage(turnCtx, pi, u, t, true);
+      drawTurn(ctx, p);
+    } else {
+      drawPage(ctx, pi, u, t, false);
+    }
+  }
+
+  /* ---------------- 时间轴 ---------------- */
+  const stage = document.getElementById('stage');
+  stage.setAttribute('data-duration', String(TOTAL));
+  const st = { t: 0 };
+  const tl = gsap.timeline({ paused: true });
+  tl.fromTo(st, { t: 0 }, {
+    t: TOTAL, duration: TOTAL, ease: 'none',
+    onUpdate: function () { render(st.t); }
+  }, 0);
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  window.__seekTo = function (t) {
+    if (typeof t !== 'number' || !isFinite(t)) return;
+    const tt = clamp(t, 0, TOTAL);
+    try { tl.pause(); tl.time(0, false); tl.time(tt, false); } catch (e) { }
+    render(tt);
+  };
+  window.__comicPage = {
+    render: render, total: TOTAL, pages: M, panels: PN, pageDur: PAGE,
+    avatar: AVATAR, eyes: EYE, accent: ACCENT,
+    redLine: REDLINE, redLineHit: RED_HIT, dateTag: DATE_TEXT,
+    sfxCount: Math.min(SFX.length, M),
+    sfxProbe: function (word, size) {
+      const a = buildSfx(word || '啪', size || 80);
+      const g = a.c.getContext('2d');
+      const d = g.getImageData(0, 0, a.w, a.h).data;
+      let opaque = 0, dark = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] > 40) opaque++;
+        if (d[i + 3] > 40 && d[i] < 100) dark++;
+      }
+      return { w: a.w, h: a.h, opaque: opaque, dark: dark, total: a.w * a.h };
+    }
+  };
+
+  const first = function () {
+    const q = /(?:^|[?&])t=([\d.]+)/.exec(location.search);
+    if (q) { render(parseFloat(q[1])); return; }
+    render(0);
+  };
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(first).catch(first);
+  } else { first(); }
+})();
+</script>
+</body>
+</html>

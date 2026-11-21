@@ -1,0 +1,7 @@
+{
+  "name": "scene-prompt",
+  "private": true,
+  "scripts": {
+    "render": "cd ../.. && npm run render -- scene-prompt"
+  }
+}

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "tagText", "type": "string", "label": "小tag文字", "default": "模板库上新"}, {"id": "pkgName", "type": "string", "label": "包名", "default": "neon-motion-pack"}, {"id": "subText", "type": "string", "label": "灰色小字", "default": "摸鱼绿 · 荧光口播包装族"}, {"id": "duration", "type": "number", "label": "总时长（秒，演完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12);
+  color: var(--foreground, #F5F5F3); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+/* 小 tag chip：小图标 + 文字，绿描边深色底 */
+.tagchip{ position:absolute; left:420px; top:300px; height:64px; display:flex; align-items:center;
+  gap:16px; padding:0 30px; background:#12161C; border:1px solid rgba(16,185,129,.85);
+  border-radius:14px; box-shadow:0 0 20px rgba(16,185,129,.3), 0 0 44px rgba(16,185,129,.1);
+  will-change:transform; }
+.tagchip svg{ width:30px; height:30px; overflow:visible; flex:0 0 auto; }
+.tagchip .tic{ stroke:#34D399; stroke-width:2.4; fill:none; stroke-linecap:round; stroke-linejoin:round;
+  filter:drop-shadow(0 0 6px rgba(52,211,153,.6)); }
+.tagchip .ttx{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:30px; letter-spacing:3px;
+  color:#34D399; text-shadow:0 0 12px rgba(52,211,153,.45); white-space:nowrap; max-width:560px;
+  overflow:hidden; text-overflow:ellipsis; }
+
+/* 大 chip：立方体线框图标 + 包名，绿描边发光深色底 */
+.pkgchip{ position:absolute; left:420px; top:400px; height:100px; display:flex; align-items:center;
+  gap:26px; padding:0 40px; background:#12161C; border:1px solid rgba(16,185,129,.9);
+  border-radius:18px;
+  box-shadow:0 0 26px rgba(16,185,129,.35), 0 0 60px rgba(16,185,129,.12), inset 0 0 30px rgba(16,185,129,.05);
+  will-change:transform; }
+.pkgchip svg{ width:60px; height:60px; overflow:visible; flex:0 0 auto; }
+.pkgchip .cic{ stroke:#34D399; stroke-width:3.4; fill:none; stroke-linecap:round; stroke-linejoin:round;
+  filter:drop-shadow(0 0 8px rgba(52,211,153,.6)); }
+.pkgchip .ptx{ font-size:46px; letter-spacing:2px; color:#F5F5F3; white-space:nowrap;
+  max-width:900px; overflow:hidden; text-overflow:ellipsis; }
+
+/* 一行灰色小字 */
+.subline{ position:absolute; left:424px; top:536px; font-size:28px; letter-spacing:2px;
+  color:#9CA3AF; max-width:720px; overflow-wrap:break-word; }
+
+/* 右侧简化卡片轮廓：绿描边空框，描边画出 */
+.framebox{ position:absolute; left:1170px; top:330px; width:480px; height:320px; }
+.framebox svg{ width:100%; height:100%; overflow:visible; }
+.framebox .frect{ stroke:rgba(16,185,129,.85); stroke-width:3; fill:none;
+  filter:drop-shadow(0 0 14px rgba(16,185,129,.35)); }
+.framebox .ftab{ stroke:rgba(52,211,153,.55); stroke-width:3; fill:none; stroke-linecap:round;
+  filter:drop-shadow(0 0 8px rgba(52,211,153,.35)); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="tagchip" id="tagChip">
+        <svg viewBox="0 0 24 24">
+          <path class="tic" d="M12 2 L14.6 9.4 L22 12 L14.6 14.6 L12 22 L9.4 14.6 L2 12 L9.4 9.4 Z"/>
+          <path class="tic" d="M18.5 3.5 L19.4 5.6 L21.5 6.5 L19.4 7.4 L18.5 9.5 L17.6 7.4 L15.5 6.5 L17.6 5.6 Z"/>
+        </svg>
+        <span class="ttx" id="tagTxt"></span>
+      </div>
+
+      <div class="pkgchip" id="pkgChip">
+        <svg viewBox="0 0 64 64">
+          <path class="cic" d="M32 7 L55 19.5 L32 32 L9 19.5 Z"/>
+          <path class="cic" d="M9 19.5 L9 44.5 L32 57 L32 32"/>
+          <path class="cic" d="M55 19.5 L55 44.5 L32 57"/>
+        </svg>
+        <span class="ptx" id="pkgTxt"></span>
+      </div>
+
+      <div class="subline" id="subTxt"></div>
+
+      <div class="framebox" id="frameBox">
+        <svg viewBox="0 0 480 320">
+          <rect class="frect" id="frameRect" x="2" y="2" width="476" height="316" rx="16"
+                pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/>
+          <line class="ftab" id="frameTab" x1="34" y1="46" x2="150" y2="46"
+                pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/>
+        </svg>
+      </div>
+    </div>
+    <script>
+      const FB = {"tagText": "模板库上新", "pkgName": "neon-motion-pack", "subText": "摸鱼绿 · 荧光口播包装族", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $=(s)=>document.querySelector(s);
+      const DUR=+v.duration>0?+v.duration:6;
+      $('[data-composition-id]').setAttribute('data-duration',String(DUR));
+      $('#tagTxt').textContent=v.tagText||'';
+      $('#pkgTxt').textContent=v.pkgName||'';
+      $('#subTxt').textContent=v.subText||'';
+
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+
+      /* 1. tag chip 弹入 */
+      tl.fromTo('#tagChip',{opacity:0,scale:0.6,transformOrigin:'0% 50%'},
+        {opacity:1,scale:1,duration:0.55,ease:'back.out(2.0)'},0.3);
+      /* 2. 大 chip 左滑入 */
+      tl.fromTo('#pkgChip',{x:-180,opacity:0},{x:0,opacity:1,duration:0.7,ease:'power3.out'},0.85);
+      /* 3. 灰色小字淡入 */
+      tl.fromTo('#subTxt',{opacity:0,y:14},{opacity:1,y:0,duration:0.5,ease:'power2.out'},1.5);
+      /* 4. 右框描边画出 */
+      tl.to('#frameRect',{strokeDashoffset:0,duration:1.0,ease:'power2.inOut'},1.9);
+      tl.to('#frameTab',{strokeDashoffset:0,duration:0.4,ease:'power2.out'},2.5);
+      /* 演完定格，占满 data-duration 防黑帧 */
+      tl.set('#root',{opacity:1},Math.max(DUR,3.1));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

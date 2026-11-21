@@ -1,0 +1,13 @@
+{
+  "title": "卡片扇形展开",
+  "subtitle": "从叠 stack 到横排，错峰入场 + 末位高亮",
+  "cardCount": 5,
+  "cardLabels": "方案A|方案B|方案C|方案D|方案E",
+  "cardValues": "32%|48%|56%|72%|89%",
+  "fanSpan": 90,
+  "staggerSec": 0.09,
+  "highlightLast": "true",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

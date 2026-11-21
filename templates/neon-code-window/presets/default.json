@@ -1,0 +1,12 @@
+{
+  "titleEn": "BUILD PROGRESS",
+  "titleCn": "它会一步一步问你",
+  "titleAccent": "一步一步",
+  "windowTitle": "generator.js",
+  "line1": "const profile = await ask(\"你平时忙什么\")",
+  "line2": "const style = await ask(\"喜欢什么风格\")",
+  "line3": "const draft = generate(profile, style)",
+  "line4": "await confirm(draft) // 一步一步确认",
+  "line5": "return publish(draft) // 完成",
+  "duration": 6
+}

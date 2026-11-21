@@ -1,0 +1,7 @@
+{
+  "title": "五层结构，一次看清",
+  "layers": "背景 BG,封面 COVER,碟片 DISC,歌词 LYRICS,控件 CONTROLS",
+  "img1": "./placeholder-1.png",
+  "accent": "#00FF00",
+  "duration": 6
+}

@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "titlePre", "type": "string", "label": "标题前半（白色）", "default": "填对了，它能一次换来"}, {"id": "titleAccent", "type": "string", "label": "标题高亮词（荧光绿）", "default": "两件事"}, {"id": "accentColor", "type": "color", "label": "主色（描边/编号/高亮）", "default": "#10B981"}, {"id": "card1Num", "type": "string", "label": "卡1编号", "default": "01"}, {"id": "card1En", "type": "string", "label": "卡1英文标签", "default": "LESS HALLUCINATION"}, {"id": "card1Title", "type": "string", "label": "卡1中文标题", "default": "少幻觉 · 少撒谎"}, {"id": "card1Sub", "type": "string", "label": "卡1灰色小字", "default": "上下文喂得准，它就不瞎编"}, {"id": "card2Num", "type": "string", "label": "卡2编号", "default": "02"}, {"id": "card2En", "type": "string", "label": "卡2英文标签", "default": "BETTER ANSWERS"}, {"id": "card2Title", "type": "string", "label": "卡2中文标题", "default": "回复质量更高"}, {"id": "card2Sub", "type": "string", "label": "卡2灰色小字", "default": "同样的问题，答得更靠谱"}, {"id": "duration", "type": "number", "label": "总时长（秒，演完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+:root{
+  --acc:#10B981; --accHi:#34D399;
+  --accA85:rgba(16,185,129,.85); --accA80:rgba(16,185,129,.8);
+  --accA50:rgba(16,185,129,.5);  --accA40:rgba(16,185,129,.4);
+  --accA35:rgba(16,185,129,.35); --accA12:rgba(16,185,129,.12); --accA05:rgba(16,185,129,.05);
+  --accHiA55:rgba(52,211,153,.55); --accHiA60:rgba(52,211,153,.6);
+}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12);
+  color: var(--foreground, #F5F5F3); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+/* 顶部标题 */
+.ctitle{ position:absolute; left:0; right:0; top:96px; text-align:center;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:64px; letter-spacing:2px;
+  white-space:nowrap; }
+.ctitle .acc{ color:var(--accHi); text-shadow:0 0 18px var(--accHiA55); position:relative; padding:0 4px; }
+.ctitle .acc::after{ content:''; position:absolute; left:6px; right:6px; bottom:-14px; height:5px;
+  border-radius:3px; background:var(--acc); box-shadow:0 0 14px var(--accA80); }
+
+/* 编号卡片 */
+.card{ position:absolute; top:270px; width:640px; height:480px; background:#12161C;
+  border:1px solid var(--accA85); border-radius:16px;
+  box-shadow:0 0 26px var(--accA35), 0 0 60px var(--accA12), inset 0 0 30px var(--accA05);
+  padding:40px 48px; will-change:transform; }
+#card1{ left:250px; } #card2{ left:1030px; }
+.cnum{ position:absolute; left:44px; top:34px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700;
+  font-size:66px; color:var(--acc); text-shadow:0 0 16px var(--accA50); }
+.cen{ position:absolute; left:150px; top:56px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700;
+  font-size:24px; letter-spacing:7px; color:var(--acc); text-transform:uppercase;
+  text-shadow:0 0 12px var(--accA40); max-width:440px; white-space:nowrap; overflow:hidden; }
+.cicon{ position:absolute; left:50%; top:150px; width:170px; height:170px; margin-left:-85px; }
+.cicon svg{ width:100%; height:100%; overflow:visible; }
+.cicon .stroke{ stroke:var(--accHi); stroke-width:5; fill:none; stroke-linecap:round; stroke-linejoin:round;
+  filter:drop-shadow(0 0 8px var(--accHiA60)); }
+.cx{ position:absolute; left:50%; top:128px; width:214px; height:214px; margin-left:-107px; opacity:0; }
+.cx svg{ width:100%; height:100%; overflow:visible; }
+.cx .xstroke{ stroke:#EF4444; stroke-width:7; fill:none; stroke-linecap:round;
+  filter:drop-shadow(0 0 10px rgba(239,68,68,.7)); }
+.ct{ position:absolute; left:48px; right:48px; top:344px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  font-weight:700; font-size:42px; color:#FFFFFF; max-width:544px; overflow-wrap:break-word; }
+.csub{ position:absolute; left:48px; right:48px; top:404px; font-size:26px;
+  color:rgba(255,255,255,.5); max-width:544px; overflow-wrap:break-word; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="ctitle" id="titleWrap"><span id="tPre"></span><span class="acc" id="tAcc"></span></div>
+
+      <div class="card" id="card1">
+        <div class="cnum e" id="n1"></div>
+        <div class="cen e" id="en1"></div>
+        <div class="cicon e" id="ic1wrap">
+          <svg viewBox="0 0 170 170">
+            <g id="ic1">
+              <!-- 机器人脸 -->
+              <rect class="stroke" x="30" y="52" width="110" height="92" rx="20"/>
+              <line class="stroke" x1="85" y1="52" x2="85" y2="30"/>
+              <circle class="stroke" cx="85" cy="24" r="7"/>
+              <circle class="stroke" cx="62" cy="94" r="9"/>
+              <circle class="stroke" cx="108" cy="94" r="9"/>
+              <path class="stroke" d="M62 124 Q85 108 108 124"/>
+            </g>
+          </svg>
+        </div>
+        <div class="cx" id="xmark">
+          <svg viewBox="0 0 214 214">
+            <circle class="xstroke" cx="107" cy="107" r="98"/>
+            <line class="xstroke" x1="66" y1="66" x2="148" y2="148"/>
+            <line class="xstroke" x1="148" y1="66" x2="66" y2="148"/>
+          </svg>
+        </div>
+        <div class="ct e" id="ct1"></div>
+        <div class="csub e" id="cs1"></div>
+      </div>
+
+      <div class="card" id="card2">
+        <div class="cnum e" id="n2"></div>
+        <div class="cen e" id="en2"></div>
+        <div class="cicon e" id="ic2wrap">
+          <svg viewBox="0 0 170 170">
+            <g id="ic2">
+              <!-- 上升柱状图 -->
+              <line class="stroke" x1="22" y1="148" x2="152" y2="148"/>
+              <rect class="stroke" x="34" y="104" width="24" height="44" rx="4"/>
+              <rect class="stroke" x="74" y="80" width="24" height="68" rx="4"/>
+              <rect class="stroke" x="114" y="52" width="24" height="96" rx="4"/>
+              <path class="stroke" d="M30 96 L78 64 L112 40"/>
+              <path class="stroke" d="M94 34 L114 36 L112 56"/>
+            </g>
+          </svg>
+        </div>
+        <div class="ct e" id="ct2"></div>
+        <div class="csub e" id="cs2"></div>
+      </div>
+    </div>
+    <script>
+      const FB = {"titlePre": "填对了，它能一次换来", "titleAccent": "两件事", "accentColor": "#10B981", "card1Num": "01", "card1En": "LESS HALLUCINATION", "card1Title": "少幻觉 · 少撒谎", "card1Sub": "上下文喂得准，它就不瞎编", "card2Num": "02", "card2En": "BETTER ANSWERS", "card2Title": "回复质量更高", "card2Sub": "同样的问题，答得更靠谱", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $=(s)=>document.querySelector(s);
+      const DUR=+v.duration>0?+v.duration:6;
+      $('[data-composition-id]').setAttribute('data-duration',String(DUR));
+      $('#tPre').textContent=v.titlePre||'';
+      $('#tAcc').textContent=v.titleAccent||'';
+      $('#n1').textContent=v.card1Num||''; $('#en1').textContent=v.card1En||'';
+      $('#ct1').textContent=v.card1Title||''; $('#cs1').textContent=v.card1Sub||'';
+      $('#n2').textContent=v.card2Num||''; $('#en2').textContent=v.card2En||'';
+      $('#ct2').textContent=v.card2Title||''; $('#cs2').textContent=v.card2Sub||'';
+
+      /* 主色变量：accentColor 驱动全部主色/高亮 CSS 变量（含各透明度衍生值） */
+      (function(){
+        const acc=String(v.accentColor||'#10B981').trim();
+        const m=/^#?([0-9a-f]{6})$/i.exec(acc); if(!m) return;
+        const n=parseInt(m[1],16), r=n>>16&255, g=n>>8&255, b=n&255;
+        const rgba=(a)=>'rgba('+r+','+g+','+b+','+a+')';
+        /* 发光高亮：默认主色 #10B981 固定对应 #34D399；自定义主色时向白色混合 35% 推导 */
+        let hr=52,hg=211,hb=153;
+        if(!/^#?10b981$/i.test(m[1])){
+          const t=0.35;
+          hr=Math.round(r+(255-r)*t); hg=Math.round(g+(255-g)*t); hb=Math.round(b+(255-b)*t);
+        }
+        const hrgba=(a)=>'rgba('+hr+','+hg+','+hb+','+a+')';
+        const st=document.documentElement.style;
+        st.setProperty('--acc','#'+m[1].toLowerCase());
+        st.setProperty('--accHi','rgb('+hr+','+hg+','+hb+')');
+        st.setProperty('--accA85',rgba(0.85)); st.setProperty('--accA80',rgba(0.8));
+        st.setProperty('--accA50',rgba(0.5));  st.setProperty('--accA40',rgba(0.4));
+        st.setProperty('--accA35',rgba(0.35)); st.setProperty('--accA12',rgba(0.12));
+        st.setProperty('--accA05',rgba(0.05));
+        st.setProperty('--accHiA55',hrgba(0.55)); st.setProperty('--accHiA60',hrgba(0.6));
+      })();
+
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+
+      /* 1. 标题淡入上移 */
+      tl.fromTo('#titleWrap',{opacity:0,y:36},{opacity:1,y:0,duration:0.6,ease:'power3.out'},0.3);
+      /* 2. 卡01 从左滑入，内部元素 stagger */
+      tl.fromTo('#card1',{x:-140,opacity:0},{x:0,opacity:1,duration:0.7,ease:'power3.out'},0.6);
+      tl.fromTo('#card1 .e',{opacity:0,y:22},{opacity:1,y:0,duration:0.4,ease:'power2.out',stagger:0.1},0.72);
+      /* 3. 卡02 从右滑入，内部元素 stagger */
+      tl.fromTo('#card2',{x:140,opacity:0},{x:0,opacity:1,duration:0.7,ease:'power3.out'},2.2);
+      tl.fromTo('#card2 .e',{opacity:0,y:22},{opacity:1,y:0,duration:0.4,ease:'power2.out',stagger:0.1},2.3);
+      /* 4. 卡01 图标叠红叉（scale 弹入） */
+      tl.fromTo('#xmark',{opacity:0,scale:0.3,transformOrigin:'50% 50%'},
+        {opacity:1,scale:1,duration:0.5,ease:'back.out(2.2)'},2.6);
+      /* 演完定格，无收尾出场动画 */
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

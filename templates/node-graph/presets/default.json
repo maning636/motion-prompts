@@ -1,0 +1,8 @@
+{
+  "title": "Agent 路由拓扑",
+  "subtitle": "多节点协作的工作流网络",
+  "nodes": "输入,规划,工具,记忆,输出",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

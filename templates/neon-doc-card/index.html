@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "headerEn", "type": "string", "label": "英文小标签", "default": "CHECKPOINT · 功能清单"}, {"id": "headerCn", "type": "string", "label": "中文标题", "default": "先给你一张功能清单"}, {"id": "cardIntro", "type": "string", "label": "卡内引导灰字", "default": "我理解下来，你的工作台应该是这样，你看看要删要加："}, {"id": "item1", "type": "string", "label": "清单第1条", "default": "今日日程 — 固定行程+当天安排，勾选打卡，第二天自动重置"}, {"id": "item2", "type": "string", "label": "清单第2条", "default": "待办清单 — 随手输入，完成的自动沉底"}, {"id": "item3", "type": "string", "label": "清单第3条", "default": "选题工作台 — AI 出题按钮+灵感池三态标注"}, {"id": "item4", "type": "string", "label": "清单第4条", "default": "公司记账 — 快速记账+本月收支分类预置"}, {"id": "item5", "type": "string", "label": "清单第5条", "default": "每日复盘 — 打开就能写，自动保存按日期存档"}, {"id": "badgeLine1", "type": "string", "label": "badge第一行（白色粗体）", "default": "你先删改"}, {"id": "badgeLine2", "type": "string", "label": "badge第二行（灰色小字）", "default": "确认了才动工"}, {"id": "bottomCaption", "type": "string", "label": "底部居中 caption", "default": "没问题再往下进行"}, {"id": "duration", "type": "number", "label": "总时长（秒，演完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12);
+  color: var(--foreground, #F5F5F3); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+/* 卡外左上：英文小标签 + 中文标题 */
+#headBox{ position:absolute; left:140px; top:64px; max-width:1240px; }
+.enlabel{ display:flex; align-items:center; gap:16px;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:26px; letter-spacing:6px;
+  color:#10B981; text-transform:uppercase; text-shadow:0 0 12px rgba(16,185,129,.4);
+  white-space:nowrap; }
+.enlabel::before{ content:''; width:34px; height:4px; border-radius:2px; background:#10B981;
+  box-shadow:0 0 10px rgba(16,185,129,.7); }
+.cntitle{ display:flex; align-items:center; gap:20px; margin-top:18px;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:56px; color:#FFFFFF;
+  letter-spacing:1px; max-width:1240px; overflow-wrap:break-word; }
+.cntitle .licon{ flex:0 0 auto; width:52px; height:52px; }
+.cntitle .licon svg{ width:100%; height:100%; overflow:visible; }
+.cntitle .licon .lst{ stroke:#10B981; stroke-width:6; fill:none; stroke-linecap:round;
+  filter:drop-shadow(0 0 6px rgba(16,185,129,.6)); }
+
+/* 浅色文档大卡 */
+#card{ position:absolute; left:140px; top:196px; width:1180px; height:640px;
+  background:#F3F4F6; border-radius:20px; border:1px solid rgba(16,185,129,.35);
+  box-shadow:0 18px 50px rgba(0,0,0,.45), 0 0 44px rgba(16,185,129,.14);
+  padding:40px 52px; display:flex; flex-direction:column; will-change:transform; }
+#cardIntro{ font-size:26px; color:#6B7280; max-width:1076px; overflow-wrap:break-word;
+  margin-bottom:10px; }
+#items{ flex:1; display:flex; flex-direction:column; justify-content:space-evenly; }
+.item{ display:flex; align-items:flex-start; gap:16px; }
+.isq{ flex:0 0 auto; width:14px; height:14px; margin-top:14px; border-radius:3px;
+  background:#10B981; box-shadow:0 0 8px rgba(16,185,129,.5); }
+.inum{ flex:0 0 auto; width:52px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700;
+  font-size:28px; line-height:1.5; color:#10B981; }
+.itxt{ flex:1; font-size:28px; line-height:1.5; color:#4B5563;
+  max-width:980px; overflow-wrap:break-word; }
+.itxt b{ color:#111827; font-weight:700; }
+
+/* 卡外右侧：绿色圆勾 badge + 两行白字 */
+#badgeBox{ position:absolute; left:1380px; top:380px; width:400px; text-align:center; }
+#badge{ width:130px; height:130px; margin:0 auto; border-radius:50%;
+  border:3px solid #34D399; background:rgba(16,185,129,.08);
+  box-shadow:0 0 26px rgba(52,211,153,.5), 0 0 64px rgba(16,185,129,.22),
+    inset 0 0 18px rgba(52,211,153,.18); will-change:transform; }
+#badge svg{ width:100%; height:100%; overflow:visible; }
+#badge .chk{ stroke:#34D399; stroke-width:9; fill:none; stroke-linecap:round; stroke-linejoin:round;
+  filter:drop-shadow(0 0 8px rgba(52,211,153,.7)); }
+#badgeTxt{ margin-top:30px; }
+#badgeL1{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:36px; color:#FFFFFF;
+  max-width:400px; overflow-wrap:break-word; }
+#badgeL2{ margin-top:12px; font-size:26px; color:#9CA3AF;
+  max-width:400px; overflow-wrap:break-word; }
+
+/* 底部居中 caption */
+#caption{ position:absolute; left:0; right:0; bottom:64px; text-align:center;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:38px; color:#FFFFFF;
+  letter-spacing:2px; }
+#caption .cdot{ color:#34D399; text-shadow:0 0 12px rgba(52,211,153,.6); padding:0 14px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div id="headBox">
+        <div class="enlabel" id="hEn"></div>
+        <div class="cntitle">
+          <span class="licon">
+            <svg viewBox="0 0 52 52">
+              <line class="lst" x1="16" y1="12" x2="44" y2="12"/>
+              <line class="lst" x1="16" y1="26" x2="44" y2="26"/>
+              <line class="lst" x1="16" y1="40" x2="36" y2="40"/>
+              <circle class="lst" cx="7" cy="12" r="2.5"/>
+              <circle class="lst" cx="7" cy="26" r="2.5"/>
+              <circle class="lst" cx="7" cy="40" r="2.5"/>
+            </svg>
+          </span>
+          <span id="hCn"></span>
+        </div>
+      </div>
+
+      <div id="card">
+        <div id="cardIntro"></div>
+        <div id="items"></div>
+      </div>
+
+      <div id="badgeBox">
+        <div id="badge">
+          <svg viewBox="0 0 130 130">
+            <path class="chk" d="M40 68 L58 86 L92 46"/>
+          </svg>
+        </div>
+        <div id="badgeTxt">
+          <div id="badgeL1"></div>
+          <div id="badgeL2"></div>
+        </div>
+      </div>
+
+      <div id="caption"><span class="cdot">▍</span><span id="capTxt"></span><span class="cdot">▍</span></div>
+    </div>
+    <script>
+      const FB = {"headerEn": "CHECKPOINT · 功能清单", "headerCn": "先给你一张功能清单", "cardIntro": "我理解下来，你的工作台应该是这样，你看看要删要加：", "item1": "今日日程 — 固定行程+当天安排，勾选打卡，第二天自动重置", "item2": "待办清单 — 随手输入，完成的自动沉底", "item3": "选题工作台 — AI 出题按钮+灵感池三态标注", "item4": "公司记账 — 快速记账+本月收支分类预置", "item5": "每日复盘 — 打开就能写，自动保存按日期存档", "badgeLine1": "你先删改", "badgeLine2": "确认了才动工", "bottomCaption": "没问题再往下进行", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $=(s)=>document.querySelector(s);
+      const DUR=+v.duration>0?+v.duration:6;
+      $('[data-composition-id]').setAttribute('data-duration',String(DUR));
+
+      $('#hEn').textContent=v.headerEn||'';
+      $('#hCn').textContent=v.headerCn||'';
+      $('#cardIntro').textContent=v.cardIntro||'';
+      $('#badgeL1').textContent=v.badgeLine1||'';
+      $('#badgeL2').textContent=v.badgeLine2||'';
+      $('#capTxt').textContent=v.bottomCaption||'';
+
+      /* 清单逐条构建：序号 + 绿方块 + 「名称 — 说明」拆分加粗 */
+      const itemsBox=$('#items');
+      [v.item1,v.item2,v.item3,v.item4,v.item5].forEach((txt,i)=>{
+        if(!txt) return;
+        const row=document.createElement('div'); row.className='item';
+        const sq=document.createElement('span'); sq.className='isq';
+        const num=document.createElement('span'); num.className='inum';
+        num.textContent=String(i+1).padStart(2,'0');
+        const tx=document.createElement('span'); tx.className='itxt';
+        const parts=String(txt).split('—');
+        const name=document.createElement('b'); name.textContent=parts.shift().trim();
+        tx.appendChild(name);
+        if(parts.length){ tx.appendChild(document.createTextNode(' — '+parts.join('—').trim())); }
+        row.appendChild(sq); row.appendChild(num); row.appendChild(tx);
+        itemsBox.appendChild(row);
+      });
+
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+
+      /* 1. 标题组淡入上移 */
+      tl.fromTo('#headBox',{opacity:0,y:30},{opacity:1,y:0,duration:0.55,ease:'power3.out'},0.2);
+      /* 2. 大卡从底部升入 */
+      tl.fromTo('#card',{opacity:0,y:150},{opacity:1,y:0,duration:0.8,ease:'power3.out'},0.55);
+      /* 3. 引导灰字 + 清单逐行淡入 */
+      tl.fromTo('#cardIntro',{opacity:0,y:16},{opacity:1,y:0,duration:0.4,ease:'power2.out'},1.2);
+      tl.fromTo('.item',{opacity:0,x:-26},{opacity:1,x:0,duration:0.42,ease:'power2.out',stagger:0.14},1.35);
+      /* 4. badge 弹入 + 两行文字 */
+      tl.fromTo('#badge',{opacity:0,scale:0.35,transformOrigin:'50% 50%'},
+        {opacity:1,scale:1,duration:0.55,ease:'back.out(2)'},2.6);
+      tl.fromTo('#badgeTxt',{opacity:0,y:18},{opacity:1,y:0,duration:0.45,ease:'power2.out'},2.85);
+      /* 5. caption 入，演完定格 */
+      tl.fromTo('#caption',{opacity:0,y:20},{opacity:1,y:0,duration:0.5,ease:'power3.out'},3.2);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

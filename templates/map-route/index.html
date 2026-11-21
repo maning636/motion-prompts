@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "它的扩张路线，只用了三步"}, {"id": "imgBg", "type": "image", "label": "地图底图", "default": "./assets/bg.png"}, {"id": "label1", "type": "string", "label": "地点1", "default": "杭州"}, {"id": "label2", "type": "string", "label": "地点2", "default": "上海"}, {"id": "label3", "type": "string", "label": "地点3", "default": "深圳"}, {"id": "routeColor", "type": "color", "label": "路线颜色", "default": "#D32F2F"}, {"id": "caption", "type": "string", "label": "底部字幕", "default": "每一步都踩在风口上"}, {"id": "duration", "type": "number", "label": "总时长（秒，画完定格）", "default": 7}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #EEE8D8); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #EEE8D8);
+  color: var(--foreground, #1D1D20); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.bgimg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.mtitle{ position:absolute; left:90px; top:70px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700;
+  font-size:60px; color:#1D1D20; max-width:1100px; }
+.pin{ position:absolute; width:34px; height:34px; margin:-17px 0 0 -17px; border-radius:50%;
+  background:var(--route,#D32F2F); border:5px solid #FFF; box-shadow:4px 4px 0 rgba(29,29,32,.4);
+  will-change:transform; }
+.plabel{ position:absolute; transform:translate(-50%,0); white-space:nowrap; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  font-weight:700; font-size:32px; color:#1D1D20; background:rgba(245,242,235,.92); padding:6px 18px;
+  border:3px solid #1D1D20; }
+.routes{ position:absolute; inset:0; pointer-events:none; }
+.mcap{ position:absolute; left:50%; transform:translateX(-50%); bottom:48px; white-space:nowrap;
+  font-size:36px; letter-spacing:.1em; color:#FFF; background:#1D1D20; padding:10px 28px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="7" data-width="1920" data-height="1080">
+<img class="bgimg" id="bg" alt="">
+<svg class="routes" viewBox="0 0 1920 1080">
+  <path id="r1" d="M 500 640 Q 640 480 830 500" fill="none" stroke-width="8" stroke-dasharray="18 14" stroke-linecap="round"/>
+  <path id="r2" d="M 870 520 Q 1050 640 1260 600" fill="none" stroke-width="8" stroke-dasharray="18 14" stroke-linecap="round"/>
+</svg>
+<div class="pin" id="p1" style="left:500px; top:640px;"></div>
+<div class="pin" id="p2" style="left:850px; top:510px;"></div>
+<div class="pin" id="p3" style="left:1280px; top:595px;"></div>
+<div class="plabel" id="lb1" style="left:500px; top:690px;"></div>
+<div class="plabel" id="lb2" style="left:850px; top:560px;"></div>
+<div class="plabel" id="lb3" style="left:1280px; top:645px;"></div>
+<div class="mtitle" id="t"></div>
+<div class="mcap" id="cap"></div>
+    </div>
+    <script>
+      const FB = {"title": "它的扩张路线，只用了三步", "imgBg": "./assets/bg.png", "label1": "杭州", "label2": "上海", "label3": "深圳", "routeColor": "#D32F2F", "caption": "每一步都踩在风口上", "duration": 7};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+const $=(s)=>document.querySelector(s);
+const F=(f)=>f/30;
+const DUR=+v.duration>0?+v.duration:7;
+$('[data-composition-id]').setAttribute('data-duration',String(DUR));
+document.documentElement.style.setProperty('--route',v.routeColor||'#D32F2F');
+$('#t').textContent=v.title||''; $('#cap').textContent=v.caption||'';
+$('#lb1').textContent=v.label1||''; $('#lb2').textContent=v.label2||''; $('#lb3').textContent=v.label3||'';
+$('#bg').src=v.imgBg||'';
+const rc=v.routeColor||'#D32F2F';
+for(const id of ['r1','r2']){
+  const p=document.getElementById(id);
+  p.setAttribute('stroke',rc);
+  const len=p.getTotalLength();
+  p.dataset.len=len;
+  p.style.strokeDasharray=`${len}`;
+  p.style.strokeDashoffset=len;
+  p.style.visibility='hidden';
+}
+
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+tl.fromTo('#t',{opacity:0,y:24},{opacity:1,y:0,duration:F(12),ease:'power3.out'},0);
+/* 点1落 → 路线1画出 → 点2落 → 路线2 → 点3落 → 标签 */
+tl.fromTo('#p1',{scale:0},{scale:1,duration:F(10),ease:'back.out(2.2)'},F(8));
+tl.set('#r1',{visibility:'visible'},F(16));
+tl.to('#r1',{strokeDashoffset:0,duration:F(20),ease:'power1.inOut',onStart:()=>{const p=$('#r1');p.style.strokeDasharray=p.dataset.len;}},F(16));
+tl.fromTo('#p2',{scale:0},{scale:1,duration:F(10),ease:'back.out(2.2)'},F(36));
+tl.set('#r2',{visibility:'visible'},F(44));
+tl.to('#r2',{strokeDashoffset:0,duration:F(20),ease:'power1.inOut',onStart:()=>{const p=$('#r2');p.style.strokeDasharray=p.dataset.len;}},F(44));
+tl.fromTo('#p3',{scale:0},{scale:1,duration:F(10),ease:'back.out(2.2)'},F(64));
+tl.fromTo('#lb1,#lb2,#lb3',{opacity:0,y:14},{opacity:1,y:0,duration:F(10),stagger:F(4),ease:'power2.out'},F(70));
+tl.fromTo('#cap',{opacity:0},{opacity:1,duration:F(12),ease:'power2.out'},F(82));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"title","name":"主标题","type":"string","label":"主标题（卡片顶部一行大字）","default":"今晚 24 点，这一档"},{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（顶部黑条上的 mono 字）","default":"LIMIT / 限时价"},{"id":"tag","name":"端头标签","type":"string","label":"顶部黑条左端的胶囊标签","default":"限时"},{"id":"note","name":"右上角注释","type":"string","label":"顶部黑条右侧注释","default":"过时不候 · 恢复日常价"},{"id":"price","name":"限时价","type":"number","label":"限时价（元）","default":99},{"id":"startText","name":"开始时间","type":"string","label":"三格 · 开始","default":"今日 20:00"},{"id":"endText","name":"结束时间","type":"string","label":"三格 · 截止","default":"今日 24:00"},{"id":"quotaText","name":"限量文案","type":"string","label":"三格 · 限量","default":"限 500 件"},{"id":"footText","name":"底部说明","type":"string","label":"底部说明（一行 mono）","default":"口径：同一 SKU · 每人限购 1 件"},{"id":"accent","name":"强调色","type":"color","label":"强调色（卡片价格区底 / 斜纹带）","default":"#FF5FA2"},{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–6）","default":5.5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="满版居中单卡构图：一张带 10px 硬阴影的大卡占住画面中央，顶部强调色价格区压着巨型限时价数字，下方三格平铺开始、截止、限量">
+<title>限时价单卡 · 今晚 24 点，这一档</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --accent:#FF5FA2;
+  }
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--paper);color:var(--ink);font-family:var(--sans);
+    display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+  /* 顶部反白通栏 */
+  .bd{flex:0 0 auto;display:flex;align-items:center;gap:22px;
+    padding:0 72px;height:70px;background:var(--ink);color:var(--white)}
+  .bd .tag{flex:0 0 auto;font-family:var(--mono);font-weight:700;font-size:24px;
+    letter-spacing:.12em;padding:4px 18px;background:var(--accent);color:var(--ink);
+    border-radius:9999px;white-space:nowrap}
+  .bd .eb{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-family:var(--mono);font-weight:700;font-size:24px;
+    letter-spacing:.14em;color:var(--yellow)}
+  .bd .nt{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-size:24px;font-weight:700}
+
+  /* 主体：一张卡居中，四周留纸底，整屏只有一件主体 */
+  .wrap{flex:1 1 auto;min-height:0;display:flex;align-items:center;
+    justify-content:center;padding:36px 72px;overflow:hidden}
+  .card{flex:0 0 auto;width:1280px;display:flex;flex-direction:column;
+    border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:10px 10px 0 var(--ink);background:var(--white);overflow:hidden}
+
+  .cTop{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+    gap:24px;padding:24px 48px;border-bottom:var(--bw) solid var(--ink);
+    background:var(--white)}
+  .cTop .tt{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-weight:900;font-size:44px;letter-spacing:0}
+
+  /* 价格区：整块强调色，字压在上面（基因 10） */
+  .cPrice{flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+    gap:22px;padding:34px 48px 40px;background:var(--accent);color:var(--ink);
+    border-bottom:var(--bw) solid var(--ink)}
+  .cPrice .cur{font-family:var(--mono);font-weight:900;font-size:88px;line-height:1}
+  .cPrice .num{display:block;white-space:nowrap;font-family:var(--mono);font-weight:900;
+    font-size:264px;line-height:.92;letter-spacing:0;
+    font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+  .cPrice .unit{font-family:var(--mono);font-weight:700;font-size:36px;letter-spacing:.06em}
+
+  /* 三格平铺：格子之间靠 3px 实线，不靠留白分段（基因 7） */
+  .grid{flex:0 0 auto;display:flex}
+  .cell{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:12px;
+    align-items:center;padding:26px 20px;border-right:var(--bw) solid var(--ink);
+    background:var(--white)}
+  .cell:last-child{border-right:0}
+  .cell .k{white-space:nowrap;font-family:var(--mono);font-weight:700;font-size:22px;
+    letter-spacing:.14em;color:var(--mute);max-width:100%;overflow:hidden;
+    text-overflow:ellipsis}
+  .cell .v{white-space:nowrap;font-weight:900;font-size:40px;letter-spacing:0;
+    max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .cell.hot .v{color:var(--pink)}
+
+  .foot{flex:0 0 auto;display:flex;align-items:center;gap:24px;padding:22px 72px;
+    border-top:var(--bw) solid var(--ink)}
+  .foot .sq{flex:0 0 auto;width:22px;height:22px;background:var(--ink);
+    border:var(--bw) solid var(--ink);border-radius:4px}
+  .foot .tx{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-family:var(--mono);font-weight:700;font-size:24px;
+    letter-spacing:.08em;color:var(--mute)}
+
+  .stripe{flex:0 0 auto;height:20px;border-top:var(--bw) solid var(--ink);
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+
+  @media (prefers-reduced-motion: reduce){
+    .anim{transition-duration:.01ms !important;animation-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="bd anim" id="bd">
+    <span class="tag anim" id="tag" data-fit-max="24" data-fit-min="15">限时</span>
+    <span class="eb anim" id="eyebrow" data-fit-max="24" data-fit-min="15">LIMIT / 限时价</span>
+    <span class="nt anim" id="note" data-fit-max="24" data-fit-min="15">过时不候 · 恢复日常价</span>
+  </div>
+
+  <div class="wrap anim" id="wrap">
+    <div class="card anim" id="card">
+      <div class="cTop">
+        <span class="tt anim" id="title" data-fit-max="44" data-fit-min="24">今晚 24 点，这一档</span>
+      </div>
+      <div class="cPrice">
+        <span class="cur">¥</span>
+        <span class="num anim" id="num" data-fit-max="264" data-fit-min="110">99</span>
+        <span class="unit">/ 件</span>
+      </div>
+      <div class="grid anim" id="grid">
+        <div class="cell"><span class="k">START / 开始</span><span class="v anim" id="startText" data-fit-max="40" data-fit-min="22">今日 20:00</span></div>
+        <div class="cell hot"><span class="k">END / 截止</span><span class="v anim" id="endText" data-fit-max="40" data-fit-min="22">今日 24:00</span></div>
+        <div class="cell"><span class="k">LIMIT / 限量</span><span class="v anim" id="quotaText" data-fit-max="40" data-fit-min="22">限 500 件</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot anim" id="foot">
+    <span class="sq"></span>
+    <span class="tx anim" id="footText" data-fit-max="24" data-fit-min="15">口径：同一 SKU · 每人限购 1 件</span>
+  </div>
+
+  <div class="stripe anim" id="stripe"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  ['tag', 'eyebrow', 'note', 'title', 'startText', 'endText', 'quotaText', 'footText']
+    .forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+
+  var price = Number(v.price);
+  if (!isFinite(price)) price = 0;
+  set('num', price % 1 === 0 ? String(price) : price.toFixed(2));
+
+  B.fitAll();
+  var tl = B.tl();
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (reduce) {
+    gsap.set('.anim', { x: 0, y: 0, scale: 1, scaleX: 1, rotate: 0 });
+    tl.fromTo('#bd',     { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, 0);
+    tl.fromTo('#wrap',   { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .15);
+    tl.fromTo('#foot',   { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .35);
+    tl.fromTo('#stripe', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, .5);
+    B.hold(tl, 1.2, 1.1);
+    return;
+  }
+
+  var INK = '#0F0F0F';
+  function slam(sel, at, dx, dy, d) {
+    tl.fromTo(sel, { x: dx, y: dy },
+      { x: 0, y: 0, duration: d, ease: 'power4.out' }, at);
+  }
+  function shadowBounce(sel, rest, at) {
+    var off = parseInt(rest, 10);
+    tl.set(sel, { boxShadow: off + 'px ' + (off + 3) + 'px 0 ' + INK, immediateRender: false }, at);
+    tl.to(sel, { boxShadow: rest, duration: 0.04, ease: 'steps(2)' }, at + 0.04);
+  }
+
+  slam('#bd',       0.00,   0, -70, 0.26);
+  slam('#tag',      0.12, -24, -20, 0.22);
+  slam('#eyebrow',  0.18, -24, -20, 0.22);
+  slam('#note',     0.24,  24, -20, 0.22);
+  /* 大面积卡片：power3.out + from:.86，起始缩到 0.86，面积单调涨到末帧 */
+  tl.fromTo('#card', { scale: .86, opacity: 0 },
+      { scale: 1, opacity: 1, duration: .3, ease: 'power3.out' }, 0.42);
+  slam('#title',    0.78, -28, -24, 0.26);
+  slam('#num',      0.94,   0, -28, 0.26);
+  /* 模 7 分格揭示：三格逐格从上落下 */
+  tl.from('#grid .cell', { y: -22, duration: 0.2, ease: 'power4.out', stagger: 0.09 }, 1.20);
+  slam('#startText', 1.32,   0, -18, 0.2);
+  slam('#endText',   1.42,   0, -18, 0.2);
+  slam('#quotaText', 1.52,   0, -18, 0.2);
+  shadowBounce('#card', '10px 10px 0 ' + INK, 1.72);
+  slam('#foot',      1.84,   0,  28, 0.26);
+  slam('#footText',  1.96, -24, -20, 0.22);
+  slam('#stripe',    2.06,   0,  24, 0.24);
+  tl.fromTo('#stripe', { backgroundPositionX: '0px' },
+    { backgroundPositionX: '60px', duration: 1.2, ease: 'none' }, 2.30);
+
+  var introEnd = 3.50;
+  var total = Math.min(6, Math.max(5, Number(v.duration) || 5.5));
+  B.hold(tl, introEnd, Math.max(0.6, total - introEnd));
+})();
+</script>
+</body></html>

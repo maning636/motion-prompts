@@ -1,0 +1,10 @@
+{
+  "title": "2024 年度业绩",
+  "subtitle": "各部门季度销售额对比",
+  "labels": "Q1,Q2,Q3,Q4",
+  "series": "Q1=45,Q2=72,Q3=58,Q4=91",
+  "show_values": true,
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

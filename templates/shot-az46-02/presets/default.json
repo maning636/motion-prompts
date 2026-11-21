@@ -1,0 +1,13 @@
+{
+  "title": "系统就绪",
+  "label1": "渲染",
+  "value1": "86",
+  "label2": "配音",
+  "value2": "92",
+  "label3": "合成",
+  "value3": "78",
+  "unit": "%",
+  "accent": "#00FF00",
+  "background": "#0A0A0F",
+  "foreground": "#F4F4F2"
+}

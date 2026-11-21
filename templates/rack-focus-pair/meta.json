@@ -1,0 +1,13 @@
+{
+  "id": "rack-focus-pair",
+  "name": "前后景虚实对焦交换",
+  "description": "前后景虚实对焦交换：前景清晰背景虚化，焦点缓缓转移到背景，前景随之虚化（镜头感）。",
+  "category": "转场镜头",
+  "tags": ["转场镜头", "虚实对焦", "景深", "前后景"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-05T00:00:00.000Z"
+}

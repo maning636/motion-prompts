@@ -1,0 +1,16 @@
+{
+ "name": "时间条",
+ "description": "右上角 ink 时钟块内 mono 时分 + 强调色秒数块，秒数按整数硬跳到设定值，右侧黄色时区方块与下方白色日期条依次分格擦出",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "clock",
+  "live",
+  "yellow"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "直播与录播的常驻时钟，需要把「几点几分」长期挂在画面右上角时"
+}

@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "vol", "type": "string", "label": "页眉左（卷/栏目）", "default": "VOL.15 · 视觉动效库"}, {"id": "pageno", "type": "string", "label": "页眉右（页码）", "default": "P.304 / 400"}, {"id": "caption", "type": "string", "label": "图注", "default": "SHEET · 整页素材 3:4"}, {"id": "img1", "type": "image", "label": "整页素材图（竖版 3:4）", "default": "./assets/sheet.png"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 5}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #F6F5EF; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #141414;
+        background-image: linear-gradient(rgba(20,20,20,.045) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(20,20,20,.045) 1px, transparent 1px);
+        background-size: 36px 36px; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      /* 整页素材卡（含阴影，整体升起） */
+      .pfs-stage{ position: absolute; left: 50%; top: 56px; width: 660px; height: 880px; margin-left: -330px; z-index: 4; }
+      .pfs-shadow{ position: absolute; left: 16px; top: 16px; width: 660px; height: 880px; background: #141414; }
+      .pfs-page{ position: absolute; left: 0; top: 0; width: 660px; height: 880px; background: #fff;
+        border: 3px solid #141414; overflow: hidden; }
+      .pfs-page img{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      .pfs-sweep{ position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none;
+        background: linear-gradient(105deg, transparent 42%, color-mix(in srgb, var(--accent) 28%, transparent) 50%, transparent 58%); }
+      /* 页眉细线压在图上缘（比图宽，左右出头） */
+      .pfs-head{ position: absolute; left: 50%; top: 40px; width: 780px; margin-left: -390px; height: 48px; z-index: 6; }
+      .pfs-head .rule{ position: absolute; left: 0; right: 0; top: 0; height: 2px; background: #141414;
+        transform: scaleX(0); transform-origin: 0 50%; }
+      .pfs-head .l{ position: absolute; left: 0; top: 12px; font-size: 19px; letter-spacing: .22em; color: #141414;
+        background: var(--ac, #00FF00); border: 2px solid #141414; padding: 5px 12px; }
+      .pfs-head .r{ position: absolute; right: 0; top: 12px; font-size: 19px; letter-spacing: .22em; color: #141414;
+        background: #F6F5EF; border: 2px solid #141414; padding: 5px 12px; }
+      /* 图注（压在图下缘左侧） */
+      .pfs-cap{ position: absolute; left: -3px; bottom: 26px; font-size: 19px; letter-spacing: .2em; color: #141414;
+        background: #fff; border: 2px solid #141414; box-shadow: 6px 6px 0 #141414; padding: 9px 16px; z-index: 5; }
+      /* 底部绿色署名条 */
+      .pfs-foot{ position: absolute; left: 0; right: 0; bottom: 0; height: 60px; background: var(--ac, #00FF00);
+        z-index: 6; display: flex; align-items: center; justify-content: space-between; padding: 0 90px;
+        transform: translateY(60px); }
+      .pfs-foot .f1{ font-size: 22px; font-weight: 900; letter-spacing: .12em; color: #141414; }
+      .pfs-foot .f2{ font-size: 18px; letter-spacing: .26em; color: #141414; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+      <div class="pfs-stage" id="stage">
+        <div class="pfs-shadow"></div>
+        <div class="pfs-page" id="page">
+          <img id="pg" src="./assets/sheet.png" alt="" />
+          <div class="pfs-sweep" id="sweep"></div>
+          <div class="pfs-cap mono" id="cap"></div>
+        </div>
+      </div>
+      <div class="pfs-head">
+        <div class="rule" id="rule"></div>
+        <div class="l mono" id="vol"></div>
+        <div class="r mono" id="pageno"></div>
+      </div>
+      <div class="pfs-foot" id="foot">
+        <div class="f1">@老马AI研习社</div>
+        <div class="f2 mono">MOTION LIBRARY · FULL SHEET</div>
+      </div>
+    </div>
+    <script>
+      const fallback = {"vol": "VOL.15 · 视觉动效库", "pageno": "P.304 / 400", "caption": "SHEET · 整页素材 3:4", "img1": "./assets/sheet.png", "accent": "#00FF00", "duration": 5};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      document.documentElement.style.setProperty("--ac", V.accent ?? "#00FF00");
+      $("vol").textContent = V.vol;
+      $("pageno").textContent = V.pageno;
+      $("cap").textContent = V.caption;
+      if (V.img1) $("pg").src = V.img1;
+      // 整页从下方升起落位
+      tl.fromTo("#stage", { y: 180, opacity: 0 }, { y: 0, opacity: 1, duration: 0.85, ease: "expo.out" }, 0.15);
+      // 页眉细线扫入 + 左右标签压在图上缘
+      tl.to("#rule", { scaleX: 1, duration: 0.5, ease: "power3.out" }, 0.6);
+      tl.fromTo(["#vol", "#pageno"], { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.4, stagger: 0.08 }, 0.8);
+      // 图注弹出
+      tl.fromTo("#cap", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.4, ease: "back.out(1.6)" }, 1.15);
+      // 荧光绿扫光掠过整页
+      tl.fromTo("#sweep", { xPercent: -100 }, { xPercent: 100, duration: 0.8, ease: "power2.inOut" }, 1.5);
+      // 底部署名条
+      tl.to("#foot", { y: 0, duration: 0.5, ease: "expo.out" }, 1.9);
+      tl.fromTo([".pfs-foot .f1", ".pfs-foot .f2"], { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.35, stagger: 0.08 }, 2.15);
+      // 呼吸浮动定格（无收尾 fade-out）
+      tl.to("#stage", { y: -8, duration: 1.3, ease: "sine.inOut", yoyo: true, repeat: 1 }, 2.8);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

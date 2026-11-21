@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "titleEn", "type": "string", "label": "顶部英文小标签", "default": "JUST SAY IT"}, {"id": "titleCn", "type": "string", "label": "顶部中文标题", "default": "后续再跟它沟通调整"}, {"id": "userMsg1", "type": "string", "label": "用户气泡1（空则隐藏）", "default": "把记账挪到第一屏"}, {"id": "aiMsg1", "type": "string", "label": "AI气泡1（空则隐藏）", "default": "好的，已经调到最上面了"}, {"id": "userMsg2", "type": "string", "label": "用户气泡2（空则隐藏）", "default": "再加一个喝水提醒"}, {"id": "aiMsg2", "type": "string", "label": "AI气泡2（自动前置绿色✓，空则隐藏）", "default": "已经加好了"}, {"id": "duration", "type": "number", "label": "总时长（秒，演完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12);
+  color: var(--foreground, #F5F5F3); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+/* 顶部标题组 */
+.tgroup{ position:absolute; left:200px; top:130px; max-width:1520px; }
+.ten{ display:flex; align-items:center; gap:16px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700;
+  font-size:24px; letter-spacing:8px; color:#10B981; text-transform:uppercase;
+  text-shadow:0 0 12px rgba(16,185,129,.4); white-space:nowrap; }
+.ten::before{ content:''; flex:0 0 auto; width:34px; height:3px; border-radius:2px;
+  background:#10B981; box-shadow:0 0 10px rgba(16,185,129,.7); }
+.tcn{ margin-top:18px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:60px;
+  letter-spacing:2px; color:#FFFFFF; max-width:1520px; overflow-wrap:break-word; }
+
+/* 聊天气泡 */
+.bubble{ position:absolute; max-width:760px; padding:26px 40px; border-radius:18px;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:34px; line-height:1.45;
+  overflow-wrap:break-word; will-change:transform; }
+.bubble.user{ right:340px; background:#06281D; border:1px solid rgba(16,185,129,.85); color:#E7FFF5;
+  box-shadow:0 0 24px rgba(16,185,129,.3), 0 0 56px rgba(16,185,129,.1), inset 0 0 24px rgba(16,185,129,.06); }
+.bubble.ai{ left:340px; background:#12161C; border:1px solid #374151; color:#E5E7EB;
+  box-shadow:0 0 20px rgba(55,65,81,.45), inset 0 0 24px rgba(156,163,175,.04); }
+
+/* 气泡小尾巴（旋转方块，下半截露出） */
+.bubble.user::after{ content:''; position:absolute; right:40px; bottom:-11px; width:22px; height:22px;
+  background:#06281D; border-right:1px solid rgba(16,185,129,.85);
+  border-bottom:1px solid rgba(16,185,129,.85); transform:rotate(45deg); }
+.bubble.ai::after{ content:''; position:absolute; left:40px; bottom:-11px; width:22px; height:22px;
+  background:#12161C; border-right:1px solid #374151;
+  border-bottom:1px solid #374151; transform:rotate(45deg); }
+
+/* AI 气泡2 前置绿色 ✓ 图标 */
+.check{ width:38px; height:38px; margin-right:14px; vertical-align:-9px; overflow:visible; }
+.check .ic{ stroke:#34D399; stroke-width:4.5; fill:none; stroke-linecap:round; stroke-linejoin:round;
+  filter:drop-shadow(0 0 8px rgba(52,211,153,.6)); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="tgroup" id="titleGroup">
+        <div class="ten" id="tEn"></div>
+        <div class="tcn" id="tCn"></div>
+      </div>
+
+      <div class="bubble user" id="bUser1"><span class="txt"></span></div>
+      <div class="bubble ai" id="bAi1"><span class="txt"></span></div>
+      <div class="bubble user" id="bUser2"><span class="txt"></span></div>
+      <div class="bubble ai" id="bAi2"><svg class="check" viewBox="0 0 40 40"><circle class="ic" cx="20" cy="20" r="17"/><path class="ic" d="M12 20.5 L17.5 26 L28 14"/></svg><span class="txt"></span></div>
+    </div>
+    <script>
+      const FB = {"titleEn": "JUST SAY IT", "titleCn": "后续再跟它沟通调整", "userMsg1": "把记账挪到第一屏", "aiMsg1": "好的，已经调到最上面了", "userMsg2": "再加一个喝水提醒", "aiMsg2": "已经加好了", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $=(s)=>document.querySelector(s);
+      const DUR=+v.duration>0?+v.duration:6;
+      $('[data-composition-id]').setAttribute('data-duration',String(DUR));
+
+      $('#tEn').textContent=v.titleEn||'';
+      $('#tCn').textContent=v.titleCn||'';
+
+      /* 对话流：空消息隐藏，可见消息自上而下顺序排槽（固定槽距，无空洞） */
+      const msgs=[
+        {el:'#bUser1', text:v.userMsg1, side:'user'},
+        {el:'#bAi1',   text:v.aiMsg1,   side:'ai'},
+        {el:'#bUser2', text:v.userMsg2, side:'user'},
+        {el:'#bAi2',   text:v.aiMsg2,   side:'ai', check:true},
+      ];
+      const TOP=330, SLOT=180;
+      let row=0; const visible=[];
+      for(const m of msgs){
+        const el=$(m.el);
+        let t=String(m.text??'').trim();
+        if(m.check) t=t.replace(/✓/g,'').trim(); /* ✓ 一律由前置绿色图标表达，文本里重复出现的一律剔除 */
+        if(!t){ el.style.display='none'; continue; }
+        el.querySelector('.txt').textContent=t;
+        el.style.top=(TOP+row*SLOT)+'px';
+        row++; visible.push(m);
+      }
+
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+
+      /* 1. 标题组淡入上移 */
+      tl.fromTo('#titleGroup',{opacity:0,y:36},{opacity:1,y:0,duration:0.6,ease:'power3.out'},0.25);
+      /* 2. 气泡按对话顺序弹入（back.out），AI 泡2 的 ✓ 图标稍后弹入 */
+      visible.forEach((m,i)=>{
+        const t0=0.85+i*0.78;
+        const origin=m.side==='user'?'85% 100%':'15% 100%';
+        tl.fromTo(m.el,{opacity:0,scale:0.5,y:34,transformOrigin:origin},
+          {opacity:1,scale:1,y:0,duration:0.55,ease:'back.out(1.8)'},t0);
+        if(m.check){
+          tl.fromTo(m.el+' .check',{opacity:0,scale:0.3,transformOrigin:'50% 50%'},
+            {opacity:1,scale:1,duration:0.4,ease:'back.out(2.4)'},t0+0.3);
+        }
+      });
+      /* 3. 演完定格：末端补 set 占满 data-duration 防黑帧 */
+      tl.set('#root',{},DUR);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

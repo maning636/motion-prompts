@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "titleEn", "type": "string", "label": "英文小标签", "default": "YOUR OWN DASHBOARD"}, {"id": "titleCn", "type": "string", "label": "中文大标题（含高亮词）", "default": "就是手机上的一个页面"}, {"id": "titleAccent", "type": "string", "label": "标题高亮词（绿色）", "default": "手机上"}, {"id": "titleSub", "type": "string", "label": "灰色副标题", "default": "点开就是你专属的一些功能"}, {"id": "chip1", "type": "string", "label": "功能chip 1（留空隐藏）", "default": "打卡"}, {"id": "chip2", "type": "string", "label": "功能chip 2（留空隐藏）", "default": "记账"}, {"id": "chip3", "type": "string", "label": "功能chip 3（留空隐藏）", "default": "日程"}, {"id": "chip4", "type": "string", "label": "功能chip 4（留空隐藏）", "default": "待办"}, {"id": "chip5", "type": "string", "label": "功能chip 5（留空隐藏）", "default": "新闻"}, {"id": "chip6", "type": "string", "label": "功能chip 6（留空隐藏）", "default": "自动选题"}, {"id": "chip7", "type": "string", "label": "功能chip 7（留空隐藏）", "default": "每日复盘"}, {"id": "caption", "type": "string", "label": "大框下方说明字", "default": "一个页面全装下"}, {"id": "duration", "type": "number", "label": "总时长（秒，演完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12);
+  color: var(--foreground, #F5F5F3); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+  display:flex; align-items:center; justify-content:center; }
+
+/* 内容列：整体居中，内部左对齐（贴合参考帧版式） */
+.col{ display:flex; flex-direction:column; align-items:flex-start; max-width:1560px; }
+
+/* 标题组 */
+.tEn{ display:flex; align-items:center; gap:18px;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:26px; letter-spacing:9px;
+  color:#10B981; text-transform:uppercase; text-shadow:0 0 14px rgba(16,185,129,.45);
+  max-width:1400px; overflow-wrap:break-word; }
+.tEn::before{ content:''; flex:0 0 auto; width:34px; height:4px; border-radius:2px;
+  background:#10B981; box-shadow:0 0 10px rgba(16,185,129,.7); }
+.tTitle{ margin-top:26px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:72px;
+  letter-spacing:2px; color:#FFFFFF; max-width:1400px; overflow-wrap:break-word; }
+.tTitle .acc{ color:#34D399; text-shadow:0 0 20px rgba(52,211,153,.55); padding:0 2px; }
+.tSub{ margin-top:20px; font-size:30px; color:#9CA3AF; max-width:1400px; overflow-wrap:break-word; }
+
+/* chips 区 + 大框 */
+.chipwrap{ position:relative; margin-top:56px; padding:38px 44px; max-width:1500px; }
+.chiprow{ display:flex; flex-wrap:wrap; gap:22px; }
+.chiprow + .chiprow{ margin-top:22px; }
+.chip{ display:flex; align-items:center; gap:14px; padding:20px 32px;
+  background:#12161C; border:1px solid rgba(16,185,129,.85); border-radius:16px;
+  box-shadow:0 0 20px rgba(16,185,129,.30), 0 0 46px rgba(16,185,129,.10), inset 0 0 22px rgba(16,185,129,.05);
+  will-change:transform; }
+.chip svg{ flex:0 0 auto; width:32px; height:32px; overflow:visible; }
+.chip svg .istroke{ stroke:#34D399; stroke-width:2.4; fill:none; stroke-linecap:round; stroke-linejoin:round;
+  filter:drop-shadow(0 0 6px rgba(52,211,153,.6)); }
+.chip .ctext{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:32px; color:#FFFFFF;
+  max-width:340px; overflow-wrap:break-word; line-height:1.25; }
+
+/* 收拢大框（SVG 描边画出） */
+.frameSvg{ position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
+.frameRect{ x:2px; y:2px; width:calc(100% - 4px); height:calc(100% - 4px); rx:26px;
+  fill:none; stroke:#10B981; stroke-width:3; stroke-dasharray:100;
+  filter:drop-shadow(0 0 12px rgba(16,185,129,.55)); }
+
+/* 底部说明 */
+.caption{ margin-top:34px; font-size:32px; color:#9CA3AF; max-width:1400px; overflow-wrap:break-word; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="col">
+        <div class="tEn e" id="tEn"></div>
+        <div class="tTitle e" id="tTitle"></div>
+        <div class="tSub e" id="tSub"></div>
+        <div class="chipwrap" id="chipwrap">
+          <svg class="frameSvg"><rect class="frameRect" id="frameRect" pathLength="100"/></svg>
+          <div class="chiprow" id="row1"></div>
+          <div class="chiprow" id="row2"></div>
+        </div>
+        <div class="caption e" id="caption"></div>
+      </div>
+    </div>
+    <script>
+      const FB = {"titleEn": "YOUR OWN DASHBOARD", "titleCn": "就是手机上的一个页面", "titleAccent": "手机上", "titleSub": "点开就是你专属的一些功能", "chip1": "打卡", "chip2": "记账", "chip3": "日程", "chip4": "待办", "chip5": "新闻", "chip6": "自动选题", "chip7": "每日复盘", "caption": "一个页面全装下", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $=(s)=>document.querySelector(s);
+      const DUR=+v.duration>0?+v.duration:6;
+      $('[data-composition-id]').setAttribute('data-duration',String(DUR));
+
+      /* 标题组 */
+      $('#tEn').textContent=v.titleEn||'';
+      (function(){
+        const t=v.titleCn||'', acc=v.titleAccent||'', el=$('#tTitle');
+        el.textContent='';
+        if(acc && t.includes(acc)){
+          const parts=t.split(acc);
+          parts.forEach((p,i)=>{
+            if(i>0){ const s=document.createElement('span'); s.className='acc'; s.textContent=acc; el.appendChild(s); }
+            if(p) el.appendChild(document.createTextNode(p));
+          });
+        }else{
+          el.textContent=t;
+          if(acc){ const s=document.createElement('span'); s.className='acc'; s.textContent=acc; el.appendChild(s); }
+        }
+      })();
+      $('#tSub').textContent=v.titleSub||'';
+      $('#caption').textContent=v.caption||'';
+
+      /* 内置线性图标（按 chip 序号分配） */
+      const ICONS=[
+        '<circle class="istroke" cx="16" cy="16" r="12"/><path class="istroke" d="M10.5 16.5 L14.5 20.5 L22 12"/>',
+        '<rect class="istroke" x="4" y="8" width="24" height="17" rx="3"/><path class="istroke" d="M4 13.5 h24"/><path class="istroke" d="M9 19.5 h6"/>',
+        '<rect class="istroke" x="5" y="7" width="22" height="20" rx="3"/><path class="istroke" d="M5 13.5 h22"/><path class="istroke" d="M11 4 v6 M21 4 v6"/><path class="istroke" d="M11 19 h4 M19 19 h4"/>',
+        '<path class="istroke" d="M12 8.5 h15 M12 16.5 h15 M12 24.5 h15"/><rect class="istroke" x="4.5" y="6.5" width="4" height="4" rx="1"/><rect class="istroke" x="4.5" y="14.5" width="4" height="4" rx="1"/><rect class="istroke" x="4.5" y="22.5" width="4" height="4" rx="1"/>',
+        '<rect class="istroke" x="5" y="6" width="17" height="20" rx="2"/><path class="istroke" d="M22 11 h4.5 v12.5 a3 3 0 0 1 -3 3 h-1.5"/><path class="istroke" d="M9 11.5 h9 M9 16.5 h9 M9 21 h5.5"/>',
+        '<path class="istroke" d="M15 5 L17.3 13.7 L26 16 L17.3 18.3 L15 27 L12.7 18.3 L4 16 L12.7 13.7 Z"/><path class="istroke" d="M24.5 3.5 l0.9 2.6 2.6 0.9 -2.6 0.9 -0.9 2.6 -0.9 -2.6 -2.6 -0.9 2.6 -0.9 Z"/>',
+        '<path class="istroke" d="M25.5 13 A10 10 0 1 0 27 18"/><path class="istroke" d="M27 6.5 V13 H20.5"/>'
+      ];
+
+      /* chips：留空的隐藏，可见 chips 分两行（上行 ceil(n/2) 个） */
+      const chipTexts=[];
+      for(let i=1;i<=7;i++){ const t=(v['chip'+i]||'').trim(); if(t) chipTexts.push({t, icon:ICONS[i-1]}); }
+      const n=chipTexts.length;
+      const split=Math.ceil(n/2);
+      const rows=[$('#row1'),$('#row2')];
+      chipTexts.forEach((c,i)=>{
+        const d=document.createElement('div'); d.className='chip';
+        d.innerHTML='<svg viewBox="0 0 32 32">'+c.icon+'</svg><span class="ctext"></span>';
+        d.querySelector('.ctext').textContent=c.t;
+        rows[i<split?0:1].appendChild(d);
+      });
+      if(n<=split){ $('#row2').style.display='none'; }
+
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+
+      /* 1. 标题组递进淡入上移 */
+      tl.fromTo('#tEn',{opacity:0,y:22},{opacity:1,y:0,duration:0.5,ease:'power3.out'},0.2);
+      tl.fromTo('#tTitle',{opacity:0,y:34},{opacity:1,y:0,duration:0.6,ease:'power3.out'},0.34);
+      tl.fromTo('#tSub',{opacity:0,y:22},{opacity:1,y:0,duration:0.5,ease:'power3.out'},0.5);
+      /* 2. chips 逐个 stagger 弹入 */
+      const chipsStart=0.78, chipsDur=0.45, chipsSt=0.11;
+      tl.fromTo('.chip',{opacity:0,y:26,scale:0.9,transformOrigin:'50% 50%'},
+        {opacity:1,y:0,scale:1,duration:chipsDur,ease:'back.out(1.7)',stagger:chipsSt},chipsStart);
+      /* 3. 绿色大框描边收拢圈住所有 chips */
+      const frameStart=chipsStart+(Math.max(n,1)-1)*chipsSt+chipsDur+0.2;
+      tl.fromTo('#frameRect',{strokeDashoffset:100},{strokeDashoffset:0,duration:0.9,ease:'power2.inOut'},frameStart);
+      /* 4. 底部说明字淡入 */
+      tl.fromTo('#caption',{opacity:0,y:18},{opacity:1,y:0,duration:0.5,ease:'power2.out'},frameStart+0.55);
+      /* 演完定格，无收尾出场动画 */
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

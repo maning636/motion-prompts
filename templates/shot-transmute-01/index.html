@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "cardTitle", "type": "string", "label": "卡标题", "default": "增长引擎"}, {"id": "cardText", "type": "string", "label": "卡描述", "default": "从一颗原型长出来的功能"}, {"id": "chip", "type": "string", "label": "角标", "default": "NEW"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#mwrap{ position:absolute; inset:0; }
+#mc{ position:absolute; left:700px; top:390px; width:520px; height:300px; opacity:0;
+  display:flex; flex-direction:column; justify-content:center; padding:0 52px; }
+#mc .t{ font-size:52px; color:var(--fg); margin-bottom:18px; }
+#mc .x{ font-size:26px; color:rgba(255,255,255,.62); line-height:1.5; }
+#mc .c{ position:absolute; right:36px; top:26px; font-size:20px; letter-spacing:3px; color:#061106;
+  background:var(--accent); border-radius:8px; padding:6px 14px; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+<div id="mwrap"><svg width="1920" height="1080" viewBox="0 0 1920 1080">
+  <path id="mp" fill="color-mix(in srgb, var(--accent) 6%, transparent)" stroke="#00FF00" stroke-width="6"/>
+</svg></div>
+<div id="mc"><div class="c" id="ch"></div><div class="t" id="mt"></div><div class="x" id="mx"></div></div>
+    </div>
+    <script>
+      const FB = {"cardTitle": "增长引擎", "cardText": "从一颗原型长出来的功能", "chip": "NEW", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#mt').textContent=v.cardTitle||'';$('#mx').textContent=v.cardText||'';$('#ch').textContent=v.chip||'NEW';
+// 同构 path：M+8C。矩形 520×300 r=40 锚于 (960,540)；圆 R=170 同方位角锚点，逐段 lerp
+const CX=960,CY=540,HW=260,HH=150,R0=40,RC=170,K=0.5523;
+const seg=(p,c1,c2,q)=>({p,c1,c2,q});
+// 矩形版 8 段（上直边→TR弧→右直边→BR弧→下直边→BL弧→左直边→TL弧）
+const tri=(a,b,t)=>[a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t];
+const corners=[
+  [[ HW-R0,-HH],[ HW,-HH+R0],[1,0],[0,1]],   // TR: 起(220,-150) 终(260,-110)
+  [[ HW, HH-R0],[ HW-R0, HH],[0,1],[-1,0]],   // BR
+  [[-HW+R0, HH],[-HW, HH-R0],[-1,0],[0,-1]],  // BL
+  [[-HW,-HH+R0],[-HW+R0,-HH],[0,-1],[1,0]],   // TL
+];
+const edges=[
+  [[-HW+R0,-HH],[ HW-R0,-HH]], [[ HW,-HH+R0],[ HW, HH-R0]],
+  [[ HW-R0, HH],[-HW+R0, HH]], [[-HW, HH-R0],[-HW,-HH+R0]],
+];
+// 顺序: E0(上) C0(TR) E1(右) C1(BR) E2(下) C2(BL) E3(左) C3(TL)
+const rectSegs=[];
+for(let i=0;i<4;i++){
+  const [a,b]=edges[i];
+  rectSegs.push(seg(a,tri(a,b,1/3),tri(a,b,2/3),b));
+  const [cs,ce,ts,te]=corners[i];
+  rectSegs.push(seg(cs,[cs[0]+ts[0]*K*R0,cs[1]+ts[1]*K*R0],[ce[0]-te[0]*K*R0,ce[1]-te[1]*K*R0],ce));
+}
+// 圆版：锚点取矩形锚点同方位角
+const circSegs=rectSegs.map(s=>{
+  const az=p=>Math.atan2(p[1],p[0]);
+  const P=s.p,Q=s.q; let a0=az(P),a1=az(Q); if(a1<a0)a1+=2*Math.PI;
+  const d=a1-a0,k=4/3*Math.tan(d/4);
+  const cp=(a)=>[RC*Math.cos(a),RC*Math.sin(a)];
+  const tg=(a)=>[-Math.sin(a),Math.cos(a)];
+  const p0=cp(a0),p1=cp(a1),t0=tg(a0),t1=tg(a1);
+  return seg(p0,[p0[0]+k*RC*t0[0],p0[1]+k*RC*t0[1]],[p1[0]-k*RC*t1[0],p1[1]-k*RC*t1[1]],p1);
+});
+const L=(a,b,t)=>a+(b-a)*t;
+const dAt=(t)=>{
+  let d='';
+  const first=circSegs[0].p.map((v,i)=>L(v,rectSegs[0].p[i],t));
+  d='M'+(CX+first[0]).toFixed(1)+','+(CY+first[1]).toFixed(1);
+  for(let i=0;i<8;i++){
+    const c=circSegs[i],r=rectSegs[i];
+    const pt=(u,w)=> (CX+L(u[0],w[0],t)).toFixed(1)+','+(CY+L(u[1],w[1],t)).toFixed(1);
+    d+='C'+pt(c.c1,r.c1)+' '+pt(c.c2,r.c2)+' '+pt(c.q,r.q);
+  }
+  return d+'Z';
+};
+const mp=$('#mp'); mp.setAttribute('d',dAt(0)); mp.setAttribute('stroke',v.accent||'#00FF00');
+const pr={t:0};
+tl.fromTo('#mwrap',{scale:1,transformOrigin:'960px 540px'},{scale:1.12,duration:F(10),ease:'sine.inOut'},F(10)); // 吸气
+tl.to('#mwrap',{scale:1,duration:F(10),ease:'sine.inOut'},F(20));
+tl.to(pr,{t:1,duration:F(24),ease:'power2.inOut',onUpdate:()=>mp.setAttribute('d',dAt(pr.t))},F(30)); // 变形生长
+tl.to('#mc',{opacity:1,duration:F(12)},F(56));
+tl.to({},{duration:F(82)},F(68)); // 真静止
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

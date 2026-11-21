@@ -1,0 +1,13 @@
+{
+  "id": "host-card-glass-board",
+  "name": "主讲人玻璃信息板",
+  "description": "左侧主讲人头像与头衔，右侧玻璃拟态信息板，条目错峰浮现，用于讲师介绍与议程展示。",
+  "category": "人物介绍",
+  "tags": ["人物介绍", "讲师卡", "玻璃拟态", "议程板", "错峰浮现"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-20T00:00:00.000Z"
+}

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "w1", "type": "string", "label": "词1", "default": "每个项目"}, {"id": "w2", "type": "string", "label": "词2", "default": "都挂上"}, {"id": "w3", "type": "string", "label": "强调词", "default": "周报"}, {"id": "sub", "type": "string", "label": "副行", "default": "5 of 31 fetched today"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#C8860A"}, {"id": "background", "type": "color", "label": "纸底色", "default": "#F4EFE4"}, {"id": "foreground", "type": "color", "label": "墨色", "default": "#221F1A"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#warm{ position:absolute; inset:0;
+  background:radial-gradient(ellipse 60% 50% at 50% 46%, rgba(255,236,190,.5), transparent 70%); }
+#card{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; }
+#sent{ font-size:116px; font-weight:700; font-family:Georgia,'Songti SC',serif; display:flex; gap:28px; }
+.wd{ opacity:0; will-change:transform,filter; }
+.wd.acc{ color:var(--accent); font-style:italic; }
+#rule{ margin-top:44px; width:220px; height:6px; border-radius:3px; background:var(--accent);
+  transform:scaleX(0); }
+#sub{ margin-top:30px; font-size:24px; font-family:'Courier New',monospace; opacity:.55; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="1.8333333333333333" data-width="1920" data-height="1080">
+<div id="warm"></div><div id="card"><div id="sent"><span class="wd" id="w1"></span><span class="wd" id="w2"></span><span class="wd acc" id="w3"></span></div><div id="rule"></div><div id="sub"></div></div>
+    </div>
+    <script>
+      const FB = {"w1": "每个项目", "w2": "都挂上", "w3": "周报", "sub": "5 of 31 fetched today", "accent": "#C8860A", "background": "#F4EFE4", "foreground": "#221F1A"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#221F1A");
+      document.documentElement.style.setProperty("--background", v.background ?? "#F4EFE4");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#w1').textContent=v.w1||'';$('#w2').textContent=v.w2||'';$('#w3').textContent=v.w3||'';
+$('#sub').textContent=v.sub||'';
+// 逐词压印：delay 4+i*4、9f，scale 1.28→1 + blur 7→0 + opacity
+['#w1','#w2','#w3'].forEach((id,i)=>{
+  tl.fromTo(id,{opacity:0,scale:1.28,filter:'blur(7px)'},
+    {opacity:1,scale:1,filter:'blur(0px)',duration:F(9),ease:'power2.out'},F(4+i*4));
+});
+// 强调色短划线收束 f16-34
+tl.to('#rule',{scaleX:1,duration:F(18),ease:'power2.inOut'},F(16));
+// 尾部 8f 淡出交棒（f44-52），收尾到 55f
+tl.to('#card',{opacity:0,duration:F(8),ease:'power1.in'},F(44));
+tl.to({},{duration:F(3)},F(52));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,34 @@
+{
+  "id": "neon-stat-overlay",
+  "name": "荧光绿数字大字压屏",
+  "description": "中央超大白色发光数字从0递增至目标值，下方白字标签加绿色进度横条展开，支持背景图压暗叠加，口播报数据 overlay 用。",
+  "category": "透明叠加",
+  "tags": [
+    "数字",
+    "百分比",
+    "数据强调",
+    "口播",
+    "叠加"
+  ],
+  "duration": 6,
+  "slot": "overlay",
+  "when": "口播报一个关键数字或百分比，需要大字压屏强调并叠加在画面上时",
+  "assets": [
+    {
+      "id": "imgBg",
+      "type": "image",
+      "label": "背景图"
+    }
+  ],
+  "path": "templates/neon-stat-overlay",
+  "size": "1920×1080",
+  "formats": [
+    "mp4"
+  ],
+  "defaultFormat": "mp4",
+  "preview": "https://maning789link.top/hub/renders/neon-stat-overlay/sample.webm",
+  "status": "ready",
+  "tier": "free",
+  "no": null,
+  "series": "shot"
+}

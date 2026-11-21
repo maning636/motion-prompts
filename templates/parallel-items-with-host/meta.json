@@ -1,0 +1,13 @@
+{
+  "id": "parallel-items-with-host",
+  "name": "主讲人 + 并行条目推进",
+  "description": "主讲人位左侧锚定，右侧 3-4 个条目错峰入场后按序高亮推进，当前讲到哪条哪条点亮，讲过的回退到暗调。",
+  "category": "讲解叙事",
+  "tags": ["讲解叙事", "主讲人", "并行条目", "高亮推进"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-20T00:00:00.000Z"
+}

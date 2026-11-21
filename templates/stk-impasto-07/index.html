@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{&quot;id&quot;: &quot;label&quot;, &quot;name&quot;: &quot;文字&quot;, &quot;type&quot;: &quot;text&quot;, &quot;label&quot;: &quot;挂件上的字&quot;, &quot;default&quot;: &quot;&quot;}, {&quot;id&quot;: &quot;hue&quot;, &quot;name&quot;: &quot;色相&quot;, &quot;type&quot;: &quot;number&quot;, &quot;label&quot;: &quot;色相偏移（-180~180）&quot;, &quot;default&quot;: 0}, {&quot;id&quot;: &quot;scale&quot;, &quot;name&quot;: &quot;大小&quot;, &quot;type&quot;: &quot;number&quot;, &quot;label&quot;: &quot;元素大小（0.7~1.4）&quot;, &quot;default&quot;: 1.05}, {&quot;id&quot;: &quot;speed&quot;, &quot;name&quot;: &quot;速度&quot;, &quot;type&quot;: &quot;enum&quot;, &quot;label&quot;: &quot;循环速度&quot;, &quot;options&quot;: [{&quot;label&quot;: &quot;慢（1 圈）&quot;, &quot;value&quot;: 1}, {&quot;label&quot;: &quot;中（2 圈）&quot;, &quot;value&quot;: 2}, {&quot;label&quot;: &quot;快（3 圈）&quot;, &quot;value&quot;: 3}], &quot;default&quot;: 1}, {&quot;id&quot;: &quot;duration&quot;, &quot;name&quot;: &quot;时长&quot;, &quot;type&quot;: &quot;number&quot;, &quot;label&quot;: &quot;时长（秒）&quot;, &quot;default&quot;: 5.0}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>厚涂油画·颜料飞溅</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 480px; height: 270px; overflow: hidden; background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  #cv { position: absolute; left: 0; top: 0; width: 480px; height: 270px; }
+</style>
+</head>
+<body>
+<div id="stage" data-composition-id="main" data-start="0" data-duration="5.0"
+     data-width="480" data-height="270">
+  <canvas id="cv" width="480" height="270"></canvas>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/sticker.js?v=1792497675"></script>
+<script src="../_lib/sticker_forms_impasto.js?v=1792491129"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"label": "", "hue": 0, "scale": 1.05, "speed": 1, "duration": 5.0};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const SPEC = {"family": "impasto", "kind": "paintSplatter", "anchor": "br", "box": [276, 144, 200, 120], "rot": 0, "w": 480, "h": 270, "dpr": 2, "pixelated": false, "label": "", "size": 16, "seed": 1307, "scale": 1.05, "speed": 1, "duration": 5.0, "hue": 0};
+
+  /* 变量覆盖：改任何一项，整条时间轴和画面重排 */
+  SPEC.label = (v.label != null && v.label !== '') ? v.label : SPEC.label;
+  SPEC.hue = (v.hue != null) ? parseFloat(v.hue) : 0;
+  SPEC.scale = (v.scale != null) ? parseFloat(v.scale) : SPEC.scale;
+  SPEC.speed = (v.speed != null) ? parseInt(v.speed, 10) : SPEC.speed;
+  SPEC.duration = (v.duration != null) ? (parseFloat(v.duration) || SPEC.duration) : SPEC.duration;
+
+  const canvas = document.getElementById('cv');
+  const app = window.Sticker.build(SPEC, canvas);
+
+  /* 整片只有一条补间：推进 {t:0}，onUpdate 把画面算出来。
+     画面是时间的纯函数 —— 逐帧 seek 不会打架（链式补间会）。 */
+  const st = { t: 0 };
+  const tl = gsap.timeline({ paused: true });
+  tl.fromTo(st, { t: 0 }, {
+    t: SPEC.duration, duration: SPEC.duration, ease: 'none',
+    onUpdate: function () { app.render(st.t); }
+  }, 0);
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+  window.__sticker = app;
+
+  const first = function () { app.render(0); };
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(first).catch(first);
+  } else { first(); }
+})();
+</script>
+</body>
+</html>

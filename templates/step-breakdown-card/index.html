@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "stepNo", "type": "number", "label": "步骤号", "default": 1}, {"id": "title", "type": "string", "label": "标题", "default": "先看见，再拆开"}, {"id": "img1", "type": "image", "label": "截图", "default": "./placeholder-1.png"}, {"id": "notes", "type": "string", "label": "引线标注（逗号分隔，最多 3 条）", "default": "深色星空背景,12×POSTER 2:3,定格光晕"}, {"id": "questions", "type": "string", "label": "问题小卡（逗号分隔）", "default": "怎么排 LAYOUT,怎么转 MOTION,怎么停 LOCK"}, {"id": "toc", "type": "string", "label": "目录项（逗号分隔）", "default": "先拆画面,布局规则,运动节奏,音效同步,组装提示词"}, {"id": "timeRange", "type": "string", "label": "右上时间码", "default": "00:02 → 00:12"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #0E100F; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #EDF2EE; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      .corner{ position: absolute; width: 34px; height: 34px; border: 3px solid var(--ac, #00FF00); }
+      .c-tl{ left: -3px; top: -3px; border-right: none; border-bottom: none; }
+      .c-tr{ right: -3px; top: -3px; border-left: none; border-bottom: none; }
+      .c-bl{ left: -3px; bottom: -3px; border-right: none; border-top: none; }
+      .c-br{ right: -3px; bottom: -3px; border-left: none; border-top: none; }
+      .tc{ position: absolute; right: 90px; top: 84px; text-align: right; font-family: 'IBM Plex Mono', monospace;
+        font-size: 20px; letter-spacing: .22em; color: rgba(237,242,238,.5); line-height: 1.9; z-index: 6; }
+      .sbc-head{ position: absolute; left: 90px; top: 70px; z-index: 6; display: flex; align-items: flex-end; gap: 34px; }
+      .sbc-step{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 110px; font-weight: 900; color: var(--ac);
+        line-height: 1; }
+      .sbc-step small{ display: block; font-size: 20px; letter-spacing: .3em; color: rgba(237,242,238,.5);
+        font-family: 'IBM Plex Mono', monospace; font-weight: 400; margin-bottom: 12px; }
+      .sbc-title{ font-size: 54px; font-weight: 900; padding-bottom: 8px; }
+      .sbc-shot{ position: absolute; left: 90px; top: 320px; width: 820px; height: 540px; z-index: 4;
+        background: #131614; border: 1px solid rgba(237,242,238,.12); }
+      .sbc-shot img{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .9; }
+      .sbc-svg{ position: absolute; inset: 0; width: 100%; height: 100%; }
+      .sbc-note{ position: absolute; width: 320px; padding: 10px 16px; background: rgba(10,12,10,.88);
+        border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); font-size: 23px; line-height: 1.4; z-index: 5; }
+      .sbc-qcard{ position: absolute; left: 90px; top: 900px; z-index: 5; display: flex; align-items: center; gap: 22px;
+        background: #131614; border: 1px solid rgba(237,242,238,.12); padding: 22px 30px; }
+      .sbc-qcard .ql{ font-size: 22px; letter-spacing: .2em; color: var(--ac); white-space: nowrap; }
+      .sbc-chip{ font-size: 22px; padding: 8px 20px; border: 1px solid rgba(237,242,238,.25);
+        border-radius: 999px; color: rgba(237,242,238,.8); white-space: nowrap; }
+      .sbc-toc{ position: absolute; right: 90px; top: 320px; width: 380px; z-index: 5; }
+      .sbc-toc-h{ font-size: 20px; letter-spacing: .3em; color: rgba(237,242,238,.5); margin-bottom: 22px; }
+      .sbc-row{ position: relative; display: flex; align-items: center; gap: 20px; padding: 20px 0 20px 26px;
+        border-top: 1px solid rgba(237,242,238,.1); opacity: .42; }
+      .sbc-row .bar{ position: absolute; left: 0; top: 18px; bottom: 18px; width: 4px; background: var(--ac);
+        transform: scaleY(0); transform-origin: 50% 0; }
+      .sbc-row .n{ font-size: 20px; color: rgba(237,242,238,.55); }
+      .sbc-row .t{ font-size: 27px; font-weight: 700; }
+      .sbc-row.cur{ opacity: 1; }
+      .sbc-row.cur .n{ color: var(--ac); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="sbc-head">
+        <div class="sbc-step" id="stepNo"><small>STEP</small>01</div>
+        <div class="sbc-title" id="title"></div>
+      </div>
+      <div class="tc mono" id="timecode"></div>
+      <div class="sbc-shot" id="shot">
+        <img id="shotImg" alt="">
+        <svg class="sbc-svg" id="svg" viewBox="0 0 820 540"></svg>
+        <div id="notes"></div>
+      </div>
+      <div class="sbc-qcard" id="qcard"><span class="ql mono" id="qlabel"></span><div id="chips" style="display:flex;gap:14px"></div></div>
+      <div class="sbc-toc"><div class="sbc-toc-h mono">目录 · CONTENTS</div><div id="toc"></div></div>
+
+    </div>
+    <script>
+      const fallback = {"stepNo": 1, "title": "先看见，再拆开", "img1": "./placeholder-1.png", "notes": "深色星空背景,12×POSTER 2:3,定格光晕", "questions": "怎么排 LAYOUT,怎么转 MOTION,怎么停 LOCK", "toc": "先拆画面,布局规则,运动节奏,音效同步,组装提示词", "timeRange": "00:02 → 00:12", "accent": "#00FF00", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      document.documentElement.style.setProperty("--ac", V.accent ?? "#00FF00");
+      const stepNo = Math.max(1, Number(V.stepNo) || 1);
+      $("stepNo").innerHTML = "<small>STEP</small>" + String(stepNo).padStart(2, "0");
+      $("title").textContent = V.title;
+      $("timecode").innerHTML = "SCENE " + String(stepNo).padStart(2, "0") + "<br>" + (V.timeRange || "");
+      if (V.img1) $("shotImg").src = V.img1;
+      const NS = "http://www.w3.org/2000/svg";
+      const svg = $("svg");
+      const DOTS = [[180, 160], [320, 350], [640, 130]];
+      const SLOTS = [{ x: 462, y: 48 }, { x: 462, y: 224 }, { x: 462, y: 400 }];
+      const notes = split(V.notes);
+      const paths = [];
+      notes.slice(0, 3).forEach((nt, i) => {
+        const [dx, dy] = DOTS[i % 3], slot = SLOTS[i % 3];
+        const ln = document.createElementNS(NS, "line");
+        ln.setAttribute("x1", dx); ln.setAttribute("y1", dy);
+        ln.setAttribute("x2", slot.x - 14); ln.setAttribute("y2", slot.y + 24);
+        ln.setAttribute("stroke", V.accent ?? "#00FF00"); ln.setAttribute("stroke-width", 2);
+        svg.appendChild(ln); paths.push(ln);
+        const dot = document.createElementNS(NS, "circle");
+        dot.setAttribute("cx", dx); dot.setAttribute("cy", dy); dot.setAttribute("r", 8);
+        dot.setAttribute("fill", V.accent ?? "#00FF00");
+        dot.setAttribute("class", "sbc-dot");
+        svg.appendChild(dot); paths.push(dot);
+        const lb = document.createElement("div");
+        lb.className = "sbc-note";
+        lb.style.left = slot.x + "px"; lb.style.top = slot.y + "px";
+        lb.textContent = nt;
+        $("notes").appendChild(lb);
+      });
+      const qs = split(V.questions);
+      $("qlabel").textContent = "先提出 " + qs.length + " 个问题";
+      qs.forEach((q) => {
+        const c = document.createElement("span");
+        c.className = "sbc-chip";
+        c.textContent = q;
+        $("chips").appendChild(c);
+      });
+      const tocItems = split(V.toc);
+      const tocEl = $("toc");
+      tocItems.forEach((t, i) => {
+        const r = document.createElement("div");
+        r.className = "sbc-row" + (i + 1 === stepNo ? " cur" : "");
+        r.innerHTML = '<span class="bar"></span><span class="n mono">' + String(i + 1).padStart(2, "0") +
+          '</span><span class="t"></span>';
+        r.querySelector(".t").textContent = t;
+        tocEl.appendChild(r);
+      });
+      tl.fromTo([".sbc-head", "#timecode"], { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.1 }, 0.15);
+      tl.fromTo("#shot", { opacity: 0, scale: 0.97 }, { opacity: 1, scale: 1, duration: 0.6, ease: "power3.out" }, 0.35);
+      paths.forEach((p) => {
+        const len = p.getTotalLength ? p.getTotalLength() : 300;
+        p.style.strokeDasharray = String(len);
+        p.style.strokeDashoffset = String(len);
+      });
+      svg.querySelectorAll("circle").forEach((c) => { c.style.strokeDasharray = "none"; c.style.strokeDashoffset = "0"; });
+      tl.fromTo(svg.querySelectorAll("circle"), { opacity: 0 }, { opacity: 1, duration: 0.25, stagger: 0.1 }, 0.85);
+      tl.to(svg.querySelectorAll("line"), { strokeDashoffset: 0, duration: 0.5, stagger: 0.12, ease: "power2.out" }, 0.9);
+      tl.fromTo(".sbc-note", { opacity: 0, x: 16 }, { opacity: 1, x: 0, duration: 0.35, stagger: 0.12 }, 1.05);
+      tl.fromTo("#qcard", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 1.3);
+      tl.fromTo(".sbc-chip", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.3, stagger: 0.07 }, 1.5);
+      tl.fromTo([".sbc-toc-h", ".sbc-row"], { opacity: 0 }, { opacity: 0.42, duration: 0.35, stagger: 0.07 }, 1.2);
+      tl.fromTo(".sbc-toc-h", { opacity: 0 }, { opacity: 1, duration: 0.35 }, 1.2);
+      tl.to(".sbc-row.cur", { opacity: 1, duration: 0.3 }, 2.0);
+      tl.to(".sbc-row.cur .bar", { scaleY: 1, duration: 0.3, ease: "power2.out" }, 2.0);
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

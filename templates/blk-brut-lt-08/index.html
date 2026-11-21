@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"text","name":"金句","type":"string","label":"金句正文（14–24 字，单行）","default":"你不是缺方法，是缺一个能验收的标准"},{"id":"au","name":"署名","type":"string","label":"署名行（6–14 字）","default":"李知遥 · 独立播客主理人"},{"id":"tag","name":"角标","type":"string","label":"右上角 mono 角标（2–6 字）","default":"QUOTE"},{"id":"accent","name":"强调色","type":"color","label":"强调色（引号方块底）","default":"#FF5FA2"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","hidden":true,"default":"transparent","options":[{"value":"transparent","label":"透明底"},{"value":"mp4","label":"MP4 纯底"},{"value":"webm","label":"WebM 纯底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="金句贴：强调色引号方块压住白底卡片左上角，卡内 900 大字金句 + 3px 规则 + mono 署名，引号方块盖章落位后与卡片做反向微位移">
+<title>金句贴 · QUOTE</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 透明底贴片：--paper 不出现，底色与阴影色收进变量（风格规范 §7.1 / §7.2 规则 A） */
+  :root{ --shadow:#FFFFFF; --background:transparent; }
+
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--background);color:var(--ink);font-family:var(--sans)}
+
+  /* 卡片定高 340px：几何固定，兄弟件（引号方块）才能用固定坐标定位，不依赖文字长度 */
+  #q{position:absolute;left:340px;right:340px;bottom:200px;height:340px;
+    background:var(--white);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow);padding:66px 52px 40px;
+    display:flex;flex-direction:column}
+  /* 中文大字：字距恒 0，超长靠 data-fit 收口 */
+  #text{display:block;font-size:64px;font-weight:900;line-height:1.2;letter-spacing:0;
+    color:var(--ink);white-space:nowrap;overflow:hidden}
+  .rule{height:3px;background:var(--ink);margin:26px 0 18px;flex:0 0 3px}
+  #au{display:block;font-family:var(--mono);font-weight:700;font-size:24px;letter-spacing:.06em;
+    color:var(--ink);white-space:nowrap;overflow:hidden}
+  /* 右上角 mono 角标：pill 形状，压在卡片右上角外沿（基因 3 允许 9999px） */
+  #tag{position:absolute;right:316px;bottom:520px;padding:12px 26px;
+    background:var(--ink);color:var(--yellow);border:var(--bw) solid var(--ink);
+    border-radius:9999px;box-shadow:8px 8px 0 var(--shadow);
+    font-family:var(--mono);font-weight:700;font-size:22px;letter-spacing:.14em;line-height:1;
+    white-space:nowrap;overflow:hidden}
+  /* 引号方块：正方 + 3px 黑边 + 4px 直角；引号是装饰字符，用文字硬投影撑住（§3.8） */
+  #mk{position:absolute;left:300px;bottom:478px;width:120px;height:120px;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--accent);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow);font-size:88px;font-weight:900;line-height:1;
+    color:var(--ink);text-shadow:3px 3px 0 var(--white)}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="q">
+    <div id="text" data-fit-max="64" data-fit-min="30">你不是缺方法，是缺一个能验收的标准</div>
+    <div class="rule"></div>
+    <div id="au" data-fit-max="24" data-fit-min="14">李知遥 · 独立播客主理人</div>
+  </div>
+  <div id="tag">QUOTE</div>
+  <div id="mk">“</div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  var isT = (v.exportMode || 'transparent') === 'transparent';
+  var r = document.documentElement.style;
+  r.setProperty('--background', isT ? 'transparent' : '#0F0F0F');
+  r.setProperty('--shadow', isT ? '#FFFFFF' : '#0F0F0F');
+  if (v.accent) r.setProperty('--accent', v.accent);
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+  ['text', 'au', 'tag'].forEach(function (k) { set(k, v[k]); });
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：去掉盖章与反向微位移，只留终态 + ≤8px 微位移淡入（规范 §13.5） */
+    gsap.set('#q', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#mk', { x: 0, y: 0, opacity: 1, scale: 1 });
+    gsap.set('#tag', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#text', { x: 0 });
+    gsap.set('#au', { x: 0 });
+
+    tl.fromTo('#q', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, 0);
+    tl.fromTo('#mk', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, .45);
+
+    B.hold(tl, 1.6, 1.2);
+    return;
+  }
+
+  var TOTAL = parseFloat(v.duration) > 0 ? parseFloat(v.duration) : 5;
+  var HOLD = 0.5;
+  var WIN = Math.max(1.6, TOTAL - HOLD);
+  var SH = isT ? '#FFFFFF' : '#0F0F0F';
+
+  /* 模 1 · 硬着陆：卡片自下 46px 落位，落定瞬间阴影压 2 帧再弹回原档 */
+  tl.fromTo('#q', { y: 46 },
+      { y: 0, duration: .28, ease: 'power4.out' }, 0)
+    .fromTo('#q', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#q', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+
+  /* 模 2 · 零件装上去：金句、规则、署名错峰跟位，纯位移，opacity 恒为 1 */
+  tl.fromTo('#text', { x: -32 }, { x: 0, duration: .24, ease: 'power4.out' }, .22);
+  tl.fromTo('.rule', { x: -32 }, { x: 0, duration: .24, ease: 'power4.out' }, .3);
+  tl.fromTo('#au',   { x: -24 }, { x: 0, duration: .22, ease: 'power4.out' }, .36);
+
+  /* 引号方块：盖章式硬进场（0.8→1 单调缩放，面积最大必然落在末帧，不触发过冲峰） */
+  tl.fromTo('#mk', { x: -46, y: -34, scale: .8, opacity: 1 },
+      { x: 0, y: 0, scale: 1, duration: .24, ease: 'power3.out' }, .18)
+    .fromTo('#mk', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#mk', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+  /* 右上角角标分格擦出（模 7） */
+  tl.fromTo('#tag', { x: 30, opacity: 0 },
+      { x: 0, opacity: 1, duration: .3, ease: 'steps(5)' }, .5);
+
+  /* 引号方块与卡片做反向微位移：两层各走一段匀速往返，读起来像引号在「咬住」这句话 */
+  var T0 = 1.2;
+  var REP = Math.max(1, Math.round((WIN - T0) / 1.0));
+  var half = (WIN - T0) / (REP * 2);
+  tl.to('#mk', { y: -6, duration: half, ease: 'none', repeat: REP * 2 - 1, yoyo: true }, T0);
+  tl.to('#q', { y: 4, duration: half, ease: 'none', repeat: REP * 2 - 2, yoyo: true }, T0 + half);
+
+  var end = tl.duration();
+  B.hold(tl, end, Math.max(HOLD, TOTAL - end));
+})();
+</script>
+</body></html>

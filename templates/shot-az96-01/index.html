@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#bgPage{ position:absolute; left:260px; top:120px; width:1400px; height:840px; border-radius:18px;
+  background:color-mix(in srgb, var(--fg) 6%, transparent); padding:60px; filter:blur(0px); }
+.bgp{ height:26px; border-radius:13px; background:color-mix(in srgb, var(--fg) 12%, transparent); margin-bottom:30px; }
+#band{ position:absolute; top:-10%; left:0; width:600px; height:120%; rotate:16deg; translate:-120% 0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent); }
+#stageLight{ position:absolute; left:50%; top:46%; translate:-50% -50%; width:1200px; height:700px;
+  background:radial-gradient(ellipse at center, color-mix(in srgb, var(--accent) 34%, transparent), transparent 70%);
+  opacity:0; }
+#crane{ position:absolute; inset:0; perspective:1400px; }
+#group{ position:absolute; inset:0; transform-style:preserve-3d; will-change:transform; }
+.el{ position:absolute; border-radius:12px; background:#14161f;
+  border:2px solid color-mix(in srgb, var(--fg) 24%, transparent); will-change:transform,filter; }
+.el .bar{ height:12px; border-radius:6px; background:color-mix(in srgb, var(--fg) 28%, transparent); margin:14px 16px; }
+.el.nav{ left:610px; top:300px; width:700px; height:64px; }
+.el.card1{ left:520px; top:420px; width:300px; height:200px; }
+.el.card2{ left:1100px; top:420px; width:300px; height:200px; }
+.el.strip{ left:850px; top:430px; width:220px; height:190px; border-color:var(--accent); }
+.el.search{ left:700px; top:660px; width:520px; height:56px; border-radius:999px; }
+.el.stat{ left:520px; top:640px; width:150px; height:120px; }
+.el.doc{ left:1250px; top:640px; width:150px; height:120px; }
+.el.tag1{ left:480px; top:790px; width:200px; height:60px; border-radius:999px; border-color:var(--accent); }
+.el.tag2{ left:1240px; top:790px; width:200px; height:60px; border-radius:999px; }
+#word{ position:absolute; left:50%; top:150px; translate:-50% 0; display:flex; }
+.wl{ font-size:120px; font-weight:900; color:var(--accent); opacity:0; will-change:transform;
+  text-shadow:0 4px 0 color-mix(in srgb, var(--accent) 35%, transparent); }
+#rule{ position:absolute; left:50%; top:290px; translate:-50% 0; width:0; height:5px; border-radius:3px;
+  background:var(--accent); box-shadow:0 0 18px var(--accent); }
+.ext{ position:absolute; top:292px; width:190px; height:2px; background:var(--accent); opacity:0; }
+#extL{ right:50%; margin-right:210px; } #extR{ left:50%; margin-left:210px; }
+.dust{ position:absolute; border-radius:50%; background:#ffd77a; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4.833333333333333" data-width="1920" data-height="1080">
+
+<div id="bgPage">
+  <div class="bgp" style="width:46%"></div><div class="bgp" style="width:70%"></div>
+  <div class="bgp" style="width:58%"></div><div class="bgp" style="width:64%"></div>
+  <div class="bgp" style="width:40%"></div>
+</div>
+<div id="stageLight"></div>
+<div id="crane"><div id="group">
+  <div class="el nav"><div class="bar" style="width:30%"></div></div>
+  <div class="el card1"><div class="bar" style="width:60%"></div><div class="bar" style="width:40%"></div></div>
+  <div class="el strip"><div class="bar" style="width:55%"></div><div class="bar" style="width:70%"></div></div>
+  <div class="el card2"><div class="bar" style="width:50%"></div><div class="bar" style="width:65%"></div></div>
+  <div class="el stat"><div class="bar" style="width:58%"></div></div>
+  <div class="el search"><div class="bar" style="width:42%"></div></div>
+  <div class="el doc"><div class="bar" style="width:62%"></div></div>
+  <div class="el tag1"></div><div class="el tag2"></div>
+</div></div>
+<div id="word"></div>
+<div id="rule"></div><div class="ext" id="extL"></div><div class="ext" id="extR"></div>
+<div id="band"></div>
+<div id="dustBox"></div>
+
+    </div>
+    <script>
+      const FB = {"accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+// 字标
+const word=$('#word');
+'MOTION'.split('').forEach((ch)=>{
+  const s=document.createElement('span'); s.className='wl'; s.textContent=ch; word.appendChild(s);
+});
+// 金尘 20 颗，参数 index 派生确定性
+const dustBox=$('#dustBox');
+for(let i=0;i<20;i++){
+  const d=document.createElement('div'); d.className='dust';
+  const sz=2+(i%3)*0.5;
+  d.style.width=sz+'px'; d.style.height=sz+'px';
+  d.style.left=(120+((i*167)%1680))+'px';
+  d.style.top=(300+((i*97)%700))+'px';
+  d.style.opacity=(0.15+((i*7)%20)/100).toFixed(2);
+  dustBox.appendChild(d);
+}
+// crane 落机位
+gsap.set('#group',{rotationX:4,scale:1.06,transformOrigin:'50% 60%'});
+tl.to('#group',{rotationX:0,scale:1,duration:F(40),ease:'power2.out'},0);
+tl.to('#group',{scale:1.035,duration:F(105),ease:'none'},F(40));
+// 背景页 24f 内 blur 0→14
+tl.to('#bgPage',{filter:'blur(14px)',opacity:.55,duration:F(24),ease:'power1.inOut'},0);
+// 光带扫过 f2-14
+tl.to('#band',{x:'420%',duration:F(12),ease:'power1.inOut'},F(2));
+// 9 元素四方飞入：cue f4 起每 3f 一个，各飞 12f，过冲缓动
+const els=document.querySelectorAll('.el');
+els.forEach((el,i)=>{
+  const dx=((i%2)?1:-1)*(360+(i*53)%140);
+  const dy=((i%3)-1)*420+(i%2?60:-60);
+  const rot=((i*37)%10-5);
+  gsap.set(el,{x:dx,y:dy,rotation:rot*2,scale:1.12,opacity:0});
+  const cue=4+i*3;
+  tl.to(el,{x:0,y:0,rotation:rot,scale:1,opacity:1,duration:F(12),ease:'back.out(1.5)'},F(cue));
+  // 落地强调色 glow 6f（0.35→0）
+  const gl={a:0.35};
+  tl.to(gl,{a:0,duration:F(6),ease:'none',onUpdate:()=>{
+    el.style.boxShadow='0 0 '+(gl.a*90)+'px color-mix(in srgb, var(--accent) '+Math.round(gl.a*100)+'%, transparent)';
+  }},F(cue+12));
+});
+// 退后排 + 舞台光（字标登场 f42 起）
+tl.to('.el',{opacity:.88,filter:'saturate(.92)',duration:F(8)},F(42));
+tl.to('#stageLight',{opacity:.5,duration:F(8)},F(42));
+tl.to('#stageLight',{opacity:.25,duration:F(8)},F(50));
+// 字标逐字 letterpress
+document.querySelectorAll('.wl').forEach((s,i)=>{
+  gsap.set(s,{y:26});
+  tl.to(s,{opacity:1,y:0,duration:F(8),ease:'power3.out'},F(42+i*1.8));
+});
+// rule 长出 f58-70，延长线射出 f70-78 淡去
+tl.to('#rule',{width:420,duration:F(12),ease:'power2.inOut'},F(58));
+tl.to('.ext',{opacity:1,duration:F(2)},F(70));
+tl.to('#extL',{x:-190,duration:F(8),ease:'power2.out'},F(70));
+tl.to('#extR',{x:190,duration:F(8),ease:'power2.out'},F(70));
+tl.to('.ext',{opacity:0,duration:F(6)},F(78));
+// 字距呼吸 f62-66
+tl.to('#word',{letterSpacing:'10px',duration:F(4),ease:'power1.inOut'},F(62));
+// 金尘上飘（长程慢速）
+document.querySelectorAll('.dust').forEach((d,i)=>{
+  tl.to(d,{y:-(50+(i*13)%60),duration:F(120),ease:'none'},F(20+(i%10)));
+});
+// sign-off hold
+tl.to({},{duration:F(61)},F(84));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

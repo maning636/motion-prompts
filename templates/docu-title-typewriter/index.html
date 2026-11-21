@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-composition-variables='[{"id": "chapterNo", "type": "string", "label": "章节序号", "default": "EP.04"}, {"id": "chapterTitle", "type": "string", "label": "打字机内容（逐字显现）", "default": "在山的那一边"}, {"id": "subtitle", "type": "string", "label": "副标题", "default": "Beyond the Mountains"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#b91c1c"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+<head>
+  <meta charset="UTF-8">
+  <title>打字机式标题·皮影档案</title>
+  <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+  <style>
+    :root { --accent: #b91c1c; --ink: #0a0a0a; --paper: #faf6ed; --warm: #8b7355; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: var(--paper); color: var(--ink); font-family: "Courier New", "PingFang SC", "Source Han Serif", monospace; }
+    .composition { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+    .layer { position: absolute; inset: 0; }
+    .l1-bg { z-index: 1; }
+    .paper-base { position: absolute; inset: 0; background: var(--paper); }
+    .paper-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(61,40,23,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(61,40,23,0.08) 1px, transparent 1px); background-size: 48px 48px; }
+    .grain-layer { position: absolute; inset: 0; background-image: url("./assets/grain.png"); background-size: 320px 320px; opacity: 0.25; mix-blend-mode: multiply; }
+    .paper-age { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 60%, rgba(61,40,23,0.18) 100%); }
+
+    .l2-content { z-index: 10; }
+
+    /* 顶部 EP 序号 */
+    .chapter-no {
+      position: absolute; left: 100px; top: 100px;
+      font-size: 22px; letter-spacing: 0.4em;
+      color: var(--accent); font-weight: 700;
+    }
+    .chapter-no::before { content: "// "; }
+
+    /* 中央打字机区（每字一个 span） */
+    .typewriter-box {
+      position: absolute; left: 100px; top: 300px;
+      width: 1720px; height: 280px;
+      display: flex; align-items: center;
+    }
+    .typewriter {
+      font-family: "Courier New", "Source Han Serif", "Songti SC", monospace;
+      font-size: 120px;
+      font-weight: 700;
+      color: var(--ink);
+      letter-spacing: 0.05em;
+      line-height: 1.2;
+      white-space: pre-wrap;
+    }
+    .typewriter .char { opacity: 0; }
+    .cursor {
+      display: inline-block;
+      width: 8px; height: 100px;
+      background: var(--accent);
+      margin-left: 8px;
+      vertical-align: middle;
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+
+    /* 副标题 */
+    .subtitle {
+      position: absolute; left: 100px; top: 640px;
+      font-family: "Source Han Serif", "Songti SC", serif;
+      font-size: 24px;
+      font-style: italic;
+      color: var(--warm);
+      letter-spacing: 0.15em;
+    }
+
+    /* 底部进度反馈：X / Y 字符 */
+    .l4-emphasis { z-index: 30; pointer-events: none; }
+    .char-progress {
+      position: absolute; right: 100px; bottom: 100px;
+      font-family: "Courier New", monospace;
+      font-size: 18px; color: var(--ink);
+      letter-spacing: 0.2em;
+    }
+
+    .l6-environment { z-index: 50; pointer-events: none; }
+    .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.15) 100%); }
+
+    .progress-bar { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--accent); width: 0%; z-index: 60; }
+
+    .chapter-no { opacity: 0; }
+    .cursor { opacity: 0; }
+    .subtitle { opacity: 0; }
+    .char-progress { opacity: 0; }
+  </style>
+</head>
+<body>
+  <div id="composition" class="composition" data-composition-id="docu-title-typewriter-2026-08-31" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+    <div class="layer l1-bg">
+      <div class="paper-base"></div>
+      <div class="paper-grid"></div>
+      <div class="grain-layer"></div>
+      <div class="paper-age"></div>
+    </div>
+    <div class="layer l2-content">
+      <div class="chapter-no" data-composition-variable="chapterNo">EP.04</div>
+      <div class="typewriter-box">
+        <div class="typewriter">
+          <span id="tw-text"></span><span class="cursor" id="cursor"></span>
+        </div>
+      </div>
+      <div class="subtitle" data-composition-variable="subtitle">Beyond the Mountains</div>
+    </div>
+    <div class="layer l4-emphasis">
+      <div class="char-progress" id="char-progress">0 / 0</div>
+    </div>
+    <div class="layer l6-environment">
+      <div class="vignette"></div>
+    </div>
+    <div class="progress-bar"></div>
+  </div>
+  <script>
+    window.addEventListener("load", () => {
+      const vars = window.__hyperframes?.getVariables?.() || {};
+      const duration = Math.max(1, Number(vars.duration) || 6);
+      const text = vars.chapterTitle || "在山的那一边";
+      const tl = gsap.timeline({ paused: true, defaults: { ease: "none" } });
+          // 注册到 window.__timelines：云渲染的 settle/逐帧定位靠它驱动时间轴。
+          // 此前有一批素材没注册，导致渲染停在第 0 帧（主体初始 opacity:0 → 整层空）。
+          // gsap 时间轴就地 mutate，先存引用即可，后续 tl.to() 作用在同一对象上。
+          window.__timelines = window.__timelines || {};
+          window.__timelines.main = tl;
+      window.__timelines = window.__timelines || {};
+
+      // 把 text 拆成 char spans
+      const textEl = document.getElementById("tw-text");
+      textEl.innerHTML = "";
+      const chars = [];
+      for (const ch of text) {
+        const span = document.createElement("span");
+        span.className = "char";
+        span.textContent = ch;
+        textEl.appendChild(span);
+        chars.push(span);
+      }
+      const total = chars.length;
+      document.getElementById("char-progress").textContent = `0 / ${total}`;
+
+      // 计算每字显现间隔：在 0.5~3.5s 内全部显现完（duration 至少 4s 才够）
+      // 起始延迟 0.3s，结束在 min(duration-1, 4.0)s
+      const typeStart = 0.3;
+      const typeEnd = Math.min(duration - 1, Math.max(typeStart + 0.5, 4.0));
+      const stepDuration = Math.max(0.04, (typeEnd - typeStart) / total);
+
+      // 入场：序号 + 光标 + 副标题（稍后）
+      tl.to(".chapter-no", { opacity: 1, duration: 0.3 }, 0);
+      tl.to("#cursor", { opacity: 1, duration: 0.05 }, typeStart - 0.05);
+
+      // 逐字显现
+      chars.forEach((c, i) => {
+        tl.to(c, { opacity: 1, duration: 0.01 }, typeStart + i * stepDuration);
+      });
+
+      // 副标题 + 字符进度
+      tl.to(".subtitle", { opacity: 1, duration: 0.4 }, typeEnd + 0.1);
+      // 字符进度文本更新
+      const progressEl = document.getElementById("char-progress");
+      chars.forEach((c, i) => {
+        tl.call(() => { progressEl.textContent = `${i + 1} / ${total}`; }, [], typeStart + i * stepDuration);
+      });
+
+      // 出场
+      const exitAt = Math.max(typeEnd + 1.5, duration - 0.6);
+      tl.to(".subtitle", { opacity: 0, duration: 0.4 }, exitAt);
+      tl.to(".char-progress", { opacity: 0, duration: 0.4 }, exitAt);
+
+      // 进度条
+      tl.to(".progress-bar", { width: "100%", duration: duration, ease: "none" }, 0);
+
+      window.__timelines["docu-title-typewriter-2026-08-31"] = tl;
+      window.__hyperframes?.ready?.();
+    });
+  </script>
+</body>
+</html>

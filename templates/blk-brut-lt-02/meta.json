@@ -1,0 +1,16 @@
+{
+ "name": "话题标题条",
+ "description": "顶部或底部一条通栏：黑条放 mono 眉标、白条压 900 主标题、底部一条斜纹导轨；整条从左往右分六格擦出，导轨随后匀速滚动",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "band",
+  "mustard",
+  "snappy"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "每期开场、章节切换、选题定场，需要一条压在画面上的话题条时"
+}

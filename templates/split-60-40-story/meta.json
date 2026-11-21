@@ -1,0 +1,13 @@
+{
+  "id": "split-60-40-story",
+  "name": "60/40 非对称分屏叙事",
+  "description": "60/40 非对称分屏：左侧 60% 主叙事（大标题+要点），右侧 40% 辅助信息栏（标签+数值+注脚），主次错峰入场，结尾停留可读。",
+  "category": "对比叙事",
+  "tags": ["对比叙事", "分屏", "非对称", "主次叙事", "信息层级"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-05T00:00:00.000Z"
+}

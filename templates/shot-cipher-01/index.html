@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "噪声里长答案"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#stage{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  flex-direction:column; }
+#word{ display:flex; }
+.sc{ display:inline-block; width:118px; height:150px; line-height:150px; text-align:center;
+  font-size:96px; font-weight:900; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  color:color-mix(in srgb, var(--fg) 45%, transparent); border-radius:12px; }
+.sc.lit{ background:var(--accent); color:#0A0A0A; }
+.sc.done{ color:var(--fg); }
+#bar{ margin-top:70px; width:420px; height:6px; border-radius:3px;
+  background:color-mix(in srgb, var(--fg) 12%, transparent); overflow:hidden; }
+#barFill{ width:0; height:100%; background:var(--accent); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4.0" data-width="1920" data-height="1080">
+<div id="stage"><div id="word"></div><div id="bar"><div id="barFill"></div></div></div>
+    </div>
+    <script>
+      const FB = {"title": "噪声里长答案", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+const T=(v.title||'噪声里长答案');
+const CHSET='ABCDEF0123456789#$%&';
+const word=$('#word'), fill=$('#barFill');
+const slots=T.split('').map(c=>{
+  const s=document.createElement('span');
+  s.className='sc'; s.textContent=c; word.appendChild(s); return s;
+});
+const N=slots.length;
+function h(n){const x=Math.sin(n*12.9898)*43758.5453;return x-Math.floor(x);}
+const sim={f:0};
+function paint(){
+  const f=Math.floor(sim.f);
+  let locked=0;
+  slots.forEach((s,i)=>{
+    const lockF=20+i*6;
+    if(f<lockF){
+      // 乱码期：每 2f 跳一个伪随机字符（帧确定）
+      const idx=Math.floor(h(i*101+Math.floor(f/2)*7+13)*CHSET.length);
+      s.textContent=CHSET[idx];
+      s.className='sc';
+    }else if(f<lockF+2){
+      s.textContent=T[i]; s.className='sc lit'; locked++;
+    }else{
+      s.textContent=T[i]; s.className='sc done'; locked++;
+    }
+  });
+  fill.style.width=(locked/N*100).toFixed(1)+'%';
+}
+paint();
+tl.to(sim,{f:120,duration:F(120),ease:'none',onUpdate:paint},0);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

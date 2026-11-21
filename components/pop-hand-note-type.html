@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"text","name":"标题","type":"string","label":"便签标题","default":"已改好"},{"id":"line1","name":"正文一","type":"string","label":"正文第一行","default":"把节奏卡在拍点上"},{"id":"line2","name":"正文二","type":"string","label":"正文第二行","default":"先出节拍地图"},{"id":"line3","name":"正文三","type":"string","label":"正文第三行","default":"再让每一刀都对得上"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"hl","name":"高亮色","type":"color","label":"标题高亮色","default":"#FFC93C"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.0}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>手绘便签打字</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  /* 撕边用 clip-path 锯齿多边形：噪声滤镜在 headless 下慢且可能失败，规则多边形更稳 */
+  .p-torn { clip-path: polygon(0% 2%, 6% 0%, 24% 2.5%, 48% .5%, 72% 3%, 92% 1%, 100% 4%,
+    98.4% 34%, 100% 66%, 97% 88%, 100% 100%, 72% 98%, 46% 100%, 22% 97.5%, 0% 100%, 1.5% 62%, 0% 30%); }
+  .p-note { position: absolute; left: 118px; top: 44px; width: 244px; height: 182px; }
+  .p-note-layer { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+  /* .p-note-shadow / .p-note-paper 必须写成**复合选择器**，不能各自独立成条。
+     它们在 DOM 上是修饰类（.p-note-layer.p-torn.p-note-shadow），
+     独立规则会命中任何叫这个名字的元素——组件一多就撞车
+     （cog-number-slap 的 .halo-l 当年就是这么撞出一个凭空多出来的橙框）。 */
+  .p-note-layer.p-note-shadow { background: rgba(36, 28, 24, .85); transform: translate(3px, 4px); }
+  .p-note-layer.p-note-paper { background: #FFFDF5; }
+  .p-note-inner { position: absolute; left: 20px; top: 18px; width: 204px; }
+  .p-hl { position: absolute; left: -5px; top: -4px; height: 27px; width: 60px;
+    background: var(--hl); opacity: .62; transform: scaleX(0); transform-origin: 0 50%; }
+  .p-line { position: relative; white-space: pre; }
+  .p-c { display: inline-block; opacity: 0; }
+  .p-fold { position: absolute; right: 0; bottom: 0; width: 34px; height: 34px;
+    background: #E6DCC2; clip-path: polygon(100% 0, 100% 100%, 0 100%); }
+  .p-crease { position: absolute; right: 0; bottom: 0; width: 48px; height: 2px;
+    background: #241C18; transform-origin: 100% 100%; transform: rotate(-45deg); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"已改好","line1":"把节奏卡在拍点上","line2":"先出节拍地图","line3":"再让每一刀都对得上","accent":"#FF6B35","hl":"#FFC93C","duration":3.0};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--hl', v.hl || FALLBACK.hl);
+  const dur = parseFloat(v.duration) || FALLBACK.duration;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  /* 中文宽度对字号极敏感，写死必溢出。量的是 nowrap 下的自然宽，
+     量完恢复 white-space —— 见规格书 §3.2。 */
+  function fit(el, avail, maxPx, minPx) {
+    const prev = el.style.whiteSpace;
+    el.style.whiteSpace = 'nowrap';
+    const nat = el.scrollWidth;
+    el.style.whiteSpace = prev;
+    if (nat > avail && nat > 0) {
+      el.style.fontSize = Math.max(minPx, Math.floor(maxPx * avail / nat)) + 'px';
+    }
+    return el;
+  }
+  /* 拆成单字 span，逐字 back.out 就是打字机。
+     span 和容器都各自带 color —— 不指望继承（红线 12）。 */
+  function typed(parent, text, css, color) {
+    const line = put('div', 'p-line', css + ';color:' + color, null, parent);
+    line.style.whiteSpace = 'pre';
+    const chars = [];
+    for (let i = 0; i < text.length; i++) {
+      const s = document.createElement('span');
+      s.className = 'p-c';
+      s.style.color = color;
+      s.textContent = text.charAt(i);
+      line.appendChild(s);
+      chars.push(s);
+    }
+    return { line: line, chars: chars };
+  }
+
+  /* ── 便签：撕边纸 + 硬阴影 + 折角 ───────────────────────── */
+  const note = put('div', 'p-note');
+  put('div', 'p-note-layer p-torn p-note-shadow', '', null, note);
+  const paper = put('div', 'p-note-layer p-torn p-note-paper', '', null, note);
+  put('div', 'p-fold', '', null, paper);
+  put('div', 'p-crease', '', null, paper);
+
+  const inner = put('div', 'p-note-inner', '', null, paper);
+  const hl = put('div', 'p-hl', '', null, inner);
+
+  const t = typed(inner, String(v.text || FALLBACK.text),
+    'font-size:23px;line-height:30px;font-weight:800;letter-spacing:.02em', '#241C18');
+  fit(t.line, 204, 23, 12);
+  /* 高亮条宽度跟着标题实测宽走，换文案不用重填数字 */
+  hl.style.width = (t.line.scrollWidth + 10) + 'px';
+
+  const rows = [
+    typed(inner, String(v.line1 || FALLBACK.line1), 'margin-top:12px;font-size:14px;line-height:22px', '#4C4139'),
+    typed(inner, String(v.line2 || FALLBACK.line2), 'margin-top:5px;font-size:14px;line-height:22px', '#4C4139'),
+    typed(inner, String(v.line3 || FALLBACK.line3), 'margin-top:5px;font-size:14px;line-height:22px', '#4C4139'),
+  ];
+  fit(rows[0].line, 204, 14, 8);
+  fit(rows[1].line, 204, 14, 8);
+  fit(rows[2].line, 204, 14, 8);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 纸弹入 */
+  tl.fromTo(note, { scale: .28, opacity: 0, rotate: -9, y: 26 },
+    { scale: 1, opacity: 1, rotate: -2.4, y: 0, duration: .52, ease: 'back.out(2.2)' }, 0);
+  /* 落纸后压一下，像真纸落在桌上 */
+  tl.fromTo(note, { y: 0 }, { y: 4, duration: .09, ease: 'power2.out', yoyo: true, repeat: 1 }, .52);
+
+  /* 标题后面的高亮先铺开，字再落上去 */
+  tl.fromTo(hl, { scaleX: 0, opacity: 0 }, { scaleX: 1, opacity: .62, duration: .36, ease: 'power3.out' }, .26);
+  tl.fromTo(t.chars, { opacity: 0, y: 8, scale: .7 },
+    { opacity: 1, y: 0, scale: 1, duration: .26, ease: 'back.out(3)', stagger: .038 }, .24);
+
+  /* 正文逐行打出 */
+  rows.forEach(function (r, i) {
+    tl.fromTo(r.chars, { opacity: 0, y: 6, scale: .78 },
+      { opacity: 1, y: 0, scale: 1, duration: .2, ease: 'back.out(2.6)', stagger: .026 }, .66 + i * .32);
+  });
+  /* 折角最后压下去一点 */
+  tl.fromTo(note, { rotate: -2.4 }, { rotate: -1.2, duration: .18, ease: 'power2.out', yoyo: true, repeat: 1 }, 1.78);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"headline","type":"string","label":"主结论","default":"三件事说清 Q3"},{"id":"metric","type":"string","label":"关键指标","default":"月活 86.4 万"},{"id":"cta","type":"string","label":"行动文案","default":"查看完整报告"},{"id":"accent","type":"color","label":"强调色","default":"#FFD429"},{"id":"background","type":"color","label":"背景色","default":"#12100E"},{"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+*{ box-sizing: border-box;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      html, body{ margin: 0; width: 1920px; height: 1080px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .scene{ position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .big{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight: 900; color: var(--accent);
+        line-height: 1.06; letter-spacing: -.03em; margin: 0;font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+      .sub{ font-size: 38px; color: rgba(244,239,231,.7); margin: 0;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .cta{ display: inline-flex; align-items: center; gap: 20px; background: var(--accent); color: var(--ink);
+        border-radius: 18px; padding: 28px 60px; box-shadow: 0 0 0 5px var(--accent), 0 0 0 9px var(--ink), 14px 14px 0 rgba(0,0,0,.55);font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight: 900; color: var(--ink);font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+      .frame{ position: absolute; width: 88px; height: 88px; border: 7px solid var(--accent); opacity: .85;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .frame.tl{ left: 54px; top: 54px; border-right: none; border-bottom: none;}
+      .frame.br{ right: 54px; bottom: 54px; border-left: none; border-top: none;}
+      .split{ display: grid; grid-template-columns: 1fr 620px; height: 100%; }
+      .split-l{ display: flex; flex-direction: column; justify-content: center; padding: 0 80px 0 140px; }
+      .split-r{ position: relative; display: flex; align-items: center; justify-content: center;
+        background: var(--accent); overflow: hidden;}
+      .split-r::after{ content:''; position:absolute; left:0; top:0; bottom:0; width: 14px; background: var(--ink);}
+      .big{ font-size: 150px; }
+      .metric{ font-size: 46px; color: var(--ink); margin: 26px 0 0; font-weight: 700;}
+      .cta{ background: var(--ink); color: var(--accent); box-shadow: none; font-size: 56px;}
+      .split-tag{ position:absolute; left: 60px; top: 60px; font-size: 26px; letter-spacing:.24em;
+        color: var(--ink); opacity:.62; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+    </style>
+  </head>
+  <body>
+      <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+      <section id="scene" class="scene clip" data-start="0" data-duration="5" data-track-index="1">
+        <div class="frame tl"></div><div class="frame br"></div>
+        <div class="split">
+          <div class="split-l">
+            <h1 class="big" id="headline"></h1>
+            <p class="metric" id="metric"></p>
+          </div>
+          <div class="split-r">
+            <span class="split-tag">NEXT STEP</span>
+            <span class="cta" id="cta"></span>
+          </div>
+        </div>
+      </section>
+      </div>
+    <script>
+      const fallback = {headline: "三件事说清 Q3", metric: "月活 86.4 万", cta: "查看完整报告", accent: "#FFD429", background: "#12100E", foreground: "#F4EFE7"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      const root = document.getElementById("root");
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4EFE7");
+      document.documentElement.style.setProperty("--background", v.background ?? "#12100E");
+      root.style.backgroundColor = v.background;
+      root.style.setProperty("--accent", v.accent ?? "#FFD429");
+      root.style.setProperty("--fg", v.foreground ?? "#F4EFE7");
+      root.style.setProperty("--ink", v.background ?? "#12100E");
+      document.getElementById("headline").textContent = v.headline;
+      document.getElementById("metric").textContent = v.metric;
+      document.getElementById("cta").textContent = v.cta;
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(".split-l", { opacity: 0, x: -70 }, { opacity: 1, x: 0, duration: 0.7, ease: "power4.out" }, 0.1);
+      tl.fromTo(".split-r", { scaleX: 0, transformOrigin: "right" }, { scaleX: 1, duration: 0.75, ease: "power4.inOut" }, 0.05);
+      tl.fromTo(".cta", { opacity: 0, y: 50, scale: 0.88 }, { opacity: 1, y: 0, scale: 1, duration: 0.62, ease: "back.out(2.2)" }, 1.0);
+      tl.to(".cta", { scale: 1.05, duration: 0.4, ease: "sine.inOut", yoyo: true, repeat: 5 }, 1.9);
+      tl.to(".frame", { opacity: 0.35, duration: 0.45, ease: "sine.inOut", yoyo: true, repeat: 3 }, 2.2);
+      tl.to(".scene", { opacity: 0, duration: 0.42, ease: "power2.in" }, 4.55);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

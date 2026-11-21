@@ -1,0 +1,19 @@
+{
+ "id": "cogni-planningfallacy-full",
+ "name": "规划谬误 · 三个都乐观",
+ "description": "三张卡各一对条：计划是满的灰条，实际是超出的橙条。不是谁不努力，是估算的依据是意图，而实际依据的是历史。",
+ "category": "数据与图表",
+ "tags": [
+  "认知类",
+  "规划谬误",
+  "排期",
+  "职场"
+ ],
+ "duration": 3.7,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "",
+ "when": "讲排期 / 讲立项 / 讲预估工时",
+ "series": "night",
+ "createdAt": "2026-10-03T10:20:00.000Z"
+}

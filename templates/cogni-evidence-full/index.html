@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"pack","name":"规格包","type":"enum","label":"规格包（配色 / 字体 / 曲线）","options":[{"label":"暗色科技","value":"dark"},{"label":"奶油贴纸","value":"cream"},{"label":"单色克制","value":"mono"},{"label":"夜航","value":"night"}],"default":"night"},{"id":"eyebrow","name":"眉标","type":"string","label":"顶部眉标","default":"THE EVIDENCE"},{"id":"title","name":"标题","type":"string","label":"标题（就是结论）","default":"结论先放这，下面是撑它的三条"},{"id":"e1","name":"证据一","type":"string","label":"第一条证据","default":"留存率从 22% 涨到 41%，同期投放没变"},{"id":"src1","name":"出处一","type":"string","label":"第一条出处","default":"数据来源 · 2026 年 3 月—8 月月报"},{"id":"e2","name":"证据二","type":"string","label":"第二条证据","default":"同期退款率从 8% 降到 3%，差评里没有新增品类"},{"id":"src2","name":"出处二","type":"string","label":"第二条出处","default":"客服工单 · 抽样 412 条"},{"id":"e3","name":"证据三","type":"string","label":"第三条证据","default":"同一个渠道、同一个价格，两批用户的复购差 2.6 倍"},{"id":"src3","name":"出处三","type":"string","label":"第三条出处","default":"内部实验 · 第 7 周结论"},{"id":"foot","name":"收口","type":"string","label":"底部收口一句","default":"每条证据都带出处。给不出出处的，叫说法，不叫证据。"}]'>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="结论放在最上面，下面三张卡各给一条证据和它的出处。认知类最容易垮在「结论对但没人信」，每条证据都带来源，是把观点变成可检验命题最省力的办法。">
+<title>证据墙 · 结论加三条出处</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<link rel="stylesheet" href="../_lib/packs.css">
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script>
+<!-- packs.js 必须排在 blocks.js **之后**：blocks.js 结尾是 global.BBlocks = BB，
+     会把它整个替换掉。谁先加载谁的东西就没了，表现是 B.pack is not a function。 -->
+<script src="../_lib/packs.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<style>
+  /* 底色和字色**必须来自规格包**，不能写死。
+     写死 #000 + #F4F1EA 的时候，四个包里只有 dark / night 正常：
+     cream 的 --pk-fg 是 #2A2118、mono 是 #14140F，两个都是**深字**，
+     压在这个写死的黑底上 → 标题、标签、说明全糊掉。
+     而写死字面量色的元素（比如 rgba(244,241,234,.82)）反而还看得见，
+     画面上就成了一半能看一半不能看——比全黑更难认。
+     一共 33 条模板中招（混剪 5 + 认知 22 + 节拍 6）。
+
+     注意区分两层契约（packs.css 顶部注释里写过）：
+       --pk-bg / --pk-fg      = 包自带底板，舞台自己用它
+       --pk-*-media           = 压在用户素材上的那一层
+     这里改的是前者。 */
+  html,body{margin:0;padding:0;background:var(--pk-bg,#000)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--pk-bg,#000);
+        color:var(--pk-fg,#F4F1EA);font-family:"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+        -webkit-font-smoothing:antialiased}
+  /* 统一安全区：混剪里所有贴边元素都从 72/88 起，不贴 0 */
+  
+  /* ── 通用 ── */
+  .eyebrow{position:absolute;left:120px;top:104px;opacity:0;
+      font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:700;
+      letter-spacing:.34em;color:var(--pk-accent);text-indent:.34em}
+  .h1{position:absolute;left:120px;top:148px;width:1680px;opacity:0;
+      font-size:76px;font-weight:900;line-height:1.16;color:var(--pk-fg);letter-spacing:.01em}
+  .foot{position:absolute;left:120px;top:922px;width:1680px;opacity:0;
+      font-size:34px;line-height:1.5;color:var(--pk-muted)}
+  .foot b{color:var(--pk-accent);font-weight:700}
+  /* 底部一条极细的分隔，给满屏一个「结束感」 */
+  .footline{position:absolute;left:120px;top:884px;width:0;height:2px;background:var(--pk-accent)}
+
+  /* ── 因果链 ── */
+  .spine{position:absolute;left:120px;top:0;width:4px;height:0;background:var(--pk-accent);opacity:.9}
+  .node{position:absolute;left:120px;width:64px;height:64px;margin:-32px 0 0 -32px;
+      border-radius:50%;border:3px solid var(--pk-accent);background:#0B0D12;opacity:0;
+      display:flex;align-items:center;justify-content:center;
+      font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:800;color:var(--pk-accent)}
+  .clabel{position:absolute;opacity:0;font-family:ui-monospace,Consolas,monospace;
+      font-size:30px;font-weight:800;letter-spacing:.20em;color:var(--pk-accent)}
+  .ctext{position:absolute;opacity:0;font-size:52px;font-weight:700;line-height:1.30;color:var(--pk-fg)}
+  .cnote{position:absolute;opacity:0;font-size:27px;line-height:1.5;
+      color:var(--pk-muted)}
+
+  /* ── 公式页 ── */
+  .eqbox{position:absolute;left:120px;top:352px;width:1680px;height:210px;opacity:0;
+      display:flex;align-items:center;justify-content:center;gap:0;
+      border-top:2px solid rgba(244,241,234,.14);border-bottom:2px solid rgba(244,241,234,.14)}
+  .eqbox .t{font-size:150px;font-weight:900;color:var(--pk-fg);font-variant-numeric:tabular-nums}
+  .eqbox .o{font-size:110px;font-weight:300;color:var(--pk-muted);padding:0 26px}
+  .eqbox .r{font-size:150px;font-weight:900;color:var(--pk-accent);font-variant-numeric:tabular-nums}
+  .vcard{position:absolute;top:650px;width:520px;opacity:0;
+      border-left:4px solid rgba(244,241,234,.18);padding-left:28px}
+  .vcard .vn{font-size:40px;font-weight:900;color:var(--pk-fg)}
+  .vcard .vd{font-size:26px;line-height:1.5;color:var(--pk-muted);margin-top:14px}
+  .vcard .vv{font-size:30px;font-weight:800;color:var(--pk-accent);margin-top:14px;
+      font-family:ui-monospace,Consolas,monospace}
+
+  /* ── 引述页 ── */
+  .qm{position:absolute;left:120px;top:236px;opacity:0;
+      font-family:Georgia,'Times New Roman',serif;font-size:220px;line-height:.7;
+      color:var(--pk-accent);opacity:0}
+  .qtext{position:absolute;left:120px;top:376px;width:1560px;opacity:0;
+      font-size:96px;font-weight:800;line-height:1.42;color:var(--pk-fg);letter-spacing:.01em}
+  .qwho{position:absolute;left:120px;opacity:0;
+      font-family:ui-monospace,Consolas,monospace;font-size:28px;font-weight:700;
+      letter-spacing:.16em;color:var(--pk-muted)}
+  .qrule{position:absolute;left:120px;width:0;height:2px;background:rgba(244,241,234,.28)}
+  .qlab{position:absolute;opacity:0;font-family:ui-monospace,Consolas,monospace;
+      font-size:26px;font-weight:800;letter-spacing:.22em;color:var(--pk-accent)}
+  .qtake{position:absolute;opacity:0;font-size:36px;line-height:1.52;
+      color:var(--pk-fg)}
+
+  /* ── 曲线页 ── */
+  .chart{position:absolute;left:120px;top:400px;width:1680px;height:400px}
+  .svgbox{position:absolute;left:0;top:0;width:100%;height:100%}
+  .grid{position:absolute;left:0;right:0;height:1px;background:rgba(244,241,234,.10)}
+  .pivot{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;
+      background:var(--pk-accent);opacity:0;box-shadow:0 0 0 8px rgba(232,160,72,.18)}
+  .pvline{position:absolute;width:2px;background:rgba(232,160,72,.55);opacity:0}
+  .pvlab{position:absolute;opacity:0;font-size:30px;font-weight:800;color:var(--pk-accent)}
+  .phase{position:absolute;top:0;opacity:0}
+  .phase .pn{font-family:ui-monospace,Consolas,monospace;font-size:24px;font-weight:800;
+      letter-spacing:.18em;color:var(--pk-accent)}
+  .phase .pt{font-size:32px;font-weight:700;color:var(--pk-fg);margin-top:12px}
+  .phase .pd{font-size:25px;color:var(--pk-muted);margin-top:10px;line-height:1.45}
+
+  /* ── 判据树 ── */
+  .tn{position:absolute;opacity:0;border:2px solid var(--pk-accent);
+      border-radius:14px;background:rgba(232,160,72,.10);
+      display:flex;align-items:center;justify-content:center;text-align:center;padding:0 24px}
+  .tn.root{border-color:var(--pk-fg);background:rgba(244,241,234,.08)}
+  .tn .t1{font-size:34px;font-weight:800;line-height:1.35}
+  .tn.root .t1{font-size:40px}
+  /* 树的连线。没有连线的话七个盒子就是散在画面上的方块，
+     观众读到的是「七条并列信息」而不是「一棵树」——结构感全靠这 9 根线。 */
+  .ln2{position:absolute;background:var(--pk-accent);opacity:.62}
+  .tb{position:absolute;width:0;height:0;opacity:0;
+      border-left:3px solid transparent;border-right:3px solid transparent}
+
+  /* ── 证据墙 ── */
+  .ev{position:absolute;top:470px;width:520px;height:330px;opacity:0;
+      border:1px solid rgba(244,241,234,.14);border-radius:16px;
+      background:rgba(244,241,234,.03);padding:34px 32px;display:flex;flex-direction:column}
+  .ev .n{font-family:ui-monospace,Consolas,monospace;font-size:24px;font-weight:800;
+      letter-spacing:.20em;color:var(--pk-accent)}
+  .ev .e{margin-top:22px;font-size:36px;font-weight:700;line-height:1.45;color:var(--pk-fg)}
+  .ev .s{margin-top:auto;font-size:22px;line-height:1.5;
+      color:var(--pk-muted);font-family:ui-monospace,Consolas,monospace}
+
+  /* ── 反直觉三连 ── */
+  .fr{position:absolute;left:120px;width:1680px;height:170px;opacity:0}
+  .fr .idx{position:absolute;left:0;top:6px;font-family:ui-monospace,Consolas,monospace;
+      font-size:30px;font-weight:800;letter-spacing:.14em;color:var(--pk-accent)}
+  .fr .old{position:absolute;left:150px;top:0;width:1500px;font-size:46px;
+      font-weight:600;color:var(--pk-muted)}
+  .fr .strike{position:absolute;left:150px;top:30px;width:0;height:3px;
+      background:rgba(244,241,234,.70)}
+  .fr .new{position:absolute;left:150px;top:62px;width:1500px;font-size:46px;
+      font-weight:800;color:var(--pk-fg)}
+
+  /* ── 定义页 ── */
+  .termbig{position:absolute;left:120px;top:330px;width:1680px;opacity:0;
+      font-size:150px;font-weight:900;line-height:1.1;letter-spacing:.02em;
+      color:var(--pk-fg)}
+  .termsub{position:absolute;left:120px;top:520px;width:1500px;opacity:0;
+      font-size:40px;line-height:1.5;color:var(--pk-fg)}
+  .chip{position:absolute;top:700px;width:520px;height:170px;opacity:0;
+      border-radius:14px;padding:26px 28px;display:flex;flex-direction:column;
+      background:rgba(244,241,234,.05)}
+  .chip .cn{font-family:ui-monospace,Consolas,monospace;font-size:22px;font-weight:800;
+      letter-spacing:.18em;color:var(--pk-accent)}
+  .chip .cd{font-size:28px;line-height:1.5;margin-top:16px;color:var(--pk-fg)}
+
+  /* ── 分叉时间轴 ── */
+  .axis{position:absolute;left:120px;top:560px;width:1680px;height:3px;
+      background:rgba(244,241,234,.20)}
+  .now{position:absolute;left:540px;top:560px;width:26px;height:26px;margin:-11px 0 0 -13px;
+      border-radius:50%;background:var(--pk-accent);opacity:0;
+      box-shadow:0 0 0 10px rgba(232,160,72,.18)}
+  .nowlab{position:absolute;left:540px;top:604px;width:300px;margin-left:-150px;opacity:0;
+      text-align:center;font-family:ui-monospace,Consolas,monospace;font-size:24px;
+      font-weight:800;letter-spacing:.16em;color:var(--pk-accent)}
+  .br{position:absolute;width:0;height:0;opacity:0;
+      border-left:3px solid transparent;border-right:3px solid transparent;
+      border-bottom:5px solid var(--pk-accent)}
+  /* 分叉的连接线：从主轴折向标签。之前只有一个小三角，没有线，
+     三个标签就浮在画面上，看不出它们和「今天」有关系。 */
+  .bl{position:absolute;background:var(--pk-accent);opacity:.62}
+  .fl{position:absolute;opacity:0;width:460px}
+  .fl .fh{font-size:34px;font-weight:800;color:var(--pk-fg)}
+  .fl .fp{font-size:24px;line-height:1.5;margin-top:12px;color:var(--pk-muted)}
+
+  /* ── 逐条对照表 ── */
+  .th{position:absolute;top:330px;width:760px;opacity:0;font-size:32px;font-weight:800;
+      letter-spacing:.10em}
+  .th.a{left:120px;color:var(--pk-muted)}
+  .th.b{left:1040px;color:var(--pk-accent)}
+  .vline{position:absolute;left:920px;top:330px;width:2px;height:440px;
+      background:rgba(244,241,234,.14)}
+  .tr{position:absolute;left:120px;width:1680px;height:120px;opacity:0}
+  .tr .rule{position:absolute;left:0;right:0;top:0;height:1px;background:rgba(244,241,234,.10)}
+  .tr .ca{position:absolute;left:0;top:30px;width:700px;text-align:right;
+      font-size:34px;font-weight:600;color:var(--pk-muted)}
+  .tr .cb{position:absolute;left:920px;top:30px;width:700px;
+      font-size:34px;font-weight:800;color:var(--pk-fg)}
+
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <div class="eyebrow" id="eb">THE EVIDENCE</div>
+  <div class="h1" id="h1" data-fit-max="88" data-fit-min="52">结论先放这，下面是撑它的三条</div>
+  
+  <div class="ev" id="ev0" style="left:120px">
+    <div class="n">EVIDENCE 0</div>
+    <div class="e" id="e0" data-fit-max="36" data-fit-min="22">留存率从 22% 涨到 41%，同期投放没变</div>
+    <div class="s" id="s0">数据来源 · 2026 年 3 月—8 月月报</div>
+  </div>
+
+  <div class="ev" id="ev1" style="left:700px">
+    <div class="n">EVIDENCE 1</div>
+    <div class="e" id="e1" data-fit-max="36" data-fit-min="22">同期退款率从 8% 降到 3%，差评里没有新增品类</div>
+    <div class="s" id="s1">客服工单 · 抽样 412 条</div>
+  </div>
+
+  <div class="ev" id="ev2" style="left:1280px">
+    <div class="n">EVIDENCE 2</div>
+    <div class="e" id="e2" data-fit-max="36" data-fit-min="22">同一个渠道、同一个价格，两批用户的复购差 2.6 倍</div>
+    <div class="s" id="s2">内部实验 · 第 7 周结论</div>
+  </div>
+
+  <div class="footline" id="fline"></div>
+  <div class="foot" id="foot" data-fit-max="34" data-fit-min="22">每条证据都带出处。给不出出处的，叫说法，不叫证据。</div>
+
+</div>
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+  var tl = B.tl();
+  /* 规格包：先定风格，再建任何元素。
+     画面素材的配色**不跟着包走**——那是"底片"，用户自己的东西不能被模板改色；
+     跟着包走的只有 UI 层（字色、强调色、描边、圆角、曲线）。这个边界必须守住。 */
+  B.pack(v.pack);
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  function q(s) { return document.querySelector(s); }
+  /* 素材位接真视频：留空就继续用 CSS 画面 */
+  function live(n, src) {
+    if (!src) return;
+    var s = document.getElementById('s' + n), e = document.getElementById('v' + n);
+    if (!s || !e) return;
+    s.classList.add('live'); e.src = src;
+    e.play().catch(function () {});
+  }
+  /* 景别缓推：v1/v3 里画面始终在极慢地动，这是「像镜头」的关键 */
+  function push(n, at, dur, from, to, ease) {
+    var s = q('#s' + n + ' .sky'), g = q('#s' + n + ' .glow'), r = q('#s' + n + ' .r2');
+    if (s) tl.fromTo(s, { scale: from, y: '0%' },
+      { scale: to, y: '-2%', duration: dur, ease: ease || 'none' }, at);
+    if (g) tl.fromTo(g, { xPercent: -4, opacity: .8 },
+      { xPercent: 5, opacity: 1, duration: dur, ease: 'none' }, at);
+    if (r) tl.fromTo(r, { xPercent: 0 },
+      { xPercent: -2.5, duration: dur, ease: 'none' }, at);
+  }
+  /* clip-path 形状插值。
+     两个坑都在这里踩过：
+       1. GSAP 各版本对 clipPath 字符串补间的处理不一致，所以不直接补间它，
+          改成补间一个 {t:0→1} 的代理对象，onUpdate 里自己算 8 个点；
+       2. **from 必须是编译期常量，不能从元素当前状态读。**
+          settle 会把时间轴来回扫；一旦回退越过一个已完成的补间，
+          GSAP 会把它按 ratio 0 重渲——onUpdate 拿到的就是起点，
+          形状会「弹回矩形」。写成常量后，形状是 t 的纯函数，
+          停在任何一帧算出来都一样。
+     相邻两段的 from 必须等于上一段的 to，这条由 Python 侧保证。 */
+  function polyStr(pts) {
+    return 'polygon(' + pts.map(function (p) {
+      return p[0].toFixed(2) + '% ' + p[1].toFixed(2) + '%'; }).join(',') + ')';
+  }
+  function morph(el, from, to, at, dur, ease) {
+    if (!el || !to || !from || from.length !== to.length) return;
+    var st = { t: 0 };
+    tl.to(st, { t: 1, duration: dur == null ? .7 : dur, ease: ease || 'power2.inOut',
+      onUpdate: function () {
+        el.style.clipPath = polyStr(from.map(function (p, i) {
+          return [p[0] + (to[i][0] - p[0]) * st.t,
+                  p[1] + (to[i][1] - p[1]) * st.t];
+        }));
+      } }, at);
+  }
+  set('eb', v.eyebrow); set('h1', v.title); set('foot', v.foot);
+  set('e0', v.e1); set('s0', v.src1);
+  set('e1', v.e2); set('s1', v.src2);
+  set('e2', v.e3); set('s2', v.src3);
+
+  tl.fromTo('#eb', { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: .4 }, 0);
+  tl.fromTo('#h1', { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .08);
+  for (var k = 0; k < 3; k++) {
+    var at = .5 + k * .3;
+    tl.fromTo('#ev' + k, { opacity: 0, y: 34 },
+        { opacity: 1, y: 0, duration: .55, ease: 'power3.out' }, at);
+  }
+  tl.fromTo('#fline', { width: 0 }, { width: 200, duration: .5, ease: 'power3.out' }, 1.7);
+  tl.fromTo('#foot', { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: .5 }, 1.82);
+  B.hold(tl, 3.2, .6);
+  B.fitAll();
+
+})();
+</script>
+</body>
+</html>

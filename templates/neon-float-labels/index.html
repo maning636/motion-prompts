@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "imgBg", "type": "image", "label": "背景图（留空为深黑底+暗角）", "default": ""}, {"id": "c1En", "type": "string", "label": "卡1英文小标签（左上）", "default": "WHAT YOU WRITE"}, {"id": "c1Text", "type": "string", "label": "卡1中文大字", "default": "你在里面写下的内容"}, {"id": "c2En", "type": "string", "label": "卡2英文小标签（左下）", "default": "NO REPEAT"}, {"id": "c2Text", "type": "string", "label": "卡2中文大字", "default": "不用每次再重复说"}, {"id": "c3En", "type": "string", "label": "卡3英文小标签（右上）", "default": "EVERY SINGLE TIME"}, {"id": "c3Text", "type": "string", "label": "卡3中文大字", "default": "它每次都会照着做"}, {"id": "c4En", "type": "string", "label": "卡4英文小标签（右下）", "default": ""}, {"id": "c4Text", "type": "string", "label": "卡4中文大字", "default": ""}, {"id": "duration", "type": "number", "label": "总时长（秒，演完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12);
+  color: var(--foreground, #FFFFFF); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+/* 背景：图片槽 + 55% 压暗层；无图时深黑底 + 暗角 */
+.bgimg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; }
+.bgdim{ position:absolute; inset:0; background:rgba(0,0,0,.55); display:none; }
+.bgvig{ position:absolute; inset:0;
+  background:radial-gradient(ellipse 70% 62% at 50% 50%, rgba(18,22,28,.0) 0%, rgba(10,13,18,.72) 100%); }
+
+/* 浮动标签卡 */
+.fcard{ position:absolute; width:480px; background:#12161C; border-radius:16px;
+  border:1px solid rgba(16,185,129,.85);
+  box-shadow:0 0 24px rgba(16,185,129,.32), 0 0 64px rgba(16,185,129,.10), inset 0 0 28px rgba(16,185,129,.05);
+  padding:34px 42px 38px; will-change:transform,opacity; }
+#fc1{ left:120px; top:150px; }
+#fc2{ left:120px; bottom:180px; }
+#fc3{ right:120px; top:150px; }
+#fc4{ right:120px; bottom:180px; }
+.fen{ display:flex; align-items:center; gap:14px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700;
+  font-size:22px; letter-spacing:6px; color:#10B981; text-transform:uppercase;
+  text-shadow:0 0 12px rgba(52,211,153,.45); white-space:nowrap; overflow:hidden; max-width:396px; }
+.fen .dash{ flex:none; width:26px; height:3px; border-radius:2px; background:#34D399;
+  box-shadow:0 0 10px rgba(52,211,153,.8); }
+.ftext{ margin-top:18px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:46px;
+  line-height:1.3; color:#FFFFFF; max-width:230px; overflow-wrap:break-word; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <img class="bgimg" id="bgimg" alt="" />
+      <div class="bgdim" id="bgdim"></div>
+      <div class="bgvig"></div>
+
+      <div class="fcard" id="fc1">
+        <div class="fen"><span class="dash"></span><span id="en1"></span></div>
+        <div class="ftext" id="tx1"></div>
+      </div>
+      <div class="fcard" id="fc2">
+        <div class="fen"><span class="dash"></span><span id="en2"></span></div>
+        <div class="ftext" id="tx2"></div>
+      </div>
+      <div class="fcard" id="fc3">
+        <div class="fen"><span class="dash"></span><span id="en3"></span></div>
+        <div class="ftext" id="tx3"></div>
+      </div>
+      <div class="fcard" id="fc4">
+        <div class="fen"><span class="dash"></span><span id="en4"></span></div>
+        <div class="ftext" id="tx4"></div>
+      </div>
+    </div>
+    <script>
+      const FB = {"imgBg": "", "c1En": "WHAT YOU WRITE", "c1Text": "你在里面写下的内容", "c2En": "NO REPEAT", "c2Text": "不用每次再重复说", "c3En": "EVERY SINGLE TIME", "c3Text": "它每次都会照着做", "c4En": "", "c4Text": "", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $=(s)=>document.querySelector(s);
+      const DUR=+v.duration>0?+v.duration:6;
+      $('[data-composition-id]').setAttribute('data-duration',String(DUR));
+
+      /* 背景：有图则铺满+压暗，无图则深黑底+暗角 */
+      const bgSrc=(v.imgBg||'').trim();
+      if(bgSrc){ $('#bgimg').src=bgSrc; $('#bgimg').style.display='block'; $('#bgdim').style.display='block'; }
+
+      /* 四个卡位：文字为空则整卡不显示 */
+      const cards=[
+        {el:'#fc1',en:v.c1En,tx:v.c1Text,side:-1},
+        {el:'#fc2',en:v.c2En,tx:v.c2Text,side:-1},
+        {el:'#fc3',en:v.c3En,tx:v.c3Text,side:1},
+        {el:'#fc4',en:v.c4En,tx:v.c4Text,side:1},
+      ];
+      const shown=[];
+      cards.forEach((c,i)=>{
+        const en=(c.en||'').trim(), tx=(c.tx||'').trim();
+        if(!en && !tx){ $(c.el).style.display='none'; return; }
+        $('#en'+(i+1)).textContent=en;
+        $('#tx'+(i+1)).textContent=tx;
+        shown.push(c);
+      });
+
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+
+      /* 各卡从各自侧方 stagger 滑入 → 定格（左列从左，右列从右） */
+      shown.forEach((c,i)=>{
+        const t=0.35+i*0.28;
+        tl.fromTo(c.el,{x:c.side*180,opacity:0},{x:0,opacity:1,duration:0.7,ease:'power3.out'},t);
+      });
+      /* 演完定格，无收尾出场动画 */
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,145 @@
+﻿/* ── 规格包（style pack）──────────────────────────────────────────────
+   为什么做这个
+   ------------
+   调研社区 475 条 Opus 5.5 作品后，最有用的发现不是提示词（那玩意儿只有两句话），
+   而是：**成品的视觉规格才是壁垒**——配色、字体、缓动曲线、时长、圆角、阴影。
+   社区解决「各长各的」的办法是让模型从参考里总结一份 style guide，
+   然后后面所有镜头照这份走。我们现在是每个模板各写各的色板和字号：
+   同一个「强调橙」在 40 个模板里是 40 个十六进制值，既没法统一改，也没法对外讲清规格。
+
+   所以引入「包」：一套规格打包成一份 CSS 自定义属性，模板引用包而不是自己写死值。
+   改一个包变量，整族模板一起变。
+
+   契约（每个包必须给全这 15 个，少一个就是漏）：
+     --pk-bg / --pk-fg / --pk-muted      底、正文、次要文字
+     --pk-accent / --pk-accent2          强调、次强调
+     --pk-panel / --pk-line              面板底、描边
+     --pk-font / --pk-mono               正文栈、等宽栈
+     --pk-radius                         圆角基准
+     --pk-shadow                         阴影基准
+     --pk-ease-out / --pk-ease-in / --pk-ease-snap   三条主曲线
+     --pk-dur-fast / --pk-dur-base / --pk-dur-slow   三档节奏
+
+   曲线为什么是契约的一部分：社区反复强调「节奏规则」要和「分镜节拍」一样被约束。
+   动画看起来"贵"或"廉价"，一大半出在缓动曲线是否统一上，不是颜色。
+
+   ── 叠在素材上的那一层，必须和"包自己的底"分开 ──
+   规格包做出来的第一版只给一套 --pk-fg / --pk-bg，试用立刻暴露一个问题：
+   cream 和 mono 两个包是给浅色底设计的，把字色换成深色之后，
+   套到 mix-longtake 的夜景素材上，「黄昏高架」四个字直接看不见——
+   而**那片素材是用户自己的，我们不知道它多亮**。
+
+   所以契约分成两层：
+     --pk-fg / --pk-bg / --pk-panel   这个包**自带底板**时用
+     --pk-fg-media / --pk-muted-media / --pk-accent-media
+                                    文字压在用户素材上时用，永远是可读的安全值
+   模板里凡是坐在素材上的字，只能引用 *-media 那组。
+   这一条是这个机制能不能用下去的分界线，不补上就是个会在暗素材上翻车的坑。
+   ──────────────────────────────────────────────────────────────── */
+
+/* 通用缺省：模板里写 var(--pk-accent, #E8A048) 时，这层保证任何一条都没定义也不会坏 */
+:root {
+  --pk-bg: #0B0F14;
+  --pk-fg: #F4F1EA;
+  --pk-muted: rgba(244, 241, 234, .62);
+  --pk-accent: #E8A048;
+  --pk-accent2: #3E5F8A;
+  --pk-panel: rgba(12, 12, 18, .68);
+  --pk-line: rgba(244, 241, 234, .16);
+  --pk-font: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  --pk-mono: ui-monospace, Consolas, monospace;
+  --pk-radius: 14px;
+  --pk-shadow: 0 10px 34px rgba(0, 0, 0, .28);
+  --pk-ease-out: cubic-bezier(.16, 1, .3, 1);
+  --pk-ease-in: cubic-bezier(.7, 0, .84, 0);
+  --pk-ease-snap: cubic-bezier(.34, 1.56, .64, 1);
+  --pk-fg-media: #F4F1EA;
+  --pk-muted-media: rgba(244, 241, 234, .62);
+  --pk-accent-media: #E8A048;
+  --pk-dur-fast: .32s;
+  --pk-dur-base: .55s;
+  --pk-dur-slow: 1.1s;
+}
+
+/* ① dark · 暗色科技 —— 教程、录屏、科技感。荧光绿只用在「正在发生」的地方。 */
+html[data-pack="dark"] {
+  --pk-bg: #07090D;
+  --pk-fg: #EAF3EA;
+  --pk-muted: rgba(234, 243, 234, .58);
+  --pk-accent: #34D399;
+  --pk-accent2: #2E7CF6;
+  --pk-panel: rgba(6, 10, 14, .74);
+  --pk-line: rgba(52, 211, 153, .22);
+  --pk-radius: 10px;
+  --pk-shadow: 0 0 0 1px rgba(52, 211, 153, .10), 0 18px 50px rgba(0, 0, 0, .48);
+  --pk-ease-snap: cubic-bezier(.2, 1.4, .4, 1);
+  --pk-fg-media: #EAF3EA;
+  --pk-muted-media: rgba(234, 243, 234, .58);
+  --pk-accent-media: #34D399;
+}
+
+/* ② cream · 奶油贴纸 —— 知识讲解、口播配图。纸面、硬投影、圆角大、饱和度高。 */
+html[data-pack="cream"] {
+  --pk-bg: #FBF4E4;
+  --pk-fg: #2A2118;
+  --pk-muted: rgba(42, 33, 24, .58);
+  --pk-accent: #E2603C;
+  --pk-accent2: #2F7A6B;
+  --pk-panel: #FFFCF4;
+  --pk-line: rgba(42, 33, 24, .14);
+  --pk-font: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  --pk-radius: 22px;
+  --pk-shadow: 6px 6px 0 rgba(42, 33, 24, .16);
+  --pk-ease-out: cubic-bezier(.22, .9, .24, 1);
+  --pk-ease-snap: cubic-bezier(.3, 1.5, .5, 1);
+  --pk-dur-base: .5s;
+  --pk-fg-media: #FFF6E6;
+  --pk-muted-media: rgba(255, 246, 230, .60);
+  --pk-accent-media: #FFB03A;
+}
+
+/* ③ mono · 单色克制 —— 品牌、收尾、观点片。
+   这套是调研里反复出现的审美签名：Opus 的片子「更克制、干净」不是加得多，是收得住。
+   所以它只有黑白 + 一个强调色，留白大、字重大、没有第二个颜色。 */
+html[data-pack="mono"] {
+  --pk-bg: #FAFAF8;
+  --pk-fg: #14140F;
+  --pk-muted: rgba(20, 20, 15, .50);
+  --pk-accent: #14140F;
+  --pk-accent2: rgba(20, 20, 15, .28);
+  --pk-panel: rgba(20, 20, 15, .04);
+  --pk-line: rgba(20, 20, 15, .18);
+  --pk-font: "Noto Serif SC", "Songti SC", Georgia, serif;
+  --pk-radius: 4px;
+  --pk-shadow: none;
+  --pk-ease-out: cubic-bezier(.2, .8, .2, 1);
+  --pk-dur-slow: 1.4s;
+  --pk-fg-media: #FAFAF8;
+  --pk-muted-media: rgba(250, 250, 248, .58);
+  --pk-accent-media: #FAFAF8;
+}
+
+/* ④ night · 夜航（混剪/口播专用）—— 深蓝底 + 暖橙光，
+   就是这一轮混剪模板从参考片里量出来的那套底子。 */
+html[data-pack="night"] {
+  --pk-bg: #0B1220;
+  --pk-fg: #F4F1EA;
+  --pk-muted: rgba(244, 241, 234, .60);
+  --pk-accent: #C97A2B;
+  --pk-accent2: #3E5F8A;
+  --pk-panel: rgba(11, 18, 32, .70);
+  --pk-line: rgba(201, 122, 43, .26);
+  --pk-radius: 14px;
+  --pk-shadow: 0 12px 40px rgba(0, 0, 0, .42);
+  --pk-ease-snap: cubic-bezier(.28, 1.5, .42, 1);
+  --pk-fg-media: #F4F1EA;
+  --pk-muted-media: rgba(244, 241, 234, .60);
+  --pk-accent-media: #C97A2B;
+}
+
+/* 包清单。模板的 pack 变量 options 要和这里一一对应，
+   对不上的话 data-pack 落空 → 落到 :root 缺省层 → 看起来"没生效"但没有任何报错。 */
+html[data-pack="dark"],
+html[data-pack="cream"],
+html[data-pack="mono"],
+html[data-pack="night"] { will-change: contents; }

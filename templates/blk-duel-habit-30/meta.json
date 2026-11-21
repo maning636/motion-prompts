@@ -1,0 +1,16 @@
+{
+ "name": "对撞对比 · 三十天能把什么拧过来",
+ "description": "左右两块数据对照，中间压一枚菱形 VS，胜出一侧盖章落款",
+ "category": "信息卡片",
+ "tags": [
+  "积木社",
+  "shield",
+  "night",
+  "snappy"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "card",
+ "when": "数据卡片 / 对撞对比"
+}

@@ -1,0 +1,16 @@
+{
+ "name": "下节预告条",
+ "description": "强调色 NEXT 方块压在 ink 预告条左端，右侧一枚箭头方块收口，标题与副行错峰装上后三块反向微位移",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "next-up",
+  "preview",
+  "yellow"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "长视频与课程在段落之间需要一句「下一节讲什么」时"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "book-page-shell",
+  "name": "书页壳（纸感页面展示框）",
+  "series": "page",
+  "createdAt": "2026-08-15T08:00:00.000Z",
+  "energy": "中",
+  "suggestedDuration": 6,
+  "knownPitfalls": [
+    "页面图建议竖版 3:4（如 1080×1440），横版图会被 cover 裁掉两侧",
+    "video1 填了路径就播视频、忽略 img1；视频需先渲染成 mp4 再喂进来",
+    "视频槽靠模板内静态 <video> 逐帧同步，不要在 JS 里动态创建 video 元素"
+  ]
+}

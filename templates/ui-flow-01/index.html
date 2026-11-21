@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "accent", "name": "强调色", "type": "color", "label": "强调色（按钮填充 / 已播段 / 开关开 / 折线）", "default": "#2F6FED"}, {"id": "product", "name": "产品名", "type": "text", "label": "产品名（左上角标题，同时被搜索框输入）", "default": "FDE Studio"}, {"id": "steps", "name": "控件链", "type": "string", "label": "控件链（10 个预置 id，逗号分隔，顺序即叙事顺序）", "default": "button,spinner,check,player,progress,volume,toggle,tabs,chart,search"}, {"id": "bpm", "name": "节拍", "type": "number", "label": "节拍 BPM（每拍都有变化，60-180）", "default": 120}, {"id": "beatsPerStep", "name": "每控件拍数", "type": "number", "label": "每个控件占几拍（1-4）", "default": 2}, {"id": "duration", "name": "总时长", "type": "number", "label": "总时长（秒，0 = 按控件数自动算）", "default": 0}, {"id": "loop", "name": "无缝循环", "type": "boolean", "label": "首尾帧一致无缝循环（false 走更慢的收尾复位）", "default": true}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<title>界面动效 · 控件状态机 · 水平工作台</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: #E8EAED;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #E8EAED; }
+  #cv { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+</style>
+</head>
+<body>
+<div id="stage" data-composition-id="main" data-start="0" data-duration="10"
+     data-width="1920" data-height="1080">
+  <canvas id="cv" width="1920" height="1080"></canvas>
+</div>
+<script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  /* ---------------------------------------------------------------
+     界面动效 · 控件状态机（ui-flow-01）
+     来源：GitHub rickyhu20/opus-code-animation 类型 7（HyperFrames / GSAP 界面动效）
+     差异（对 motion 的 ui-01/02/03）：
+       - 不做鼠标光标、不做居中大卡：控件排成底部一条**水平工作台**（控件轨），
+         机位固定，全程不切镜头；
+       - 不做浮起 + 阴影生长：一律 **1px 描边、零投影**，卡片不浮起；
+       - 进度条是**播放器的组成部分**（带播放头 / 已播总时长读数 / 缓冲段），没有 tooltip；
+       - 底色冷灰 #E8EAED（motion 是 245 浅灰 + 白卡 255），单强调色由 accent 控，
+         默认蓝 #2F6FED（motion 是绿 32,120,80）。
+     硬规则：画面只由时间 t 决定（纯函数），逐帧 seek 不打架。
+     --------------------------------------------------------------- */
+
+  /* ---------------- 变量 ---------------- */
+  const FALLBACK = {
+    accent: '#2F6FED',
+    product: 'FDE Studio',
+    steps: 'button,spinner,check,player,progress,volume,toggle,tabs,chart,search',
+    bpm: 120,
+    beatsPerStep: 2,
+    duration: 0,
+    loop: true
+  };
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+
+  const pick = (val, fb) => (val === undefined || val === null || val === '') ? fb : val;
+  const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+  const clamp01 = (x) => clamp(x, 0, 1);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const easeOutCubic = (x) => { x = clamp01(x); return 1 - Math.pow(1 - x, 3); };
+  const easeInCubic = (x) => { x = clamp01(x); return x * x * x; };
+  const easeInOutCubic = (x) => {
+    x = clamp01(x);
+    return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+  };
+
+  /* 颜色：只接受 #RGB / #RRGGBB / #RRGGBBAA，非法回落默认 */
+  function normColor(c, fb) {
+    const s = String(c === undefined || c === null ? '' : c).trim();
+    if (/^#[0-9a-fA-F]{3}$/.test(s)) return s;
+    if (/^#[0-9a-fA-F]{6}$/.test(s)) return s;
+    if (/^#[0-9a-fA-F]{8}$/.test(s)) return s;
+    return fb;
+  }
+
+  const ACCENT = normColor(pick(v.accent, FALLBACK.accent), FALLBACK.accent);
+  const PRODUCT = String(pick(v.product, FALLBACK.product)).trim().slice(0, 12) || FALLBACK.product;
+
+  /* ---------------- 控件链解析（非法 id 跳过并记账） ---------------- */
+  const VALID_IDS = ['button', 'spinner', 'check', 'player', 'progress',
+                     'volume', 'toggle', 'tabs', 'chart', 'search'];
+  const CN = {
+    button: '按钮', spinner: '加载', check: '完成', player: '播放', progress: '进度',
+    volume: '音量', toggle: '开关', tabs: '标签', chart: '图表', search: '搜索'
+  };
+
+  const rawSteps = String(pick(v.steps, FALLBACK.steps));
+  const tokens = rawSteps.split(/[,，、;；\s]+/).map(function (s) { return s.trim().toLowerCase(); })
+                      .filter(function (s) { return s.length > 0; });
+  const STEP_IDS = [];
+  const INVALID = [];
+  const DUPLICATE = [];
+  const seen = {};
+  for (let i = 0; i < tokens.length; i++) {
+    const tk = tokens[i];
+    if (VALID_IDS.indexOf(tk) < 0) { INVALID.push(tk); continue; }
+    if (seen[tk]) { DUPLICATE.push(tk); continue; }
+    seen[tk] = 1;
+    STEP_IDS.push(tk);
+  }
+  if (!STEP_IDS.length) { for (let i = 0; i < VALID_IDS.length; i++) STEP_IDS.push(VALID_IDS[i]); }
+
+  const N = STEP_IDS.length;
+  const BEATS = N * Math.max(1, Math.round(clamp(parseFloat(pick(v.beatsPerStep, FALLBACK.beatsPerStep)) || 2, 1, 4)));
+
+  let BPM = parseFloat(pick(v.bpm, FALLBACK.bpm));
+  if (!isFinite(BPM)) BPM = FALLBACK.bpm;
+  BPM = clamp(BPM, 40, 240);
+
+  let DUR = parseFloat(pick(v.duration, FALLBACK.duration));
+  if (!isFinite(DUR) || DUR < 0) DUR = 0;
+
+  /* 总时长：duration=0 时按「控件数 × 每控件拍数 × 60/bpm」自动算；
+     duration>0 时覆盖总时长，但**重新分配拍格**（每拍 = 总时长/总拍数），
+     这样拍相位在片尾仍然是 0，首尾帧才能像素一致。 */
+  const TOTAL = DUR > 0 ? clamp(DUR, 1, 120) : (BEATS * 60 / BPM);
+  const BEAT = TOTAL / BEATS;
+  const STEP_DUR = BEAT * (BEATS / N);
+
+  const LOOP_RAW = v.loop;
+  const LOOP = (LOOP_RAW === undefined || LOOP_RAW === null || LOOP_RAW === '')
+    ? true
+    : !(LOOP_RAW === false || LOOP_RAW === 'false' || LOOP_RAW === 0 || LOOP_RAW === '0');
+
+  /* ---------------- 画面常量 ---------------- */
+  const W = 1920, H = 1080;
+  const BG = '#E8EAED';
+  const INK = '#0B0B0B';
+  const WHITE = '#FFFFFF';
+  const GREY_TXT = '#8A8A8A';
+  const MID_TXT = '#3A3A3A';
+
+  const MX = 120;
+  const CW = W - 2 * MX;                 /* 1680 */
+  const CELL_W = CW / N;
+  const cellCx = (i) => MX + (i + 0.5) * CELL_W;
+  const cellX = (i) => MX + i * CELL_W;
+
+  const RULE_Y = 140;                   /* 拍尺线 */
+  const CHAIN_Y = 250;                  /* 状态链节点心 */
+  const CHAIN_X0 = MX + 82, CHAIN_X1 = MX + CW - 82;
+  const chainX = (i) => (N > 1 ? CHAIN_X0 + i * (CHAIN_X1 - CHAIN_X0) / (N - 1) : (CHAIN_X0 + CHAIN_X1) / 2);
+  const STRIP_Y0 = 420, STRIP_Y1 = 920; /* 工作台条 */
+  const GRAPH_Y = 640;                  /* 控件图形中心 */
+  const CAP_Y = 874;                    /* 控件中文名 */
+  const BAR_Y = 898;                    /* 当前格拍点条 */
+  const FOOT_Y = 992;                   /* 页脚状态读数 */
+
+  const GHOST_DT = 1 / 60;              /* 残影采样间隔（一帧） */
+
+  /* ---------------- 画布 ---------------- */
+  const canvas = document.getElementById('cv');
+  const ctx = canvas.getContext('2d');
+  const dyn = document.createElement('canvas'); dyn.width = W; dyn.height = H;
+  const dynCtx = dyn.getContext('2d');
+  const ghost = document.createElement('canvas'); ghost.width = W; ghost.height = H;
+  const ghostCtx = ghost.getContext('2d');
+
+  const F_HDR = '700 38px MiSans, "Microsoft YaHei", sans-serif';
+  const F_SUB = '500 15px MiSans, "Microsoft YaHei", sans-serif';
+  const F_TICK = '500 12px MiSans, "Microsoft YaHei", sans-serif';
+  const F_NODE = '600 13px MiSans, "Microsoft YaHei", sans-serif';
+  const F_CAP = '700 17px MEBHeiHeiTi, "Microsoft YaHei", sans-serif';
+  const F_CHAIN = '500 15px MiSans, "Microsoft YaHei", sans-serif';
+  const F_BTN = '700 20px MiSans, "Microsoft YaHei", sans-serif';
+  const F_TAB = '500 16px MiSans, "Microsoft YaHei", sans-serif';
+  const F_NUM = '600 15px MiSans, "Microsoft YaHei", sans-serif';
+  const F_FOOT = '600 21px MiSans, "Microsoft YaHei", sans-serif';
+  const F_FOOT_CN = '900 21px MEBHeiHeiTi, "Microsoft YaHei", sans-serif';
+
+  function rrPath(g, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    g.beginPath();
+    g.moveTo(x + r, y);
+    g.lineTo(x + w - r, y); g.arcTo(x + w, y, x + w, y + r, r);
+    g.lineTo(x + w, y + h - r); g.arcTo(x + w, y + h, x + w - r, y + h, r);
+    g.lineTo(x + r, y + h); g.arcTo(x, y + h, x, y + h - r, r);
+    g.lineTo(x, y + r); g.arcTo(x, y, x + r, y, r);
+    g.closePath();
+  }
+  function mixHex(a, b, t) {
+    const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+    const r = Math.round(lerp((pa >> 16) & 255, (pb >> 16) & 255, t));
+    const gg = Math.round(lerp((pa >> 8) & 255, (pb >> 8) & 255, t));
+    const bb = Math.round(lerp(pa & 255, pb & 255, t));
+    return 'rgb(' + r + ',' + gg + ',' + bb + ')';
+  }
+  function fitText(g, text, maxW, font) {
+    g.font = font;
+    if (g.measureText(text).width <= maxW) return text;
+    let s = text;
+    while (s.length > 1 && g.measureText(s).width > maxW) s = s.slice(0, -1);
+    return s;
+  }
+
+  /* ---------------- 状态机核心 ---------------- */
+  /* 轻微回弹：overshoot ≤ 4%（1.00 → 1.04 → 1.00），不是夸张弹跳 */
+  function bump(a) {
+    if (a <= 0) return 0;
+    if (a >= 1) return 0;
+    if (a < 0.45) return easeOutCubic(a / 0.45);
+    return 1 - easeInOutCubic((a - 0.45) / 0.55);
+  }
+
+  /* 收尾复位：最后一小段把所有控件收回初始态。
+     loop=false 时复位更慢（收尾更明显），但末帧仍然回到初始态。 */
+  const RESET_FRAC = LOOP ? 0.22 : 0.40;
+  const RESET_DUR = BEAT * RESET_FRAC;
+  const RESET_START = TOTAL - RESET_DUR;
+  function resetFactor(t) {
+    if (t >= TOTAL) return 0;
+    if (t <= RESET_START) return 1;
+    return 1 - easeInCubic((t - RESET_START) / RESET_DUR);
+  }
+
+  /* 每个控件的激活量：第 1 拍做回弹，第 2 拍保持，之后冻结 */
+  function ctrlState(i, t) {
+    const local = t - i * STEP_DUR;
+    const a = local <= 0 ? 0 : clamp01(local / BEAT);
+    return {
+      a: a,
+      scale: 1 + 0.04 * bump(a),
+      fill: easeOutCubic(clamp01(a / 0.55)) * resetFactor(t)
+    };
+  }
+  function curIndex(t) { return clamp(Math.floor(t / STEP_DUR), 0, N - 1); }
+  function phaseOf(t) { return (t / BEAT) % 1; }
+
+  /* ---------------- 控件绘制 ---------------- */
+  function polyAt(pts, frac) {
+    let total = 0, i;
+    for (i = 1; i < pts.length; i++) {
+      total += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    }
+    let target = total * clamp01(frac);
+    for (i = 1; i < pts.length; i++) {
+      const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      if (target >= d) { target -= d; continue; }
+      const u = d === 0 ? 0 : target / d;
+      return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * u,
+              pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * u];
+    }
+    return pts[pts.length - 1];
+  }
+  function polyDraw(g, pts, frac, color, width) {
+    g.strokeStyle = color; g.lineWidth = width; g.lineCap = 'round'; g.lineJoin = 'round';
+    g.beginPath();
+    g.moveTo(pts[0][0], pts[0][1]);
+    let target = 0, total = 0, i;
+    for (i = 1; i < pts.length; i++) {
+      total += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    }
+    target = total * clamp01(frac);
+    for (i = 1; i < pts.length; i++) {
+      const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      if (target >= d) { g.lineTo(pts[i][0], pts[i][1]); target -= d; continue; }
+      const u = d === 0 ? 0 : target / d;
+      g.lineTo(pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * u,
+               pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * u);
+      break;
+    }
+    g.stroke();
+  }
+
+  function drawWidget(g, id, cx, cy, f, phase) {
+    g.save();
+    g.translate(cx, cy);
+    g.scale(1, 1);
+    g.translate(-cx, -cy);
+    g.lineJoin = 'round';
+    g.lineCap = 'butt';
+
+    if (id === 'button') {
+      const w = 116, h = 48, x = cx - w / 2, y = cy - h / 2;
+      g.fillStyle = WHITE; rrPath(g, x, y, w, h, 8); g.fill();
+      g.strokeStyle = INK; g.lineWidth = 1; g.stroke();
+      g.font = F_BTN; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = INK; g.fillText('开始', cx, cy + 1);
+      if (f > 0.001) {
+        g.save();
+        g.beginPath(); g.rect(x, y, w * f, h); g.clip();
+        g.fillStyle = ACCENT; rrPath(g, x, y, w, h, 8); g.fill();
+        g.fillStyle = WHITE; g.fillText('开始', cx, cy + 1);
+        g.restore();
+      }
+
+    } else if (id === 'spinner') {
+      const r = 44;
+      g.strokeStyle = 'rgba(11,11,11,0.13)'; g.lineWidth = 3;
+      g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke();
+      if (f > 0.001) {
+        const a0 = -Math.PI / 2, a1 = a0 + (300 * Math.PI / 180) * f;
+        g.strokeStyle = ACCENT; g.lineWidth = 3; g.lineCap = 'butt';
+        g.beginPath(); g.arc(cx, cy, r, a0, a1); g.stroke();
+        g.fillStyle = ACCENT; g.globalAlpha = f;
+        g.beginPath(); g.arc(cx + r * Math.cos(a1), cy + r * Math.sin(a1), 6, 0, Math.PI * 2); g.fill();
+        g.globalAlpha = 1;
+      }
+
+    } else if (id === 'check') {
+      const r = 36;
+      g.strokeStyle = 'rgba(11,11,11,0.13)'; g.lineWidth = 2;
+      g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke();
+      if (f > 0.001) {
+        g.strokeStyle = ACCENT; g.lineWidth = 2.5;
+        g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke();
+        const pts = [[cx - 17, cy + 1], [cx - 6, cy + 13], [cx + 19, cy - 15]];
+        polyDraw(g, pts, f, ACCENT, 3);
+      }
+
+    } else if (id === 'player') {
+      const r = 30;
+      g.fillStyle = WHITE; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = INK; g.lineWidth = 1; g.stroke();
+      g.fillStyle = INK;
+      g.beginPath();
+      g.moveTo(cx - 9, cy - 13); g.lineTo(cx + 21, cy); g.lineTo(cx - 9, cy + 13);
+      g.closePath(); g.fill();
+      if (f > 0.001) {
+        g.strokeStyle = ACCENT; g.lineWidth = 3;
+        g.beginPath(); g.arc(cx, cy, 43, 0, Math.PI * 2); g.stroke();
+        g.globalAlpha = f; g.fillStyle = ACCENT;
+        g.beginPath();
+        g.moveTo(cx - 9, cy - 13); g.lineTo(cx + 21, cy); g.lineTo(cx - 9, cy + 13);
+        g.closePath(); g.fill();
+        g.globalAlpha = 1;
+      }
+
+    } else if (id === 'progress') {
+      /* 播放器的一部分：小播放钮 + 进度条（播放头 + 缓冲段 + 已播/总时长读数） */
+      const bx = cx - 44, bw = 106, by = cy - 5, bh = 9;
+      g.fillStyle = INK;
+      g.beginPath(); g.moveTo(cx - 70, cy - 9); g.lineTo(cx - 54, cy - 4); g.lineTo(cx - 70, cy + 1);
+      g.closePath(); g.fill();
+      g.fillStyle = WHITE; rrPath(g, bx, by, bw, bh, 4.5); g.fill();
+      g.strokeStyle = INK; g.lineWidth = 1; g.stroke();
+      /* 缓冲段 */
+      g.fillStyle = '#D2D2D2';
+      rrPath(g, bx + 1, by + 1, (bw - 2) * 0.95, bh - 2, 3.5); g.fill();
+      /* 已播段 */
+      const played = bw * 0.78 * f;
+      if (played > 0.5) {
+        g.fillStyle = ACCENT;
+        rrPath(g, bx + 1, by + 1, Math.max(2, played - 1), bh - 2, 3.5); g.fill();
+      }
+      /* 播放头 */
+      if (played > 0.5) {
+        g.fillStyle = INK;
+        g.fillRect(bx + played - 1.5, by - 7, 3, bh + 14);
+      }
+      /* 已播 / 总时长读数 */
+      const totalSec = 12;
+      const el = Math.floor(totalSec * 0.78 * f);
+      const txt = (el < 10 ? '00:0' : '00:') + el + ' / 00:' + (totalSec < 10 ? '0' : '') + totalSec;
+      g.font = F_NUM; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = MID_TXT; g.fillText(txt, cx + 8, cy + 34);
+
+    } else if (id === 'volume') {
+      g.fillStyle = INK;
+      g.beginPath();
+      g.moveTo(cx - 72, cy - 6); g.lineTo(cx - 60, cy - 6); g.lineTo(cx - 48, cy - 18);
+      g.lineTo(cx - 48, cy + 18); g.lineTo(cx - 60, cy + 6); g.lineTo(cx - 72, cy + 6);
+      g.closePath(); g.fill();
+      const tx = cx - 30, tw = 92;
+      g.fillStyle = WHITE; rrPath(g, tx, cy - 3, tw, 6, 3); g.fill();
+      g.strokeStyle = INK; g.lineWidth = 1; g.stroke();
+      const lvl = tw * 0.7 * f;
+      if (lvl > 0.5) {
+        g.fillStyle = ACCENT; rrPath(g, tx + 1, cy - 2, Math.max(2, lvl - 1), 4, 2); g.fill();
+      }
+      const kx = tx + lvl;
+      g.fillStyle = WHITE; g.beginPath(); g.arc(kx, cy, 10, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = INK; g.lineWidth = 2; g.stroke();
+
+    } else if (id === 'toggle') {
+      const w = 68, h = 34, x = cx - w / 2, y = cy - h / 2;
+      g.fillStyle = WHITE; rrPath(g, x, y, w, h, 17); g.fill();
+      g.strokeStyle = INK; g.lineWidth = 1; g.stroke();
+      if (f > 0.001) {
+        g.globalAlpha = f; g.fillStyle = ACCENT; rrPath(g, x, y, w, h, 17); g.fill(); g.globalAlpha = 1;
+      }
+      const kx = lerp(x + 17, x + w - 17, f);
+      g.fillStyle = WHITE; g.beginPath(); g.arc(kx, cy, 13, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = INK; g.lineWidth = 1; g.stroke();
+
+    } else if (id === 'tabs') {
+      const names = ['概览', '数据', '设置'];
+      g.font = F_TAB; g.textAlign = 'center'; g.textBaseline = 'middle';
+      for (let i = 0; i < 3; i++) {
+        const lx = cx + (i - 1) * 52;
+        g.fillStyle = (i === 1) ? mixHex(GREY_TXT, INK, f) : GREY_TXT;
+        g.fillText(names[i], lx, cy - 8);
+      }
+      if (f > 0.001) {
+        g.fillStyle = ACCENT;
+        g.fillRect(cx - 23 * f, cy + 16, 46 * f, 3);
+      }
+
+    } else if (id === 'chart') {
+      const pts = [[cx - 52, cy + 22], [cx - 27, cy + 2], [cx - 4, cy + 13],
+                   [cx + 17, cy - 15], [cx + 54, cy - 31]];
+      g.strokeStyle = 'rgba(11,11,11,0.45)'; g.lineWidth = 1;
+      g.beginPath();
+      g.moveTo(cx - 58, cy + 38); g.lineTo(cx + 58, cy + 38);
+      g.moveTo(cx - 58, cy + 38); g.lineTo(cx - 58, cy - 38);
+      g.stroke();
+      polyDraw(g, pts, 1, '#C9C9C9', 2);
+      if (f > 0.001) {
+        polyDraw(g, pts, f, ACCENT, 2.5);
+        const hp = polyAt(pts, f);
+        g.fillStyle = ACCENT; g.globalAlpha = f;
+        g.beginPath(); g.arc(hp[0], hp[1], 5, 0, Math.PI * 2); g.fill();
+        g.globalAlpha = 1;
+      }
+
+    } else if (id === 'search') {
+      const w = 148, h = 42, x = cx - w / 2, y = cy - h / 2;
+      g.fillStyle = WHITE; rrPath(g, x, y, w, h, 21); g.fill();
+      g.strokeStyle = INK; g.lineWidth = 1; g.stroke();
+      g.strokeStyle = INK; g.lineWidth = 2;
+      g.beginPath(); g.arc(cx - 48, cy - 2, 9, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.moveTo(cx - 42, cy + 4); g.lineTo(cx - 35, cy + 11); g.stroke();
+      const txt = fitText(g, PRODUCT, 96, F_BTN);
+      g.font = F_BTN; g.textAlign = 'left'; g.textBaseline = 'middle';
+      if (f > 0.001) {
+        g.save();
+        g.beginPath(); g.rect(cx - 32, y + 2, 96 * f, h - 4); g.clip();
+        g.fillStyle = INK; g.fillText(txt, cx - 32, cy + 1);
+        g.restore();
+        const blink = 0.15 + 0.85 * (0.5 + 0.5 * Math.cos(2 * Math.PI * phase));
+        g.globalAlpha = f * blink;
+        g.fillStyle = INK; g.fillRect(cx - 32 + 96 * f, cy - 11, 2, 22);
+        g.globalAlpha = 1;
+      }
+    }
+    g.restore();
+  }
+
+  /* ---------------- 静态层 ---------------- */
+  function drawHeader(g) {
+    g.font = F_HDR; g.textAlign = 'left'; g.textBaseline = 'middle';
+    g.fillStyle = INK; g.fillText(PRODUCT, MX, 78);
+    g.font = F_SUB; g.textAlign = 'right';
+    g.fillStyle = GREY_TXT; g.fillText('UI FLOW · 控件状态机 · 固定机位', MX + CW, 80);
+    g.strokeStyle = 'rgba(11,11,11,0.16)'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(MX, RULE_Y + 0.5); g.lineTo(MX + CW, RULE_Y + 0.5); g.stroke();
+  }
+
+  function drawRulerBase(g) {
+    g.strokeStyle = 'rgba(11,11,11,0.22)'; g.lineWidth = 1;
+    for (let b = 0; b < BEATS; b++) {
+      const bx = Math.round(MX + (b + 0.5) * (CW / BEATS)) + 0.5;
+      g.beginPath(); g.moveTo(bx, RULE_Y); g.lineTo(bx, RULE_Y + 11); g.stroke();
+    }
+  }
+
+  function drawChainBase(g, cur, states) {
+    for (let i = 0; i < N; i++) {
+      if (i === cur) continue;
+      /* 连接线 */
+      if (i < N - 1) {
+        const x0 = chainX(i) + 16, x1 = chainX(i + 1) - 16;
+        g.strokeStyle = 'rgba(11,11,11,0.15)'; g.lineWidth = 1;
+        g.beginPath(); g.moveTo(x0, CHAIN_Y + 0.5); g.lineTo(x1, CHAIN_Y + 0.5); g.stroke();
+        const f = states[i].fill;
+        if (f > 0.001) {
+          g.strokeStyle = ACCENT; g.globalAlpha = f;
+          g.beginPath(); g.moveTo(x0, CHAIN_Y + 0.5); g.lineTo(x1, CHAIN_Y + 0.5); g.stroke();
+          g.globalAlpha = 1;
+        }
+      }
+      /* 节点 */
+      const nx = chainX(i);
+      g.fillStyle = WHITE; g.beginPath(); g.arc(nx, CHAIN_Y, 15, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = INK; g.lineWidth = 1; g.stroke();
+      const f = states[i].fill;
+      if (f > 0.001) {
+        g.fillStyle = ACCENT; g.globalAlpha = f;
+        g.beginPath(); g.arc(nx, CHAIN_Y, 14, 0, Math.PI * 2); g.fill();
+        g.globalAlpha = 1;
+      }
+      g.font = F_NODE; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = MID_TXT;
+      g.fillText((i + 1 < 10 ? '0' : '') + (i + 1), nx, CHAIN_Y + 1);
+      /* 节点下的控件名 */
+      g.font = F_CHAIN; g.textAlign = 'center';
+      g.fillStyle = GREY_TXT;
+      g.fillText(CN[STEP_IDS[i]], nx, CHAIN_Y + 50);
+    }
+  }
+
+  function drawWorkbench(g) {
+    g.fillStyle = WHITE; g.fillRect(MX, STRIP_Y0, CW, STRIP_Y1 - STRIP_Y0);
+    g.strokeStyle = INK; g.lineWidth = 1;
+    g.strokeRect(MX + 0.5, STRIP_Y0 + 0.5, CW - 1, STRIP_Y1 - STRIP_Y0 - 1);
+    g.strokeStyle = 'rgba(11,11,11,0.10)';
+    for (let i = 1; i < N; i++) {
+      const dx = Math.round(MX + i * CELL_W) + 0.5;
+      g.beginPath(); g.moveTo(dx, STRIP_Y0 + 1); g.lineTo(dx, STRIP_Y1 - 1); g.stroke();
+    }
+    for (let i = 0; i < N; i++) {
+      g.font = F_TICK; g.textAlign = 'left'; g.textBaseline = 'middle';
+      g.fillStyle = GREY_TXT;
+      g.fillText((i + 1 < 10 ? '0' : '') + (i + 1), cellX(i) + 16, STRIP_Y0 + 26);
+      g.font = F_CAP; g.textAlign = 'center';
+      g.fillStyle = MID_TXT;
+      g.fillText(CN[STEP_IDS[i]], cellCx(i), CAP_Y);
+    }
+  }
+
+  /* ---------------- 动态层（当前焦点组：会动，所以吃残影） ---------------- */
+  function drawDynamic(g, t) {
+    const cur = curIndex(t);
+    const phase = phaseOf(t);
+    const st = ctrlState(cur, t);
+    const f = st.fill;
+
+    /* 拍尺上当前拍 */
+    const beat = Math.floor(t / BEAT);
+    if (beat >= 0 && beat < BEATS && f > 0.001) {
+      const bx = Math.round(MX + (beat + 0.5) * (CW / BEATS)) + 0.5;
+      g.strokeStyle = ACCENT; g.globalAlpha = f; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(bx, RULE_Y); g.lineTo(bx, RULE_Y + 24); g.stroke();
+      g.globalAlpha = 1; g.lineWidth = 1;
+    }
+
+    /* 当前节点的连接线 / 节点 / 环 / 名字 */
+    if (cur < N - 1) {
+      const x0 = chainX(cur) + 16, x1 = chainX(cur + 1) - 16;
+      g.strokeStyle = 'rgba(11,11,11,0.15)'; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(x0, CHAIN_Y + 0.5); g.lineTo(x1, CHAIN_Y + 0.5); g.stroke();
+      if (f > 0.001) {
+        g.strokeStyle = ACCENT; g.globalAlpha = f;
+        g.beginPath(); g.moveTo(x0, CHAIN_Y + 0.5); g.lineTo(x1, CHAIN_Y + 0.5); g.stroke();
+        g.globalAlpha = 1;
+      }
+    }
+    const nx = chainX(cur);
+    g.fillStyle = WHITE; g.beginPath(); g.arc(nx, CHAIN_Y, 15, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = INK; g.lineWidth = 1; g.stroke();
+    if (f > 0.001) {
+      g.fillStyle = ACCENT; g.globalAlpha = f;
+      g.beginPath(); g.arc(nx, CHAIN_Y, 14, 0, Math.PI * 2); g.fill();
+      g.globalAlpha = 1;
+      /* 拍点环：随拍相位连续呼吸 —— 「每拍有变化」的承担者 */
+      const rr = 24 + 5 * Math.sin(Math.PI * phase);
+      g.strokeStyle = ACCENT; g.globalAlpha = f; g.lineWidth = 3;
+      g.beginPath(); g.arc(nx, CHAIN_Y, rr, 0, Math.PI * 2); g.stroke();
+      g.globalAlpha = 1; g.lineWidth = 1;
+    }
+    g.font = F_NODE; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = MID_TXT;
+    g.fillText((cur + 1 < 10 ? '0' : '') + (cur + 1), nx, CHAIN_Y + 1);
+    g.font = F_CHAIN; g.textAlign = 'center';
+    g.fillStyle = mixHex(GREY_TXT, INK, f);
+    g.fillText(CN[STEP_IDS[cur]], nx, CHAIN_Y + 50);
+
+    /* 当前控件本体 */
+    g.save();
+    g.translate(cellCx(cur), GRAPH_Y);
+    g.scale(st.scale, st.scale);
+    g.translate(-cellCx(cur), -GRAPH_Y);
+    drawWidget(g, STEP_IDS[cur], cellCx(cur), GRAPH_Y, f, phase);
+    g.restore();
+
+    /* 当前格底部的拍点条 */
+    if (f > 0.001) {
+      const bw = 44 + 26 * Math.sin(Math.PI * phase);
+      g.fillStyle = ACCENT; g.globalAlpha = f;
+      g.fillRect(cellCx(cur) - bw / 2, BAR_Y, bw, 4);
+      g.globalAlpha = 1;
+    }
+
+    /* 页脚状态读数 */
+    if (f > 0.001) {
+      g.globalAlpha = f;
+      g.font = F_FOOT; g.textAlign = 'left'; g.textBaseline = 'middle';
+      g.fillStyle = INK;
+      g.fillText('STEP ' + (cur + 1 < 10 ? '0' : '') + (cur + 1) + ' / ' + (N < 10 ? '0' : '') + N, MX, FOOT_Y);
+      g.font = F_FOOT_CN; g.textAlign = 'right';
+      g.fillStyle = INK;
+      g.fillText(CN[STEP_IDS[cur]], MX + CW, FOOT_Y);
+      g.globalAlpha = 1;
+    }
+  }
+
+  /* ---------------- 渲染（纯函数） ---------------- */
+  function render(t) {
+    t = clamp(t, 0, TOTAL);
+    const cur = curIndex(t);
+    const states = [];
+    for (let i = 0; i < N; i++) states.push(ctrlState(i, t));
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H);
+
+    drawHeader(ctx);
+    drawRulerBase(ctx);
+    drawChainBase(ctx, cur, states);
+    drawWorkbench(ctx);
+    /* 非当前控件：激活后冻结，不再变化 */
+    for (let i = 0; i < N; i++) {
+      if (i === cur) continue;
+      ctx.save();
+      ctx.translate(cellCx(i), GRAPH_Y);
+      ctx.scale(states[i].scale, states[i].scale);
+      ctx.translate(-cellCx(i), -GRAPH_Y);
+      drawWidget(ctx, STEP_IDS[i], cellCx(i), GRAPH_Y, states[i].fill, phaseOf(t));
+      ctx.restore();
+    }
+
+    /* 动态层直接画在主画布上（不经过离屏合成：否则半透明边缘的
+       预乘舍入会让首帧和尾帧差 1 级灰度，loop 判据就过不了） */
+    drawDynamic(ctx, t);
+
+    /* 子帧混合运动模糊残影：残影强度 = 拍相位的纯函数，末帧强度归零 */
+    const phase = phaseOf(t);
+    const trail = 0.11 * Math.pow(Math.sin(Math.PI * phase), 2);
+    if (trail > 0.002) {
+      const tg = Math.max(0, t - GHOST_DT);
+      ghostCtx.clearRect(0, 0, W, H);
+      drawDynamic(ghostCtx, tg);
+      ctx.globalAlpha = trail;
+      ctx.drawImage(ghost, 2.5, 0);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  /* ---------------- 时间轴 ---------------- */
+  const stage = document.getElementById('stage');
+  stage.setAttribute('data-duration', String(TOTAL));
+  const st = { t: 0 };
+  const tl = gsap.timeline({ paused: true });
+  tl.fromTo(st, { t: 0 }, {
+    t: TOTAL, duration: TOTAL, ease: 'none',
+    onUpdate: function () { render(st.t); }
+  }, 0);
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  window.__seekTo = function (t) {
+    if (typeof t !== 'number' || !isFinite(t)) return;
+    const tt = clamp(t, 0, TOTAL);
+    try { tl.pause(); tl.time(0, false); tl.time(tt, false); } catch (e) { }
+    render(tt);
+  };
+  window.__uiFlow = {
+    render: render,
+    total: TOTAL,
+    beat: BEAT,
+    beats: BEATS,
+    stepDur: STEP_DUR,
+    bpm: BPM,
+    steps: STEP_IDS.slice(),
+    invalid: INVALID.slice(),
+    duplicate: DUPLICATE.slice(),
+    accent: ACCENT,
+    product: PRODUCT,
+    loop: LOOP
+  };
+
+  const first = function () {
+    const q = /(?:^|[?&])t=([\d.]+)/.exec(location.search);
+    if (q) { render(parseFloat(q[1])); return; }
+    render(0);
+  };
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(first).catch(first);
+  } else { first(); }
+})();
+</script>
+</body>
+</html>

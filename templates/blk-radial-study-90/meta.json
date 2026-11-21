@@ -1,0 +1,16 @@
+{
+ "name": "环形仪表 · 九十天学一件事的账",
+ "description": "左侧 240° 环形仪表读主指标，右侧清单逐条列出构成",
+ "category": "数据可视化",
+ "tags": [
+  "积木社",
+  "target",
+  "sun",
+  "snappy"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "card",
+ "when": "数据卡片 / 环形仪表"
+}

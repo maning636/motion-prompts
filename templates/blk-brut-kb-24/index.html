@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（mono + 大字距）","default":"ISSUE / 期号卡"},
+{"id":"issueNo","name":"期号","type":"string","label":"期号（mono，建议 EP.001 形式）","default":"EP.012"},
+{"id":"date","name":"日期","type":"string","label":"日期（mono）","default":"2026.10.13"},
+{"id":"topicA","name":"本期主题上","type":"string","label":"本期主题第一行（8–12 字）","default":"为什么你的画面"},
+{"id":"topicB","name":"本期主题下","type":"string","label":"本期主题第二行（8–12 字）","default":"总比句子慢一拍"},
+{"id":"period","name":"区间","type":"string","label":"右上角区间 pill（mono）","default":"2025 — 2026"},
+{"id":"note","name":"注脚","type":"string","label":"底部 mono 注脚","default":"每周二更新 · 攒够 12 期就开一期长篇"},
+{"id":"accent","name":"强调色","type":"color","label":"强调色（期号色块 + 斜纹带）","default":"#3D7BFF"},
+{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–8）","default":5.5},
+{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>日期期号卡 · EP.012 为什么你的画面总比句子慢一拍</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 字号阶梯 = 风格规范基因 8 的 76/48/24/17/13/11 在 1920×1080 画布上等比放大 2.0。 */
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --accent:#3D7BFF;
+  }
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--paper);color:var(--ink);font-family:var(--sans);
+    display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+  .sh-l{box-shadow:8px 8px 0 var(--ink)}
+  .sh-m{box-shadow:6px 6px 0 var(--ink)}
+
+  .hd{flex:0 0 auto;display:flex;align-items:center;gap:22px;padding:44px 88px 0}
+  .eyebrow{font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:.14em;
+    white-space:nowrap;flex:0 0 auto}
+  .hd .rule{flex:1 1 auto;border-top:var(--bw) solid var(--ink)}
+  /* 区间 pill：凡是时间范围都用它，`—` 是参考页写法，不要换成 ~ 或 至（§3.12） */
+  .period{font-family:var(--mono);font-weight:700;font-size:22px;letter-spacing:.10em;
+    padding:8px 20px;border-radius:9999px;white-space:nowrap;flex:0 1 auto;
+    min-width:0;overflow:hidden;text-overflow:ellipsis;background:var(--yellow);
+    color:var(--ink);border:var(--bw) solid var(--ink);box-shadow:4px 4px 0 var(--ink)}
+
+  /* 期号区：期号压在强调色块上，左侧日期竖排在期号旁边 */
+  .issue{flex:0 0 auto;display:flex;align-items:center;gap:48px;margin:40px 88px 0}
+  .inum{flex:0 0 auto;background:var(--accent);color:var(--ink);padding:22px 40px 26px;
+    border:var(--bw) solid var(--ink);border-radius:4px;box-shadow:8px 8px 0 var(--ink);
+    font-family:var(--mono);font-weight:900;font-size:170px;line-height:1;letter-spacing:0;
+    white-space:nowrap}
+  .idate{flex:0 0 auto;writing-mode:vertical-rl;text-orientation:upright;height:240px;
+    font-family:var(--mono);font-weight:700;font-size:30px;letter-spacing:.16em;
+    color:var(--mute);white-space:nowrap}
+
+  /* 本期主题：两行大字，贴在期号区下面 */
+  .topic{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;
+    justify-content:center;padding:0 88px}
+  /* 中文大字：块级 + nowrap，交给 B.fit() 按容器实测缩放，字距 0 */
+  .tl{display:block;white-space:nowrap;font-weight:900;font-size:112px;line-height:1.14;
+    letter-spacing:0;padding-right:24px}
+  .tbar{flex:0 0 auto;display:flex;align-items:center;gap:22px;padding:0 88px 44px}
+  .tbar .rule{flex:1 1 auto;border-top:var(--bw) solid var(--ink)}
+  .note{font-family:var(--mono);font-weight:700;font-size:22px;letter-spacing:.12em;
+    color:var(--mute);white-space:nowrap;flex:0 1 auto;min-width:0;
+    overflow:hidden;text-overflow:ellipsis}
+  .stripe{flex:0 0 auto;height:20px;border-top:var(--bw) solid var(--ink);
+    border-bottom:var(--bw) solid var(--ink);
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+
+  @media (prefers-reduced-motion: reduce){
+    .anim{transition-duration:.01ms !important;animation-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="hd anim" id="hd">
+    <span class="eyebrow anim" id="eyebrow" data-fit-max="26" data-fit-min="16">ISSUE / 期号卡</span>
+    <span class="rule anim" id="ruleTop"></span>
+    <span class="period anim" id="period" data-fit-max="22" data-fit-min="14">2025 — 2026</span>
+  </div>
+
+  <div class="issue anim" id="issueRow">
+    <div class="inum anim" id="issueNo" data-fit-max="170" data-fit-min="80">EP.012</div>
+    <span class="idate anim" id="date" data-fit-max="30" data-fit-min="18">2026.10.13</span>
+  </div>
+
+  <div class="topic anim" id="topic">
+    <div class="tl anim" id="topicA" data-fit-max="112" data-fit-min="56">为什么你的画面</div>
+    <div class="tl anim" id="topicB" data-fit-max="112" data-fit-min="56">总比句子慢一拍</div>
+  </div>
+
+  <div class="tbar anim" id="tbar">
+    <span class="rule anim" id="ruleBot"></span>
+    <span class="note anim" id="note" data-fit-max="22" data-fit-min="14">每周二更新 · 攒够 12 期就开一期长篇</span>
+  </div>
+
+  <div class="stripe anim" id="stripe"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  ['eyebrow', 'period', 'issueNo', 'date', 'topicA', 'topicB', 'note']
+    .forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+
+  B.fitAll();
+  var tl = B.tl();
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (reduce) {
+    gsap.set('.anim', { x: 0, y: 0, scaleX: 1, scale: 1, rotate: 0 });
+    tl.fromTo('#hd',    { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0);
+    tl.fromTo('#issueRow', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' }, 0.12);
+    tl.fromTo('#topic', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' }, 0.3);
+    tl.fromTo('#tbar',  { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.55, ease: 'power3.out' }, 0.46);
+    tl.fromTo('#stripe',{ opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.6);
+    B.hold(tl, 1.2, 1.1);
+    return;
+  }
+
+  function slam(sel, at, dx, dy, d) {
+    tl.fromTo(sel, { x: dx, y: dy },
+      { x: 0, y: 0, duration: d, ease: 'power4.out' }, at);
+  }
+  var INK = '#0F0F0F';
+  function press(sel, at, rest) {
+    var off = parseInt(rest, 10);
+    tl.set(sel, { boxShadow: off + 'px ' + (off + 3) + 'px 0 ' + INK, immediateRender: false }, at);
+    tl.to(sel, { boxShadow: rest, duration: 0.04, ease: 'steps(2)' }, at + 0.04);
+  }
+
+  slam('#hd', 0.00, -28, -20, 0.24);
+  press('#period', 0.24, '4px 4px 0 ' + INK);
+  tl.fromTo('#ruleTop', { scaleX: 0, transformOrigin: 'left center' },
+    { scaleX: 1, duration: 0.28, ease: 'power4.out' }, 0.12);
+
+  slam('#issueRow', 0.22,   0, -24, 0.28);
+  /* 大面积期号块：power3.out + from:.86，零过冲 */
+  tl.fromTo('#issueNo', { scale: 0.86 },
+    { scale: 1, duration: 0.28, ease: 'power3.out' }, 0.36);
+  press('#issueNo', 0.64, '8px 8px 0 ' + INK);
+  slam('#date', 0.46, 28, -20, 0.26);
+
+  slam('#topic', 0.76,  0, -24, 0.28);
+  slam('#topicA', 0.88, -40, -40, 0.28);
+  slam('#topicB', 1.04, -40, -40, 0.28);
+
+  slam('#tbar', 1.42, 0, 24, 0.26);
+  tl.fromTo('#ruleBot', { scaleX: 0, transformOrigin: 'left center' },
+    { scaleX: 1, duration: 0.28, ease: 'power4.out' }, 1.54);
+  slam('#note',    1.68, 0, -16, 0.22);
+  /* 模 7 分格揭示：斜纹带从左逐格推出 */
+  tl.fromTo('#stripe', { clipPath: 'inset(0 100% 0 0)' },
+    { clipPath: 'inset(0 0% 0 0%)', duration: 0.34, ease: 'steps(8)' }, 1.82);
+  /* 模 6：斜纹带匀速滚动，位移取 20px 整周期，ease:none */
+  tl.fromTo('#stripe', { backgroundPositionX: '0px' },
+    { backgroundPositionX: '40px', duration: 1.0, ease: 'none' }, 2.16);
+
+  var introEnd = 3.16;
+  var total = Math.min(8, Math.max(5, Number(v.duration) || 5.5));
+  B.hold(tl, introEnd, Math.max(0.6, total - introEnd));
+})();
+</script>
+</body></html>

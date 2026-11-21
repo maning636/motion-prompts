@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"eyebrow","type":"string","label":"顶部小标","default":"OVERVIEW · 信息拼版"},
+  {"id":"headline","type":"string","label":"主标题","default":"六张数据卡拼合一个完整画面"},
+  {"id":"subhead","type":"string","label":"副标题","default":"每张卡从画面边缘飞入 · 旋转回正 · 落定后整体微浮"},
+  {"id":"labels","type":"string","label":"6 个标签（逗号分隔）","default":"覆盖人群,频次节奏,转化路径,留存信号,成本结构,反馈闭环"},
+  {"id":"values","type":"string","label":"6 个主数据（逗号分隔）","default":"128万,7.2x,23.4%,62d,¥0.83,94%"},
+  {"id":"units","type":"string","label":"6 个单位（逗号分隔）","default":"DAU,同比,完成率,中位,AOV,正面"},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+
+      /* ---------- 点阵底纹 ---------- */
+      .scene{
+        position:absolute; inset:0;
+      }
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity:.55;
+      }
+
+      /* ---------- 顶头 eyebrow + 标题 ---------- */
+      .head{
+        position:absolute; top:64px; left:96px; right:96px;
+        z-index:5; opacity:0;
+      }
+      .chip{
+        display:inline-flex; align-items:center; gap:10px;
+        padding:7px 16px; border:1px solid #2A2A2E; border-radius:999px;
+        font-size:18px; letter-spacing:.18em; color:#9CA3AF; text-transform:uppercase;
+      }
+      .chip b{ color: var(--accent, #00FF00); font-weight:700; letter-spacing:.05em; }
+      .head h1{
+        margin:18px 0 8px; font-size:46px; line-height:1.1;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight:700; letter-spacing:-.015em;
+        color: var(--foreground, #F4EFE7);
+      }
+      .head p{
+        margin:0; font-size:20px; color:#8A8A85;
+      }
+
+      /* ---------- 卡片网格 ---------- */
+      .board{
+        position:absolute;
+        left:96px; right:96px; top:230px; bottom:96px;
+        display:grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        gap:30px;
+        z-index:2;
+      }
+      .card{
+        position:relative;
+        background: linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.005));
+        border:1px solid #232220;
+        border-radius:14px;
+        padding:24px 26px;
+        display:flex; flex-direction:column; justify-content:space-between;
+        overflow:hidden;
+        will-change: transform, opacity;
+        opacity:0;
+      }
+      .card::before{
+        content:""; position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.03) 1px, transparent 1.5px);
+        background-size:22px 22px;
+        mask-image: linear-gradient(180deg, #000 0%, transparent 70%);
+        -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 70%);
+      }
+      .card::after{
+        content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
+        background: var(--accent, #00FF00);
+        opacity:.85;
+      }
+      .card .row1{
+        display:flex; align-items:center; justify-content:space-between;
+      }
+      .card .tag{
+        display:inline-flex; align-items:center; gap:8px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:14px; letter-spacing:.16em;
+        color:#8A8A85; text-transform:uppercase;
+      }
+      .card .tag .num{
+        display:inline-grid; place-items:center;
+        width:24px; height:24px; border-radius:6px;
+        border:1px solid #2A2A2E; color:var(--foreground, #F4EFE7);
+        font-size:12px; letter-spacing:.04em;
+      }
+      .card .corner{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:13px; letter-spacing:.14em; color:#5A5A55;
+        text-transform:uppercase;
+      }
+      .card .val{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight:700; line-height:1;
+        font-size:78px;
+        color: var(--foreground, #F4EFE7);
+        letter-spacing:-.02em;
+        display:flex; align-items:baseline; gap:10px;
+      }
+      .card .val .unit{
+        font-size:22px; font-weight:500; color:#8A8A85;
+        letter-spacing:.02em;
+      }
+      .card .caption{
+        margin-top:14px;
+        font-size:16px; line-height:1.45;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 70%, transparent);
+      }
+
+      /* ---------- 中央十字坐标小装饰（落定后出现） ---------- */
+      .centeraxis{
+        position:absolute; left:50%; top:50%;
+        transform: translate(-50%, -50%);
+        width:36px; height:36px;
+        pointer-events:none;
+        opacity:0;
+      }
+      .centeraxis::before, .centeraxis::after{
+        content:""; position:absolute; background: var(--accent, #00FF00);
+      }
+      .centeraxis::before{ top:50%; left:0; right:0; height:1px; transform: translateY(-50%); }
+      .centeraxis::after{ left:50%; top:0; bottom:0; width:1px; transform: translateX(-50%); }
+
+      /* ---------- 角落扫描线（强调"拼合成版"的视觉锚点） ---------- */
+      .cornerMark{
+        position:absolute; width:24px; height:24px;
+        border:1.5px solid var(--accent, #00FF00);
+        opacity:0;
+      }
+      .cornerMark.tl{ top:20px; left:20px; border-right:none; border-bottom:none; }
+      .cornerMark.tr{ top:20px; right:20px; border-left:none; border-bottom:none; }
+      .cornerMark.bl{ bottom:20px; left:20px; border-right:none; border-top:none; }
+      .cornerMark.br{ bottom:20px; right:20px; border-left:none; border-top:none; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+
+        <!-- 标题区 -->
+        <header class="head" id="head">
+          <span class="chip"><b id="chipB">01</b><span id="chipLab">OVERVIEW · 信息拼版</span></span>
+          <h1 id="headline">六张数据卡拼合一个完整画面</h1>
+          <p id="subhead">每张卡从画面边缘飞入 · 旋转回正 · 落定后整体微浮</p>
+        </header>
+
+        <!-- 中央十字坐标 -->
+        <div class="centeraxis" id="centeraxis"></div>
+
+        <!-- 2x3 信息卡网格 -->
+        <div class="board" id="board">
+          <div class="card" data-side="tl" data-i="0">
+            <div class="row1"><span class="tag"><span class="num">01</span><span id="lab0">覆盖人群</span></span><span class="corner">A · 用户</span></div>
+            <div><div class="val" id="val0">128<span class="unit" id="unit0">万</span></div><div class="caption">活跃账户的稳定基础盘</div></div>
+            <div class="cornerMark tl"></div><div class="cornerMark tr"></div><div class="cornerMark bl"></div><div class="cornerMark br"></div>
+          </div>
+          <div class="card" data-side="t" data-i="1">
+            <div class="row1"><span class="tag"><span class="num">02</span><span id="lab1">频次节奏</span></span><span class="corner">B · 节奏</span></div>
+            <div><div class="val" id="val1">7.2<span class="unit" id="unit1">x</span></div><div class="caption">周均触达频率的健康区间</div></div>
+            <div class="cornerMark tl"></div><div class="cornerMark tr"></div><div class="cornerMark bl"></div><div class="cornerMark br"></div>
+          </div>
+          <div class="card" data-side="tr" data-i="2">
+            <div class="row1"><span class="tag"><span class="num">03</span><span id="lab2">转化路径</span></span><span class="corner">C · 路径</span></div>
+            <div><div class="val" id="val2">23.4<span class="unit" id="unit2">%</span></div><div class="caption">端到端漏斗完成率</div></div>
+            <div class="cornerMark tl"></div><div class="cornerMark tr"></div><div class="cornerMark bl"></div><div class="cornerMark br"></div>
+          </div>
+          <div class="card" data-side="bl" data-i="3">
+            <div class="row1"><span class="tag"><span class="num">04</span><span id="lab3">留存信号</span></span><span class="corner">D · 留存</span></div>
+            <div><div class="val" id="val3">62<span class="unit" id="unit3">d</span></div><div class="caption">中位生命周期</div></div>
+            <div class="cornerMark tl"></div><div class="cornerMark tr"></div><div class="cornerMark bl"></div><div class="cornerMark br"></div>
+          </div>
+          <div class="card" data-side="b" data-i="4">
+            <div class="row1"><span class="tag"><span class="num">05</span><span id="lab4">成本结构</span></span><span class="corner">E · 成本</span></div>
+            <div><div class="val" id="val4">¥0.83<span class="unit" id="unit4">AOV</span></div><div class="caption">单均履约成本</div></div>
+            <div class="cornerMark tl"></div><div class="cornerMark tr"></div><div class="cornerMark bl"></div><div class="cornerMark br"></div>
+          </div>
+          <div class="card" data-side="br" data-i="5">
+            <div class="row1"><span class="tag"><span class="num">06</span><span id="lab5">反馈闭环</span></span><span class="corner">F · 反馈</span></div>
+            <div><div class="val" id="val5">94<span class="unit" id="unit5">%</span></div><div class="caption">正向反馈闭环率</div></div>
+            <div class="cornerMark tl"></div><div class="cornerMark tr"></div><div class="cornerMark bl"></div><div class="cornerMark br"></div>
+          </div>
+        </div>
+
+      </section>
+    </div>
+
+    <script>
+      /* ===========================================================
+       * 变量接线（与全库契约一致）
+       * =========================================================== */
+      const fallback = {
+        eyebrow: "OVERVIEW · 信息拼版",
+        headline: "六张数据卡拼合一个完整画面",
+        subhead: "每张卡从画面边缘飞入 · 旋转回正 · 落定后整体微浮",
+        labels: "覆盖人群,频次节奏,转化路径,留存信号,成本结构,反馈闭环",
+        values: "128万,7.2x,23.4%,62d,¥0.83,94%",
+        units: "万,x,%,d,AOV,%",
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      /* ===========================================================
+       * 内容回填
+       * =========================================================== */
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim());
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      $("chipLab").textContent = v.eyebrow || fallback.eyebrow;
+      $("chipB").textContent = "01";
+      $("headline").textContent = v.headline || fallback.headline;
+      $("subhead").textContent = v.subhead || fallback.subhead;
+
+      const labels = split(v.labels);
+      const values = split(v.values);
+      const units  = split(v.units);
+      for (let i = 0; i < 6; i++) {
+        const lab = labels[i] || "";
+        const val = values[i] || "";
+        const unit = units[i] || "";
+        const labNode = $(`lab${i}`);
+        const valNode = $(`val${i}`);
+        const unitNode = $(`unit${i}`);
+        if (labNode) labNode.textContent = lab;
+        if (valNode) {
+          // 主数据保留完整字符串（如 "¥0.83"、"128"、"7.2"），unit 作为独立小字
+          // 若 values 已含单位，则 unit 留空（避免重复）
+          valNode.innerHTML = `${escapeHtml(val)}${unit ? `<span class="unit">${escapeHtml(unit)}</span>` : ""}`;
+        }
+      }
+
+      /* ===========================================================
+       * 飞入方向（按 data-side）：
+       *   tl 左上角外 / t 正上外 / tr 右上角外
+       *   bl 左下角外 / b 正下外 / br 右下角外
+       * 飞入向量 = 从屏幕外向卡片最终位置收敛
+       * =========================================================== */
+      const flightVectors = {
+        tl: { x: -560, y: -360, rot: -18 },
+        t:  { x:    0, y: -540, rot:  -6 },
+        tr: { x:  560, y: -360, rot:  18 },
+        bl: { x: -560, y:  360, rot:  18 },
+        b:  { x:    0, y:  540, rot:   6 },
+        br: { x:  560, y:  360, rot: -18 },
+      };
+
+      const cards = Array.from(document.querySelectorAll(".card"));
+      cards.forEach((card) => {
+        const side = card.getAttribute("data-side");
+        const v0 = flightVectors[side] || { x: 0, y: -400, rot: 0 };
+        gsap.set(card, {
+          opacity: 0,
+          y: v0.y,
+          x: v0.x,
+          rotation: v0.rot,
+          scale: 0.92,
+          transformOrigin: "50% 50%",
+        });
+      });
+
+      /* ===========================================================
+       * 时间线
+       * =========================================================== */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+      const tl = gsap.timeline({ paused: true });
+
+      // 入场顺序（按画面"四角 + 上下边中点"）：
+      // t=0.10 → 左上 → 右上 → 左下 → 右下 → t=0.45 → 上中 → 下中
+      // 每张卡 0.7s，stagger 0.16s
+      const flightOrder = ["tl","tr","bl","br","t","b"];
+      const flightCards = flightOrder.map((side) => cards.find((c) => c.getAttribute("data-side") === side));
+
+      // 第一波：四个角同时开始飞入，stagger 0.08s 错峰
+      tl.to(flightCards.slice(0,4), {
+        opacity: 1, x: 0, y: 0, rotation: 0, scale: 1,
+        duration: 0.7, ease: "power3.out", stagger: 0.08,
+      }, 0.10);
+
+      // 第二波：上中、下中（晚 0.35s 飞入）
+      tl.to(flightCards.slice(4), {
+        opacity: 1, x: 0, y: 0, rotation: 0, scale: 1,
+        duration: 0.7, ease: "power3.out", stagger: 0.12,
+      }, 0.45);
+
+      // 标题头：四张角卡开始落定时浮现
+      tl.fromTo("#head",
+        { opacity: 0, y: -16 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 0.30);
+
+      // 落定后：四角卡的角标（cornerMark）+ 中央十字坐标延迟出现
+      tl.to(".cornerMark", {
+        opacity: 1, duration: 0.4, ease: "power2.out", stagger: 0.04,
+      }, 1.50);
+      tl.fromTo("#centeraxis",
+        { opacity: 0, scale: 0.6 },
+        { opacity: 0.55, scale: 1, duration: 0.5, ease: "power2.out" }, 1.65);
+
+      // === 整体微浮（落定后）===
+      // 6 张卡同步呼吸 y±4px，1.6s 一轮，yoyo 持续到结尾
+      tl.to(".card", {
+        y: -4,
+        duration: 1.6,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1, // 0..1.6 一轮 down, 1.6..3.2 一轮 up，重复 1 次覆盖 ~3.2s
+        delay: 1.2, // 让卡片先稳一定时长再开始浮
+      }, 2.40);
+
+      // 标题末尾轻微再强调一次（避免戛然而止）
+      tl.fromTo("#headline",
+        { letterSpacing: "-.015em" },
+        { letterSpacing: "-.022em", duration: 0.8, ease: "power2.out" }, 4.4);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

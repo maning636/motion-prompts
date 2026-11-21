@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "summary", "type": "string", "label": "结论摘要", "default": "本周三条视频全部按时发布，数据最快的是切片号"}, {"id": "ev1", "type": "string", "label": "证据1", "default": "主账号《AGENTS.md 实践》已发布 · 2.1w 播放"}, {"id": "ev2", "type": "string", "label": "证据2", "default": "切片号《模板库 tour》已发布 · 4.7w 播放"}, {"id": "ev3", "type": "string", "label": "证据3", "default": "播客切片《Hacker News 周报》已发布 · 1.3w 播放"}, {"id": "ev4", "type": "string", "label": "证据4", "default": "封面图三张 A/B 测试完成 · 点击率 9.4%"}, {"id": "ev5", "type": "string", "label": "证据5", "default": "评论区高频词已归档进选题库"}, {"id": "ev6", "type": "string", "label": "证据6", "default": "下周选题会材料已生成草稿"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#panel{ position:absolute; left:460px; top:180px; width:1000px; height:720px; border-radius:20px;
+  background:#14141B; border:1px solid rgba(255,255,255,.13); box-shadow:0 40px 120px rgba(0,0,0,.55); overflow:hidden; }
+#glow{ position:absolute; inset:0; border-radius:20px; pointer-events:none; opacity:0;
+  box-shadow:inset 0 0 0 2px var(--accent), 0 0 60px color-mix(in srgb, var(--accent) 25%, transparent); }
+#sum{ position:absolute; left:48px; top:44px; width:904px; font-size:32px; line-height:1.5; color:var(--fg);
+  clip-path:inset(0 100% 0 0); }
+#sum::before{ content:''; display:block; width:52px; height:8px; border-radius:4px; background:var(--accent); margin-bottom:18px; }
+.rows{ position:absolute; left:48px; top:200px; width:904px; }
+.er{ display:flex; align-items:center; gap:22px; height:72px; border-bottom:1px solid rgba(255,255,255,.07); opacity:0; }
+.st{ width:28px; height:28px; border-radius:50%; border:3px solid rgba(255,255,255,.3); flex:none;
+  font-size:18px; line-height:24px; text-align:center; color:#061106; }
+.st.run{ border-color:rgba(255,255,255,.18); border-top-color:var(--accent); }
+.st.done{ background:var(--accent); border-color:var(--accent); }
+.et{ font-size:25px; color:rgba(255,255,255,.82); }
+#doneTag{ position:absolute; right:40px; top:52px; font-size:22px; color:var(--accent); opacity:0;
+  border:1px solid var(--accent); border-radius:999px; padding:8px 22px; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+<div id="panel"><div id="sum"></div><div class="rows"><div class="er" id="r0"><div class="st" id="s0"></div><div class="et" id="t0"></div></div><div class="er" id="r1"><div class="st" id="s1"></div><div class="et" id="t1"></div></div><div class="er" id="r2"><div class="st" id="s2"></div><div class="et" id="t2"></div></div><div class="er" id="r3"><div class="st" id="s3"></div><div class="et" id="t3"></div></div><div class="er" id="r4"><div class="st" id="s4"></div><div class="et" id="t4"></div></div><div class="er" id="r5"><div class="st" id="s5"></div><div class="et" id="t5"></div></div></div><div id="doneTag">✓ 本轮任务完成</div><div id="glow"></div></div>
+    </div>
+    <script>
+      const FB = {"summary": "本周三条视频全部按时发布，数据最快的是切片号", "ev1": "主账号《AGENTS.md 实践》已发布 · 2.1w 播放", "ev2": "切片号《模板库 tour》已发布 · 4.7w 播放", "ev3": "播客切片《Hacker News 周报》已发布 · 1.3w 播放", "ev4": "封面图三张 A/B 测试完成 · 点击率 9.4%", "ev5": "评论区高频词已归档进选题库", "ev6": "下周选题会材料已生成草稿", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#sum').textContent=v.summary||'';
+for(let i=0;i<6;i++) $('#t'+i).textContent=v['ev'+(i+1)]||'';
+// 面板入场
+tl.fromTo('#panel',{opacity:0,y:24},{opacity:1,y:0,duration:F(10),ease:'power2.out'},0);
+// 摘要 wipe 落定（f18, 12f），落定后 hold ≥12f 才起首条证据
+tl.to('#sum',{clipPath:'inset(0 0% 0 0)',duration:F(12),ease:'power2.out'},F(18));
+// 6 条证据：间隔收紧 11/11/11/11/11 -> 42,53,64,75,86,97
+const CUES=[42,53,64,75,86,97];
+CUES.forEach((cue,i)=>{
+  tl.fromTo('#r'+i,{opacity:0,y:18,filter:'blur(6px)'},{opacity:1,y:0,filter:'blur(0px)',duration:F(12),ease:'power2.out'},F(cue));
+  // 状态图标晚 3f：pending 环 → running 缺口环 → done 实心勾
+  tl.call(((n)=>()=>{const s=$('#s'+n);s.classList.add('run');})(i),[],F(cue+3));
+  tl.call(((n)=>()=>{const s=$('#s'+n);s.classList.remove('run');s.classList.add('done');s.textContent='✓';})(i),[],F(cue+11));
+});
+// 末条完成后 6f：面板级完成脉冲一次（不逐行发光）
+tl.to('#glow',{opacity:.55,duration:F(5),ease:'power1.in'},F(103));
+tl.to('#glow',{opacity:0,duration:F(5),ease:'power1.out'},F(108));
+tl.fromTo('#doneTag',{opacity:0,scale:.9},{opacity:1,scale:1,duration:F(8),ease:'back.out(1.6)'},F(105));
+tl.to({},{duration:F(37)},F(113)); // 真静止 ≥35f
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

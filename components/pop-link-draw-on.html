@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"label","name":"标签","type":"string","label":"落点标签","default":"完成"},{"id":"accent","name":"强调色","type":"color","label":"描边色","default":"#2EC4B6"},{"id":"accent2","name":"次强调","type":"color","label":"落点色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>路径描边生长</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+
+  .p-do-halo {
+    position: absolute; left: 40px; top: 24px; width: 400px; height: 222px;
+    background: radial-gradient(60% 64% at 50% 50%,
+      rgba(0, 0, 0, .46) 0%, rgba(0, 0, 0, .22) 56%, rgba(0, 0, 0, 0) 86%);
+  }
+  .p-do-svg { position: absolute; left: 0; top: 0; width: 480px; height: 270px; overflow: visible; }
+  /* 主描边：实线、更粗，stroke-dashoffset 从满到 0 */
+  .p-do-path {
+    fill: none; stroke: var(--ac, #2EC4B6); stroke-width: 7;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  /* 第二遍更细的副描边，叠出手绘"两笔"的味道 */
+  .p-do-path2 {
+    fill: none; stroke: var(--ac2, #FF6B35); stroke-width: 2.5;
+    stroke-linecap: round; stroke-linejoin: round; opacity: .85;
+  }
+  /* 落点：方框 + 中心小点 */
+  .p-do-endBox {
+    fill: none; stroke: var(--ac2, #FF6B35); stroke-width: 3;
+    opacity: 0; will-change: transform, opacity;
+  }
+  .p-do-endDot { fill: var(--ac2, #FF6B35); opacity: 0; will-change: transform, opacity; }
+  .p-do-startDot { fill: rgba(255, 248, 238, .85); opacity: 0; will-change: transform, opacity; }
+  .p-do-label {
+    position: absolute; font-size: 12px; line-height: 1; font-weight: 800; letter-spacing: .14em;
+    color: #FFF8EE; white-space: nowrap; opacity: 0;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, .8);
+    will-change: transform, opacity;
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"label":"完成","accent":"#2EC4B6","accent2":"#FF6B35","duration":3};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--ac2', v.accent2 || FALLBACK.accent2);
+  const dur = parseFloat(v.duration) || 3;
+
+  const stage = document.getElementById('stage');
+  const NS = 'http://www.w3.org/2000/svg';
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  function svgPut(tag, cls, attrs, parent) {
+    const el = document.createElementNS(NS, tag);
+    if (cls) el.setAttribute('class', cls);
+    if (attrs) for (const k in attrs) el.setAttribute(k, attrs[k]);
+    (parent || svg).appendChild(el);
+    return el;
+  }
+
+  const label = (v.label == null || v.label === '' ? FALLBACK.label : v.label)
+    .toString().replace(/\s+/g, ' ').trim().slice(0, 8);
+
+  put('div', 'p-do-halo');
+  const labelEl = put('div', 'p-do-label', null, label, stage);
+
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('class', 'p-do-svg');
+  svg.setAttribute('viewBox', '0 0 480 270');
+  svg.setAttribute('width', '480');
+  svg.setAttribute('height', '270');
+  stage.appendChild(svg);
+
+  /* 一条 S 形主路径 */
+  const D = 'M 62 196 C 62 96 148 74 240 74 C 332 74 418 104 418 172 ' +
+            'C 418 224 350 214 300 196';
+  const path = svgPut('path', 'p-do-path', { d: D });
+  const path2 = svgPut('path', 'p-do-path2', { d: D });
+
+  const startPt = path.getPointAtLength(0);
+  const L = path.getTotalLength();
+  const endPoint = path.getPointAtLength(L);
+
+  const startDot = svgPut('circle', 'p-do-startDot',
+    { cx: startPt.x.toFixed(2), cy: startPt.y.toFixed(2), r: 5 });
+  const endDot = svgPut('circle', 'p-do-endDot',
+    { cx: endPoint.x.toFixed(2), cy: endPoint.y.toFixed(2), r: 6 });
+  const endBox = svgPut('rect', 'p-do-endBox',
+    { x: (endPoint.x - 13).toFixed(2), y: (endPoint.y - 13).toFixed(2),
+      width: 26, height: 26, rx: 5 });
+
+  /* 经典做法：dasharray 设为路径全长，dashoffset 从全长收到 0，
+     线条就"一笔画出来"。长度运行时量，不写死。 */
+  path.setAttribute('stroke-dasharray', L);
+  path.setAttribute('stroke-dashoffset', L);
+  path2.setAttribute('stroke-dasharray', L);
+  path2.setAttribute('stroke-dashoffset', L);
+
+  labelEl.style.left = Math.max(10, Math.min(400, endPoint.x - 14)) + 'px';
+  labelEl.style.top = (endPoint.y + 20) + 'px';
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  const DRAW_END = Math.max(1.2, dur - .95);
+
+  /* §3.2 中文溢出防护 */
+  const MAXFS = 12, MINFS = 8, AVAIL = 200;
+  labelEl.style.whiteSpace = 'nowrap';
+  const natural = labelEl.scrollWidth;
+  if (natural > AVAIL && natural > 0) {
+    labelEl.style.fontSize = String(Math.max(MINFS, Math.floor(MAXFS * AVAIL / natural))) + 'px';
+  }
+
+  /* ① 起点 */
+  tl.fromTo(startDot, { scale: 0, opacity: 0 },
+    { scale: 1, opacity: 1, duration: .24, ease: 'back.out(3.4)' }, .08);
+
+  /* ② 主描边生长：dashoffset 全长 → 0。ease 用 power2.inOut，像手起笔到收笔 */
+  tl.fromTo(path, { strokeDashoffset: L },
+    { strokeDashoffset: 0, duration: DRAW_END - .20, ease: 'power2.inOut' }, .20);
+
+  /* ③ 第二遍细描边错开一点点，叠出手绘复笔感 */
+  tl.fromTo(path2, { strokeDashoffset: L },
+    { strokeDashoffset: 0, duration: (DRAW_END - .20) * .92, ease: 'power2.inOut' }, .34);
+
+  /* ④ 落点：方框弹入 + 中心点 */
+  tl.fromTo(endBox, { scale: .2, opacity: 0, rotation: -25 },
+    { scale: 1, opacity: 1, rotation: 0, duration: .30, ease: 'back.out(3.2)' }, DRAW_END - .16);
+  tl.fromTo(endDot, { scale: 0, opacity: 0 },
+    { scale: 1, opacity: 1, duration: .24, ease: 'back.out(3.6)' }, DRAW_END - .10);
+  tl.to(endBox, { scale: 1.18, duration: .16, ease: 'power2.out' }, DRAW_END + .16);
+  tl.to(endBox, { scale: 1, duration: .22, ease: 'back.out(2.6)' }, DRAW_END + .32);
+
+  /* ⑤ 标签落在落点旁 */
+  tl.fromTo(labelEl, { y: 8, opacity: 0 },
+    { y: 0, opacity: 1, duration: .34, ease: 'back.out(2.4)' }, DRAW_END + .04);
+
+  /* ⑥ 收尾：整条线反向收回（dashoffset 收到负一整圈 = 整条消失）。
+        tail 夹在 dur 之内，保证时间轴长度就是填进来的那个 dur。 */
+  const tail = Math.min(Math.max(DRAW_END + .70, dur - .78), Math.max(.5, dur - .62));
+  tl.to(path, { strokeDashoffset: -L, duration: .32, ease: 'power2.inOut' }, tail);
+  tl.to(path2, { strokeDashoffset: -L, duration: .32, ease: 'power2.inOut' }, tail + .04);
+  const fadeAt = Math.min(tail + .26, Math.max(.1, dur - .30));
+  tl.to(endBox, { opacity: 0, duration: .22, ease: 'power2.in' }, fadeAt);
+  tl.to(endDot, { opacity: 0, duration: .22, ease: 'power2.in' }, fadeAt);
+  tl.to(labelEl, { opacity: 0, duration: .20, ease: 'power2.in' }, fadeAt);
+  tl.to(startDot, { opacity: 0, duration: .20, ease: 'power2.in' }, fadeAt);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

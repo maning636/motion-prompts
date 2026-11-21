@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"startValue","type":"number","label":"起始数字","default":10},
+  {"id":"endValue","type":"number","label":"结束数字","default":0},
+  {"id":"ticksPerDigit","type":"number","label":"每个数字的弧形刻度数","default":36},
+  {"id":"digitLabel","type":"string","label":"场景标签（chip）","default":"倒计时"},
+  {"id":"caption","type":"string","label":"底部说明","default":"时间正在流逝"},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+
+      /* ----- 底纹 ----- */
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity:.55;
+      }
+      .vignette{
+        position:absolute; inset:0; pointer-events:none;
+        background: radial-gradient(circle at 50% 50%, transparent 0%, rgba(0,0,0,.45) 75%);
+      }
+
+      /* ----- 顶部 eyebrow + 标题 ----- */
+      .eyebrow{
+        position:absolute; top:56px; left:96px; right:96px;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:16px; letter-spacing:.22em; text-transform:uppercase;
+        color:#8A8A85;
+      }
+      .eyebrow .acc{ color: var(--accent, #00FF00); font-weight:700; letter-spacing:.18em; }
+
+      .chip{
+        display:inline-flex; align-items:center; gap:10px;
+        padding:7px 16px; border:1px solid #2A2A2E; border-radius:999px;
+        font-size:18px; letter-spacing:.16em; color:#9CA3AF; text-transform:uppercase;
+        white-space:nowrap;
+      }
+      .chip b{ color: var(--accent, #00FF00); font-weight:700; letter-spacing:.05em; }
+
+      .scene-title{
+        position:absolute; top:120px; left:96px; right:96px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight:700; letter-spacing:-.02em;
+        font-size:48px; line-height:1.1; margin:0;
+        color: var(--foreground, #F4EFE7);
+        opacity:0;
+      }
+      .scene-title small{
+        display:block; margin-top:14px;
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+        font-size:20px; font-weight:400; letter-spacing:.02em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+      }
+
+      /* ----- 弧形刻度盘 ----- */
+      .dial{
+        position:absolute; left:50%; top:50%;
+        transform: translate(-50%, -50%);
+        width:1200px; height:1200px;
+      }
+      .dial-ring{
+        position:absolute; inset:0;
+        border-radius:50%;
+        border:1px solid color-mix(in srgb, var(--foreground, #F4EFE7) 8%, transparent);
+      }
+      .dial-ring.inner{
+        inset: 200px;
+        border-color: color-mix(in srgb, var(--foreground, #F4EFE7) 5%, transparent);
+        border-style:dashed;
+      }
+
+      .tick{
+        position:absolute; left:50%; top:50%;
+        width:6px; height:18px; margin-left:-3px; margin-top:-9px;
+        background: color-mix(in srgb, var(--foreground, #F4EFE7) 22%, transparent);
+        border-radius:2px;
+        will-change: transform, opacity, background-color;
+        opacity:0;
+      }
+      .tick.major{
+        height:30px; margin-top:-6px;
+        background: color-mix(in srgb, var(--accent, #00FF00) 55%, transparent);
+      }
+      .tick.alive{
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 14px color-mix(in srgb, var(--accent, #00FF00) 65%, transparent);
+      }
+
+      /* ----- 中心数字 ----- */
+      .num-host{
+        position:absolute; left:50%; top:50%;
+        transform: translate(-50%, -50%);
+        width:520px; height:520px;
+        display:grid; place-items:center;
+        pointer-events:none;
+      }
+      .digit{
+        position:absolute; inset:0;
+        display:grid; place-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight:700;
+        font-size:380px; line-height:1;
+        letter-spacing:-.04em;
+        color: var(--foreground, #F4EFE7);
+        text-shadow:
+          0 0 30px color-mix(in srgb, var(--accent, #00FF00) 25%, transparent),
+          0 0 90px color-mix(in srgb, var(--accent, #00FF00) 15%, transparent);
+        opacity:0;
+        will-change: transform, opacity;
+      }
+      .digit.alive{
+        color: var(--accent, #00FF00);
+      }
+      .digit small{
+        display:block;
+        font-size:18px; font-weight:500;
+        letter-spacing:.32em;
+        margin-top:24px;
+        text-transform:uppercase;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+        text-shadow:none;
+      }
+      .digit .num-text{
+        display:block;
+      }
+
+      /* ----- 底部状态条 ----- */
+      .footnote{
+        position:absolute; bottom:64px; left:96px; right:96px;
+        display:flex; justify-content:space-between; align-items:flex-end;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:18px; letter-spacing:.06em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 65%, transparent);
+      }
+      .footnote .msg{
+        font-size:24px; color: var(--foreground, #F4EFE7);
+        max-width: 900px;
+      }
+      .footnote .msg em{
+        color: var(--accent, #00FF00); font-weight:700; font-style:normal;
+      }
+      .pulse-dot{
+        display:inline-block; width:12px; height:12px; border-radius:50%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--accent, #00FF00) 65%, transparent);
+        margin-right:12px; vertical-align:middle;
+      }
+
+      .progress{
+        position:absolute; bottom:140px; left:96px; right:96px;
+        height:3px; background: color-mix(in srgb, var(--foreground, #F4EFE7) 12%, transparent);
+        border-radius:2px;
+      }
+      .progress-fill{
+        position:absolute; left:0; top:0; bottom:0;
+        width:0%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--accent, #00FF00) 55%, transparent);
+        border-radius:2px;
+      }
+
+      /* ----- 四角十字标（科技感刻度装饰）----- */
+      .corner{
+        position:absolute; width:36px; height:36px;
+        border:1px solid color-mix(in srgb, var(--foreground, #F4EFE7) 20%, transparent);
+      }
+      .corner.tl{ top:32px; left:32px; border-right:none; border-bottom:none; }
+      .corner.tr{ top:32px; right:32px; border-left:none; border-bottom:none; }
+      .corner.bl{ bottom:32px; left:32px; border-right:none; border-top:none; }
+      .corner.br{ bottom:32px; right:32px; border-left:none; border-top:none; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+        <div class="vignette"></div>
+
+        <!-- 科技感角标 -->
+        <div class="corner tl"></div>
+        <div class="corner tr"></div>
+        <div class="corner bl"></div>
+        <div class="corner br"></div>
+
+        <!-- 顶部 eyebrow -->
+        <div class="eyebrow">
+          <span><b class="acc">T-MINUS</b>&nbsp;&nbsp;COUNTDOWN</span>
+          <span>arc · scatter</span>
+        </div>
+
+        <!-- 标题 + 副标题 -->
+        <h1 class="scene-title" id="sceneTitle">
+          <span id="chipLabel" class="chip"><b>·</b><span id="chipLabelText">倒计时</span></span>
+          <small id="sceneSub">弧形刻度聚合 → 数字 → 散开</small>
+        </h1>
+
+        <!-- 弧形刻度盘 -->
+        <div class="dial" id="dial">
+          <div class="dial-ring"></div>
+          <div class="dial-ring inner"></div>
+          <!-- 刻度由 JS 注入 -->
+        </div>
+
+        <!-- 中心数字 -->
+        <div class="num-host" id="numHost">
+          <div class="digit" id="digitA">
+            <span class="num-text">10</span>
+          </div>
+          <div class="digit" id="digitB">
+            <span class="num-text">9</span>
+          </div>
+        </div>
+
+        <!-- 进度条 + 底部 -->
+        <div class="progress"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="footnote">
+          <span class="msg"><span class="pulse-dot" id="pulseDot"></span><span id="captionText">时间正在流逝</span></span>
+          <span id="stepLabel">03 / 03</span>
+        </div>
+
+      </section>
+    </div>
+    <script>
+      /* =========================================================
+         变量接线（与全库契约一致）
+         ========================================================= */
+      const fallback = {
+        startValue: 10,
+        endValue: 0,
+        ticksPerDigit: 36,
+        digitLabel: "倒计时",
+        caption: "时间正在流逝",
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const $ = (id) => document.getElementById(id);
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      /* =========================================================
+         内容回填
+         ========================================================= */
+      const startVal   = Math.max(0, Math.min(99, Math.round(Number(v.startValue ?? fallback.startValue))));
+      const endVal     = Math.max(0, Math.min(99, Math.round(Number(v.endValue   ?? fallback.endValue))));
+      const ticksN     = Math.max(8, Math.min(72, Math.round(Number(v.ticksPerDigit ?? fallback.ticksPerDigit))));
+      const digitLabel = String(v.digitLabel ?? fallback.digitLabel);
+      const caption    = String(v.caption ?? fallback.caption);
+
+      $("chipLabelText").textContent = digitLabel;
+      $("captionText").textContent   = caption;
+      $("sceneSub").textContent      = `从 ${startVal} 到 ${endVal} · 共 ${Math.abs(startVal - endVal) || 1} 步`;
+
+      /* =========================================================
+         弧形刻度盘：N 个均匀分布在 360° 上的小条（取 360° 而不是 270°，
+         为了让「散开 → 聚合」的视觉对称更好看；与上游及任何外部实现的
+         取角方式无关）
+         ========================================================= */
+      const dial   = $("dial");
+      const RADIUS = 580;            // 刻度中心到转盘中心的距离
+      const TICKS  = ticksN;
+      const tickEls = [];
+      const stepAngle = (Math.PI * 2) / TICKS;
+
+      for (let i = 0; i < TICKS; i++) {
+        const t = document.createElement("div");
+        t.className = "tick" + (i % 6 === 0 ? " major" : "");
+        t.dataset.idx = String(i);
+        dial.appendChild(t);
+        tickEls.push(t);
+      }
+
+      /* 设置每个刻度的静态位置（围绕转盘中心旋转）。
+         起始角 -90°（12 点钟方向），顺时针。 */
+      function layoutTicks(angleOffset = 0) {
+        tickEls.forEach((t, i) => {
+          const a = -Math.PI / 2 + i * stepAngle + angleOffset;
+          const x = Math.cos(a) * RADIUS;
+          const y = Math.sin(a) * RADIUS;
+          t.style.transform = `translate(${x}px, ${y}px) rotate(${(a * 180 / Math.PI) + 90}deg)`;
+        });
+      }
+      layoutTicks(0);
+
+      /* =========================================================
+         数字切换：准备三个数字位（A 现 / B 现 / 待出现 C）
+         用两层叠 digit（A 和 B）做交叉淡入散开
+         ========================================================= */
+      const digitA = $("digitA");
+      const digitB = $("digitB");
+      const numHost = $("numHost");
+      const digitAInner = digitA.querySelector(".num-text");
+      const digitBInner = digitB.querySelector(".num-text");
+
+      let currentIdx = 0;        // 当前是 steps 里的第几个
+      let currentShown = startVal;
+      let useA = true;
+
+      /* 准备一组 steps：从 start → end。
+         极端情况 start==end 时，至少放一个 step（停留）。 */
+      const diff = startVal - endVal;
+      const stepCount = Math.max(1, Math.abs(diff));
+      const steps = [];
+      if (diff >= 0) {
+        for (let i = 0; i <= stepCount; i++) {
+          const val = startVal - i;
+          if (val >= endVal) steps.push(val);
+        }
+      } else {
+        for (let i = 0; i <= stepCount; i++) {
+          const val = startVal + i;
+          if (val <= endVal) steps.push(val);
+        }
+      }
+
+      /* 默认在屏幕上画好首个数字 */
+      digitAInner.textContent = String(startVal);
+      digitA.classList.add("alive");
+
+      /* =========================================================
+         数字 → 弧形刻度散开（用克隆粒子，从数字中心飞出到弧形位置）
+         实现：每次切换前，先把当前数字「拆解」成 tickPos 的位置（用
+         tween 一次性 from→to 路径）。然后再把「待显示数字」从
+         tickPos 收拢到中心位置。
+         之所以用粒子（而非直接动 .digit）：粒子是 SVG/DOM 节点，
+         可以独立控制透明度 / 颜色 / 缩放，运动语法（§2.4）所
+         要求的「stagger / fade + y 位移 / 缩放」都能精确控制。
+         ========================================================= */
+      const DIGIT_DUR = 6;
+      const STEP_DUR = DIGIT_DUR / steps.length;  // 每一步的时间
+      const ttl = { v: 0 };  // 当前 steps 索引（用 tweens 维护）
+
+      /* 粒子池（散开 + 收拢共用） */
+      const particleLayer = document.createElement("div");
+      particleLayer.style.cssText = "position:absolute; inset:0; pointer-events:none;";
+      numHost.appendChild(particleLayer);
+
+      function makeParticle() {
+        const p = document.createElement("div");
+        p.style.cssText = [
+          "position:absolute", "left:50%", "top:50%",
+          "width:14px", "height:14px",
+          "margin-left:-7px", "margin-top:-7px",
+          "border-radius:50%",
+          "background:var(--accent,#00FF00)",
+          "box-shadow:0 0 14px color-mix(in srgb, var(--accent,#00FF00) 70%, transparent)",
+          "opacity:0", "will-change:transform,opacity",
+        ].join(";");
+        particleLayer.appendChild(p);
+        return p;
+      }
+
+      /* 把粒子从一个目标位置「散开」到弧形 tick 位置 */
+      function scatterParticles(count, fromCenter = true) {
+        const particles = [];
+        for (let i = 0; i < count; i++) particles.push(makeParticle());
+        return particles;
+      }
+
+      /* 收拢：粒子从刻度回到中心，中心数字出现 */
+      function gatherToCenter(value, dur) {
+        const particles = [];
+        for (let i = 0; i < TICKS; i++) {
+          const p = makeParticle();
+          particles.push(p);
+        }
+        const tlSub = gsap.timeline();
+        const newDigitEl = useA ? digitB : digitA;
+        const oldDigitEl = useA ? digitA : digitB;
+        // 把文字写入放到 onStart，避免脚本初始化时污染 DOM（test 才能正确读 t=0 的数字）
+        tlSub.call(() => {
+          newDigitEl.querySelector(".num-text").textContent = String(value);
+        }, [], 0);
+        particles.forEach((p, i) => {
+          const t = tickEls[i];
+          const r = t.getBoundingClientRect();
+          const c = numHost.getBoundingClientRect();
+          const sx = r.left + r.width / 2 - c.left - c.width / 2;
+          const sy = r.top + r.height / 2 - c.top - c.height / 2;
+          tlSub.fromTo(p,
+            { x: sx, y: sy, scale: 1, opacity: 0 },
+            { x: 0, y: 0, scale: 0.2, opacity: 1, duration: dur * 0.85, ease: "power3.in" },
+            0);
+          tlSub.to(p, { opacity: 0, duration: 0.18, ease: "power1.out" },
+            dur * 0.78 + (i % 6) * 0.005);
+        });
+        // 同步：刻度本身也收回（缩放+淡出）
+        tlSub.to(tickEls, {
+          scale: 0.2, opacity: 0,
+          duration: dur * 0.85, ease: "power3.in",
+          stagger: { each: 0.005, from: "random" },
+        }, 0);
+        // 新数字显形
+        tlSub.fromTo(newDigitEl,
+          { opacity: 0, scale: 0.6 },
+          { opacity: 1, scale: 1, duration: dur * 0.45, ease: "back.out(1.4)" },
+          dur * 0.55);
+        tlSub.to(oldDigitEl,
+          { opacity: 0, scale: 1.4, duration: dur * 0.25, ease: "power2.in" }, 0);
+        // useA 翻转也放到 onStart（不然脚本初始化时已经污染 DOM）
+        const capturedUseA = useA;
+        tlSub.call(() => { useA = !capturedUseA; }, [], 0);
+        return tlSub;
+      }
+
+      /* 散开：当前数字「炸」成刻度粒子（从中心向弧形 tick 飞） */
+      function scatterFromCenter(value, dur) {
+        const particles = [];
+        for (let i = 0; i < TICKS; i++) {
+          const p = makeParticle();
+          particles.push(p);
+        }
+        const tlSub = gsap.timeline();
+        const oldDigitEl = useA ? digitA : digitB;
+        tlSub.to(oldDigitEl, { opacity: 0, scale: 0.85, duration: dur * 0.25, ease: "power2.in" }, 0);
+        particles.forEach((p, i) => {
+          const t = tickEls[i];
+          const r = t.getBoundingClientRect();
+          const c = numHost.getBoundingClientRect();
+          const tx = r.left + r.width / 2 - c.left - c.width / 2;
+          const ty = r.top + r.height / 2 - c.top - c.height / 2;
+          tlSub.fromTo(p,
+            { x: 0, y: 0, scale: 0.3, opacity: 0 },
+            { x: tx, y: ty, scale: 1, opacity: 1, duration: dur * 0.9,
+              ease: "expo.out" },
+            dur * 0.05);
+          tlSub.to(p, { opacity: 0, duration: dur * 0.18, ease: "power1.out" },
+            dur * 0.05 + dur * 0.7);
+        });
+        // 刻度亮起
+        tlSub.fromTo(tickEls,
+          { scale: 0.2, opacity: 0 },
+          { scale: 1, opacity: 1, duration: dur * 0.55, ease: "power3.out",
+            stagger: { each: 0.008, from: "start" } },
+          dur * 0.2);
+        tlSub.to(tickEls, {
+          backgroundColor: "var(--accent,#00FF00)",
+          duration: dur * 0.25,
+          stagger: { each: 0.006, from: "start" },
+        }, dur * 0.35);
+        return tlSub;
+      }
+
+      /* =========================================================
+         时间线
+         ========================================================= */
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      // 入场：标题 + chip
+      tl.fromTo(".scene-title",
+        { opacity: 0, y: 24 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.05);
+      tl.fromTo(".eyebrow",
+        { opacity: 0, y: -12 },
+        { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 0.1);
+      tl.fromTo(".scene-title .chip",
+        { opacity: 0, scale: 0.85 },
+        { opacity: 1, scale: 1, duration: 0.35, ease: "back.out(1.4)" }, 0.25);
+
+      // 弧形刻度环本身先淡入（外圈线）
+      tl.fromTo(".dial-ring",
+        { opacity: 0, scale: 0.85 },
+        { opacity: 1, scale: 1, duration: 0.7, ease: "power3.out", stagger: 0.1 }, 0.15);
+
+      // 中心初始数字入场
+      tl.fromTo("#digitA",
+        { opacity: 0, scale: 0.55 },
+        { opacity: 1, scale: 1, duration: 0.7, ease: "back.out(1.6)" }, 0.45);
+
+      // 底部脚注 + 进度条
+      tl.fromTo(".footnote",
+        { opacity: 0, y: 16 },
+        { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 0.55);
+      tl.fromTo(".progress",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.3, ease: "power2.out" }, 0.55);
+
+      // 数字步进循环：每一步先用 scatterFromCenter（数字散开 + 刻度亮起），
+      // 再用 gatherToCenter（刻度收回 + 新数字出现）。
+      let cur = 0;
+      const firstStepAt = 1.2;            // 第一步起点
+      const stepGap = STEP_DUR;            // 每步时长
+
+      // 第一步起点：直接放初始数字（已在 0.45s 入场）
+      for (let s = 1; s < steps.length; s++) {
+        const at = firstStepAt + (s - 1) * stepGap;
+        // 散开（仅当不是最后一步时）
+        if (s < steps.length - 1 || true) {
+          tl.add(scatterFromCenter(steps[s - 1], stepGap * 0.5), at);
+          tl.add(gatherToCenter(steps[s], stepGap * 0.5), at + stepGap * 0.5);
+        }
+      }
+
+      // 进度条与步数联动
+      tl.to("#progressFill", {
+        width: "100%",
+        duration: DIGIT_DUR - 1.6,
+        ease: "power1.inOut",
+      }, 0.6);
+
+      // 脉冲点呼吸（强调紧迫感）
+      // 只补间到片尾 DIGIT_DUR：repeat:-1 会把时间轴拖成无限长，duration() 变非有限值。
+      // 1.2 + (repeat+1)*0.6 = 6 → repeat = 7
+      tl.fromTo("#pulseDot",
+        { scale: 0.85 },
+        { scale: 1.15, duration: 0.6, ease: "sine.inOut", yoyo: true, repeat: 7 }, 1.2);
+
+      // 步数标签（stepLabel）实时刷新
+      tl.eventCallback("onUpdate", () => {
+        const t = tl.time();
+        const idx = Math.min(steps.length - 1, Math.max(0, Math.floor((t - firstStepAt) / stepGap) + 1));
+        $("stepLabel").textContent =
+          String(Math.min(idx + 1, steps.length)).padStart(2, "0") +
+          " / " + String(steps.length).padStart(2, "0");
+      });
+
+      // 结尾：停留（约 0.8s 可读）
+      // 默认 timeline 总时长即 DIGIT_DUR = 6
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

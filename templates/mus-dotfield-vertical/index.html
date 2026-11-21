@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"bpm","type":"number","label":"每分钟拍数","default":100},{"id":"beatsPerBar","type":"number","label":"每小节拍数","default":4},{"id":"pattern","type":"string","label":"落点组合（每拍落几个点，逗号分隔）","default":"5-3-2"},{"id":"lyrics","type":"string","label":"歌词（用 | 分行）","default":"夜风吹过街口|心事折成纸飞机"},{"id":"seed","type":"number","label":"随机种子（换个数换一片地形）","default":20261019},{"id":"accent","type":"color","label":"强调色","default":"#5CE1E6"},{"id":"title","type":"string","label":"标题文字","default":"夜风吹过街口"}]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <meta name="description" content="竖屏版的 3D 点阵。整片地形随拍起伏，改 BPM 或落点组合就换一片。短视频竖版底板。" />
+    <title>音乐混剪·竖屏点阵</title>
+    <script src="../_lib/gsap.min.js"></script>
+    <script src="../_lib/music.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1080px; height: 1920px; overflow: hidden; background: #04070E; }
+body { font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+#root { position: relative; width: 1080px; height: 1920px; overflow: hidden; background: #04070E; }
+.scene { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+
+
+#field { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; display: block; }
+#dome { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px;
+  background: radial-gradient(ellipse 62% 48% at 50% 66%, rgba(92,225,230,.11), rgba(4,7,14,0) 72%); }
+.hud { position: absolute; left: 68px; top: 150px; }
+.hud .k { font-size: 22px; letter-spacing: .36em; color: var(--ac); font-weight: 700; text-indent: .36em; }
+.hud .t { font-size: 56px; font-weight: 900; color: #EAF2FF; margin-top: 20px; letter-spacing: .01em; line-height: 1.05; }
+.hud .m { font-size: 25px; color: rgba(234,242,255,.50); margin-top: 18px; letter-spacing: .04em; }
+.bpm { position: absolute; right: 68px; top: 146px; text-align: right; }
+.bpm .n { font-size: 88px; font-weight: 900; color: var(--ac); line-height: .88; font-variant-numeric: tabular-nums;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+.bpm .u { font-size: 20px; letter-spacing: .32em; color: rgba(234,242,255,.44); margin-top: 12px; }
+.pat { position: absolute; left: 68px; bottom: 96px; display: flex; gap: 12px; align-items: flex-end;
+  background: rgba(4,7,14,.66); padding: 13px 15px; border-radius: 15px;
+  border: 1px solid rgba(122,158,206,.14); }
+.pat .g { min-width: 46px; height: 46px; padding: 0 14px; border: 2px solid rgba(92,225,230,.34);
+  border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  font-size: 26px; font-weight: 900; color: rgba(92,225,230,.72); font-variant-numeric: tabular-nums;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+.patlab { position: absolute; left: 68px; bottom: 172px; font-size: 20px; letter-spacing: .26em;
+  color: rgba(234,242,255,.58); background: rgba(4,7,14,.72); padding: 7px 14px; border-radius: 9px;
+  border: 1px solid rgba(122,158,206,.14); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="10.90" data-width="1080" data-height="1920">
+      <section id="scene" class="scene clip" data-start="0" data-duration="10.90" data-track-index="1">
+      <canvas id="field"></canvas>
+      <div id="dome"></div>
+      <div class="hud">
+        <div class="k">SPECTRUM FIELD</div>
+        <div class="t" id="hudt"></div>
+        <div class="m" id="hudm"></div>
+      </div>
+      <div class="bpm"><div class="n" id="bpmn"></div><div class="u">BEATS PER MINUTE</div></div>
+      <div class="patlab">每拍落几个点</div>
+      <div class="pat" id="pat"></div>
+      </section>
+    </div>
+    <script>
+
+window.__MDEFAULTS = {"bpm": 100, "beatsPerBar": 4, "pattern": "5-3-2", "lyrics": "夜风吹过街口|心事折成纸飞机", "seed": 20261019, "accent": "#5CE1E6", "title": "夜风吹过街口", "bg": "#04070E"};
+(function () {
+  'use strict';
+  var DF = window.__MDEFAULTS || {};
+  var raw = (window.__hyperframes && window.__hyperframes.getVariables)
+            ? window.__hyperframes.getVariables() : null;
+  var v = {};
+  for (var kk in DF) { if (Object.prototype.hasOwnProperty.call(DF, kk)) v[kk] = DF[kk]; }
+  if (raw) { for (var k2 in raw) { if (Object.prototype.hasOwnProperty.call(raw, k2) && raw[k2] !== '' && raw[k2] != null) v[k2] = raw[k2]; } }
+  function val(k, d) { return (v[k] === undefined || v[k] === null || v[k] === '') ? d : v[k]; }
+
+  var score = MMusic.build({
+    bpm: val('bpm', 100),
+    beatsPerBar: val('beatsPerBar', 4),
+    pattern: val('pattern', '5-3-2'),
+    lyrics: val('lyrics', ''),
+    seed: val('seed', 20261019)
+  });
+
+  function hex2rgb(h) {
+    h = String(h || '#5CE1E6').replace('#', '');
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    var n = parseInt(h, 16);
+    if (!isFinite(n)) n = 0x5CE1E6;
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function mix(a, b, t) {
+    t = t < 0 ? 0 : (t > 1 ? 1 : t);
+    return 'rgb(' + Math.round(a[0] + (b[0] - a[0]) * t) + ',' +
+                    Math.round(a[1] + (b[1] - a[1]) * t) + ',' +
+                    Math.round(a[2] + (b[2] - a[2]) * t) + ')';
+  }
+  function clamp(x, a, b) { return x < a ? a : (x > b ? b : x); }
+  function easeIO(p) { return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; }
+
+  var ACC = val('accent', '#5CE1E6');
+  var accRGB = hex2rgb(ACC);
+  var ACCS = 'rgb(' + accRGB[0] + ',' + accRGB[1] + ',' + accRGB[2] + ')';
+  var MUTED = [138, 164, 200];
+  var ROOT = document.getElementById('root');
+  ROOT.style.setProperty('--ac', ACCS);
+  ROOT.style.backgroundColor = val('bg', '#04070E');
+  document.documentElement.style.setProperty('--ac', ACCS);
+
+
+  /* 落点组合的节拍条：每格 = 一拍落几个点。当前拍放大高亮。
+     这条把「5个键、3个键、2个键」的按法摆在明面上，不是玄学。 */
+  var chipEls = [];
+  (function () {
+    var box = document.getElementById('pat');
+    if (!box) return;
+    /* 节拍格子的数量要跟画幅走：竖屏只有 1080 宽，按横屏的 16 个排会切掉。
+       算式里减掉 300 是给「起始边距 + 面板内边距」留的余量。 */
+    var n = Math.min(score.totalBeats, 16, Math.floor((1080 - 300) / 70));
+    for (var i = 0; i < n; i++) {
+      var sz = score.pattern[i % score.pattern.length];
+      var c = document.createElement('div');
+      c.className = 'g';
+      c.textContent = String(sz);
+      box.appendChild(c);
+      chipEls.push(c);
+    }
+  })();
+  function updateChips(t) {
+    var beat = Math.floor(t / score.spb);
+    for (var i = 0; i < chipEls.length; i++) {
+      var d = beat - i;
+      var on = (d === 0);
+      chipEls[i].style.opacity = on ? 1 : (d > 0 ? 0.20 : 0.40);
+      chipEls[i].style.transform = on ? 'scale(1.16)' : 'scale(1)';
+      chipEls[i].style.borderColor = on ? ACCS : 'rgba(' + accRGB.join(',') + ',.32)';
+      chipEls[i].style.color = on ? '#04070E' : 'rgba(' + accRGB.join(',') + ',.70)';
+      chipEls[i].style.background = on ? ACCS : 'transparent';
+    }
+  }
+
+
+  /* ── 点阵场 ────────────────────────────────────────────────
+     一片有纵深的地面网格。每拍落下一团点（2/3/5 个一组），团里的点
+     同时弹起再落下，周围按高斯权重跟着晃 —— 这就是「网格随机拍起伏」。
+     起伏的随机性来自 seed，不是 Math.random()：渲染管线会逐帧 seek，
+     随机数会让同一个模板渲两次两张图，自动验收就废了。 */
+  var NX = 48, NZ = 19;
+  var FLD = document.getElementById('field');
+  var ctx = FLD.getContext('2d');
+  FLD.width = 1080; FLD.height = 1920;
+
+  var SX = new Float32Array(NX * NZ), SY = new Float32Array(NX * NZ), SS = new Float32Array(NX * NZ);
+  (function () {
+    for (var k = 0; k < NZ; k++) {
+      var t = k / (NZ - 1);
+      /* 透视别拉太狠：近远缩放比超过 3 倍，网格就散成一面墙，不像地面了 */
+      var sc = 0.42 + 0.58 * Math.pow(t, 1.15);
+      var gy = 1920 * 0.30 + (1920 * 0.65) * Math.pow(t, 1.40);
+      for (var i = 0; i < NX; i++) {
+        var idx = k * NX + i;
+        SS[idx] = sc;
+        SX[idx] = 540 + (i / (NX - 1) - 0.5) * 1240 * sc;
+        SY[idx] = gy;
+      }
+    }
+  })();
+  var seed = score.seed;
+  var HGT = new Float32Array(NX * NZ);
+
+  /* 每一拍从一侧扫过来的行波 —— 这才是「网格起伏」的主体。
+     落的点是「重音」，行波是「律动」，两个叠起来才有呼吸感。
+     每列的幅度带随机抖动，所以波是不规则的，不是整齐的正弦。 */
+  var WAVES = [];
+  (function () {
+    for (var b = 0; b < score.totalBeats; b++) {
+      var dir = MMusic.hash(score.seed, b, 71) < 0.5 ? 1 : -1;
+      WAVES.push({
+        t: b * score.spb, beat: b, dir: dir,
+        sp: 44 + MMusic.hash(score.seed, b, 73) * 28,
+        amp: 0.24 + MMusic.hash(score.seed, b, 77) * 0.26
+      });
+    }
+  })();
+
+  function drawField(t) {
+    HGT.fill(0);
+    var pl = score.pulses;
+    for (var p = 0; p < pl.length; p++) {
+      var ps = pl[p];
+      var age = t - ps.t;
+      if (age < -0.02 || age > 1.7) continue;
+      var env = 0;
+      if (age >= 0) {
+        env = age < 0.07 ? age / 0.07
+             : Math.exp(-(age - 0.07) * 3.1) * (1 + 0.15 * Math.sin((age - 0.07) * 15));
+      }
+      if (env <= 0.003) continue;
+      for (var ci = 0; ci < ps.cells.length; ci++) {
+        var cell = ps.cells[ci];
+        var ii = Math.round(cell.u * (NX - 1));
+        var kk = Math.round(cell.v * (NZ - 1));
+        for (var dk = -1; dk <= 1; dk++) {
+          var k2 = kk + dk;
+          if (k2 < 0 || k2 >= NZ) continue;
+          for (var di = -1; di <= 1; di++) {
+            var i2 = ii + di;
+            if (i2 < 0 || i2 >= NX) continue;
+            var w = (di === 0 && dk === 0) ? 1 : ((di === 0 || dk === 0) ? 0.42 : 0.20);
+            HGT[k2 * NX + i2] += cell.amp * env * w;
+          }
+        }
+      }
+    }
+
+    /* 行波叠加 */
+    for (var wi = 0; wi < WAVES.length; wi++) {
+      var W = WAVES[wi];
+      var wa = t - W.t;
+      if (wa < 0 || wa > 2.6) continue;
+      var head = wa * W.sp;
+      var decay = Math.exp(-wa * 0.72);
+      for (var wi2 = 0; wi2 < NX; wi2++) {
+        var pos = W.dir > 0 ? (wi2 - head) : (head - wi2);
+        if (pos < -5 || pos > 11) continue;
+        var wamp = W.amp * decay * Math.exp(-Math.max(0, pos) * 0.40);
+        if (wamp < 0.002) continue;
+        var jit = 0.50 + MMusic.hash(score.seed, wi2, W.beat) * 0.95;
+        var skew = Math.round(MMusic.hash(score.seed, wi2, W.beat + 5) * 4) - 2;
+        for (var wk = 0; wk < NZ; wk++) {
+          var wkk = wk + skew;
+          if (wkk < 0 || wkk >= NZ) continue;
+          HGT[wkk * NX + wi2] += wamp * jit * (0.35 + 0.65 * SS[wkk * NX + wi2]);
+        }
+      }
+    }
+
+    ctx.clearRect(0, 0, 1080, 1920);
+    ctx.lineWidth = 1;
+    var k3, i3;
+    for (k3 = 0; k3 < NZ; k3++) {
+      ctx.strokeStyle = 'rgba(120,170,220,0.052)';
+      ctx.beginPath();
+      ctx.moveTo(SX[k3 * NX], SY[k3 * NX]);
+      ctx.lineTo(SX[k3 * NX + NX - 1], SY[k3 * NX + NX - 1]);
+      ctx.stroke();
+    }
+    for (i3 = 0; i3 < NX; i3++) {
+      ctx.strokeStyle = 'rgba(120,170,220,0.028)';
+      ctx.beginPath();
+      ctx.moveTo(SX[i3], SY[i3]);
+      ctx.lineTo(SX[(NZ - 1) * NX + i3], SY[(NZ - 1) * NX + i3]);
+      ctx.stroke();
+    }
+    for (k3 = 0; k3 < NZ; k3++) {
+      for (i3 = 0; i3 < NX; i3++) {
+        var idx = k3 * NX + i3;
+        var sc = SS[idx], gx = SX[idx], gy = SY[idx];
+        var h = HGT[idx];
+        var yy = gy - h * 470 * sc;
+        var rad = (2.0 + 3.1 * sc) * (1 + h * 0.68);
+        var alpha = Math.min(1, 0.15 + 0.44 * sc + h * 0.82);
+        if (h > 0.06) {
+          ctx.strokeStyle = 'rgba(' + accRGB.join(',') + ',' + (0.42 * Math.min(1, h)).toFixed(3) + ')';
+          ctx.lineWidth = 1.3;
+          ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx, yy); ctx.stroke();
+        }
+        ctx.fillStyle = h > 0.06
+          ? 'rgba(' + accRGB.join(',') + ',' + alpha.toFixed(3) + ')'
+          : 'rgba(122,158,206,' + alpha.toFixed(3) + ')';
+        ctx.beginPath(); ctx.arc(gx, yy, rad, 0, 6.28318); ctx.fill();
+        if (h > 0.34) {
+          ctx.fillStyle = 'rgba(255,255,255,' + ((h - 0.34) * 0.85).toFixed(3) + ')';
+          ctx.beginPath(); ctx.arc(gx, yy, rad * 0.44, 0, 6.28318); ctx.fill();
+        }
+      }
+    }
+  }
+
+  function render(t) {
+    if (t > DUR) t = DUR;
+    drawField(t);
+    updateChips(t);
+  }
+
+  (function () {
+    var t = document.getElementById('hudt');
+    var m = document.getElementById('hudm');
+    var b = document.getElementById('bpmn');
+    if (t) t.textContent = val('title', '');
+    if (m) m.textContent = score.bars + ' 小节 · ' + score.chars.length + ' 字 · 2/3/5 复节奏';
+    if (b) b.textContent = String(Math.round(score.bpm));
+  })();
+
+
+  /* ── 时间轴 ───────────────────────────────────────────────
+     全片只有这一条补间：一个 {t:0} 代理对象线性推进，onUpdate 调 render。
+     画面是时间的纯函数，往回 seek 也一定还原得对。 */
+  var DUR = score.duration;
+  var st = { t: 0 };
+  var tl = gsap.timeline({ paused: true });
+  tl.fromTo(st, { t: 0 }, {
+    t: DUR, duration: DUR, ease: 'none',
+    onUpdate: function () { render(st.t); }
+  }, 0);
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+  render(0);
+})();
+
+    </script>
+  </body>
+</html>

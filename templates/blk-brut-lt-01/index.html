@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"name","name":"姓名","type":"string","label":"姓名（主色块上的大字）","default":"李知遥"},{"id":"role","name":"头衔","type":"string","label":"头衔 / 说明（下方白底小字）","default":"独立播客主理人 · 每周三 20:00 更新"},{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（黑条上的 mono 字）","default":"HOST / 主理人"},{"id":"tag","name":"标签","type":"string","label":"黄标签（2–6 字，别太长）","default":"LIVE"},{"id":"accent","name":"强调色","type":"color","label":"强调色（姓名色块底）","default":"#FF5FA2"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","hidden":true,"default":"transparent","options":[{"value":"transparent","label":"透明底"},{"value":"mp4","label":"MP4 纯底"},{"value":"webm","label":"WebM 纯底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="左下角姓名贴片：黑条眉标 + 强调色姓名块 + 白底头衔 + 绿色斜纹带，从左上斜向拍入后整条停住不动">
+<title>人名字幕条 · 李知遥</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 透明底贴片：--paper 全程不出现，底色收进 --background（风格规范 §7.1）。
+     --shadow 走 §7.2 规则 A：透明底默认切白，因为直播 footage 绝大多数是中深色调。 */
+  :root{ --shadow:#FFFFFF; --background:transparent; }
+
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--background);color:var(--ink);font-family:var(--sans)}
+
+  /* 四档硬阴影，X 恒等于 Y，第三值恒 0（基因 2）。阴影色走变量，透明底切白。 */
+  .sh-s {box-shadow:4px 4px 0 var(--shadow)}
+  .sh-m {box-shadow:6px 6px 0 var(--shadow)}
+  .sh-l {box-shadow:8px 8px 0 var(--shadow)}
+  .sh-w {box-shadow:8px 8px 0 var(--white)}
+
+  /* 四件积木叠成一个外框：每件 3px 黑边，靠 margin-top:-3px 吃掉重复的那条边。
+     阴影只挂在整摞上，避免四层硬阴影叠成一坨黑。 */
+  .lt{position:absolute;left:96px;bottom:104px;width:960px;
+      display:flex;flex-direction:column;box-shadow:8px 8px 0 var(--shadow)}
+
+  .eb{display:flex;align-items:center;gap:18px;padding:12px 26px;
+      background:var(--ink);color:var(--white);
+      border:var(--bw) solid var(--ink);border-radius:4px 4px 0 0}
+  .eb .tag{flex:0 0 auto;font-family:var(--mono);font-weight:700;font-size:26px;
+      letter-spacing:.1em;padding:6px 14px;background:var(--yellow);color:var(--ink)}
+  .eb .ebtx{font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:.14em;
+      white-space:nowrap;overflow:hidden}
+
+  .card{border:var(--bw) solid var(--ink);border-top:0;margin-top:-3px;background:var(--white)}
+  /* 姓名：900 字重 + 极限字号，压在强调色块上（基因 8 / §7.3.2 高饱和块自带对比） */
+  .card .nm{background:var(--accent);color:var(--ink);
+      font-size:76px;font-weight:900;line-height:1.04;letter-spacing:-.01em;
+      padding:22px 34px 20px;white-space:nowrap;overflow:hidden}
+  /* 头衔：mono + 大字距，字号只有姓名的一半都不到，字号比 ≥1.6×（iart §7 停留帧判据） */
+  .card .rl{background:var(--white);color:var(--ink);
+      font-family:var(--mono);font-weight:700;font-size:30px;letter-spacing:.05em;
+      padding:14px 34px 16px;border-top:3px solid var(--ink);
+      white-space:nowrap;overflow:hidden}
+
+  /* 斜纹带：唯一的合法渐变，周期 10px + 10px（基因 4 / §3.9）。
+     滚动靠「整条砖带平移一个图案周期的整数倍」，而不是 background-position：
+     background-position 的取值字符串长度只有个位数变化，逐帧指纹几乎读不出来；
+     真正的 translate 才有连续的小数，帧形态才站得住。 */
+  .stripe{height:20px;margin-top:-3px;border:3px solid var(--ink);border-top:0;
+      border-radius:0 0 4px 4px;overflow:hidden}
+  .stripes{display:flex;width:max-content;height:20px}
+  .stripes i{display:block;flex:0 0 80px;height:20px;
+      background:repeating-linear-gradient(-45deg,var(--ink) 0 10px,var(--green) 10px 20px)}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="lt" id="lt">
+    <div class="eb">
+      <span class="tag" id="tag">LIVE</span>
+      <span class="ebtx" id="eyebrow" data-fit-max="26" data-fit-min="16">HOST / 主理人</span>
+    </div>
+    <div class="card">
+      <div class="nm" id="name" data-fit-max="76" data-fit-min="40">李知遥</div>
+      <div class="rl" id="role" data-fit-max="30" data-fit-min="18">独立播客主理人 · 每周三 20:00 更新</div>
+    </div>
+    <div class="stripe"><div class="stripes" id="stripes"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+  </div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  /* 透明底分支（风格规范 §7.5）：底色与阴影色都收进变量，JS 只改这两个。 */
+  var isT = (v.exportMode || 'transparent') === 'transparent';
+  var r = document.documentElement.style;
+  r.setProperty('--background', isT ? 'transparent' : '#0F0F0F');
+  r.setProperty('--shadow', isT ? '#FFFFFF' : '#0F0F0F');
+  if (v.accent) r.setProperty('--accent', v.accent);
+  /* 阴影要参与补间（模 1 的压/弹），CSS 变量 GSAP 插不了，先取成字面量 */
+  var SH = isT ? '#FFFFFF' : '#0F0F0F';
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+  ['name', 'role', 'eyebrow', 'tag'].forEach(function (k) { set(k, v[k]); });
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：去掉斜向拍入与整圈滚动，只留终态 + ≤8px 微位移淡入（§13.5）。 */
+    gsap.set('#lt', { x: 0, y: 0, opacity: 1, boxShadow: '8px 8px 0 ' + SH });
+    gsap.set('#tag', { y: 0 });
+    gsap.set('#eyebrow', { x: 0 });
+
+    tl.fromTo('#lt', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power2.out' }, 0);
+    tl.fromTo('.eb', { opacity: 0 },
+        { opacity: 1, duration: .45, ease: 'power2.out' }, .05);
+    tl.fromTo('.card', { opacity: 0 },
+        { opacity: 1, duration: .5, ease: 'power2.out' }, .12);
+    tl.fromTo('.stripe', { opacity: 0 },
+        { opacity: 1, duration: .45, ease: 'power2.out' }, .24);
+
+    B.hold(tl, 1.25, 1.15);
+    return;
+  }
+
+  var TOTAL = parseFloat(v.duration) > 0 ? parseFloat(v.duration) : 5;
+  var HOLD = 0.5;
+  var WIN = Math.max(1.6, TOTAL - HOLD);
+
+  /* 模 1 · 拍进来：斜向硬着陆，落定瞬间阴影压 2 帧再弹回原档。入场 0.28s，零 overshoot。 */
+  tl.fromTo('#lt', { x: -140, y: -48 },
+      { x: 0, y: 0, duration: .28, ease: 'power4.out' }, 0)
+    .fromTo('#lt', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#lt', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+  /* 零件装上去：内部两件错峰跟位，位移都在自身 padding 内，不会跨出黑边。 */
+  tl.fromTo('#tag', { y: -10 }, { y: 0, duration: .18, ease: 'power4.out' }, .16);
+  tl.fromTo('#eyebrow', { x: -16 }, { x: 0, duration: .2, ease: 'power4.out' }, .22);
+
+  /* 模 6 · 斜纹带滚动：图案周期 10+10=20px，平移量必须落在周期的整数倍上，
+     否则循环点会跳帧。这里一格 = 80px = 4 个周期，平移 80px 即无缝。
+     repeat 是**有限**的：repeat:-1 会把 tl.duration() 撑到 1e10s，
+     云渲染的 settle 取帧会直接失效，所以按窗口长度数圈。 */
+  /* 圈数按窗口算、每圈时长再按圈数摊分，保证循环正好在 WIN 收尾——
+     这样 duration 变量是多少，时间轴就是多少，不会多出零点几秒。 */
+  var SP = .55;
+  var REP = Math.max(1, Math.floor((WIN - SP) / .5));
+  tl.fromTo('#stripes', { x: 0 },
+      { x: -80, duration: (WIN - SP) / REP, ease: 'none', repeat: REP - 1 }, SP);
+
+  var end = tl.duration();
+  B.hold(tl, end, Math.max(HOLD, TOTAL - end));
+})();
+</script>
+</body></html>

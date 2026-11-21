@@ -1,0 +1,13 @@
+{
+  "id": "still-layout-relay",
+  "name": "静态版面接力换位",
+  "description": "静态版面中的元素块按顺序接力换位，前一块让位到角落，下一块放大到中心，形成信息重组的接力感",
+  "category": "版式动效",
+  "tags": ["版式动效", "元素接力", "信息重组", "静态版面", "焦点切换"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-20T00:00:00.000Z"
+}

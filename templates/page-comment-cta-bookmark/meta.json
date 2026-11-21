@@ -1,0 +1,13 @@
+{
+  "id": "page-comment-cta-bookmark",
+  "name": "评论关键词 CTA 横幅（书签抽出式）",
+  "series": "page",
+  "createdAt": "2026-08-16T08:00:00.000Z",
+  "energy": "中",
+  "suggestedDuration": 5,
+  "knownPitfalls": [
+    "words 只取前 3 个关键词，不足 3 个会自动复用最后一个补齐",
+    "关键词建议 2-4 个字，超过 5 个字会顶满书签宽度",
+    "书签抽出的 back.out 回弹在 overflow:hidden 容器内，容器外不会再露头"
+  ]
+}

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"title","type":"string","label":"标题","default":"为什么效率会提升？"},{"id":"cause","type":"string","label":"原因","default":"重复动效被模板化"},{"id":"mechanism","type":"string","label":"机制","default":"只修改文案和数据"},{"id":"result","type":"string","label":"结果","default":"新视频能快速生成"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+*{ box-sizing: border-box; }
+html, body{ margin:0; width:1920px; height:1080px; overflow:hidden; background: var(--background, #F5F0E6); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #F5F0E6); color: var(--foreground, #1D1D20);
+  font-family:'Noto Sans SC','PingFang SC',sans-serif; }
+.scene{ position:absolute; inset:0; padding:64px 80px; }
+.card{ background:#FFFDF7; border:3px solid #1D1D20; border-radius:16px; box-shadow:6px 6px 0 #2A292B; }
+.tape{ position:absolute; width:120px; height:32px; background:rgba(185,232,51,.6); border:2px solid #1D1D20;
+  border-radius:4px; transform:rotate(-5deg); z-index:5; }
+.tape.pink{ background:rgba(241,59,136,.35); transform:rotate(4deg); }
+.tape.blue{ background:rgba(62,123,242,.3); transform:rotate(-3deg); }
+.chip{ display:inline-flex; align-items:center; gap:8px; padding:6px 14px; background:#FFFDF7; border:3px solid #1D1D20;
+  border-radius:999px; font-family:'Fredoka','Arial Rounded MT Bold',sans-serif; font-weight:700; font-size:18px;
+  letter-spacing:.1em; text-transform:uppercase; white-space:nowrap; box-shadow:4px 4px 0 #2A292B; }
+.chip.lime{ background:#B9E833; } .chip.blue{ background:#3E7BF2; color:#FFFDF7; }
+.chip.pink{ background:#F13B88; color:#FFFDF7; } .chip.orange{ background:#FF9F1C; }
+.num{ font-family:'Fredoka','Arial Rounded MT Bold',sans-serif; font-weight:700; }
+.mono{ font-family:'IBM Plex Mono','JetBrains Mono',monospace; font-weight:700; }
+.dashline{ border:none; border-top:3px dashed #1D1D20; }
+</style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="card" style="position:absolute;left:60px;top:56px;padding:16px 28px;">
+          <span class="chip orange">WHY</span>
+          <h1 id="title" class="num" style="display:inline-block;margin:0 0 0 16px;font-size:40px;vertical-align:middle;"></h1>
+        </div>
+        <div style="position:absolute;left:120px;top:220px;bottom:70px;width:0;border-left:4px dashed #1D1D20;" id="rail"></div>
+        <div style="position:absolute;left:180px;right:120px;top:230px;display:flex;flex-direction:column;gap:34px;">
+          <div class="cnode card" style="padding:30px 36px;"><span class="chip blue">因 · CAUSE</span><p style="margin:14px 0 0;font-size:32px;font-weight:700;" id="cause"></p></div>
+          <div class="cnode card" style="padding:30px 36px;"><span class="chip pink">机制 · HOW</span><p style="margin:14px 0 0;font-size:32px;font-weight:700;" id="mechanism"></p></div>
+          <div class="cnode card" style="padding:30px 36px;background:#B9E833;"><span class="chip">果 · RESULT</span><p class="num" style="margin:14px 0 0;font-size:38px;" id="result"></p></div>
+        </div>
+        <span class="tape" style="right:140px;top:70px;"></span>
+        <style>.cnode{opacity:0;transform:translateX(-60px);}</style>
+
+      </section>
+    </div>
+    <script>
+      const fallback = {"title": "为什么效率会提升？", "cause": "重复动效被模板化", "mechanism": "只修改文案和数据", "result": "新视频能快速生成", "accent": "#00FF00", "foreground": "#F4EFE7", "exportMode": "transparent"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.documentElement.style.setProperty("--accent", v.accent ?? "#00FF00");
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const DUR = 6;
+      const countTo = (el, target, at, dur = 1.1, dec = 0) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(target) || 0, duration: dur, ease: "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+
+      $("title").textContent = v.title; $("cause").textContent = v.cause;
+      $("mechanism").textContent = v.mechanism; $("result").textContent = v.result;
+      tl.fromTo("#rail", { scaleY: 0, transformOrigin: "top" }, { scaleY: 1, duration: 1.8, ease: "power2.inOut" }, 0.3);
+      tl.to(".cnode", { opacity: 1, x: 0, duration: 0.55, ease: "power3.out", stagger: 0.55 }, 0.4);
+      tl.fromTo(".tape", { scale: 0 }, { scale: 1, duration: 0.4, ease: "back.out(2.5)" }, 0.2);
+      tl.to(".scene", { clipPath: "inset(0 0 0 100%)", duration: 0.5, ease: "power2.in" }, DUR - 0.6);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

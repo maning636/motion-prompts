@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"eyebrow","name":"eyebrow","type":"string","label":"眉标（mono + 大字距）","default":"PAY / 退款"},{"id":"title","name":"title","type":"string","label":"大数字下方的一句话","default":"先把钱退了"},{"id":"sub","name":"sub","type":"string","label":"副标题（一行短句）","default":"退款话术先给数字，再讲原因"},{"id":"peer","name":"peer","type":"string","label":"对方昵称（头像方块 + 转账收款人）","default":"老学员 · 郑野"},{"id":"m1","name":"m1","type":"string","label":"对方 · 第 1 条气泡","default":"上期那个课能退吗"},{"id":"m2","name":"m2","type":"string","label":"自己 · 第 2 条气泡","default":"能，全额退。"},{"id":"note","name":"note","type":"string","label":"转账备注（卡上小字，6–12 字）","default":"全额退款 · 已确认"},{"id":"m3","name":"m3","type":"string","label":"对方 · 复购收口","default":"那我下期再报。"},{"id":"stamp","name":"stamp","type":"string","label":"时间条（HH:MM，mono）","default":"15:58"},{"id":"amount","name":"转账金额","type":"number","label":"转账金额（元，整数跳数；同时驱动卡面金额与右侧大数字）","default":520},{"id":"unread","name":"未读数","type":"number","label":"未读角标数字（0–99）","default":2},{"id":"tag1","name":"tag1","type":"string","label":"要点标签 1（2–6 字）","default":"售后话术"},{"id":"tag2","name":"tag2","type":"string","label":"要点标签 2（2–6 字）","default":"先给数字"},{"id":"tag3","name":"tag3","type":"string","label":"要点标签 3（2–6 字）","default":"复购承接"},{"id":"accent","name":"accent","type":"color","label":"强调色（转账卡底 / 单位块 / 斜纹带 / 头像方块）","default":"#3D7BFF"},{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–6）","default":5.5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>聊天退款转账 · 先把钱退了</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 对话气泡体（第 2 批 · msg 族）· 退款子型
+     大额退款方向：观点区换成「amount 驱动的大数字版式」，卡面与观点区两处金额同源。 */
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --accent:#3D7BFF; --avc:#FFD429;
+    /* 聊天窗 UI 色全部收进变量（行业通行色，非官方色值）：换平台只改这两个 token。
+       圆角只有 4px 与 9999px 两档（BLOCKBRUT 基因 3），所以气泡尾巴用 border 三角
+       切角而不是 border-radius:50%。 */
+    --wa-green:#95EC69; --wa-grey:#EDEDED; --wa-red:#FA5151;
+  }
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--paper);color:var(--ink);font-family:var(--sans);
+    display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+  .sh-s{box-shadow:4px 4px 0 var(--ink)}
+  .sh-m{box-shadow:6px 6px 0 var(--ink)}
+  .sh-l{box-shadow:8px 8px 0 var(--ink)}
+  .sh-xl{box-shadow:10px 10px 0 var(--ink)}
+
+  .promo{flex:0 0 auto;height:56px;display:flex;align-items:center;justify-content:center;
+    gap:14px;background:var(--ink);color:var(--white);font-size:22px;font-weight:700;
+    letter-spacing:.06em}
+  .promo .ptag{font-family:var(--mono);font-size:22px;font-weight:700;letter-spacing:.12em;
+    background:var(--accent);color:var(--ink);padding:3px 14px;border-radius:9999px}
+  .promo .parw{color:var(--accent);font-weight:900}
+
+  .main{flex:1 1 auto;min-height:0;display:flex;gap:52px;padding:40px 72px 34px}
+
+  /* ---------- 观点区 ---------- */
+  .side{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;padding:10px 12px 0 0}
+  .side.l{padding:10px 0 0 12px}
+  .eyebrow{font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:.14em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stack{margin-top:auto}
+  /* 大字标题：只 nowrap，不加 overflow:hidden —— 行高 1.08 小于中文字体的墨迹盒高，
+     加了 overflow 反而把上下缘的字切掉（抽帧审计报 overflow-y 裁切）。 */
+  .line{display:block;font-size:112px;font-weight:900;line-height:1.08;letter-spacing:0;
+    white-space:nowrap}
+  .chip{display:inline-block;line-height:1;padding:0 22px;background:var(--accent);color:var(--ink);
+    border:var(--bw) solid var(--ink);border-radius:4px;box-shadow:8px 8px 0 var(--ink)}
+  .sub{font-size:32px;font-weight:700;line-height:1.5;letter-spacing:0;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:16px 0 0}
+  .deck{font-size:30px;font-weight:700;line-height:1.5;letter-spacing:0;max-width:1060px;
+    margin:18px 0 0}
+  .stat{display:flex;align-items:center;gap:18px;margin:0 0 10px}
+  .stat b{display:block;font-family:var(--mono);font-size:150px;font-weight:900;line-height:.92;
+    letter-spacing:0;font-variant-numeric:tabular-nums}
+  .stat span{display:block;font-size:34px;font-weight:900;line-height:1;color:var(--ink);
+    background:var(--accent);padding:9px 16px;border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:6px 6px 0 var(--ink)}
+  .rule{width:100%;margin-top:auto;margin-bottom:28px;border-top:var(--bw) solid var(--ink)}
+  .tags{display:flex;align-items:center;gap:16px;flex-wrap:nowrap;min-width:0}
+  .tg{display:inline-block;padding:9px 18px;border:var(--bw) solid var(--ink);border-radius:9999px;
+    font-family:var(--mono);font-weight:700;font-size:24px;letter-spacing:.06em;
+    background:var(--white);color:var(--ink);box-shadow:4px 4px 0 var(--ink);
+    white-space:nowrap;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .tg.on{background:var(--accent)}
+
+  /* ---------- 手机外壳（聊天窗） ----------
+     外壳是 3px 黑边 + 10px 硬阴影的方块（不做有机圆角，只有 4px）。
+     高度 840 是算出来的：1080 − 通告条 56 − 斜纹带 20 − 页脚 66 − 上下内边距 74 = 864，留 24 余量。 */
+  .phone{flex:0 0 auto;width:466px;height:840px;display:flex;flex-direction:column;
+    border:var(--bw) solid var(--ink);border-radius:4px;box-shadow:10px 10px 0 var(--ink);
+    background:var(--wa-grey);overflow:hidden}
+
+  .status{flex:0 0 auto;height:40px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 16px;font-family:var(--mono);font-weight:700;font-size:17px;color:var(--ink)}
+  .status .rt{display:flex;align-items:center;gap:7px}
+  .status .sig i{display:block;width:5px;background:var(--ink)}
+  .status .sig i:nth-child(1){height:6px}.status .sig i:nth-child(2){height:9px}
+  .status .sig i:nth-child(3){height:12px}.status .sig i:nth-child(4){height:15px}
+  .status .bat{width:26px;height:13px;border:var(--bw) solid var(--ink);border-radius:2px;
+    position:relative;padding:1px}
+  .status .bat::after{content:"";position:absolute;right:-7px;top:3px;width:4px;height:5px;
+    background:var(--ink)}
+  .status .bat b{display:block;height:100%;width:74%;background:var(--ink)}
+
+  .chead{flex:0 0 auto;height:66px;display:flex;align-items:center;gap:14px;padding:0 16px;
+    border-bottom:var(--bw) solid var(--ink)}
+  .chead .back{font-family:var(--sans);font-weight:900;font-size:34px;line-height:1;width:22px}
+  .chead .nm{font-size:26px;font-weight:900;letter-spacing:0}
+  .chead .more{margin-left:auto;font-family:var(--mono);font-weight:900;font-size:22px;
+    letter-spacing:.06em}
+  /* 未读角标：红色**方块** + 白字，不是圆点——BLOCKBRUT 圆角只有 4px / 9999px 两档。 */
+  .badge{margin-left:auto;display:flex;align-items:center;justify-content:center;
+    min-width:34px;height:34px;padding:0 8px;background:var(--wa-red);color:var(--white);
+    border:var(--bw) solid var(--ink);border-radius:4px;
+    font-family:var(--mono);font-weight:900;font-size:22px;line-height:1}
+
+  .thread{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;
+    gap:14px;padding:14px 14px 18px;overflow:hidden}
+  .tline{align-self:center;background:var(--ink);color:var(--white);font-family:var(--mono);
+    font-weight:700;font-size:16px;letter-spacing:.08em;padding:4px 12px;border-radius:9999px}
+  .row{display:flex;align-items:flex-start;gap:10px}
+  .row.me{flex-direction:row-reverse}
+  /* 头像 = 46px 色块方块 + 单字。不复制任何真人头像素材。 */
+  .av{flex:0 0 auto;width:46px;height:46px;display:flex;align-items:center;
+    justify-content:center;font-size:22px;font-weight:900;border:var(--bw) solid var(--ink);
+    border-radius:4px;background:var(--avc);color:var(--ink)}
+  .bub{max-width:300px;padding:11px 14px;border:var(--bw) solid var(--ink);border-radius:4px;
+    font-size:23px;font-weight:700;line-height:1.34;letter-spacing:0;color:var(--ink);
+    position:relative}
+  .row.them .bub{background:var(--white)}
+  .row.me .bub{background:var(--wa-green)}
+  /* 气泡尾巴：border 三角切角，不引第三种圆角 */
+  .row.them .bub::before{content:"";position:absolute;left:-11px;top:16px;width:0;height:0;
+    border-top:8px solid transparent;border-bottom:8px solid transparent;
+    border-right:11px solid var(--ink)}
+  .row.me .bub::before{content:"";position:absolute;right:-11px;top:16px;width:0;height:0;
+    border-top:8px solid transparent;border-bottom:8px solid transparent;
+    border-left:11px solid var(--ink)}
+
+  .inbar{flex:0 0 auto;height:76px;display:flex;align-items:center;gap:12px;padding:0 12px;
+    border-top:var(--bw) solid var(--ink)}
+  .inbar .ib{flex:0 0 auto;width:42px;height:42px;border:var(--bw) solid var(--ink);
+    border-radius:4px;background:var(--white)}
+  .inbar .ib.tone{background:var(--accent)}
+  .inbar .send{flex:0 0 auto;width:66px;height:42px;display:flex;align-items:center;
+    justify-content:center;background:var(--accent);color:var(--ink);
+    border:var(--bw) solid var(--ink);border-radius:4px;
+    font-family:var(--mono);font-weight:900;font-size:20px;letter-spacing:.06em}
+  .inbar .field{flex:1 1 auto;height:42px;display:flex;align-items:center;padding:0 12px;
+    background:var(--white);border:var(--bw) solid var(--ink);border-radius:4px;
+    font-size:21px;font-weight:700;color:var(--mute);overflow:hidden}
+  .inbar .field .fx{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .inbar .field .fc{flex:0 0 auto;width:4px;height:26px;background:var(--ink);margin-left:3px}
+
+  .stripe{flex:0 0 auto;height:20px;border-top:var(--bw) solid var(--ink);
+    border-bottom:var(--bw) solid var(--ink);
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+  .foot{flex:0 0 auto;height:66px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 72px;background:var(--ink);color:var(--white)}
+  .foot .fm{font-family:var(--mono);font-weight:700;font-size:22px;letter-spacing:.14em;
+    color:var(--accent)}
+  .foot .fc{font-size:25px;font-weight:700;letter-spacing:0}
+
+  /* 降级媒体查询：只压 duration 不够 —— transition-property 初值是 all，
+     只压 duration 会让 JS 写的内联几何全部变成 0.01ms 的过渡，
+     元素卡在 CSS 旧值上（agent-114 实测踩过）。这两行是红线，必须带。 */
+  @media (prefers-reduced-motion: reduce){
+    .anim{transition-duration:.01ms !important;animation-duration:.01ms !important;
+      transition-property:none !important;animation-name:none !important}
+  }
+
+  /* 转账卡：一张积木卡，不是气泡。三段式 = 色条 / 金额 / 收款人（BLOCKBRUT §3.6 语法）。 */
+  .pay{width:300px;border:var(--bw) solid var(--ink);border-radius:4px;
+    background:var(--accent);color:var(--ink);overflow:hidden}
+  .pay .bar{height:30px;display:flex;align-items:center;padding:0 14px;background:var(--ink);
+    color:var(--white);font-family:var(--mono);font-weight:700;font-size:17px;letter-spacing:.12em}
+  .pay .amt{display:flex;align-items:baseline;gap:6px;padding:16px 16px 12px}
+  .pay .cur{font-family:var(--mono);font-weight:900;font-size:34px;line-height:1}
+  .pay .num{font-family:var(--mono);font-weight:900;font-size:62px;line-height:1;
+    font-variant-numeric:tabular-nums}
+  .pay .to{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    border-top:var(--bw) solid var(--ink);padding:9px 16px 11px}
+  .pay .tn{font-size:18px;font-weight:700;letter-spacing:0;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis}
+  .pay .seal{flex:0 0 auto;font-family:var(--mono);font-weight:900;font-size:16px;
+    letter-spacing:.1em;padding:3px 10px;background:var(--white);color:var(--ink);
+    border:var(--bw) solid var(--ink);border-radius:4px}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="promo anim" id="promo">
+    <span class="ptag">NEW</span><span class="ptx">聊天退款转账 · 卡面与右侧大数字同源</span><span class="parw">→</span>
+  </div>
+
+  <div class="main anim" id="main">
+    <div class="side l">
+      <span class="eyebrow anim" id="eyebrow" data-fit-max="26" data-fit-min="16">PAY / 退款</span>
+      <div class="stack">
+        <div class="stat anim" id="statWrap"><b id="stat" data-fit-max="140" data-fit-min="72">520</b><span id="statUnit">元</span></div>
+        <span class="line anim" id="title" data-fit-max="104" data-fit-min="48">先把钱退了</span>
+        <p class="sub anim" id="sub" data-fit-max="32" data-fit-min="18">退款话术先给数字，再讲原因</p>
+      </div>
+      <div class="rule anim" id="rule"></div>
+      <div class="tags">
+        <span class="tg on anim" id="tag1" data-fit-max="24" data-fit-min="15">售后话术</span>
+        <span class="tg anim" id="tag2" data-fit-max="24" data-fit-min="15">先给数字</span>
+        <span class="tg anim" id="tag3" data-fit-max="24" data-fit-min="15">复购承接</span>
+      </div>
+    </div>
+    <div class="phone anim" id="phone">
+      <div class="status anim" id="status">
+        <span>15:58</span>
+        <span class="rt"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"><b></b></span></span>
+      </div>
+      <div class="chead anim" id="chead">
+        <span class="back">‹</span><span class="nm" id="peer" data-fit-max="26" data-fit-min="16">老学员 · 郑野</span>
+        <span class="badge anim" id="badge">2</span>
+      </div>
+      <div class="thread" id="thread">
+        <div class="tline anim" id="stamp" data-fit-max="16" data-fit-min="12">15:58</div>
+        <div class="row them anim" id="r1"><span class="av">野</span><span class="bub" id="m1" data-fit-max="23" data-fit-min="14">上期那个课能退吗</span></div>
+        <div class="row me anim" id="r2"><span class="av">我</span><span class="bub" id="m2" data-fit-max="23" data-fit-min="14">能，全额退。</span></div>
+        <div class="row them anim" id="r3"><span class="av">野</span><span class="pay" id="pay">
+          <span class="bar">TRANSFER / 转账</span>
+          <span class="amt"><span class="cur">¥</span><span class="num" id="amount">88</span></span>
+          <span class="to"><span class="tn" id="note">请客 · 下期见</span><span class="seal">已收款</span></span>
+        </span></div>
+        <div class="row them anim" id="r4"><span class="av">野</span><span class="bub" id="m3" data-fit-max="23" data-fit-min="14">那我下期再报。</span></div>
+      </div>
+      <div class="inbar anim" id="inbar">
+        <span class="ib"></span><span class="field"><span class="fx">发消息…</span></span><span class="ib"></span><span class="ib tone"></span>
+      </div>
+    </div>
+  </div>
+  <div class="stripe anim" id="stripe"></div>
+  <div class="foot anim" id="foot">
+    <span class="fm">MSG / 2026</span><span class="fc">售后先给数字，再讲原因</span>
+  </div>
+
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  ['eyebrow','title','sub','peer','m1','m2','note','m3','stamp','tag1','tag2','tag3']
+    .forEach(function (k) { set(k, v[k]); });
+  var un = Math.max(0, Math.min(99, Math.round(Number(v.unread) || 0)));
+  set('badge', String(un));
+
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+  var target = Math.max(0, Math.round(Number(v.amount) || 520));
+  var numEl = document.getElementById('amount');
+  numEl.textContent = '0';
+  /* 右侧大数字与卡面金额同源：两处手填的片子比没有片子更糟 */
+  var bigEl = document.getElementById('stat');
+  bigEl.textContent = '0';
+
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+  var INK = '#0F0F0F';
+
+  /* 模 1 · 拍进来：斜向硬着陆 ≤0.3s，落定后阴影压 2 帧再弹回原档。全文件零 overshoot。 */
+  function slam(sel, at, dx, dy, d) {
+    tl.fromTo(sel, { x: dx, y: dy },
+      { x: 0, y: 0, duration: d || 0.26, ease: 'power4.out' }, at);
+  }
+  function press(sel, rest, at) {
+    tl.set(sel, { boxShadow: rest, immediateRender: false }, at);
+    tl.to(sel, { boxShadow: rest.replace(/(\d+)px (\d+)px/, function (_, a, b) {
+      return a + 'px ' + (parseInt(b, 10) + 3) + 'px'; }), duration: 0.04, ease: 'steps(2)' }, at + 0.04);
+    tl.to(sel, { boxShadow: rest, duration: 0.04, ease: 'steps(2)' }, at + 0.08);
+  }
+
+  if (reduce) {
+    gsap.set('#r1,#r2,#r3,#r4,#stamp,#badge', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#phone', { x: 0, y: 0, boxShadow: '10px 10px 0 ' + INK });
+    numEl.textContent = String(target);
+    bigEl.textContent = String(target);
+    tl.fromTo('#promo',  { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, 0);
+    tl.fromTo('#main',   { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .12);
+    tl.fromTo('#stripe', { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, .28);
+    tl.fromTo('#foot',   { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .40);
+    B.hold(tl, 1.15, 1.15);
+    return;
+  }
+
+  slam('#promo', 0.00, 0, -56, 0.26);
+  slam('#phone', 0.10, 56, -36, 0.28);
+  press('#phone', '10px 10px 0 ' + INK, 0.38);
+  slam('#status', 0.34, 18, 0, 0.2);
+  slam('#chead',  0.42, 18, 0, 0.2);
+  slam('#inbar',  0.50,   0, 22, 0.22);
+  slam('#eyebrow', 0.62,  0, -22, 0.22);
+  slam('#badge', 0.46, 22, 0, 0.2);
+  slam('#stamp', 0.72, 0, 16, 0.18);
+  var rows = [{sel:'#r1', side:-1, at:0.78}, {sel:'#r2', side: 1, at:1.26},
+              {sel:'#r3', side:-1, at:1.74}, {sel:'#r4', side:-1, at:2.34}];
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    slam(r.sel, r.at, r.side * 26, 30, 0.24);
+    if (i === 2) {
+      press('#pay', '6px 6px 0 ' + INK, r.at + 0.24);
+      var st = { n: 0 };
+      tl.to(st, { n: target, duration: 0.7, ease: 'steps(14)', onUpdate: function () {
+        numEl.textContent = String(Math.round(this.targets()[0].n));
+      } }, r.at + 0.26);
+    } else {
+      press(r.sel + ' .bub', '4px 4px 0 ' + INK, r.at + 0.24);
+    }
+  }
+  slam('#statWrap', 1.30, 0, -26, 0.26);
+  var bg = { n: 0 };
+  tl.to(bg, { n: target, duration: 0.8, ease: 'steps(16)', onUpdate: function () {
+    bigEl.textContent = String(Math.round(this.targets()[0].n));
+  } }, 1.44);
+  slam('#title', 1.90, -34, -34, 0.28);
+  slam('#sub',   2.14, 0, -22, 0.24);
+  tl.fromTo('#rule', { scaleX: 0, transformOrigin: 'left center' },
+    { scaleX: 1, duration: 0.28, ease: 'power4.out' }, 2.34);
+  slam('#tag1', 2.46, -26, 26, 0.24);
+  press('#tag1', '4px 4px 0 ' + INK, 2.70);
+  slam('#tag2', 2.58, -26, 26, 0.24);
+  slam('#tag3', 2.70, -26, 26, 0.24);
+  slam('#foot', 2.86, 0, 26, 0.26);
+  /* 模 6：斜纹带匀速滚动，位移取 20px 整周期，ease:none（不做无限循环，避免时长发散） */
+  tl.fromTo('#stripe', { backgroundPositionX: '0px' },
+    { backgroundPositionX: '40px', duration: 0.8, ease: 'none' }, 3.06);
+
+
+  var introEnd = tl.duration();
+  var total = Math.min(6, Math.max(5, Number(v.duration) || 5.5));
+  B.hold(tl, introEnd, Math.max(0.6, total - introEnd));
+})();
+</script>
+</body></html>

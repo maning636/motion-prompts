@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#wall{ position:absolute; inset:-200px; perspective:1000px; }
+#tilt{ position:absolute; inset:0; transform:rotateX(20deg) scale(1.2); display:flex; gap:36px;
+  justify-content:center; will-change:transform; }
+.col{ width:460px; flex:none; overflow:visible; }
+.colInner{ display:flex; flex-direction:column; will-change:transform; }
+.pg{ width:460px; height:300px; flex:none; border-radius:14px; margin-bottom:24px;
+  background:#14161F; border:1px solid color-mix(in srgb, var(--fg) 14%, transparent); padding:26px; }
+.pg .t{ height:22px; border-radius:11px; background:color-mix(in srgb, var(--fg) 30%, transparent); width:55%; }
+.pg .l{ height:12px; border-radius:6px; background:color-mix(in srgb, var(--fg) 14%, transparent); margin-top:16px; }
+.pg.hot{ border-color:color-mix(in srgb, var(--accent) 55%, transparent); }
+.pg.hot .t{ background:var(--accent); }
+.maskT{ position:absolute; left:0; top:0; right:0; height:200px; z-index:5;
+  background:linear-gradient(180deg,var(--bg),transparent); pointer-events:none; }
+.maskB{ position:absolute; left:0; bottom:0; right:0; height:200px; z-index:5;
+  background:linear-gradient(0deg,var(--bg),transparent); pointer-events:none; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+<div id="wall"><div id="tilt"><div class="col"><div class="colInner" id="c0"><div class="pg"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg hot"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg hot"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div></div></div><div class="col"><div class="colInner" id="c1"><div class="pg"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg hot"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg hot"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div></div></div><div class="col"><div class="colInner" id="c2"><div class="pg hot"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg hot"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div><div class="pg"><div class="t"></div><div class="l" style="width:86%"></div><div class="l" style="width:64%"></div><div class="l" style="width:74%"></div></div></div></div></div></div><div class="maskT"></div><div class="maskB"></div>
+    </div>
+    <script>
+      const FB = {"accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+// 单副本高 = 4×(300+24)=1296；差速 12/9/14s，中列反向
+gsap.set('#c0',{y:0});        tl.to('#c0',{y:-1296,duration:12,ease:'none'},0);
+gsap.set('#c1',{y:-1296});    tl.to('#c1',{y:0,duration:9,ease:'none'},0);
+gsap.set('#c2',{y:-648});     tl.to('#c2',{y:-1944,duration:14,ease:'none'},0);
+// 镜头缓推铺满全镜
+tl.to('#tilt',{scale:1.26,duration:F(150),ease:'none'},0);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

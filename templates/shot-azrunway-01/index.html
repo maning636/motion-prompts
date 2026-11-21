@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#view{ position:absolute; inset:0; perspective:1400px; overflow:hidden; }
+#darkband{ position:absolute; inset:0; background:linear-gradient(180deg,rgba(0,0,0,.5),transparent 32%); z-index:4; pointer-events:none; }
+#page{ position:absolute; left:260px; top:170px; width:1400px; height:740px; border-radius:20px;
+  background:#12141B; border:1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+  transform:rotateX(66deg); transform-style:preserve-3d; will-change:transform; }
+.rc{ position:absolute; width:400px; height:210px; border-radius:14px; background:#1A1D26;
+  border:1px solid color-mix(in srgb, var(--fg) 16%, transparent); padding:26px; will-change:transform,filter; }
+.rc .t{ height:20px; border-radius:10px; background:color-mix(in srgb, var(--fg) 30%, transparent); width:60%; }
+.rc .l{ height:11px; border-radius:6px; background:color-mix(in srgb, var(--fg) 15%, transparent); margin-top:16px; }
+.rc.hot{ border-color:var(--accent); } .rc.hot .t{ background:var(--accent); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4" data-width="1920" data-height="1080">
+<div id="view"><div id="darkband"></div><div id="page"><div class="rc" id="rc0" style="left:70px;top:60px"><div class="t"></div><div class="l" style="width:85%"></div><div class="l" style="width:60%"></div></div><div class="rc hot" id="rc1" style="left:510px;top:60px"><div class="t"></div><div class="l" style="width:85%"></div><div class="l" style="width:60%"></div></div><div class="rc" id="rc2" style="left:950px;top:60px"><div class="t"></div><div class="l" style="width:85%"></div><div class="l" style="width:60%"></div></div><div class="rc" id="rc3" style="left:70px;top:400px"><div class="t"></div><div class="l" style="width:85%"></div><div class="l" style="width:60%"></div></div><div class="rc" id="rc4" style="left:510px;top:400px"><div class="t"></div><div class="l" style="width:85%"></div><div class="l" style="width:60%"></div></div><div class="rc" id="rc5" style="left:950px;top:400px"><div class="t"></div><div class="l" style="width:85%"></div><div class="l" style="width:60%"></div></div></div></div>
+    </div>
+    <script>
+      const FB = {"accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+// 悬空 560-880px 错落 + 空中提亮 1.35；急雨贴落：起点 6+i*1.5+jitter、9f 重力加速、零回弹
+const cards=document.querySelectorAll('.rc');
+cards.forEach((c,i)=>{
+  const h=560+((i*167)%320);                 // 560-880 确定性错落
+  const jitter=Math.sin(i*12.9898)*1.2;      // ≤1.2f 保序
+  const st=6+i*1.5+jitter;
+  gsap.set(c,{y:-h,filter:'brightness(1.35)'});
+  tl.to(c,{y:0,duration:F(9),ease:'power2.in'},F(st));
+  tl.to(c,{filter:'brightness(1)',duration:F(9),ease:'power2.in',
+    onComplete:()=>gsap.set(c,{clearProps:'filter'})},F(st));
+});
+// 落齐后整页立起 66°→0 + 拉远归中
+tl.to('#page',{rotationX:0,scale:.92,y:20,duration:F(56),ease:'power2.inOut'},F(34));
+// 压黑带随立起撤掉
+tl.to('#darkband',{opacity:0,duration:F(20)},F(60));
+// 收尾真静止（补齐到 120f）
+tl.to({},{duration:F(30)},F(90));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

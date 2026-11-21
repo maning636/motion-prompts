@@ -1,0 +1,13 @@
+{
+  "leftTag": "FOREGROUND",
+  "leftTitle": "运营·执行",
+  "leftDesc": "当下动作\n稳定产出\n实时反馈",
+  "rightTag": "BACKGROUND",
+  "rightTitle": "战略·方向",
+  "rightDesc": "长期目标\n市场位置\n未来路径",
+  "focusStart": 12,
+  "focusEnd": 88,
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

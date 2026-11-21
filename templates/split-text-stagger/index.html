@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"eyebrow","type":"string","label":"顶部小标","default":"BEFORE · AFTER"},
+  {"id":"leftLines","type":"string","label":"左侧文字（换行分隔）","default":"流程靠人盯\n跨部门拉群对齐\n出错再回炉返工\n汇报全靠截图与口头"},
+  {"id":"rightLines","type":"string","label":"右侧文字（换行分隔）","default":"结构化卡片沉淀\n上下游语义互通\n实时校验与回放\n看板一键取数"},
+  {"id":"leftLabel","type":"string","label":"左侧脚注","default":"BEFORE"},
+  {"id":"rightLabel","type":"string","label":"右侧脚注","default":"AFTER"},
+  {"id":"staggerGap","type":"number","label":"错峰间隔（秒，0.04–0.18）","default":0.10},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+
+      /* 点阵底纹 + 顶/底两端渐隐（呼应 §2.2 圆点网格） */
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.045) 1px, transparent 1.5px);
+        background-size: 44px 44px;
+        mask-image: linear-gradient(180deg, transparent 0%, #000 22%, #000 78%, transparent 100%);
+        -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 22%, #000 78%, transparent 100%);
+        opacity: .85;
+      }
+
+      /* 顶部 eyebrow */
+      .eyebrow{
+        position:absolute; top: 60px; left: 96px; right: 96px;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.22em; text-transform:uppercase;
+        color: #8A8A85;
+        z-index: 2;
+      }
+      .eyebrow .acc{ color: var(--accent, #00FF00); font-weight: 700; letter-spacing:.18em; }
+
+      /* 中央舞台：左右两列 + 中缝 */
+      .stage{
+        position:absolute; left: 96px; right: 96px;
+        top: 200px; bottom: 168px;
+        display:flex; align-items:flex-start; justify-content:space-between;
+      }
+      .col{
+        position:relative;
+        width: calc(50% - 56px);
+        padding: 8px 8px 8px 0;
+        opacity: 0; will-change: transform, opacity;
+      }
+      .col.left  { padding-right: 0; padding-left: 8px; text-align: left; }
+      .col.right { padding-left: 0; padding-right: 8px; text-align: right; }
+
+      /* 列头小标 */
+      .col-label{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 18px; letter-spacing:.28em;
+        text-transform: uppercase;
+        color: #6B6B66;
+        margin: 0 0 26px;
+        display:flex; align-items:center; gap:14px;
+      }
+      .col.right .col-label{ justify-content: flex-end; }
+      .col-label .dot{
+        width: 8px; height: 8px; border-radius: 50%;
+        background: #6B6B66;
+      }
+      .col.right .col-label .dot{
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 10px color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+      }
+
+      /* 文字条目：等高短杠 + 文字 */
+      .lines{
+        list-style:none; padding:0; margin:0;
+        display:flex; flex-direction:column; gap: 22px;
+      }
+      .col.right .lines{ align-items: flex-end; }
+      .line{
+        display:flex; gap: 16px; align-items:flex-start;
+        font-size: 38px; line-height: 1.32;
+        letter-spacing: -.005em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 70%, transparent);
+        opacity: 0; will-change: transform, opacity;
+      }
+      .col.right .line{
+        flex-direction: row-reverse;
+        color: var(--foreground, #F4EFE7);
+      }
+      .col.left .line .dash{
+        flex:none; margin-top: 22px;
+        width: 28px; height: 2px;
+        background: #6B6B66;
+      }
+      .col.right .line .dash{
+        flex:none; margin-top: 22px;
+        width: 28px; height: 2px;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 10px color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+      }
+
+      /* 中缝：竖线 + 中点小圆 + 顶/底端点 */
+      .seam{
+        position:absolute;
+        top: 200px; bottom: 168px;
+        left: 50%; transform: translateX(-50%);
+        width: 2px;
+        pointer-events:none;
+        opacity: 0;
+      }
+      .seam .line-v{
+        position:absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%);
+        width: 2px;
+        background: linear-gradient(180deg,
+          transparent 0%,
+          color-mix(in srgb, var(--accent, #00FF00) 65%, transparent) 18%,
+          var(--accent, #00FF00) 50%,
+          color-mix(in srgb, var(--accent, #00FF00) 65%, transparent) 82%,
+          transparent 100%);
+        box-shadow: 0 0 14px color-mix(in srgb, var(--accent, #00FF00) 55%, transparent);
+      }
+      .seam .mid{
+        position:absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        width: 14px; height: 14px; border-radius: 50%;
+        background: var(--accent, #00FF00);
+        box-shadow:
+          0 0 0 4px color-mix(in srgb, var(--accent, #00FF00) 18%, transparent),
+          0 0 22px color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+      }
+      .seam .tick{
+        position:absolute; left: 50%; transform: translateX(-50%);
+        width: 6px; height: 6px; border-radius: 50%;
+        background: var(--accent, #00FF00);
+      }
+      .seam .tick.top{ top: 0; }
+      .seam .tick.bot{ bottom: 0; }
+
+      /* 脚注：左名 + 中段小标 + 右名 */
+      .footnote{
+        position:absolute; bottom: 78px; left: 96px; right: 96px;
+        display:flex; align-items:center; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 18px; letter-spacing:.18em;
+        text-transform: uppercase;
+        color: #8A8A85;
+      }
+      .footnote .right-lab{ color: var(--accent, #00FF00); font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="stage-outer" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+
+        <div class="eyebrow">
+          <span id="eyebrowLeft">SPLIT · STAGGER</span>
+          <span><b class="acc">VS</b>&nbsp;&nbsp;<span id="eyebrowRight">PARALLEL · TEXT</span></span>
+        </div>
+
+        <div class="stage">
+          <!-- 左列 -->
+          <div class="col left" id="colLeft">
+            <p class="col-label"><span class="dot"></span><span id="labelLeft">BEFORE</span></p>
+            <ul class="lines" id="linesLeft">
+              <li class="line"><span class="dash"></span><span>流程靠人盯</span></li>
+              <li class="line"><span class="dash"></span><span>跨部门拉群对齐</span></li>
+              <li class="line"><span class="dash"></span><span>出错再回炉返工</span></li>
+              <li class="line"><span class="dash"></span><span>汇报全靠截图与口头</span></li>
+            </ul>
+          </div>
+
+          <!-- 右列 -->
+          <div class="col right" id="colRight">
+            <p class="col-label"><span id="labelRight">AFTER</span><span class="dot"></span></p>
+            <ul class="lines" id="linesRight">
+              <li class="line"><span class="dash"></span><span>结构化卡片沉淀</span></li>
+              <li class="line"><span class="dash"></span><span>上下游语义互通</span></li>
+              <li class="line"><span class="dash"></span><span>实时校验与回放</span></li>
+              <li class="line"><span class="dash"></span><span>看板一键取数</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 中缝分隔线 -->
+        <div class="seam" id="seam">
+          <div class="line-v"></div>
+          <div class="tick top"></div>
+          <div class="mid"></div>
+          <div class="tick bot"></div>
+        </div>
+
+        <!-- 脚注 -->
+        <div class="footnote">
+          <span id="footLeft">BEFORE</span>
+          <span>·</span>
+          <span class="right-lab" id="footRight">AFTER</span>
+        </div>
+
+      </section>
+    </div>
+    <script>
+      /* ----- 变量接线（与全库契约一致） ----- */
+      const fallback = {
+        eyebrow: "BEFORE · AFTER",
+        leftLines: "流程靠人盯\n跨部门拉群对齐\n出错再回炉返工\n汇报全靠截图与口头",
+        rightLines: "结构化卡片沉淀\n上下游语义互通\n实时校验与回放\n看板一键取数",
+        leftLabel: "BEFORE",
+        rightLabel: "AFTER",
+        staggerGap: 0.10,
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const $ = (id) => document.getElementById(id);
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      /* ----- 内容回填 ----- */
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      const setLines = (hostId, raw) => {
+        const ul = $(hostId);
+        if (!ul) return;
+        const lines = String(raw ?? "").split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        const maxN = Math.min(Math.max(lines.length, 1), 6);
+        const padded = lines.slice(0, maxN);
+        while (padded.length < 4) padded.push("");
+        ul.innerHTML = padded.map((t) =>
+          `<li class="line"><span class="dash"></span><span>${escapeHtml(t)}</span></li>`
+        ).join("");
+      };
+
+      // eyebrow 自定义（拆成两半；空串就保持默认）
+      const eb = String(v.eyebrow || fallback.eyebrow);
+      const ebParts = eb.split(/[·\u00b7]/);
+      $("eyebrowLeft").textContent  = (ebParts[0] || "SPLIT · STAGGER").trim();
+      $("eyebrowRight").textContent = (ebParts[1] || "PARALLEL · TEXT").trim();
+
+      $("labelLeft").textContent  = v.leftLabel  || fallback.leftLabel;
+      $("labelRight").textContent = v.rightLabel || fallback.rightLabel;
+      $("footLeft").textContent   = v.leftLabel  || fallback.leftLabel;
+      $("footRight").textContent  = v.rightLabel || fallback.rightLabel;
+      setLines("linesLeft",  v.leftLines  || fallback.leftLines);
+      setLines("linesRight", v.rightLines || fallback.rightLines);
+
+      /* ----- 时间线 ----- */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+      const tl = gsap.timeline({ paused: true });
+
+      const stagger = Math.max(0.04, Math.min(0.18, Number(v.staggerGap) || fallback.staggerGap));
+
+      // 0) eyebrow 错峰先入（避免镜头整体跳变，给一点底色"呼吸"）
+      tl.fromTo(".eyebrow",
+        { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 0);
+
+      // 1) 左列整体淡入 + 微微上移
+      tl.fromTo("#colLeft",
+        { opacity: 0, y: 28 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.10);
+
+      // 2) 左列条目错峰入场（每行从左滑入）
+      tl.fromTo("#linesLeft .line",
+        { opacity: 0, x: -22 },
+        { opacity: 1, x: 0, duration: 0.42, ease: "power2.out", stagger: stagger }, 0.30);
+
+      // 3) 中缝分隔线随后亮起（先 scaleY 0 → 1，再 opacity）
+      tl.fromTo("#seam",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.45, ease: "power2.out" }, 1.55);
+      tl.fromTo("#seam .line-v",
+        { scaleY: 0, transformOrigin: "50% 50%" },
+        { scaleY: 1, duration: 0.55, ease: "power3.out" }, 1.55);
+      tl.fromTo("#seam .mid",
+        { scale: 0 },
+        { scale: 1, duration: 0.45, ease: "back.out(2.0)" }, 1.80);
+
+      // 4) 右列晚一拍入场（整体 + 错峰）
+      tl.fromTo("#colRight",
+        { opacity: 0, y: 28 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 1.95);
+      tl.fromTo("#linesRight .line",
+        { opacity: 0, x: 22 },
+        { opacity: 1, x: 0, duration: 0.42, ease: "power2.out", stagger: stagger }, 2.15);
+
+      // 5) 结尾：两侧同时定格强调——左右列轻微呼吸一次 + 脚注亮起
+      tl.to(["#colLeft", "#colRight"],
+        { scale: 1.02, duration: 0.9, ease: "sine.inOut", yoyo: true, repeat: 1 }, 4.10);
+      tl.fromTo(".footnote",
+        { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 4.50);
+
+      // 中点小圆呼吸贯穿强调（轻微）
+      tl.to("#seam .mid",
+        { scale: 1.25, duration: 1.4, ease: "sine.inOut", yoyo: true, repeat: 2 }, 2.40);
+
+      // 收尾：把整体 opacity 保持到结束，无 fade out（保留定格）
+      tl.to({}, { duration: 0.001 }, DUR - 0.001);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "id": "stack-fan-out",
+  "name": "卡片扇形展开",
+  "description": "一叠卡片从画面中心扇形展开成横排（弧形落位），每张卡依次错峰入场，最后一张用强调色高亮 + 微呼吸；适用方案对比 / 选项罗列 / 能力梯度等叙事。",
+  "category": "对比叙事",
+  "tags": ["对比叙事", "扇形展开", "错峰", "卡片", "高亮", "序列进程"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-20T00:00:00.000Z"
+}

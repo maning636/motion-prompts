@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"text","name":"台词","type":"string","label":"气泡里的一句话","default":"我先剪掉这段"},{"id":"accent","name":"气泡色","type":"color","label":"气泡填充色","default":"#FF6B35"},{"id":"color","name":"字色","type":"color","label":"气泡里的文字颜色","default":"#FFF8EE"},{"id":"edge","name":"描边色","type":"color","label":"气泡硬边 / 阴影色","default":"#241C18"},{"id":"fontSize","name":"字号","type":"number","label":"字号 px（超出气泡自动缩）","default":26},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":2.8}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>对话气泡弹出</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    /* 透明底：这层是挂件，底下是用户自己的实拍 */
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+
+  .p-grp { position: absolute; inset: 0; display: flex;
+           align-items: center; justify-content: center;
+           /* 从左下角（尾巴那头）长出来，像有人刚说完 */
+           transform-origin: 20% 116%; }
+  .p-bwrap { position: relative; display: inline-block; }
+  /* 硬边用 box-shadow 而不是 drop-shadow：body 里装着文字，
+     drop-shadow 会把整棵子树（含字）都复制一份染成描边色，字会多一层脏影。 */
+  .p-bbody {
+    position: relative; padding: 17px 24px; border-radius: 20px;
+    background: var(--ac, #FF6B35);
+    box-shadow: 4px 5px 0 var(--edge, #241C18);
+  }
+  .p-btext {
+    display: inline-block; white-space: nowrap;
+    font-size: var(--fs, 26px); font-weight: 800; line-height: 1.24;
+    letter-spacing: .01em; color: var(--fg, #FFF8EE);
+    transform-origin: 50% 50%;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* 尾巴：硬阴影必须挂在外壳上。filter 在 clip-path 之前渲染，
+     阴影写在切角的那一层会被整片裁掉（实测：切角 + drop-shadow = 没有阴影）。 */
+  .p-btailwrap {
+    position: absolute; left: 26px; bottom: -21px; width: 28px; height: 26px;
+    transform-origin: 50% 0%;
+    filter: drop-shadow(4px 5px 0 var(--edge, #241C18));
+  }
+  .p-btail {
+    position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+    background: var(--ac, #FF6B35);
+    clip-path: polygon(0 0, 100% 0, 14% 100%);
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"我先剪掉这段","accent":"#FF6B35","color":"#FFF8EE","edge":"#241C18","fontSize":26,"duration":2.8};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--fg', v.color || FALLBACK.color);
+  root.style.setProperty('--edge', v.edge || FALLBACK.edge);
+  const dur = parseFloat(v.duration) || 2.8;
+  const fs = parseFloat(v.fontSize) || 26;
+  root.style.setProperty('--fs', fs + 'px');
+  const text = String(v.text == null ? FALLBACK.text : v.text);
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text_, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text_ != null) el.textContent = text_;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  const grp = put('div', 'p-grp', '');
+  const wrap = put('div', 'p-bwrap', '', null, grp);
+  const body = put('div', 'p-bbody', '', null, wrap);
+  const label = put('span', 'p-btext', '', text, body);
+  const tailwrap = put('div', 'p-btailwrap', '', null, wrap);
+  put('div', 'p-btail', '', null, tailwrap);
+
+  const tl = gsap.timeline({ paused: true });
+  /* 注册：云渲染的 settle / 逐帧定位靠 window.__timelines 驱动时间轴 */
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 收口：先量字，再定气泡宽（气泡自己跟着字长宽），超宽才缩字号 */
+  (function fit() {
+    root.style.setProperty('--fs', fs + 'px');
+    const padX = 48;
+    const natural = label.scrollWidth;
+    const maxBody = 380;
+    let need = natural + padX;
+    if (need > maxBody) {
+      const nfs = Math.max(12, Math.floor(fs * (maxBody - padX) / natural));
+      root.style.setProperty('--fs', nfs + 'px');
+      need = maxBody;
+    }
+    body.style.width = need + 'px';
+  })();
+
+  // 弹出：从尾巴那头缩着冒上来
+  tl.fromTo(grp, { scale: .28, opacity: 0 },
+    { scale: 1, opacity: 1, duration: .42, ease: 'back.out(2.2)',
+      immediateRender: false }, 0);
+  // 尾巴被"甩"出来：先拉长再收回
+  tl.fromTo(tailwrap, { scaleY: .12, scaleX: 1.5, rotation: -18 },
+    { scaleY: 1, scaleX: 1, rotation: 0, duration: .42, ease: 'back.out(3)',
+      immediateRender: false }, 0);
+  // 文字最后跟上
+  tl.fromTo(label, { opacity: 0, scale: .72 },
+    { opacity: 1, scale: 1, duration: .26, ease: 'power2.out', immediateRender: false }, .14);
+
+  // 出现后轻微呼吸。repeat 取奇数 = 最后回到 scale 1，定格帧不会停在放大态
+  let br = Math.floor((dur - .75) / 2);
+  if (br < 1) br = 1;
+  if (br % 2 === 0) br -= 1;
+  tl.to(grp, { scale: 1.028, duration: 1, yoyo: true, repeat: br,
+    ease: 'sine.inOut' }, .55);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

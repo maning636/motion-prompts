@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"title","name":"主标题","type":"string","label":"主标题（反白顶部条上的 900 白字）","default":"这张券怎么把价格压下来的"},{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（黑条上的 mono 字）","default":"COUPON / 券后账"},{"id":"basePrice","name":"日常价","type":"number","label":"日常价（元）","default":199},{"id":"coupon","name":"券额","type":"number","label":"减免金额（元）","default":70},{"id":"couponName","name":"券名","type":"string","label":"减免项名称","default":"平台通用券"},{"id":"nowLabel","name":"到手标签","type":"string","label":"到手行标签","default":"券后到手价"},{"id":"note","name":"口径说明","type":"string","label":"底部口径说明（一行 mono）","default":"满 199 可用 · 有效期至 今日 24:00"},{"id":"accent","name":"强调色","type":"color","label":"强调色（到手行色块 / 斜纹带）","default":"#FFD429"},{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–6）","default":5.5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="三行阶梯式价格瀑布：日常价、减免项、券后到手价逐行落位，每行之间 3px 实线分隔，数字右对齐、末行压强调色">
+<title>券后账三行 · 这张券怎么把价格压下来的</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --accent:#FFD429;
+  }
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--paper);color:var(--ink);font-family:var(--sans);
+    display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+  /* 反白标题条（基因 10：整块换底色） */
+  .hd{flex:0 0 auto;display:flex;align-items:baseline;gap:26px;
+    padding:40px 88px 36px;background:var(--ink);color:var(--white);
+    border-bottom:var(--bw) solid var(--ink)}
+  .hd .eb{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-family:var(--mono);font-weight:700;font-size:26px;
+    letter-spacing:.14em;color:var(--yellow)}
+  .hd .tt{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-weight:900;font-size:48px;letter-spacing:0}
+
+  /* 三行阶梯：每行缩进一档，宽度逐级收窄，价格一路往下压 */
+  .ladder{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;
+    justify-content:center;padding:36px 88px;gap:22px;overflow:hidden}
+  .row{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+    gap:36px;padding:26px 40px;background:var(--white);
+    border:var(--bw) solid var(--ink);border-radius:4px;min-width:0}
+  .row .k{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-size:38px;font-weight:700;letter-spacing:0}
+  .row .k .cap{font-family:var(--mono);font-weight:700;font-size:22px;
+    letter-spacing:.12em;color:var(--mute);margin-right:16px}
+  .row .v{flex:0 0 auto;display:block;white-space:nowrap;font-family:var(--mono);
+    font-weight:900;font-size:76px;line-height:1;letter-spacing:0;
+    font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+  .row.minus{width:84%}
+  .row.minus .v{color:var(--pink)}
+  /* 末行整块换强调色并加硬阴影：唯一的重音行 */
+  .row.now{width:100%;background:var(--accent);box-shadow:10px 10px 0 var(--ink);
+    padding:32px 44px}
+  .row.now .k{font-weight:900;font-size:44px}
+  .row.now .v{font-size:128px}
+  .row.now .k .cap{color:var(--ink)}
+
+  .foot{flex:0 0 auto;display:flex;align-items:center;gap:24px;
+    padding:24px 88px;border-top:var(--bw) solid var(--ink)}
+  .foot .dot{flex:0 0 auto;width:22px;height:22px;background:var(--accent);
+    border:var(--bw) solid var(--ink);border-radius:4px}
+  .foot .tx{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-family:var(--mono);font-weight:700;font-size:24px;
+    letter-spacing:.08em}
+
+  .stripe{flex:0 0 auto;height:20px;border-top:var(--bw) solid var(--ink);
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+
+  @media (prefers-reduced-motion: reduce){
+    .anim{transition-duration:.01ms !important;animation-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="hd anim" id="hd">
+    <span class="eb anim" id="eyebrow" data-fit-max="26" data-fit-min="16">COUPON / 券后账</span>
+    <span class="tt anim" id="title" data-fit-max="48" data-fit-min="26">这张券怎么把价格压下来的</span>
+  </div>
+
+  <div class="ladder anim" id="ladder">
+    <div class="row anim" id="rowA">
+      <span class="k"><span class="cap">01</span>日常价</span>
+      <span class="v anim" id="basePrice" data-fit-max="76" data-fit-min="40">¥199</span>
+    </div>
+    <div class="row minus anim" id="rowB">
+      <span class="k"><span class="cap">02</span><span id="couponName" data-fit-max="38" data-fit-min="20">平台通用券</span></span>
+      <span class="v anim" id="coupon" data-fit-max="76" data-fit-min="40">−¥70</span>
+    </div>
+    <div class="row now anim" id="rowC">
+      <span class="k"><span class="cap">03</span><span id="nowLabel" data-fit-max="44" data-fit-min="24">券后到手价</span></span>
+      <span class="v anim" id="nowPrice" data-fit-max="128" data-fit-min="64">¥129</span>
+    </div>
+  </div>
+
+  <div class="foot anim" id="foot">
+    <span class="dot"></span>
+    <span class="tx anim" id="note" data-fit-max="24" data-fit-min="15">满 199 可用 · 有效期至 今日 24:00</span>
+  </div>
+
+  <div class="stripe anim" id="stripe"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  ['eyebrow', 'title', 'couponName', 'nowLabel', 'note']
+    .forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+
+  /* 到手价是算出来的：base − coupon。表单上只暴露前两项，
+     不让同一个数字在两处各填一遍（iart 非协商规则）。 */
+  var base = Number(v.basePrice), off = Number(v.coupon);
+  if (!isFinite(base)) base = 0;
+  if (!isFinite(off)) off = 0;
+  off = Math.max(0, Math.min(base, Math.round(off)));
+  var now = base - off;
+  set('basePrice', '¥' + base);
+  set('coupon', '−¥' + off);
+  set('nowPrice', '¥' + now);
+
+  B.fitAll();
+  var tl = B.tl();
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (reduce) {
+    gsap.set('.anim', { x: 0, y: 0, scale: 1, scaleX: 1, rotate: 0 });
+    tl.fromTo('#hd',     { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, 0);
+    tl.fromTo('#ladder', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .15);
+    tl.fromTo('#foot',   { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .35);
+    tl.fromTo('#stripe', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, .5);
+    B.hold(tl, 1.2, 1.1);
+    return;
+  }
+
+  var INK = '#0F0F0F';
+  function slam(sel, at, dx, dy, d) {
+    tl.fromTo(sel, { x: dx, y: dy },
+      { x: 0, y: 0, duration: d, ease: 'power4.out' }, at);
+  }
+
+  slam('#hd',       0.00,   0, -80, 0.26);
+  slam('#eyebrow',  0.14, -24, -20, 0.22);
+  slam('#title',    0.22,   0, -20, 0.24);
+  /* 三行硬着陆：每行都从左侧画外切入，宽度逐级收窄，读出来就是一条下降的台阶 */
+  tl.fromTo('#rowA', { x: -120 }, { x: 0, duration: .28, ease: 'power4.out' }, 0.50);
+  tl.fromTo('#rowB', { x: -120 }, { x: 0, duration: .28, ease: 'power4.out' }, 0.86);
+  tl.fromTo('#rowC', { x: -120 }, { x: 0, duration: .3,  ease: 'power4.out' }, 1.24);
+  slam('#basePrice', 0.70,   0, -24, 0.24);
+  slam('#coupon',    1.06,   0, -24, 0.24);
+  slam('#nowPrice',  1.46,   0, -24, 0.26);
+  /* 模 9 阴影档位脉冲：末行数字停稳的瞬间换一次档再换回来 */
+  tl.to('#rowC', { boxShadow: '8px 8px 0 ' + INK, duration: .06, ease: 'steps(2)' }, 1.76);
+  tl.to('#rowC', { boxShadow: '10px 10px 0 ' + INK, duration: .06, ease: 'steps(2)' }, 1.82);
+  slam('#foot',     1.92,   0,  28, 0.26);
+  slam('#note',     2.04, -24, -20, 0.22);
+  slam('#stripe',   2.14,   0,  24, 0.24);
+  tl.fromTo('#stripe', { backgroundPositionX: '0px' },
+    { backgroundPositionX: '60px', duration: 1.1, ease: 'none' }, 2.38);
+
+  var introEnd = 3.48;
+  var total = Math.min(6, Math.max(5, Number(v.duration) || 5.5));
+  B.hold(tl, introEnd, Math.max(0.6, total - introEnd));
+})();
+</script>
+</body></html>

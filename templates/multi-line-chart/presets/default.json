@@ -1,0 +1,14 @@
+{
+  "title": "模型能力演进",
+  "subtitle": "多模型评分趋势对比",
+  "labels": "2023,2024 Q1,2024 Q3,2025",
+  "series1Label": "GPT-4",
+  "series1Values": "65,78,85,91",
+  "series2Label": "Claude",
+  "series2Values": "60,72,80,87",
+  "series3Label": "Gemini",
+  "series3Values": "55,68,75,84",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

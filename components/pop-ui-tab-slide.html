@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"label","name":"控件文案","type":"string","label":"控件说明文案","default":"面板切换"},{"id":"tabs","name":"页签","type":"string","label":"三个页签名（逗号分隔）","default":"剪辑,音频,字幕"},{"id":"notes","name":"面板文字","type":"string","label":"三行面板文字（逗号分隔）","default":"拼接与裁切,配乐与混音,字幕与标题"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.4}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>页签指示滑块</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-halo { position: absolute; inset: 0;
+    background: radial-gradient(64% 76% at 50% 48%,
+      rgba(0,0,0,.56) 0%, rgba(0,0,0,.30) 54%, rgba(0,0,0,0) 84%); }
+  .p-label { position: absolute; font-size: 11px; font-weight: 700; letter-spacing: .18em;
+    color: rgba(255,248,238,.6); white-space: nowrap; }
+  .p-tabs { position: absolute; left: 96px; top: 96px; width: 288px; height: 30px; }
+  .p-tab { position: absolute; top: 0; height: 30px; display: flex;
+    align-items: center; justify-content: center; white-space: nowrap;
+    font-size: 13px; font-weight: 800; color: rgba(255,248,238,.55); }
+  /* 指示块压在页签文字下面 */
+  .p-ind { position: absolute; left: 96px; top: 96px; width: 92px; height: 30px;
+    border-radius: 15px; background: var(--ac);
+    box-shadow: 0 4px 12px rgba(0,0,0,.35); }
+  .p-body { position: absolute; left: 96px; top: 146px; width: 288px; height: 56px;
+    border-radius: 12px; background: rgba(255,248,238,.06);
+    border: 1.5px solid rgba(255,248,238,.16); overflow: hidden; }
+  .p-pane { position: absolute; left: 0; top: 0; width: 288px; height: 56px;
+    display: flex; align-items: center; padding: 0 16px; }
+  /* 文字装一层 inline-block 才量得到真实排版宽：直接量 288px 的块级
+     永远得到 288（scrollWidth 不小于 clientWidth）。 */
+  .p-pane-in { display: inline-block; font-size: 13px; font-weight: 600;
+    color: #FFF8EE; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"label":"面板切换","tabs":"剪辑,音频,字幕","notes":"拼接与裁切,配乐与混音,字幕与标题","accent":"#FF6B35","duration":3.4};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || 3.4;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  const fits = [];
+  function fit(list) { fits.push.apply(fits, list); }
+  function runFit() {
+    fits.forEach((f) => {
+      const el = f.el;
+      el.style.fontSize = f.max + 'px';
+      const avail = f.box || el.clientWidth;
+      const ws = el.style.whiteSpace;
+      el.style.whiteSpace = 'nowrap';
+      const natural = el.scrollWidth;
+      el.style.whiteSpace = ws;
+      if (natural > avail) {
+        el.style.fontSize = Math.max(f.min, Math.floor(f.max * avail / natural)) + 'px';
+      }
+    });
+  }
+  function list3(s, fb) {
+    const a = String(s == null ? '' : s).split(/[,，|]/);
+    const out = [];
+    for (let i = 0; i < 3; i++) {
+      const t = (a[i] || '').trim();
+      out.push(t || fb[i]);
+    }
+    return out;
+  }
+
+  put('div', 'p-halo');
+  const label = put('div', 'p-label', 'left:96px; top:56px;', v.label || FALLBACK.label);
+  const tabWrap = put('div', 'p-tabs');
+  const ind = put('div', 'p-ind');
+  const body = put('div', 'p-body');
+
+  const names = list3(v.tabs, list3(FALLBACK.tabs, ['剪辑', '音频', '字幕']));
+  const notes = list3(v.notes, list3(FALLBACK.notes, ['拼接与裁切', '配乐与混音', '字幕与标题']));
+  const STEP = 98;
+  const tabs = names.map(function (s, i) {
+    return put('div', 'p-tab', 'left:' + (i * STEP) + 'px; width:92px;', s, tabWrap);
+  });
+  const panes = notes.map(function (s) {
+    const pane = put('div', 'p-pane', '', null, body);
+    put('div', 'p-pane-in', '', s, pane);
+    return pane;
+  });
+
+  fit([{ el: label, max: 11, min: 9, box: 288 }]
+    .concat(tabs.map((el) => ({ el: el, max: 13, min: 10, box: 92 })))
+    .concat(panes.map((el) => ({ el: el.firstChild, max: 13, min: 10, box: 256 }))));
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 指示块位移与面板淡入淡出都由时间算出，任意 seek 都能重放。 */
+  const A1 = 0.86, A2 = 1.76, SEG = 0.48, FADE = 0.26;
+  const clamp01 = (x) => x < 0 ? 0 : (x > 1 ? 1 : x);
+  const outBack = (x) => { const c1 = 1.9, c3 = 2.9, u = x - 1; return 1 + c3 * u * u * u + c1 * u * u; };
+  function indX(t) {
+    if (t < A1) return 0;
+    if (t < A1 + SEG) return STEP * outBack(clamp01((t - A1) / SEG));
+    if (t < A2) return STEP;
+    return STEP + STEP * outBack(clamp01((t - A2) / SEG));
+  }
+  function mixCol(k) {
+    const r = Math.round(255 + (36 - 255) * k);
+    const g = Math.round(248 + (26 - 248) * k);
+    const b = Math.round(238 + (20 - 238) * k);
+    const a = 0.55 + 0.45 * k;
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + a.toFixed(3) + ')';
+  }
+  function paint() {
+    const t = tl.time();
+    const x = indX(t);
+    ind.style.transform = 'translateX(' + x.toFixed(2) + 'px)';
+    ind.style.opacity = clamp01(t / 0.22).toFixed(3);
+    for (let i = 0; i < 3; i++) {
+      const w = clamp01(1 - Math.abs(x + 46 - (i * STEP + 46)) / 58);
+      tabs[i].style.color = mixCol(w);
+      const t0 = i === 0 ? -2 : (i === 1 ? A1 - 0.05 : A2 - 0.05);
+      const t1 = i === 0 ? A1 - 0.05 : (i === 1 ? A2 - 0.05 : 99);
+      const o = clamp01((t - t0) / FADE) * (1 - clamp01((t - t1) / FADE));
+      panes[i].style.opacity = o.toFixed(3);
+      panes[i].style.transform = 'translateY(' + ((1 - o) * 9).toFixed(2) + 'px)';
+    }
+    body.style.opacity = clamp01((t - 0.1) / 0.28).toFixed(3);
+  }
+  tl.to({}, { duration: dur, onUpdate: paint }, 0);
+
+  tl.fromTo(label, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .3 }, .04);
+  tl.fromTo(tabWrap, { opacity: 0, y: -8 },
+    { opacity: 1, y: 0, duration: .34, ease: 'back.out(2)' }, .08);
+  /* opacity 由 paint 统一算（面板整体随时间淡入），这里只补一个弹出的缩放，
+     两边都写 opacity 会打架：paint 在时间轴里先渲染，GSAP 后渲染会盖回去。 */
+  tl.fromTo(body, { scaleY: .7 },
+    { scaleY: 1, duration: .34, ease: 'back.out(1.8)' }, .16);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  runFit();
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

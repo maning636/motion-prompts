@@ -1,0 +1,14 @@
+{
+  "eyebrow": "INPUT DEMO · TYPE / BACKSPACE / RE-TYPE",
+  "title": "打错，删掉，再对一次",
+  "subTitle": "输入过程中的自我纠正",
+  "prefix": "npm install ",
+  "errorText": "fack",
+  "correctText": "fastify",
+  "suffix": " --save",
+  "errorMsg": "拼写错误 · 回退重打",
+  "okMsg": "包已安装 · 2.1s",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

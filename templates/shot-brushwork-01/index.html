@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "cap", "type": "string", "label": "顶部小字", "default": "PRODUCT LAUNCH · 2026"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#cap{ position:absolute; left:0; right:0; top:150px; text-align:center; font-size:24px;
+  letter-spacing:8px; color:#B8B8B8; opacity:.75; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+#svgWrap{ position:absolute; left:50%; top:50%; width:920px; height:280px; margin:-160px 0 0 -460px;
+  will-change:transform; }
+.seg{ stroke:var(--fg); stroke-width:44; stroke-linecap:square; display:none; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4.7" data-width="1920" data-height="1080">
+
+<div id="cap"></div>
+<div id="svgWrap">
+  <svg width="920" height="280" viewBox="0 0 920 280"><line class="seg" id="s0" x1="290" y1="30" x2="390" y2="30"/><line class="seg" id="s1" x1="780" y1="240" x2="900" y2="240"/><line class="seg" id="s2" x1="60" y1="30" x2="170" y2="30"/><line class="seg" id="s3" x1="525" y1="240" x2="575" y2="30"/><line class="seg" id="s4" x1="410" y1="60" x2="410" y2="210"/><line class="seg" id="s5" x1="200" y1="150" x2="200" y2="210"/><line class="seg" id="s6" x1="760" y1="30" x2="760" y2="240"/><line class="seg" id="s7" x1="605" y1="30" x2="655" y2="240"/><line class="seg" id="s8" x1="270" y1="60" x2="270" y2="210"/><line class="seg" id="s9" x1="60" y1="240" x2="180" y2="240"/><line class="seg" id="s10" x1="290" y1="240" x2="390" y2="240"/><line class="seg" id="s11" x1="30" y1="60" x2="30" y2="210"/><line class="seg" id="s12" x1="548" y1="155" x2="632" y2="155"/><line class="seg" id="s13" x1="120" y1="135" x2="200" y2="135"/></svg>
+</div>
+
+    </div>
+    <script>
+      const FB = {"cap": "PRODUCT LAUNCH · 2026", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#cap').textContent=v.cap||'';
+const SEGS=[[0, 12.0, 0.0], [1, 12.0, 0.0], [2, 12.0, 0.0], [3, 2.8, -11.7], [4, 0.0, 12.0], [5, 0.0, 12.0], [6, 0.0, 12.0], [7, 2.8, 11.7], [8, 0.0, 12.0], [9, 12.0, 0.0], [10, 12.0, 0.0], [11, 0.0, 12.0], [12, 12.0, 0.0], [13, 12.0, 0.0]];
+SEGS.forEach((s,i)=>{
+  const el=document.getElementById('s'+s[0]);
+  const t=12+6*i; // 段间隔 6f 错峰
+  tl.set(el,{display:'block'},F(t));
+  tl.fromTo(el,{opacity:0,x:-s[1],y:-s[2]},{opacity:1,x:0,y:0,duration:F(6),ease:'power3.out'},F(t));
+});
+// 末段落位帧：整字 scale 1→1.10→1 脉冲 8f
+tl.to('#svgWrap',{scale:1.10,duration:F(4),ease:'power2.in'},F(96));
+tl.to('#svgWrap',{scale:1,duration:F(4),ease:'power2.out'},F(100));
+tl.to({},{duration:F(37)},F(104));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

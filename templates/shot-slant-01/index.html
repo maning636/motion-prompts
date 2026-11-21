@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#vp{ position:absolute; inset:0; overflow:hidden; }
+.sec{ position:absolute; left:0; top:170px; width:1080px; height:740px; border-radius:28px;
+  padding:70px 64px; transform-origin:left center; will-change:transform,opacity,filter;
+  background:#101018; border:1px solid color-mix(in srgb, var(--fg) 10%, transparent); }
+.sec .sk{ font-size:20px; letter-spacing:7px; color:var(--accent); font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+.sec h2{ margin-top:20px; font-size:72px; font-weight:900; }
+.sec .sr{ height:16px; border-radius:8px; margin-top:28px; background:color-mix(in srgb, var(--fg) 14%, transparent); }
+.mini{ display:flex; gap:22px; margin-top:40px; }
+.mini .mc{ flex:1; height:150px; border-radius:14px; background:color-mix(in srgb, var(--accent) 16%, transparent);
+  border:1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.bignum{ display:flex; gap:50px; margin-top:46px; }
+.bignum .bn{ font-size:92px; font-weight:900; color:var(--accent); }
+.ghostL{ pointer-events:none; opacity:0; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4.0" data-width="1920" data-height="1080">
+
+<div id="vp"><div class="sec"><div class="sk">SECTION 01</div><h2>巡览开篇</h2><div class="sr" style="width:62%"></div><div class="sr" style="width:48%"></div><div class="sr" style="width:55%"></div></div><div class="sec"><div class="sk">SECTION 02</div><h2>功能矩阵</h2><div class="sr" style="width:58%"></div><div class="sr" style="width:44%"></div><div class="mini"><div class="mc"></div><div class="mc"></div><div class="mc"></div></div></div><div class="sec"><div class="sk">SECTION 03</div><h2>关键数字</h2><div class="sr" style="width:50%"></div><div class="bignum"><div class="bn">87</div><div class="bn">12K</div><div class="bn">99%</div></div></div><div class="sec"><div class="sk">SECTION 04</div><h2>案例陈列</h2><div class="sr" style="width:56%"></div><div class="sr" style="width:42%"></div></div><div class="sec"><div class="sk">SECTION 05</div><h2>收尾定版</h2><div class="sr" style="width:60%"></div><div class="sr" style="width:46%"></div></div></div>
+
+    </div>
+    <script>
+      const FB = {"accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+// 2.5D 手动投影：近端锚点 R=1500（屏幕右侧近、左侧远）
+// wx >= R：平铺滑出右缘；wx < R：向远压缩 sx = R - d*0.5*P(d)
+const R=1500, KW=0.87, STRIDE=1160, N=5, X0=60;
+const vp=$('#vp');
+const secs=Array.prototype.slice.call(vp.querySelectorAll('.sec'));
+// 速度重影：每块 section 克隆两层
+const ghosts=secs.map(s=>{
+  const a=s.cloneNode(true); a.classList.add('ghostL');
+  const b=s.cloneNode(true); b.classList.add('ghostL');
+  vp.insertBefore(b,s); vp.insertBefore(a,s);
+  return [a,b];
+});
+function cb(x1,y1,x2,y2){return function(x){
+  let t=x;
+  const cx=3*x1,bx=3*(x2-x1)-cx,ax=1-cx-bx;
+  for(let i=0;i<5;i++){
+    const f=((ax*t+bx)*t+cx)*t-x, d=(3*ax*t+2*bx)*t+cx;
+    if(Math.abs(d)<1e-4)break; t-=f/d;
+  }
+  t=Math.max(0,Math.min(1,t));
+  const cy=3*y1,by=3*(y2-y1)-cy,ay=1-cy-by;
+  return ((ay*t+by)*t+cy)*t;
+};}
+const ease=cb(0.3,0.12,0.72,0.9);
+// 滑移量 s：f0 时 section1 落在锚点附近，f120 时 section5 滑到锚点
+const S0=1440, S1=-3200;
+function sAt(f){const p=Math.max(0,Math.min(1,f/120));return S0+(S1-S0)*ease(p);}
+function P(d){return R/(R+d*KW);}
+function proj(wx){
+  if(wx>=R) return {x:wx,p:1,d:0};
+  const d=R-wx, p=P(d);
+  return {x:R-d*0.5*p, p:p, d:d};
+}
+function lay(el,wx,bright){
+  const a=proj(wx);
+  el.style.transform='translateX('+a.x.toFixed(1)+'px) scale('+a.p.toFixed(4)+')';
+  el.style.filter='brightness('+(bright*(1-0.35*Math.min(1,a.d/4000))).toFixed(3)+')';
+}
+const sim={f:0};
+function paint(){
+  const f=sim.f;
+  const s=sAt(f);
+  const bright=0.7+0.3*Math.min(1,f/42);   // 由暗揭亮
+  const vel=Math.abs(sAt(f)-sAt(f-1));
+  for(let i=0;i<N;i++){
+    const wx=X0+i*STRIDE+s;
+    lay(secs[i],wx,bright);
+    const g=ghosts[i];
+    lay(g[0],X0+i*STRIDE+sAt(f-2.5),bright);
+    lay(g[1],X0+i*STRIDE+sAt(f-5),bright);
+    g[0].style.opacity=(Math.min(1,vel/140)*0.30).toFixed(3);
+    g[1].style.opacity=(Math.min(1,vel/140)*0.18).toFixed(3);
+  }
+}
+paint();
+tl.to(sim,{f:120,duration:F(120),ease:'none',onUpdate:paint},0);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

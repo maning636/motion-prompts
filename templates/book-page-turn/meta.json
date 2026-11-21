@@ -1,0 +1,12 @@
+{
+  "id": "book-page-turn",
+  "name": "书页翻页转场（沿书脊掀起）",
+  "series": "page",
+  "createdAt": "2026-08-15T08:10:00.000Z",
+  "energy": "中",
+  "suggestedDuration": 5,
+  "knownPitfalls": [
+    "两张页面图都建议竖版 3:4，横版会被 cover 裁两侧",
+    "翻页靠 transform-origin 左书脊 rotateY，翻过 90° 后页面淡出，勿把翻页时长拉到 1.5s 以上会显假"
+  ]
+}

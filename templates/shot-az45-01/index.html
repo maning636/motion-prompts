@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "titleA", "type": "string", "label": "旧页标题", "default": "昨日数据"}, {"id": "titleB", "type": "string", "label": "新页标题", "default": "今日实时"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+.page{ position:absolute; inset:0; padding:80px; }
+.page h2{ font-size:56px; color:var(--fg); margin-bottom:44px; }
+.pc{ position:absolute; width:420px; height:260px; border-radius:16px; background:#15151C;
+  border:1px solid rgba(255,255,255,.09); padding:24px; }
+.pc .pt{ height:16px; width:52%; border-radius:8px; background:rgba(255,255,255,.22); margin-bottom:14px; }
+.pc .pl{ height:11px; border-radius:6px; background:rgba(255,255,255,.11); margin-bottom:9px; }
+.pc.hot{ border-color:var(--accent); } .pc.hot .pt{ background:var(--accent); }
+#pageB{ clip-path:polygon(960px 540px, 960px 540px); }
+#scan{ position:absolute; inset:0; pointer-events:none; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+<div class="page" id="pageA"><h2 id="ta"></h2><div style="position:relative"><div class="pc" style="left:80px;top:240px"><div class="pt"></div><div class="pl"></div><div class="pl" style="width:70%"></div></div><div class="pc hot" style="left:560px;top:240px"><div class="pt"></div><div class="pl"></div><div class="pl" style="width:70%"></div></div><div class="pc" style="left:1040px;top:240px"><div class="pt"></div><div class="pl"></div><div class="pl" style="width:70%"></div></div><div class="pc" style="left:320px;top:580px"><div class="pt"></div><div class="pl"></div><div class="pl" style="width:70%"></div></div><div class="pc" style="left:800px;top:580px"><div class="pt"></div><div class="pl"></div><div class="pl" style="width:70%"></div></div><div class="pc" style="left:1280px;top:580px"><div class="pt"></div><div class="pl"></div><div class="pl" style="width:70%"></div></div></div></div><div class="page" id="pageB"><h2 id="tb"></h2><div style="position:relative"><div class="pc" style="left:180px;top:260px"><div class="pt"></div><div class="pl"></div><div class="pl" style="width:70%"></div></div><div class="pc" style="left:660px;top:260px"><div class="pt"></div><div class="pl"></div><div class="pl" style="width:70%"></div></div><div class="pc" style="left:1140px;top:260px"><div class="pt"></div><div class="pl"></div><div class="pl" style="width:70%"></div></div><div class="pc hot" style="left:420px;top:600px"><div class="pt"></div><div class="pl"></div><div class="pl" style="width:70%"></div></div><div class="pc" style="left:900px;top:600px"><div class="pt"></div><div class="pl"></div><div class="pl" style="width:70%"></div></div><div class="pc" style="left:1380px;top:600px"><div class="pt"></div><div class="pl"></div><div class="pl" style="width:70%"></div></div></div></div><svg id="scan" width="1920" height="1080" viewBox="0 0 1920 1080"><g id="sg"><line x1="960" y1="540" x2="960" y2="-860" stroke="#fff" stroke-width="26" opacity=".35"/><line x1="960" y1="540" x2="960" y2="-860" stroke="#fff" stroke-width="13" opacity=".6"/><line x1="960" y1="540" x2="960" y2="-860" stroke="#000" stroke-width="9" opacity=".55"/><line x1="960" y1="540" x2="960" y2="-860" stroke="#fff" stroke-width="4"/></g></svg>
+    </div>
+    <script>
+      const FB = {"titleA": "昨日数据", "titleB": "今日实时", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#ta').textContent=v.titleA||'';$('#tb').textContent=v.titleB||'';
+// 扇形 clip：中心(960,540) R=1400，SEGS=72 顶点防锯齿；指针纯 linear 扫 360°
+const SEGS=72, CX=960, CY=540, R=1400;
+const clip=(deg)=>{
+  let pts=[CX+'px '+CY+'px'];
+  const steps=Math.max(1,Math.round(SEGS*deg/360));
+  for(let i=0;i<=steps;i++){
+    const a=(-90+deg*i/steps)*Math.PI/180;
+    pts.push((CX+R*Math.cos(a)).toFixed(1)+'px '+(CY+R*Math.sin(a)).toFixed(1)+'px');
+  }
+  return 'polygon('+pts.join(',')+')';
+};
+const p={ang:0}, pb=$('#pageB');
+tl.to(p,{ang:360,duration:F(60),ease:'none',onUpdate:()=>{
+  pb.style.clipPath=clip(p.ang);
+  $('#sg').setAttribute('transform','rotate('+p.ang+' 960 540)');
+}},F(20));
+// 亮线淡出与摘罩同帧衔接
+tl.to('#sg',{opacity:0,duration:F(6)},F(80));
+tl.set('#sg',{display:'none'},F(86));
+tl.set(pb,{clipPath:'none'},F(86));
+tl.to({},{duration:F(64)},F(86)); // 真静止 ≥40f
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

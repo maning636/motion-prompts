@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "图表标题", "default": "2024 年度业绩"}, {"id": "subtitle", "type": "string", "label": "副标题", "default": "各部门季度销售额对比"}, {"id": "labels", "type": "string", "label": "标签（逗号分隔）", "default": "Q1,Q2,Q3,Q4,全年"}, {"id": "values", "type": "string", "label": "数值（逗号分隔）", "default": "45,72,58,91,85"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+*{ box-sizing: border-box; }
+html, body{ margin:0; width:1920px; height:1080px; overflow:hidden; background: var(--background, #F5F0E6); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #F5F0E6); color: var(--foreground, #1D1D20);
+  font-family:'Noto Sans SC','PingFang SC',sans-serif; }
+.scene{ position:absolute; inset:0; padding:64px 80px; }
+.card{ background:#FFFDF7; border:3px solid #1D1D20; border-radius:16px; box-shadow:6px 6px 0 #2A292B; }
+.tape{ position:absolute; width:120px; height:32px; background:rgba(185,232,51,.6); border:2px solid #1D1D20;
+  border-radius:4px; transform:rotate(-5deg); z-index:5; }
+.tape.pink{ background:rgba(241,59,136,.35); transform:rotate(4deg); }
+.tape.blue{ background:rgba(62,123,242,.3); transform:rotate(-3deg); }
+.chip{ display:inline-flex; align-items:center; gap:8px; padding:6px 14px; background:#FFFDF7; border:3px solid #1D1D20;
+  border-radius:999px; font-family:'Fredoka','Arial Rounded MT Bold',sans-serif; font-weight:700; font-size:18px;
+  letter-spacing:.1em; text-transform:uppercase; white-space:nowrap; box-shadow:4px 4px 0 #2A292B; }
+.chip.lime{ background:#B9E833; } .chip.blue{ background:#3E7BF2; color:#FFFDF7; }
+.chip.pink{ background:#F13B88; color:#FFFDF7; } .chip.orange{ background:#FF9F1C; }
+.num{ font-family:'Fredoka','Arial Rounded MT Bold',sans-serif; font-weight:700; }
+.mono{ font-family:'IBM Plex Mono','JetBrains Mono',monospace; font-weight:700; }
+.dashline{ border:none; border-top:3px dashed #1D1D20; }
+</style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="card" style="position:absolute;left:60px;top:60px;padding:18px 30px;">
+          <span class="chip lime">CHART</span>
+          <h1 id="title" class="num" style="display:inline-block;margin:0 0 0 18px;font-size:44px;vertical-align:middle;"></h1>
+          <p id="subtitle" style="margin:8px 0 0;font-size:20px;color:#4D4A48;"></p>
+        </div>
+        <span class="tape" style="left:56px;top:48px;"></span>
+        <div class="card" style="position:absolute;left:80px;right:80px;top:250px;bottom:90px;padding:44px 48px 70px;">
+          <div id="plot" style="width:100%;height:100%;display:flex;align-items:flex-end;gap:34px;border-bottom:4px solid #1D1D20;padding:0 16px;"></div>
+        </div>
+        <span class="tape pink" style="right:100px;top:232px;"></span>
+        <style>
+          .cw{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; position:relative; }
+          .cb{ width:70%; max-width:140px; border:3px solid #1D1D20; border-bottom:none; border-radius:12px 12px 0 0;
+            background:#3E7BF2; transform:scaleY(0); transform-origin:bottom; box-shadow:5px 0 0 rgba(42,41,43,.25); }
+          .cb.hot{ background:#B9E833; }
+          .cv{ font-size:28px; margin-bottom:8px; opacity:0; }
+          .cl{ position:absolute; bottom:-48px; font-size:20px; font-weight:700; color:#4D4A48; opacity:0; }
+        </style>
+
+      </section>
+    </div>
+    <script>
+      const fallback = {"title": "2024 年度业绩", "subtitle": "各部门季度销售额对比", "labels": "Q1,Q2,Q3,Q4,全年", "values": "45,72,58,91,85", "colors": "#00FF00,#00FF00,#6B7280,#00FF00,#6B7280", "accent": "#00FF00", "background": "#12100E", "foreground": "#F4EFE7"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.documentElement.style.setProperty("--accent", v.accent ?? "#00FF00");
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const DUR = 6;
+      const countTo = (el, target, at, dur = 1.1, dec = 0) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(target) || 0, duration: dur, ease: "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+
+      $("title").textContent = v.title; $("subtitle").textContent = v.subtitle;
+      const labels = split(v.labels), values = split(v.values).map(Number);
+      const max = Math.max(...values, 1), maxIdx = values.indexOf(max);
+      const plot = $("plot");
+      const bars = labels.map((lab, i) => {
+        const w = document.createElement("div"); w.className = "cw";
+        w.innerHTML = `<span class="cv num">0</span><div class="cb ${i === maxIdx ? "hot" : ""}" style="height:${(values[i] / max) * 86}%"></div><span class="cl">${lab}</span>`;
+        plot.appendChild(w);
+        return { val: w.querySelector(".cv"), target: values[i] };
+      });
+      tl.fromTo(".card", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.15, ease: "power3.out" }, 0.1);
+      tl.to(".cb", { scaleY: 1, duration: 0.7, ease: "back.out(1.4)", stagger: 0.09 }, 0.6);
+      bars.forEach((b, i) => { countTo(b.val, b.target, 0.7 + i * 0.09, 0.6); tl.to(b.val, { opacity: 1, duration: 0.2 }, 0.7 + i * 0.09); });
+      tl.to(".cl", { opacity: 1, duration: 0.3, stagger: 0.05 }, 1.3);
+      tl.fromTo(".tape", { scale: 0 }, { scale: 1, duration: 0.4, ease: "back.out(2.5)", stagger: 0.1 }, 0.3);
+      tl.to(".scene", { opacity: 0, y: -30, duration: 0.5 }, DUR - 0.6);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

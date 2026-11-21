@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"accent","name":"强调色","type":"color","label":"轨迹色","default":"#FFC93C"},{"id":"accent2","name":"次强调","type":"color","label":"箭头色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>虚线轨迹生长</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+
+  .p-td-halo {
+    position: absolute; left: 30px; top: 20px; width: 420px; height: 230px;
+    background: radial-gradient(62% 66% at 50% 50%,
+      rgba(0, 0, 0, .46) 0%, rgba(0, 0, 0, .22) 56%, rgba(0, 0, 0, 0) 86%);
+  }
+  .p-td-svg { position: absolute; left: 0; top: 0; width: 480px; height: 270px; overflow: visible; }
+  /* 弧形虚线主轨 */
+  .p-td-path {
+    fill: none; stroke: var(--ac, #FFC93C); stroke-width: 4;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  /* 底层一条极淡的实线，交代"这里本来有一条路" */
+  .p-td-ghost {
+    fill: none; stroke: rgba(255, 248, 238, .16); stroke-width: 2;
+    stroke-linecap: round; opacity: 0; will-change: opacity;
+  }
+  /* 起点小方块 */
+  .p-td-node {
+    fill: var(--ac, #FFC93C); opacity: 0; will-change: transform, opacity;
+  }
+  /* 末端箭头（一个三角形，运行时算好位置和角度） */
+  .p-td-head { fill: var(--ac2, #FF6B35); opacity: 0; will-change: transform, opacity; }
+  .p-td-haloRing { fill: none; stroke: var(--ac2, #FF6B35); stroke-width: 2; opacity: 0; will-change: transform, opacity; }
+  .p-td-tip {
+    position: absolute; font-size: 12px; font-weight: 800; letter-spacing: .12em;
+    color: #FFF8EE; white-space: nowrap; opacity: 0;
+    will-change: transform, opacity;
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"accent":"#FFC93C","accent2":"#FF6B35","duration":3};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--ac2', v.accent2 || FALLBACK.accent2);
+  const dur = parseFloat(v.duration) || 3;
+
+  const stage = document.getElementById('stage');
+  const NS = 'http://www.w3.org/2000/svg';
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  function svgPut(tag, cls, attrs, parent) {
+    const el = document.createElementNS(NS, tag);
+    if (cls) el.setAttribute('class', cls);
+    if (attrs) for (const k in attrs) el.setAttribute(k, attrs[k]);
+    (parent || svg).appendChild(el);
+    return el;
+  }
+  put('div', 'p-td-halo');
+  const tip = put('div', 'p-td-tip', null, 'ARRIVE', stage);
+
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('class', 'p-td-svg');
+  svg.setAttribute('viewBox', '0 0 480 270');
+  svg.setAttribute('width', '480');
+  svg.setAttribute('height', '270');
+  stage.appendChild(svg);
+
+  /* 一条从左下到右上的弧（控制点写死在 d 里，路径长度运行时量） */
+  const D = 'M 40 214 C 128 214 132 78 240 78 C 336 78 344 186 434 186';
+  const ghost = svgPut('path', 'p-td-ghost', { d: D });
+  const path = svgPut('path', 'p-td-path', { d: D });
+  const node = svgPut('rect', 'p-td-node', { width: 12, height: 12, x: 34, y: 208, rx: 3 });
+  const ring = svgPut('circle', 'p-td-haloRing', { cx: 434, cy: 186, r: 13 });
+  const head = svgPut('path', 'p-td-head',
+    { d: 'M 0 -11 L 19 0 L 0 11 L 5.5 0 Z' });
+
+  /* 路径长度运行时取，不写死数值 */
+  const L = path.getTotalLength();
+
+  /* 虚线：dasharray 用长度推出来，保证最后一段正好收口 */
+  const DASH = 13, GAP = 9;
+  const CYCLE = DASH + GAP;
+  const nDash = Math.max(1, Math.floor(L / CYCLE));
+  path.setAttribute('stroke-dasharray', DASH + ' ' + GAP);
+  /* 起始 dashoffset 藏住整条线；末尾回到 0 时最后一格刚好接上 */
+  const OFF0 = nDash * CYCLE;
+  path.setAttribute('stroke-dashoffset', OFF0);
+
+  /* 末端箭头的位置和角度也用 getPointAtLength 算 */
+  const endPt = path.getPointAtLength(L);
+  const prevPt = path.getPointAtLength(Math.max(0, L - 2));
+  const ang = Math.atan2(endPt.y - prevPt.y, endPt.x - prevPt.x) * 180 / Math.PI;
+  head.setAttribute('transform',
+    'translate(' + (endPt.x - 13) + ' ' + endPt.y + ') rotate(' + ang + ')');
+  const startPt = path.getPointAtLength(0);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  const GROW_END = Math.max(1.3, dur - .95);
+
+  /* ① 底层的淡实线先描出来，交代路线 */
+  tl.fromTo(ghost, { opacity: 0, strokeDashoffset: L },
+    { opacity: 1, strokeDashoffset: 0, duration: .30, ease: 'power2.out' }, 0);
+
+  /* ② 起点小方块 */
+  tl.fromTo(node, { scale: 0, opacity: 0 },
+    { scale: 1, opacity: 1, duration: .26, ease: 'back.out(3.2)' }, .10);
+
+  /* ③ 虚线轨迹逐段生长：dashoffset 从整条长度收到 0。
+        ease:'none' 保证是"匀速画线"，不是先慢后快。 */
+  tl.fromTo(path, { strokeDashoffset: OFF0 },
+    { strokeDashoffset: 0, duration: GROW_END - .20, ease: 'none' }, .20);
+
+  /* ④ 末端箭头到位 + 环扩散 */
+  tl.fromTo(ring, { scale: .2, opacity: 0 },
+    { scale: 1, opacity: .9, duration: .16, ease: 'back.out(3)' }, GROW_END - .18);
+  tl.to(ring, { scale: 1.9, opacity: 0, duration: .46, ease: 'power2.out' }, GROW_END - .02);
+  tl.fromTo(head, { scale: 0, opacity: 0 },
+    { scale: 1, opacity: 1, duration: .28, ease: 'back.out(3.4)' }, GROW_END - .14);
+  tl.to(head, { x: 3, duration: .30, ease: 'sine.inOut' }, GROW_END + .14);
+
+  /* ⑤ 小字落在箭头附近 */
+  tl.fromTo(tip, { x: endPt.x - 20, y: endPt.y - 30, opacity: 0 },
+    { opacity: 1, duration: .30, ease: 'power2.out' }, GROW_END + .06);
+  tl.fromTo(tip, { scale: .7 },
+    { scale: 1, duration: .34, ease: 'back.out(2.6)' }, GROW_END + .06);
+
+  /* ⑥ 收尾：虚线往前"跑"掉一格（dashoffset 收到 -CYCLE），尾部淡出。
+        tail 夹在 dur 之内，保证时间轴长度就是填进来的那个 dur。 */
+  const tail = Math.min(Math.max(GROW_END + .62, dur - .55), Math.max(.5, dur - .40));
+  tl.to(head, { opacity: 0, duration: .22, ease: 'power2.in' }, tail);
+  tl.to(tip, { opacity: 0, duration: .20, ease: 'power2.in' }, tail + .03);
+  tl.to(path, { strokeDashoffset: -CYCLE, duration: .30, ease: 'power2.in' }, tail);
+  tl.to(ghost, { opacity: 0, duration: .24, ease: 'power2.in' }, tail + .03);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

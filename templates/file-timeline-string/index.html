@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "三次改版的时间线"}, {"id": "dates", "type": "string", "label": "日期标签（逗号分隔×3）", "default": "06-02 初版,07-18 二版,08-13 现行版"}, {"id": "img1", "type": "image", "label": "照片1", "default": "./placeholder-1.png"}, {"id": "img2", "type": "image", "label": "照片2", "default": "./placeholder-2.png"}, {"id": "img3", "type": "image", "label": "照片3", "default": "./placeholder-3.png"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      #root{ background: #EAE2CF; font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; color: #26211A; }
+      .f-vig{ position: absolute; inset: 0; pointer-events: none;
+        background: radial-gradient(ellipse at center, transparent 52%, rgba(64,48,26,.32) 100%); }
+      .f-head{ position: absolute; left: 150px; top: 90px; display: flex; align-items: baseline; gap: 26px; }
+      .f-hl{ display: inline-block; background: #F5D73F; font-size: 40px; font-weight: 900;
+        padding: 2px 16px; transform: rotate(-1.5deg); }
+      .f-head h1{ font-size: 52px; font-weight: 900; }
+      .f-stage{ position: absolute; left: 150px; right: 150px; top: 300px; height: 640px; }
+      .f-string{ position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+      .f-string path{ fill: none; stroke: #B03028; stroke-width: 5; stroke-linecap: round; }
+      .f-row{ position: absolute; inset: 0; display: flex; justify-content: center; gap: 110px; }
+      .f-item{ position: relative; width: 400px; }
+      .f-photo{ position: relative; width: 400px; height: 470px; background: #FFFDF7; padding: 14px 14px 50px;
+        box-shadow: 7px 9px 0 rgba(38,33,26,.18); margin-top: 40px; }
+      .f-photo img{ width: 100%; height: 100%; object-fit: cover; display: block; filter: sepia(.22) contrast(.96); }
+      .f-pin{ position: absolute; left: 50%; top: 26px; width: 30px; height: 30px; margin-left: -15px;
+        background: #B03028; border: 4px solid #FFFDF7; border-radius: 50%;
+        box-shadow: 2px 3px 0 rgba(38,33,26,.35); z-index: 3; }
+      .f-date{ margin-top: 26px; text-align: center; }
+      .f-date span{ display: inline-block; background: #26211A; color: #F5D73F; font-size: 24px;
+        font-weight: 800; letter-spacing: .08em; padding: 6px 20px; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="f-vig"></div>
+      <div class="f-head"><span class="f-hl" id="hl">TIMELINE</span><h1 id="title"></h1></div>
+      <div class="f-stage" id="stage">
+        <svg class="f-string" id="string"></svg>
+        <div class="f-row" id="row">
+          <div class="f-item" id="it1"><span class="f-pin"></span><figure class="f-photo"><img id="img1" alt=""></figure><div class="f-date"><span class="mono" id="d1"></span></div></div>
+          <div class="f-item" id="it2"><span class="f-pin"></span><figure class="f-photo"><img id="img2" alt=""></figure><div class="f-date"><span class="mono" id="d2"></span></div></div>
+          <div class="f-item" id="it3"><span class="f-pin"></span><figure class="f-photo"><img id="img3" alt=""></figure><div class="f-date"><span class="mono" id="d3"></span></div></div>
+        </div>
+      </div>
+
+    </div>
+    <script>
+      const fallback = {"title": "三次改版的时间线", "dates": "06-02 初版,07-18 二版,08-13 现行版", "img1": "./placeholder-1.png", "img2": "./placeholder-2.png", "img3": "./placeholder-3.png", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      $("title").textContent = V.title;
+      ["img1", "img2", "img3"].forEach((k) => { if (V[k]) $(k).src = V[k]; });
+      const dates = split(V.dates);
+      ["d1", "d2", "d3"].forEach((k, i) => { $(k).textContent = dates[i] ?? ""; });
+      const svg = $("string");
+      const stage = $("stage");
+      svg.setAttribute("viewBox", `0 0 ${stage.offsetWidth} ${stage.offsetHeight}`);
+      const pins = stage.querySelectorAll(".f-pin");
+      const pts = Array.from(pins).map((p) => [p.offsetParent.offsetLeft + p.offsetLeft + 15, p.offsetTop + 15]);
+      const ns = "http://www.w3.org/2000/svg";
+      const paths = [];
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p = document.createElementNS(ns, "path");
+        p.setAttribute("d", `M ${pts[i][0]} ${pts[i][1]} Q ${(pts[i][0] + pts[i + 1][0]) / 2} ${pts[i][1] + 90} ${pts[i + 1][0]} ${pts[i + 1][1]}`);
+        svg.appendChild(p);
+        paths.push(p);
+      }
+      paths.forEach((p) => {
+        const l = p.getTotalLength();
+        p.style.strokeDasharray = String(l);
+        p.style.strokeDashoffset = String(l);
+      });
+      const rots = [-3, 2.5, -2];
+      tl.fromTo("#hl", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.45, ease: "power3.out" }, 0.15);
+      tl.fromTo("#title", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 0.35);
+      ["#it1", "#it2", "#it3"].forEach((sel, i) => {
+        tl.fromTo(sel + " .f-photo", { scale: 0.6, opacity: 0, rotation: rots[i] + 8 },
+          { scale: 1, opacity: 1, rotation: rots[i], duration: 0.42, ease: "back.out(2.2)" }, 0.6 + i * 0.2);
+        tl.fromTo(sel + " .f-pin", { y: -34, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3, ease: "back.out(2.6)" }, 0.85 + i * 0.2);
+        tl.fromTo(sel + " .f-date", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.3 }, 1.0 + i * 0.2);
+      });
+      paths.forEach((p, i) => {
+        tl.to(p, { strokeDashoffset: 0, duration: 0.5, ease: "power2.inOut" }, 1.55 + i * 0.4);
+      });
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

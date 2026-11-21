@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "上千张照片里，有一张改变了一切"}, {"id": "img1", "type": "image", "label": "照片1", "default": "./assets/photo1.png"}, {"id": "img2", "type": "image", "label": "照片2", "default": "./assets/photo2.png"}, {"id": "img3", "type": "image", "label": "照片3", "default": "./assets/photo3.png"}, {"id": "img4", "type": "image", "label": "照片4", "default": "./assets/photo4.png"}, {"id": "img5", "type": "image", "label": "照片5", "default": "./assets/photo5.png"}, {"id": "img6", "type": "image", "label": "照片6", "default": "./assets/photo6.png"}, {"id": "focusIndex", "type": "number", "label": "定格第几张（1-6）", "default": 3}, {"id": "caption", "type": "string", "label": "定格字幕", "default": "就是这张"}, {"id": "duration", "type": "number", "label": "总时长（秒，推近后定格）", "default": 7}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0A0F);
+  color: var(--foreground, #F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.wall{ position:absolute; inset:-140px; display:grid; grid-template-columns:repeat(4,1fr);
+  grid-template-rows:repeat(3,1fr); gap:26px; will-change:transform; }
+.tile{ position:relative; overflow:hidden; border-radius:10px; }
+.tile img{ width:100%; height:100%; object-fit:cover; display:block; }
+.dim{ position:absolute; inset:0; background:#0A0A0F; opacity:0; }
+.frame{ position:absolute; border:6px solid #FFF; border-radius:12px; pointer-events:none;
+  box-shadow:0 0 60px rgba(0,0,0,.6); opacity:0; }
+.ptitle{ position:absolute; left:0; right:0; top:70px; text-align:center; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  font-weight:700; font-size:58px; text-shadow:0 2px 24px rgba(0,0,0,.8); }
+.pcap{ position:absolute; left:0; right:0; bottom:70px; text-align:center; font-size:44px;
+  letter-spacing:.15em; text-shadow:0 2px 18px rgba(0,0,0,.8); opacity:0; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="7" data-width="1920" data-height="1080">
+<div class="wall" id="wall"></div>
+<div class="frame" id="frame"></div>
+<div class="ptitle" id="t"></div>
+<div class="pcap" id="cap"></div>
+    </div>
+    <script>
+      const FB = {"title": "上千张照片里，有一张改变了一切", "img1": "./assets/photo1.png", "img2": "./assets/photo2.png", "img3": "./assets/photo3.png", "img4": "./assets/photo4.png", "img5": "./assets/photo5.png", "img6": "./assets/photo6.png", "focusIndex": 3, "caption": "就是这张", "duration": 7};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+const $=(s)=>document.querySelector(s);
+const F=(f)=>f/30;
+const DUR=+v.duration>0?+v.duration:7;
+$('[data-composition-id]').setAttribute('data-duration',String(DUR));
+$('#t').textContent=v.title||''; $('#cap').textContent=v.caption||'';
+
+const wall=$('#wall');
+const imgs=[v.img1,v.img2,v.img3,v.img4,v.img5,v.img6].filter(Boolean);
+const focus=Math.min(Math.max(1,+v.focusIndex||1),Math.max(1,imgs.length));
+// 12 格：6 张图用两遍
+for(let i=0;i<12;i++){
+  const t=document.createElement('div');t.className='tile';
+  const src=imgs[i%imgs.length]||'';
+  t.innerHTML='<img src="'+src+'" alt=""><div class="dim"></div>';
+  wall.appendChild(t);
+}
+const tiles=[...wall.children];
+// 焦点格：该图第一次出现的格子
+const fi=focus-1;
+const rect=()=>tiles[fi].getBoundingClientRect();
+
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+/* 墙整体缓推放大到焦点格：以墙心为缩放原点，精确求平移量 */
+const wr=wall.getBoundingClientRect();
+const wcx=wr.left+wr.width/2, wcy=wr.top+wr.height/2;
+const r0=rect();
+const cx=r0.left+r0.width/2, cy=r0.top+r0.height/2;
+const s=2.6;
+// CSS/GSAP 变换中 translate 不被 scale 放大：t = 视口中心 - 缩放原点 - s×(焦点中心-原点)
+const tx=960-wcx-s*(cx-wcx), ty=540-wcy-s*(cy-wcy);
+tl.fromTo(wall,{scale:1,x:0,y:0},{scale:s,x:tx,y:ty,duration:F(70),ease:'power2.inOut'},F(10));
+tl.fromTo('#t',{opacity:0,y:24},{opacity:1,y:0,duration:F(12),ease:'power3.out'},F(4));
+tl.to('.dim',{opacity:.72,duration:F(24),ease:'power2.inOut'},F(48));
+tl.to(tiles[fi].querySelector('.dim'),{opacity:0,duration:F(20)},F(48));
+tl.fromTo('#frame',{opacity:0},{opacity:1,duration:F(10)},F(76));
+tl.fromTo('#cap',{opacity:0},{opacity:1,duration:F(12),ease:'power2.out'},F(84));
+/* 白框跟随焦点格 */
+const placeFrame=()=>{
+  const r=rect(), fr=$('#frame');
+  fr.style.left=(r.left-8)+'px'; fr.style.top=(r.top-8)+'px';
+  fr.style.width=(r.width+16)+'px'; fr.style.height=(r.height+16)+'px';
+};
+tl.eventCallback('onUpdate',placeFrame);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

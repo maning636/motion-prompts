@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"pack","name":"规格包","type":"enum","label":"规格包（配色 / 字体 / 曲线）","options":[{"label":"暗色科技","value":"dark"},{"label":"奶油贴纸","value":"cream"},{"label":"单色克制","value":"mono"},{"label":"夜航","value":"night"}],"default":"night"},{"id":"video1","name":"素材1","type":"string","label":"第 1 镜素材（留空用内置画面）","default":""},{"id":"video2","name":"素材2","type":"string","label":"第 2 镜素材（留空用内置画面）","default":""},{"id":"video3","name":"素材3","type":"string","label":"第 3 镜素材（留空用内置画面）","default":""},{"id":"video4","name":"素材4","type":"string","label":"第 4 镜素材（留空用内置画面）","default":""},{"id":"video5","name":"素材5","type":"string","label":"第 5 镜素材（留空用内置画面）","default":""},{"id":"video6","name":"素材6","type":"string","label":"第 6 镜素材（留空用内置画面）","default":""},{"id":"watermark","name":"水印","type":"string","label":"账号水印","default":"@nightwalk"},{"id":"endtag","name":"尾卡角标","type":"string","label":"尾卡左上角标","default":"NEXT"},{"id":"cta","name":"尾卡主文案","type":"string","label":"尾卡主文案","default":"关注我，下一条见"},{"id":"keyword","name":"搜索词","type":"string","label":"搜索框里的字","default":"搜 名字 抢先看"}]'>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="0.75s 一镜直切不转场，画面全变而水印与编号框一动不动，末尾落一张搜索框+二维码引导卡。">
+<title>快切素材流 · 固定层与尾卡</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<link rel="stylesheet" href="../_lib/packs.css">
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script>
+<!-- packs.js 必须排在 blocks.js **之后**：blocks.js 结尾是 global.BBlocks = BB，
+     会把它整个替换掉。谁先加载谁的东西就没了，表现是 B.pack is not a function。 -->
+<script src="../_lib/packs.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<style>
+  /* 底色和字色**必须来自规格包**，不能写死。
+     写死 #000 + #F4F1EA 的时候，四个包里只有 dark / night 正常：
+     cream 的 --pk-fg 是 #2A2118、mono 是 #14140F，两个都是**深字**，
+     压在这个写死的黑底上 → 标题、标签、说明全糊掉。
+     而写死字面量色的元素（比如 rgba(244,241,234,.82)）反而还看得见，
+     画面上就成了一半能看一半不能看——比全黑更难认。
+     一共 33 条模板中招（混剪 5 + 认知 22 + 节拍 6）。
+
+     注意区分两层契约（packs.css 顶部注释里写过）：
+       --pk-bg / --pk-fg      = 包自带底板，舞台自己用它
+       --pk-*-media           = 压在用户素材上的那一层
+     这里改的是前者。 */
+  html,body{margin:0;padding:0;background:var(--pk-bg,#000)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--pk-bg,#000);
+        color:var(--pk-fg,#F4F1EA);font-family:"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+        -webkit-font-smoothing:antialiased}
+  /* 统一安全区：混剪里所有贴边元素都从 72/88 起，不贴 0 */
+  
+  /* 素材位：用 CSS 画一个「像镜头」的抽象画面。
+     真视频在当前渲染管线里不播（compose.html 不处理 <video>），
+     预览会全黑——所以默认走 CSS，逻辑才看得见。 */
+  .shot{position:absolute;inset:0;overflow:hidden;opacity:0}
+  .shot .sky{position:absolute;inset:-12%;background:
+      linear-gradient(180deg,var(--c1) 0%,var(--c2) 52%,var(--c3) 100%)}
+  .shot .glow{position:absolute;left:56%;top:26%;width:340px;height:340px;border-radius:50%;
+      background:radial-gradient(circle,var(--c4) 0%,rgba(0,0,0,0) 68%);filter:blur(12px)}
+  .shot .haze{position:absolute;left:-10%;right:-10%;top:52%;height:26%;
+      background:linear-gradient(180deg,rgba(0,0,0,0),var(--c3) 78%,rgba(0,0,0,0));opacity:.55}
+  .shot .ridge{position:absolute;left:-8%;right:-8%;bottom:0;height:46%;
+      background:linear-gradient(180deg,var(--c5),var(--c6))}
+  .shot .ridge.r1{clip-path:polygon(0 44%,13% 27%,26% 41%,40% 19%,55% 37%,69% 24%,85% 40%,100% 26%,100% 100%,0 100%)}
+  .shot .ridge.r2{height:28%;opacity:.92;
+      clip-path:polygon(0 58%,12% 40%,25% 57%,38% 35%,52% 55%,66% 37%,80% 53%,100% 39%,100% 100%,0 100%)}
+  .shot .grain{position:absolute;inset:0;opacity:.10;background-image:
+      repeating-linear-gradient(0deg,rgba(255,255,255,.10) 0 1px,rgba(0,0,0,0) 1px 3px),
+      repeating-linear-gradient(90deg,rgba(0,0,0,.10) 0 1px,rgba(0,0,0,0) 1px 4px)}
+  .shot .vig{position:absolute;inset:0;box-shadow:inset 0 0 260px 80px rgba(0,0,0,.52)}
+  .shot video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+  .shot.live .sky,.shot.live .glow,.shot.live .haze,
+  .shot.live .ridge,.shot.live .grain{display:none}
+  .shot.live video{display:block}
+
+  /* 固定层 1：右上账号水印，切一镜动一次、全程位置不变 */
+  .wm{position:absolute;right:88px;top:80px;z-index:30;opacity:0;
+      display:flex;align-items:center;gap:14px;padding:12px 22px;
+      border:1px solid rgba(244,241,234,.30);border-radius:999px;
+      background:rgba(10,10,12,.34)}
+  .wm .dot{width:9px;height:9px;border-radius:50%;background:#E8702A}
+  .wm span{font-family:ui-monospace,Consolas,monospace;font-size:22px;font-weight:700;
+      letter-spacing:.10em;color:var(--pk-fg-media);white-space:nowrap}
+
+  /* 固定层 2：左下编号角标，每镜换一次号。
+     号码全部预先堆在框里、各自一条透明度补间——
+     不用 tl.call 改文字：settle 会把时间轴来回扫，
+     call 是「越点越累加」的，扫完就停在错的那个号上。 */
+  .badge{position:absolute;left:88px;bottom:96px;z-index:30;opacity:0;
+      display:flex;align-items:flex-end;gap:16px}
+  .badge .no{position:relative;width:74px;height:74px;border:2px solid rgba(244,241,234,.72)}
+  .badge .no b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+      opacity:0;font-family:ui-monospace,Consolas,monospace;font-size:34px;font-weight:800;
+      letter-spacing:.02em;color:var(--pk-fg-media);line-height:1}
+  .badge .tot{font-family:ui-monospace,Consolas,monospace;font-size:20px;font-weight:700;
+      letter-spacing:.18em;color:var(--pk-muted-media);padding-bottom:9px}
+
+  /* 固定层 3：底部进度条——快切的「计量表」，让人看得见自己在第几条 */
+  .track{position:absolute;left:88px;right:88px;bottom:60px;height:3px;z-index:30;
+      background:rgba(244,241,234,.18);opacity:0}
+  .track .fill{position:absolute;left:0;top:0;bottom:0;width:0;background:#E8702A}
+
+  /* 电影黑边：v2 那种素材流本来就配黑边。顺手解决了一个定格帧问题——
+     settle 取可见面积最大的一帧，尾卡容器一旦铺满整屏就白拿一屏，
+     快切段再好看也争不过，缩略图会变成一张 CTA。改成居中面板后，
+     这段叠满屏的黑边反过来成了快切段的最强项，定格帧就落回快切里。 */
+  .cine{position:absolute;inset:0;z-index:20;opacity:0;pointer-events:none;
+      background:linear-gradient(180deg,rgba(0,0,0,.62) 0%,rgba(0,0,0,0) 17%,
+                 rgba(0,0,0,0) 83%,rgba(0,0,0,.62) 100%)}
+
+  /* 引导尾卡：搜索框 + 二维码位。做成居中面板而不是满屏，
+     理由同 .cine——满屏容器会在 settle 里白送一屏面积。 */
+  .end{position:absolute;left:50%;top:50%;width:1700px;height:660px;margin:-330px 0 0 -850px;
+      z-index:40;opacity:0;border:1px solid rgba(244,241,234,.10);border-radius:28px;
+      background:rgba(244,241,234,.025);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:44px}
+  /* 尾卡：素材在 CUT 处被 tl.set('#s0'.., {opacity:0}) 整片关掉，
+     尾卡是压在**包底色**上的（脚本里那段注释写的就是这个意图：
+     「素材位同时关掉，尾卡自带满屏底」）。
+     所以这里用 --pk-* 而不是 --pk-*-media——
+     早先按 media 改过一版，cream / mono 上主标题浅字压浅底、整块消失，
+     是目检看出来的，探针当时还把已关掉的素材层当成了背景。 */
+  .end .tag2{position:absolute;left:48px;top:30px;font-family:ui-monospace,Consolas,monospace;
+      font-size:22px;font-weight:700;letter-spacing:.32em;color:var(--pk-muted)}
+  .end .foot{position:absolute;left:0;right:0;bottom:28px;text-align:center;
+      font-family:ui-monospace,Consolas,monospace;font-size:22px;font-weight:700;
+      letter-spacing:.30em;color:var(--pk-muted)}
+  .end .kicker{font-family:ui-monospace,Consolas,monospace;font-size:24px;font-weight:700;
+      letter-spacing:.42em;color:var(--pk-accent);padding-left:.42em}
+  .end .cta{display:block;width:1640px;text-align:center;font-size:86px;font-weight:900;
+      letter-spacing:.02em;line-height:1.15;color:var(--pk-fg)}
+  .end .row{display:flex;align-items:center;gap:48px}
+  .search{width:620px;height:104px;border-radius:52px;border:1px solid rgba(244,241,234,.34);
+      display:flex;align-items:center;gap:24px;padding:0 48px;background:#141418}
+  .search .mag{position:relative;width:28px;height:28px;border:3px solid #E8702A;border-radius:50%}
+  .search .mag::after{content:'';position:absolute;right:-12px;bottom:-7px;width:14px;height:3px;
+      background:#E8702A;transform:rotate(45deg);border-radius:2px}
+  .search .kw{font-size:32px;font-weight:600;color:rgba(244,241,234,.86);white-space:nowrap}
+  /* 二维码位：用三个定位角画出来，而不是打一层噪点方块 */
+  .qr{position:relative;width:200px;height:200px;border:1px solid rgba(244,241,234,.22);
+      border-radius:14px;background:#141418}
+  .qr i{position:absolute;width:46px;height:46px;border:6px solid rgba(244,241,234,.60);
+      border-radius:7px}
+  .qr i:nth-child(1){left:20px;top:20px}
+  .qr i:nth-child(2){right:20px;top:20px}
+  .qr i:nth-child(3){left:20px;bottom:20px}
+  .qr::after{content:'';position:absolute;left:50%;top:50%;width:76px;height:76px;margin:-38px 0 0 -38px;
+      background-image:radial-gradient(circle,rgba(244,241,234,.40) 0 4px,rgba(0,0,0,0) 4px);
+      background-size:19px 19px}
+
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <div class="shot" id="s0" data-media-layer style="--c1:#2A1408;--c2:#8A4A18;--c3:#C07A2E;--c4:#E8A048;--c5:#3A1E0A;--c6:#1A0D04"><span class="sky"></span><span class="glow"></span><span class="haze"></span><span class="ridge r1"></span><span class="ridge r2"></span><span class="grain"></span><span class="vig"></span><video id="v0" muted playsinline preload="auto"></video></div><div class="shot" id="s1" data-media-layer style="--c1:#2E1004;--c2:#96380F;--c3:#C4761F;--c4:#E8952F;--c5:#381806;--c6:#180B03"><span class="sky"></span><span class="glow"></span><span class="haze"></span><span class="ridge r1"></span><span class="ridge r2"></span><span class="grain"></span><span class="vig"></span><video id="v1" muted playsinline preload="auto"></video></div><div class="shot" id="s2" data-media-layer style="--c1:#380F02;--c2:#A8480F;--c3:#D07A22;--c4:#F0A838;--c5:#461606;--c6:#200A03"><span class="sky"></span><span class="glow"></span><span class="haze"></span><span class="ridge r1"></span><span class="ridge r2"></span><span class="grain"></span><span class="vig"></span><video id="v2" muted playsinline preload="auto"></video></div><div class="shot" id="s3" data-media-layer style="--c1:#1A0E06;--c2:#6A3A12;--c3:#A0631F;--c4:#D08030;--c5:#241206;--c6:#100803"><span class="sky"></span><span class="glow"></span><span class="haze"></span><span class="ridge r1"></span><span class="ridge r2"></span><span class="grain"></span><span class="vig"></span><video id="v3" muted playsinline preload="auto"></video></div><div class="shot" id="s4" data-media-layer style="--c1:#3A1A06;--c2:#B05A1E;--c3:#D89040;--c4:#F0C060;--c5:#4A2408;--c6:#200F04"><span class="sky"></span><span class="glow"></span><span class="haze"></span><span class="ridge r1"></span><span class="ridge r2"></span><span class="grain"></span><span class="vig"></span><video id="v4" muted playsinline preload="auto"></video></div><div class="shot" id="s5" data-media-layer style="--c1:#140A04;--c2:#5A2E0E;--c3:#8A521A;--c4:#C06A20;--c5:#1C1006;--c6:#0C0603"><span class="sky"></span><span class="glow"></span><span class="haze"></span><span class="ridge r1"></span><span class="ridge r2"></span><span class="grain"></span><span class="vig"></span><video id="v5" muted playsinline preload="auto"></video></div>
+  <div class="cine" id="cine"></div>
+  <div class="wm"><i class="dot"></i><span id="wm">@nightwalk</span></div>
+  <div class="badge">
+    <div class="no"><b id="n0">01</b><b id="n1">02</b><b id="n2">03</b><b id="n3">04</b><b id="n4">05</b><b id="n5">06</b><b id="n6">END</b></div>
+    <div class="tot" id="tot">/ 06</div>
+  </div>
+  <div class="track"><div class="fill" id="fill"></div></div>
+  <div class="end" id="end">
+    <span class="tag2" id="tag2">NEXT</span>
+    <span class="kicker">FOLLOW</span>
+    <span class="cta" id="cta" data-fit-max="86" data-fit-min="44">关注我，下一条见</span>
+    <div class="row">
+      <div class="search"><i class="mag"></i><span class="kw" id="kw">搜 名字 抢先看</span></div>
+      <div class="qr"><i></i><i></i><i></i></div>
+    </div>
+    <span class="foot" id="foot">@nightwalk</span>
+  </div>
+
+</div>
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+  var tl = B.tl();
+  /* 规格包：先定风格，再建任何元素。
+     画面素材的配色**不跟着包走**——那是"底片"，用户自己的东西不能被模板改色；
+     跟着包走的只有 UI 层（字色、强调色、描边、圆角、曲线）。这个边界必须守住。 */
+  B.pack(v.pack);
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  function q(s) { return document.querySelector(s); }
+  /* 素材位接真视频：留空就继续用 CSS 画面 */
+  function live(n, src) {
+    if (!src) return;
+    var s = document.getElementById('s' + n), e = document.getElementById('v' + n);
+    if (!s || !e) return;
+    s.classList.add('live'); e.src = src;
+    e.play().catch(function () {});
+  }
+  /* 景别缓推：v1/v3 里画面始终在极慢地动，这是「像镜头」的关键 */
+  function push(n, at, dur, from, to, ease) {
+    var s = q('#s' + n + ' .sky'), g = q('#s' + n + ' .glow'), r = q('#s' + n + ' .r2');
+    if (s) tl.fromTo(s, { scale: from, y: '0%' },
+      { scale: to, y: '-2%', duration: dur, ease: ease || 'none' }, at);
+    if (g) tl.fromTo(g, { xPercent: -4, opacity: .8 },
+      { xPercent: 5, opacity: 1, duration: dur, ease: 'none' }, at);
+    if (r) tl.fromTo(r, { xPercent: 0 },
+      { xPercent: -2.5, duration: dur, ease: 'none' }, at);
+  }
+  /* clip-path 形状插值。
+     两个坑都在这里踩过：
+       1. GSAP 各版本对 clipPath 字符串补间的处理不一致，所以不直接补间它，
+          改成补间一个 {t:0→1} 的代理对象，onUpdate 里自己算 8 个点；
+       2. **from 必须是编译期常量，不能从元素当前状态读。**
+          settle 会把时间轴来回扫；一旦回退越过一个已完成的补间，
+          GSAP 会把它按 ratio 0 重渲——onUpdate 拿到的就是起点，
+          形状会「弹回矩形」。写成常量后，形状是 t 的纯函数，
+          停在任何一帧算出来都一样。
+     相邻两段的 from 必须等于上一段的 to，这条由 Python 侧保证。 */
+  function polyStr(pts) {
+    return 'polygon(' + pts.map(function (p) {
+      return p[0].toFixed(2) + '% ' + p[1].toFixed(2) + '%'; }).join(',') + ')';
+  }
+  function morph(el, from, to, at, dur, ease) {
+    if (!el || !to || !from || from.length !== to.length) return;
+    var st = { t: 0 };
+    tl.to(st, { t: 1, duration: dur == null ? .7 : dur, ease: ease || 'power2.inOut',
+      onUpdate: function () {
+        el.style.clipPath = polyStr(from.map(function (p, i) {
+          return [p[0] + (to[i][0] - p[0]) * st.t,
+                  p[1] + (to[i][1] - p[1]) * st.t];
+        }));
+      } }, at);
+  }
+  set('wm', v.watermark); set('kw', v.keyword); set('cta', v.cta);
+  set('tot', '/ ' + 6); set('foot', v.watermark); set('tag2', v.endtag);
+
+  var N = 6, D = 0.75, CUT = N * D, END = 2.5;
+
+  /* 固定层只进一次，之后一路不动——快切的说服力全在这层「不动」 */
+  tl.set('#s0', { opacity: 1 }, 0);
+  tl.set('#cine', { opacity: 1 }, 0);
+  tl.fromTo('.wm', { opacity: 0, y: -16 }, { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, 0);
+  tl.fromTo('.badge', { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, 0);
+  tl.fromTo('.track', { opacity: 0 }, { opacity: 1, duration: .5, ease: 'power2.out' }, 0);
+
+  for (var i = 0; i < N; i++) {
+    var at = i * D;
+    live(i, v['video' + (i + 1)]);
+    /* 直切，不加任何转场：v2 就是这么干的，加了就不叫快切了 */
+    if (i > 0) {
+      tl.set('#s' + i, { opacity: 1 }, at);
+      tl.set('#s' + (i - 1), { opacity: 0 }, at);
+    }
+    /* 编号角标跟着换号：内容全变、框不动，这就是「素材流」的手感 */
+    tl.set('#n' + i, { opacity: 1 }, at);
+    for (var j = 0; j <= N; j++) if (j !== i) tl.set('#n' + j, { opacity: 0 }, at);
+    push(i, at, D, 1.03, 1.10);
+  }
+  tl.set('#n' + N, { opacity: 1 }, CUT);
+  tl.set('#n' + N, { opacity: 0 }, CUT + END);
+  tl.to('#fill', { width: '100%', duration: CUT, ease: 'none' }, 0);
+
+  /* 尾卡：画面整块换掉，只做极短的淡入。
+     素材位同时关掉——尾卡自带满屏底，留着素材就等于多摊一层满屏，
+     settle 会被它拽走，缩略图就只剩一张 CTA，看不出这是个快切模板。 */
+  tl.set('.track', { opacity: 0 }, CUT);
+  tl.set('.badge', { opacity: 0 }, CUT);
+  tl.to('#cine', { opacity: 0, duration: .22, ease: 'power2.inOut' }, CUT);
+  for (i = 0; i < N; i++) tl.set('#s' + i, { opacity: 0 }, CUT);
+  tl.to('#end', { opacity: 1, duration: .22, ease: 'power2.out' }, CUT);
+  tl.fromTo('.end .tag2', { opacity: 0, x: -14 },
+      { opacity: 1, x: 0, duration: .4, ease: 'power3.out' }, CUT + .1);
+  tl.fromTo('.end .kicker', { opacity: 0, y: 14 },
+      { opacity: 1, y: 0, duration: .4, ease: 'power3.out' }, CUT + .12);
+  tl.fromTo('#cta', { opacity: 0, y: 22 },
+      { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, CUT + .2);
+  tl.fromTo('.end .row', { opacity: 0, y: 26 },
+      { opacity: 1, y: 0, duration: .55, ease: 'power3.out' }, CUT + .34);
+  tl.fromTo('.end .foot', { opacity: 0 },
+      { opacity: 1, duration: .5, ease: 'power2.out' }, CUT + .5);
+
+  B.hold(tl, CUT + END, .5);
+  B.fitAll();
+
+})();
+</script>
+</body>
+</html>

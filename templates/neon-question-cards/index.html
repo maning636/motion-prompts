@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "imgBg", "type": "image", "label": "背景图（空则深黑底+暗角）", "default": ""}, {"id": "titleCn", "type": "string", "label": "顶部标题（整句）", "default": "它会像产品经理一样，先问你几个问题"}, {"id": "titleAccent", "type": "string", "label": "标题高亮词（绿色，须为标题子串）", "default": "问你几个问题"}, {"id": "q1", "type": "string", "label": "Q01 问题（空则不显示）", "default": "你平时主要在忙什么"}, {"id": "q2", "type": "string", "label": "Q02 问题（空则不显示）", "default": "每天有哪些事是你怕忘的"}, {"id": "q3", "type": "string", "label": "Q03 问题（空则不显示）", "default": "有什么是你一直想记录的"}, {"id": "q4", "type": "string", "label": "Q04 问题（空则不显示）", "default": "有什么想让 AI 每天自动做"}, {"id": "duration", "type": "number", "label": "总时长（秒，演完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12);
+  color: var(--foreground, #F5F5F3); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+/* 背景：有图铺满+55% 黑色压暗；空则深黑底+暗角 */
+.bgimg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; }
+.bgdim{ position:absolute; inset:0; background:rgba(0,0,0,.55); display:none; }
+.bgvig{ position:absolute; inset:0; display:none;
+  background:radial-gradient(ellipse at center, rgba(0,0,0,0) 46%, rgba(0,0,0,.55) 100%); }
+
+/* 顶部标题 */
+.ctitle{ position:absolute; left:0; right:0; top:88px; text-align:center;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:60px; letter-spacing:2px;
+  white-space:nowrap; }
+.ctitle .acc{ color:#34D399; text-shadow:0 0 20px rgba(52,211,153,.6); position:relative; padding:0 4px; }
+.ctitle .acc::after{ content:''; position:absolute; left:6px; right:6px; bottom:-12px; height:5px;
+  border-radius:3px; background:#10B981; box-shadow:0 0 14px rgba(16,185,129,.8); }
+
+/* 四角问题卡 */
+.qcard{ position:absolute; width:600px; height:150px; background:#12161C;
+  border:1px solid rgba(16,185,129,.85); border-radius:16px;
+  box-shadow:0 0 26px rgba(16,185,129,.35), 0 0 60px rgba(16,185,129,.12), inset 0 0 30px rgba(16,185,129,.05);
+  padding:26px 36px; will-change:transform; }
+#qc1{ left:90px;  top:300px; }
+#qc2{ left:1230px; top:300px; }
+#qc3{ left:90px;  top:620px; }
+#qc4{ left:1230px; top:620px; }
+.qnum{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:26px; letter-spacing:4px;
+  color:#10B981; text-shadow:0 0 12px rgba(16,185,129,.5); margin-bottom:12px; }
+.qtxt{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:34px; color:#FFFFFF;
+  max-width:528px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <img class="bgimg" id="bg" alt="">
+      <div class="bgdim" id="dim"></div>
+      <div class="bgvig" id="vig"></div>
+
+      <div class="ctitle" id="titleWrap"><span id="tPre"></span><span class="acc" id="tAcc"></span><span id="tPost"></span></div>
+
+      <div class="qcard" id="qc1"><div class="qnum">Q01</div><div class="qtxt" id="qt1"></div></div>
+      <div class="qcard" id="qc2"><div class="qnum">Q02</div><div class="qtxt" id="qt2"></div></div>
+      <div class="qcard" id="qc3"><div class="qnum">Q03</div><div class="qtxt" id="qt3"></div></div>
+      <div class="qcard" id="qc4"><div class="qnum">Q04</div><div class="qtxt" id="qt4"></div></div>
+    </div>
+    <script>
+      const FB = {"imgBg": "", "titleCn": "它会像产品经理一样，先问你几个问题", "titleAccent": "问你几个问题", "q1": "你平时主要在忙什么", "q2": "每天有哪些事是你怕忘的", "q3": "有什么是你一直想记录的", "q4": "有什么想让 AI 每天自动做", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $=(s)=>document.querySelector(s);
+      const DUR=+v.duration>0?+v.duration:6;
+      $('[data-composition-id]').setAttribute('data-duration',String(DUR));
+
+      /* 背景槽：有图铺满+55% 压暗，空则深黑底+暗角 */
+      if(v.imgBg){
+        $('#bg').src=v.imgBg; $('#bg').style.display='block'; $('#dim').style.display='block';
+      }else{
+        $('#vig').style.display='block';
+      }
+
+      /* 标题：高亮词作为子串拆分染绿，找不到则整体前置、高亮词附加在后 */
+      const title=String(v.titleCn??''), acc=String(v.titleAccent??'');
+      const idx=acc?title.indexOf(acc):-1;
+      if(idx>=0){
+        $('#tPre').textContent=title.slice(0,idx);
+        $('#tAcc').textContent=acc;
+        $('#tPost').textContent=title.slice(idx+acc.length);
+      }else{
+        $('#tPre').textContent=title;
+        $('#tAcc').textContent=acc;
+        $('#tPost').textContent='';
+      }
+
+      /* 四张问题卡：q 变量为空则整卡不显示 */
+      const cards=[];
+      for(let i=1;i<=4;i++){
+        const q=String(v['q'+i]??'').trim();
+        const el=$('#qc'+i);
+        if(!q){ el.style.display='none'; continue; }
+        $('#qt'+i).textContent=q;
+        /* 左列从左侧滑入，右列从右侧滑入 */
+        cards.push({el:el, dir:(i%2===1)?-1:1});
+      }
+
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+
+      /* 1. 标题淡入上移 */
+      tl.fromTo('#titleWrap',{opacity:0,y:36},{opacity:1,y:0,duration:0.6,ease:'power3.out'},0.3);
+      /* 2. 问题卡 stagger 从各自侧方滑入 */
+      cards.forEach(function(c,i){
+        tl.fromTo(c.el,{x:160*c.dir,opacity:0},{x:0,opacity:1,duration:0.6,ease:'power3.out'},1.0+i*0.18);
+      });
+      /* 3. 演完定格，时间线末端占满总时长防黑帧 */
+      tl.set('#root',{opacity:1},DUR);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

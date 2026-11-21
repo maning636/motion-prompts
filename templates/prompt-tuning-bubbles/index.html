@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "说感受，剩下的让它改"}, {"id": "bubbles", "type": "string", "label": "气泡文本（逗号分隔）", "default": "背景推得再慢一点,相框落位再稳一点,切换的间隔拉长一点"}, {"id": "changes", "type": "string", "label": "参数变更（名称|旧值|新值，分号分隔）", "default": "背景速度 DURATION|1.40|1.78;相框缓动 EASE|POWER2.OUT|EXPO.OUT;切换间隔 INTERVAL|1.90|2.30"}, {"id": "side", "type": "string", "label": "右侧金句", "default": "第一版只要能动就行，剩下的我看着给反馈——来回两三轮就顺了。"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #0E100F; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #EDF2EE; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      .corner{ position: absolute; width: 34px; height: 34px; border: 3px solid var(--ac, #00FF00); }
+      .c-tl{ left: -3px; top: -3px; border-right: none; border-bottom: none; }
+      .c-tr{ right: -3px; top: -3px; border-left: none; border-bottom: none; }
+      .c-bl{ left: -3px; bottom: -3px; border-right: none; border-top: none; }
+      .c-br{ right: -3px; bottom: -3px; border-left: none; border-top: none; }
+      .tc{ position: absolute; right: 90px; top: 84px; text-align: right; font-family: 'IBM Plex Mono', monospace;
+        font-size: 20px; letter-spacing: .22em; color: rgba(237,242,238,.5); line-height: 1.9; z-index: 6; }
+      .ptb-head{ position: absolute; left: 90px; top: 76px; z-index: 6; }
+      .ptb-kicker{ font-size: 20px; letter-spacing: .3em; color: var(--ac); }
+      .ptb-title{ margin-top: 14px; font-size: 62px; font-weight: 900; }
+      .ptb-bubbles{ position: absolute; left: 90px; top: 270px; width: 940px; z-index: 4; }
+      .ptb-b{ position: relative; background: #151917; border: 1px solid rgba(237,242,238,.12);
+        border-radius: 20px; border-bottom-left-radius: 4px; padding: 24px 34px; margin-bottom: 26px;
+        font-size: 30px; line-height: 1.5; max-width: 860px; }
+      .ptb-b .tag{ display: block; font-size: 18px; letter-spacing: .26em; color: rgba(237,242,238,.45);
+        margin-bottom: 8px; font-family: 'IBM Plex Mono', monospace; }
+      .ptb-card{ position: absolute; left: 90px; bottom: 80px; width: 940px; z-index: 4;
+        background: #121513; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 16px; padding: 30px 38px; }
+      .ptb-ch{ font-size: 20px; letter-spacing: .26em; color: var(--ac); margin-bottom: 14px; }
+      .ptb-row{ display: flex; align-items: baseline; gap: 26px; padding: 13px 0;
+        border-top: 1px solid rgba(237,242,238,.09); font-size: 26px; opacity: .3; }
+      .ptb-code{ width: 400px; color: rgba(237,242,238,.85); }
+      .ptb-old{ color: rgba(237,242,238,.4); text-decoration: line-through; }
+      .ptb-arr{ color: rgba(237,242,238,.5); }
+      .ptb-new{ color: var(--ac); font-weight: 700; }
+      .ptb-side{ position: absolute; right: 90px; top: 300px; width: 620px; z-index: 4; font-size: 28px;
+        line-height: 1.8; color: rgba(237,242,238,.6); border-left: 4px solid var(--ac); padding-left: 30px; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="ptb-head"><div class="ptb-kicker mono">ITERATION · 口语反馈</div><div class="ptb-title" id="title"></div></div>
+      <div class="tc mono">01:10 → 01:22<br>V1 → V2</div>
+      <div class="ptb-bubbles" id="bubbles"></div>
+      <div class="ptb-card" id="card"><div class="ptb-ch mono">codex 已调整 · PARAM CHANGES</div><div id="changes"></div></div>
+      <div class="ptb-side" id="side"></div>
+
+    </div>
+    <script>
+      const fallback = {"title": "说感受，剩下的让它改", "bubbles": "背景推得再慢一点,相框落位再稳一点,切换的间隔拉长一点", "changes": "背景速度 DURATION|1.40|1.78;相框缓动 EASE|POWER2.OUT|EXPO.OUT;切换间隔 INTERVAL|1.90|2.30", "side": "第一版只要能动就行，剩下的我看着给反馈——来回两三轮就顺了。", "accent": "#00FF00", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      document.documentElement.style.setProperty("--ac", V.accent ?? "#00FF00");
+      $("title").textContent = V.title;
+      $("side").textContent = V.side;
+      split(V.bubbles).forEach((b, i) => {
+        const d = document.createElement("div");
+        d.className = "ptb-b";
+        d.innerHTML = '<span class="tag">FEEDBACK 0' + (i + 1) + '</span><span></span>';
+        d.querySelector("span:last-child").textContent = b;
+        $("bubbles").appendChild(d);
+      });
+      const rows = String(V.changes ?? "").split(";").map((r) => r.split("|").map((s) => s.trim())).filter((r) => r[0]);
+      const chEl = $("changes");
+      rows.forEach((r) => {
+        const d = document.createElement("div");
+        d.className = "ptb-row";
+        d.innerHTML = '<span class="ptb-code mono"></span><span class="ptb-old mono"></span>' +
+          '<span class="ptb-arr">→</span><span class="ptb-new mono"></span>';
+        d.querySelector(".ptb-code").textContent = r[0];
+        d.querySelector(".ptb-old").textContent = r[1] || "";
+        d.querySelector(".ptb-new").textContent = r[2] || "";
+        chEl.appendChild(d);
+      });
+      tl.fromTo([".ptb-head", ".tc"], { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.1 }, 0.1);
+      tl.fromTo(".ptb-b", { opacity: 0, y: 34, scale: 0.96 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.45, stagger: 0.45, ease: "back.out(1.5)" }, 0.4);
+      tl.fromTo("#side", { opacity: 0 }, { opacity: 1, duration: 0.5 }, 1.6);
+      tl.fromTo("#card", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 2.0);
+      Array.from(chEl.children).forEach((d, i) => {
+        const t = 2.45 + i * 0.3;
+        tl.to(d, { opacity: 1, duration: 0.25 }, t);
+        tl.fromTo(d.querySelector(".ptb-new"), { scale: 1.3 }, { scale: 1, duration: 0.35, ease: "back.out(2)" }, t);
+      });
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

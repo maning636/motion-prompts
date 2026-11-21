@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "brand", "type": "string", "label": "账号名", "default": "老马AI研习社"}, {"id": "cta", "type": "string", "label": "引导语", "default": "关注我，明天讲评论区最高赞"}, {"id": "btnText", "type": "string", "label": "按钮文字", "default": "关注"}, {"id": "btnDone", "type": "string", "label": "已关注文字", "default": "已关注 ✓"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "accentColor", "type": "color", "label": "主色（优先于强调色）", "default": "#00FF00"}, {"id": "duration", "type": "number", "label": "总时长（秒）", "default": 5}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0A0F);
+  color: var(--foreground, #F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.center{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:60px; }
+.thumb{ width:280px; height:280px; border-radius:50%; background:#14141B;
+  border:4px solid var(--accent); display:flex; align-items:center; justify-content:center;
+  will-change:transform; }
+.thumb svg{ width:150px; height:150px; fill:var(--accent); }
+.spark{ position:absolute; width:14px; height:14px; border-radius:50%; background:var(--accent); }
+.btn{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:52px; color:#0A0A0F;
+  background:var(--accent); border-radius:999px; padding:26px 110px; will-change:transform; }
+.btn.done{ background:#1B1B22; color:var(--accent); border:3px solid var(--accent); }
+.cta{ font-size:44px; letter-spacing:.06em; color:rgba(255,255,255,.9); }
+.brand{ position:absolute; top:80px; left:0; right:0; text-align:center; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  font-weight:700; font-size:40px; color:rgba(255,255,255,.6); letter-spacing:.2em; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+<div class="brand" id="bd"></div>
+<div class="center">
+  <div class="thumb" id="th"><svg viewBox="0 0 24 24"><path d="M2 10h4v11H2zM7 21V9.5l5.5-7c.8-1 2.4-.5 2.6.8l.5 3.7h5.2c1.2 0 2.1 1.1 1.9 2.3l-1.5 9c-.2 1-1.1 1.7-2.1 1.7H7z"/></svg></div>
+  <div class="btn" id="bt"></div>
+  <div class="cta" id="cta"></div>
+</div>
+<div id="sparks"></div>
+    </div>
+    <script>
+      const FB = {"brand": "老马AI研习社", "cta": "关注我，明天讲评论区最高赞", "btnText": "关注", "btnDone": "已关注 ✓", "accent": "#00FF00", "accentColor": "#00FF00", "duration": 5};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+const $=(s)=>document.querySelector(s);
+const F=(f)=>f/30;
+const DUR=+v.duration>0?+v.duration:5;
+$('[data-composition-id]').setAttribute('data-duration',String(DUR));
+/* accentColor 定制时优先；仍为默认值时回退旧 accent 变量，保证旧预设渲染不变 */
+const ACC=(v.accentColor&&String(v.accentColor).toLowerCase()!=='#00ff00')?v.accentColor:(v.accent||'#00FF00');
+document.documentElement.style.setProperty('--accent', v.accent ?? '#00FF00');
+$('#bd').textContent=v.brand||''; $('#cta').textContent=v.cta||''; $('#bt').textContent=v.btnText||'关注';
+
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+tl.fromTo('#bd',{opacity:0},{opacity:1,duration:F(8)},0);
+tl.fromTo('#th',{scale:0,rotation:-40},{scale:1,rotation:0,duration:F(16),ease:'back.out(1.8)'},F(4));
+/* 点赞粒子 */
+const sp=$('#sparks');
+for(let i=0;i<10;i++){
+  const s=document.createElement('div');s.className='spark';
+  s.style.left='960px'; s.style.top='470px'; sp.appendChild(s);
+  const a=i/10*Math.PI*2;
+  tl.fromTo(s,{x:0,y:0,opacity:1,scale:1},
+    {x:Math.cos(a)*190,y:Math.sin(a)*190,opacity:0,scale:.4,duration:F(16),ease:'power2.out'},F(14));
+}
+tl.fromTo('#bt',{y:90,opacity:0},{y:0,opacity:1,duration:F(12),ease:'back.out(1.6)'},F(20));
+/* 按钮呼吸两下 → 翻面成已关注 */
+tl.to('#bt',{scale:1.1,duration:F(8),ease:'sine.inOut',yoyo:true,repeat:3},F(34));
+tl.to('#bt',{scale:1,duration:F(4)},F(66));
+tl.to('#bt',{rotationX:90,duration:F(6),ease:'power2.in',onComplete:()=>{
+  const b=$('#bt'); b.textContent=v.btnDone||'已关注 ✓'; b.classList.add('done');
+}},F(72));
+tl.to('#bt',{rotationX:0,duration:F(6),ease:'back.out(1.6)'},F(78));
+tl.fromTo('#cta',{opacity:0,y:20},{opacity:1,y:0,duration:F(10),ease:'power2.out'},F(26));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

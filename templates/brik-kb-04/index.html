@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（本期主题标签）","default":"能力拼装"},
+{"id":"title","name":"主标题","type":"string","label":"主标题（8–16 字）","default":"五块拼装成一套能用的系统"},
+{"id":"sub","name":"补位块","type":"string","label":"补位块文案（第 3 格，≤8 字）","default":"还能再加一块"},
+{"id":"item1","name":"模块一","type":"string","label":"第 1 块（≤8 字）","default":"内容选题"},
+{"id":"item2","name":"模块二","type":"string","label":"第 2 块（≤8 字）","default":"素材拆条"},
+{"id":"item3","name":"模块三","type":"string","label":"第 3 块（≤8 字）","default":"成片交付"},
+{"id":"item4","name":"模块四","type":"string","label":"第 4 块（≤8 字）","default":"数据回收"},
+{"id":"accent","name":"强调色","type":"color","label":"强调色（品牌落款方块底 / 凸点亮起色 / 眉标下划块）","default":"#FFD429"},
+{"id":"brickColor","name":"配色包","type":"enum","label":"配色包（五块功能面的轮转顺序）","default":"mixed","options":[{"value":"yellow","label":"暖黄主调"},{"value":"pink","label":"桃粉主调"},{"value":"green","label":"薄荷主调"},{"value":"blue","label":"靛蓝主调"},{"value":"mixed","label":"四色轮转"}]},
+{"id":"layout","name":"版式","type":"enum","label":"版式（2×3 墙 / 1×6 横排）","default":"grid3","options":[{"value":"grid3","label":"2×3 块墙"},{"value":"rail","label":"1×6 横排"}]},
+{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–6）","default":5.5},
+{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}
+]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>五块拼装墙</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 积木风 · 知识口播 · 五块拼装墙
+     五块功能块从四边飞入合位，拼成一块留一个空位的墙；最后一枚品牌方块从上方落下填进空位，
+     缺口闭合的瞬间整面墙按「3/3 斜移」压 2 帧。块宽只用 480 / 240，块高只用 120。 */
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --mod:240px; --mod-h:120px; --shadow:#0F0F0F; --background:var(--paper); --accent:#FFD429;
+  }
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--background);color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased}
+  .blk-noise{background-image:radial-gradient(rgba(15,15,15,.12) 1px,transparent 1px);
+    background-size:10px 10px}
+  .sh-s{box-shadow:4px 4px 0 var(--shadow)}
+  .sh-l{box-shadow:8px 8px 0 var(--shadow)}
+
+  .promo{position:absolute;left:0;top:0;width:1920px;height:56px;display:flex;
+    align-items:center;justify-content:space-between;padding:0 72px;
+    background:var(--ink);color:var(--white);font-family:var(--mono);
+    font-size:24px;font-weight:700;letter-spacing:.14em}
+  .promo .pc{color:var(--accent)}
+
+  .head{position:absolute;left:240px;top:132px;width:1440px;display:flex;
+    align-items:flex-end;gap:32px}
+  .head .eb{flex:0 0 auto;font-family:var(--mono);font-size:30px;font-weight:700;
+    letter-spacing:.14em;color:var(--ink);white-space:nowrap}
+  .head .eb i{display:block;width:120px;height:20px;margin-top:8px;
+    background:var(--accent);border:3px solid var(--ink);border-radius:4px}
+  .head .ti{margin:0;font-size:60px;font-weight:900;line-height:1.2;letter-spacing:0;
+    color:var(--ink);white-space:nowrap}
+
+  /* 块墙：2×3（默认）或 1×6，两种版式都是六格、五块功能 + 一个空位 */
+  .wall{position:absolute;left:240px;top:440px;width:1440px;height:120px;
+    display:grid;grid-template-columns:repeat(3,480px);gap:0}
+  .wall.rail{grid-template-columns:repeat(6,240px);top:480px}
+  .cell{height:120px;display:flex;align-items:center;gap:20px;padding:0 24px;
+    border:var(--bw) solid var(--ink);border-radius:4px;box-shadow:8px 8px 0 var(--shadow)}
+  /* 相邻块共享一条 3px 黑线：用 margin-right/-top 负 3px 把两条描边合成一条缝，
+     不用「上下各留 3px」的双线缝（基因 2）。 */
+  .wall .cell.c1,.wall .cell.c2,.wall .cell.c4,.wall .cell.c5{margin-right:-3px}
+  .wall.rail .cell.c3{margin-right:-3px}
+  .wall:not(.rail) .cell.c4,.wall:not(.rail) .cell.c5,.wall:not(.rail) .hole{margin-top:-3px}
+  .cell .st{flex:0 0 auto;width:60px;height:60px;display:block}
+  .cell .tx{flex:0 0 auto;font-size:40px;font-weight:900;line-height:1.1;letter-spacing:0;
+    color:inherit;white-space:nowrap}
+  .cell .ix{flex:0 0 auto;margin-left:auto;font-family:var(--mono);font-size:26px;
+    font-weight:700;letter-spacing:.1em;color:inherit}
+  /* 空位：纸底 + 3px 实线描边，缺口本身是件，描边仍是全族唯一那一种 3px 纯黑实线 */
+  .hole{height:120px;border:var(--bw) solid var(--ink);border-radius:4px;
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:.14em;
+    color:var(--ink)}
+  .wall:not(.rail) .hole{grid-column:3;grid-row:2}
+
+  /* 品牌落款方块：52×52 在 1920 画布上放大到 104×104，落进空位中心 */
+  .mark{position:absolute;width:104px;height:104px;display:flex;align-items:center;
+    justify-content:center;background:var(--accent);border:var(--bw) solid var(--ink);
+    border-radius:4px;box-shadow:4px 4px 0 var(--shadow);
+    font-family:var(--mono);font-size:36px;font-weight:700;letter-spacing:0;color:var(--ink)}
+
+  .note{position:absolute;left:240px;top:760px;width:1440px;font-size:34px;font-weight:400;
+    line-height:1.4;letter-spacing:0;color:var(--ink);white-space:nowrap}
+
+  .foot{position:absolute;left:0;bottom:0;width:1920px;height:64px;display:flex;
+    align-items:center;justify-content:space-between;padding:0 72px;
+    background:var(--ink);color:var(--white);font-family:var(--mono);
+    font-size:26px;font-weight:700;letter-spacing:.1em}
+  .foot em{font-style:normal;color:var(--accent)}
+  .divline{position:absolute;left:0;bottom:64px;width:1920px;height:20px;
+    border-top:3px solid var(--ink);border-bottom:3px solid var(--ink);
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="promo">
+    <span class="pc">BRICK / 积木风</span>
+    <span>拼装墙 · 五块合位填缺口</span>
+  </div>
+
+  <div class="head" id="head">
+    <span class="eb" id="eyebrow" data-fit-max="30" data-fit-min="16">能力拼装<i></i></span>
+    <h1 class="ti" id="title" data-fit-max="60" data-fit-min="28">五块拼装成一套能用的系统</h1>
+  </div>
+
+  <div class="wall" id="wall">
+    <div class="cell c1" id="c1">
+      <svg class="st" width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden="true">
+        <circle class="sc" id="p1" cx="30" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+      </svg>
+      <span class="tx" id="item1" data-fit-max="40" data-fit-min="18">内容选题</span>
+      <span class="ix">01</span>
+    </div>
+    <div class="cell c2" id="c2">
+      <svg class="st" width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden="true">
+        <circle class="sc" id="p2" cx="30" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+      </svg>
+      <span class="tx" id="item2" data-fit-max="40" data-fit-min="18">素材拆条</span>
+      <span class="ix">02</span>
+    </div>
+    <div class="cell c3" id="c3">
+      <svg class="st" width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden="true">
+        <circle class="sc" id="p3" cx="30" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+      </svg>
+      <span class="tx" id="sub" data-fit-max="40" data-fit-min="18">还能再加一块</span>
+      <span class="ix">03</span>
+    </div>
+    <div class="cell c4" id="c4">
+      <svg class="st" width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden="true">
+        <circle class="sc" id="p4" cx="30" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+      </svg>
+      <span class="tx" id="item3" data-fit-max="40" data-fit-min="18">成片交付</span>
+      <span class="ix">04</span>
+    </div>
+    <div class="cell c5" id="c5">
+      <svg class="st" width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden="true">
+        <circle class="sc" id="p5" cx="30" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+      </svg>
+      <span class="tx" id="item4" data-fit-max="40" data-fit-min="18">数据回收</span>
+      <span class="ix">05</span>
+    </div>
+    <div class="hole" id="hole">待填</div>
+  </div>
+
+  <div class="mark" id="mark">B</div>
+  <p class="note" id="note">墙拼齐之后，缺口自己会告诉你还差什么。</p>
+
+  <div class="divline"></div>
+  <div class="foot">
+    <span>KB / 知识口播</span>
+    <span id="meta">功能块 5 · 空位 1 · 凸点 5</span>
+  </div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+  ['eyebrow', 'title', 'sub', 'item1', 'item2', 'item3', 'item4']
+    .forEach(function (k) { set(k, v[k]); });
+
+  var rs = document.documentElement.style;
+  if (v.accent) rs.setProperty('--accent', v.accent);
+  var ACC = v.accent || '#FFD429';
+
+  /* 版式：2×3 块墙（默认）/ 1×6 横排。两版都是六格、五块功能 + 一个空位。 */
+  var layout = v.layout || 'grid3';
+  var wall = document.getElementById('wall');
+  if (wall) wall.className = 'wall' + (layout === 'rail' ? ' rail' : '');
+  var hole = document.getElementById('hole');
+  if (hole) hole.textContent = layout === 'rail' ? '待填' : '待填';
+
+  var PACK = {
+    yellow: ['#FFD429', '#FFFFFF', '#FF5FA2', '#FFFFFF', '#3D7BFF'],
+    pink:   ['#FF5FA2', '#FFFFFF', '#3D7BFF', '#FFFFFF', '#2FD07A'],
+    green:  ['#2FD07A', '#FFFFFF', '#FFD429', '#FFFFFF', '#FF5FA2'],
+    blue:   ['#3D7BFF', '#FFFFFF', '#2FD07A', '#FFFFFF', '#FFD429'],
+    mixed:  ['#FFD429', '#FF5FA2', '#3D7BFF', '#2FD07A', '#FFFFFF']
+  };
+  function inkOn(hex) {
+    var h = String(hex || '').replace('#', '');
+    if (h.length !== 6) return '#0F0F0F';
+    var f = function (c) { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    var L = 0.2126 * f(parseInt(h.slice(0, 2), 16)) +
+            0.7152 * f(parseInt(h.slice(2, 4), 16)) +
+            0.0722 * f(parseInt(h.slice(4, 6), 16));
+    return L > 0.42 ? '#0F0F0F' : '#FFFFFF';
+  }
+  var pack = PACK[v.brickColor] || PACK.mixed;
+  var CELLS = ['#c1', '#c2', '#c3', '#c4', '#c5'];
+  CELLS.forEach(function (id, i) {
+    var el = document.querySelector(id);
+    if (!el) return;
+    el.style.background = pack[i];
+    var fg = inkOn(pack[i]);
+    ['tx', 'ix'].forEach(function (c) {
+      var t = el.querySelector('.' + c);
+      if (t) t.style.color = fg;
+    });
+  });
+
+  /* 派生量：功能块数 / 空位数 / 凸点枚数；品牌方块落在空位几何中心（按实测盒子算） */
+  var studs = [].slice.call(document.querySelectorAll('#wall .sc'));
+  var meta = document.getElementById('meta');
+  if (meta) {
+    meta.innerHTML = '功能块 <em>' + CELLS.length + '</em> · 空位 <em>1</em> · 凸点 <em>' +
+      studs.length + '</em>';
+  }
+  var mark = document.getElementById('mark');
+  if (mark && hole) {
+    var hr = hole.getBoundingClientRect();
+    mark.style.left = Math.round(hr.left + (hr.width - 104) / 2) + 'px';
+    mark.style.top = Math.round(hr.top + (hr.height - 104) / 2) + 'px';
+  }
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：四边飞入与整墙斜移压帧都撤掉，直接给拼好的终态 */
+    gsap.set('#head', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#wall', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#mark', { x: 0, y: 0, opacity: 1, boxShadow: '4px 4px 0 #0F0F0F' });
+    gsap.set('#note', { x: 0, y: 0, opacity: 1 });
+    if (studs.length) gsap.set(studs, { attr: { fill: ACC } });
+    tl.fromTo('#head', { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .55, ease: 'power3.out' }, 0);
+    tl.fromTo('#wall', { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .60, ease: 'power3.out' }, .16);
+    tl.fromTo('#note', { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .45, ease: 'power3.out' }, .30);
+    B.hold(tl, 1.15, 1.05);
+    return;
+  }
+
+  var stageRect = document.getElementById('stage').getBoundingClientRect();
+  var promoEl = document.querySelector('.promo');
+  var CEIL = promoEl ? Math.round(promoEl.getBoundingClientRect().bottom - stageRect.top) : 0;
+
+  /* 式 6 拼装：每块从离自己最近的那条画布边飞入，单轴、终点落在模数格点上。
+     位移量按实测盒子算到「正好贴住那条边」，任何时刻都不越框。 */
+  function nearestEdge(sel) {
+    var el = document.querySelector(sel);
+    if (!el) return { x: 0, y: 0 };
+    var r = el.getBoundingClientRect();
+    var dl = Math.round(r.left - stageRect.left);
+    var dr = Math.round(stageRect.right - r.right);
+    var dt = Math.round(r.top - stageRect.top);
+    var db = Math.round(stageRect.bottom - r.bottom);
+    var m = Math.min(dl, dr, dt, db);
+    if (m === dt) return { x: 0, y: -dt };
+    if (m === db) return { x: 0, y: db };
+    if (m === dl) return { x: -dl, y: 0 };
+    return { x: dr, y: 0 };
+  }
+
+  tl.fromTo('#head', { y: CEIL - Math.round(document.getElementById('head').getBoundingClientRect().top - stageRect.top) },
+    { y: 0, duration: 0.26, ease: 'power4.out' }, 0.00);
+
+  var SHADOW = '8px 8px 0 #0F0F0F';
+  CELLS.forEach(function (sel, i) {
+    var at = 0.30 + i * 0.11;
+    tl.fromTo(sel, nearestEdge(sel), { x: 0, y: 0, duration: 0.26, ease: 'power4.out' }, at);
+    tl.set(sel, { boxShadow: '8px 11px 0 #0F0F0F', immediateRender: false }, at + 0.26);
+    tl.to(sel, { boxShadow: SHADOW, duration: 0.04, ease: 'steps(2)' }, at + 0.30);
+    tl.set(sel + ' .sc', { attr: { fill: ACC }, immediateRender: false }, at + 0.36);
+  });
+
+  /* 品牌落款方块从上方落下填进空位 */
+  tl.fromTo('#mark', { y: CEIL - Math.round(document.getElementById('mark').getBoundingClientRect().top - stageRect.top) },
+    { y: 0, duration: 0.26, ease: 'power4.out' }, 1.22);
+  tl.set('#mark', { boxShadow: '4px 7px 0 #0F0F0F', immediateRender: false }, 1.48);
+  tl.to('#mark', { boxShadow: '4px 4px 0 #0F0F0F', duration: 0.04, ease: 'steps(2)' }, 1.52);
+
+  /* 缺口闭合 → 整面墙按「3/3 斜移」压 2 帧（基因 4 唯一的交互签名） */
+  tl.set('#wall', { x: 3, y: 3, immediateRender: false }, 1.78);
+  tl.to('#wall', { x: 0, y: 0, duration: 0.06, ease: 'steps(2)' }, 1.82);
+
+  /* 凸点阵逐枚硬切（式 8） */
+  tl.set(studs, { attr: { fill: '#FFFFFF' }, immediateRender: false }, 1.70);
+  studs.forEach(function (c, i) {
+    tl.set(c, { attr: { fill: ACC }, immediateRender: false }, 1.96 + i * 0.12);
+  });
+
+  tl.fromTo('#note', { y: 24 }, { y: 0, duration: 0.26, ease: 'power4.out' }, 2.60);
+
+  var introEnd = tl.duration();
+  var TOTAL = Math.min(6, Math.max(5, Number(v.duration) || 5.5));
+  var holdAt = Math.min(introEnd, TOTAL - 0.8);
+  B.hold(tl, holdAt, Math.max(0.8, TOTAL - holdAt));
+})();
+</script>
+</body></html>

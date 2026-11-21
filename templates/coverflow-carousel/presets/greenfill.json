@@ -1,0 +1,12 @@
+{
+  "title": "每日一影 · 片头轮转",
+  "img1": "./assets/_gf0.png",
+  "img2": "./assets/_gf1.png",
+  "img3": "./assets/_gf2.png",
+  "img4": "./assets/_gf3.png",
+  "img5": "./assets/_gf4.png",
+  "img6": "./assets/_gf5.png",
+  "focusIndex": 7,
+  "glowColor": "#FFC83D",
+  "duration": 6
+}

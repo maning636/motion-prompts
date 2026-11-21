@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"moods","name":"表情序列","type":"string","label":"表情序列（逗号分隔）","default":"plain,smile,star,angry"},{"id":"accent","name":"角色色","type":"color","label":"角色色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.4}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>哈士奇表情切换</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  :root {
+    --ac2: #FFC93C;
+    --ac3: #2EC4B6;
+    --ink: #241C18;
+    --fg: #FFF8EE;
+  }
+
+  .pop-spark { position: absolute; left: 100px; top: -4px; width: 36px; height: 36px;
+    background: var(--ac2); opacity: 0;
+    clip-path: polygon(50% 0%, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0% 50%, 40% 40%); }
+
+  .pop-hero { position: absolute; left: 190px; top: 106px; width: 100px; height: 92px;
+    transform-origin: 50% 100%; opacity: 0; }
+  .pop-leg { position: absolute; top: 71px; width: 20px; height: 21px;
+    border-radius: 3px 3px 9px 9px; background: var(--ac); border: 3px solid var(--ink); }
+  .pop-leg-l { left: 22px; }
+  .pop-leg-r { left: 54px; }
+  .pop-arm { position: absolute; top: 34px; width: 24px; height: 15px; z-index: 1;
+    border-radius: 15px; background: var(--ac); border: 3px solid var(--ink); }
+  .pop-arm-l { left: -7px; transform-origin: 100% 50%; }
+  .pop-arm-r { left: 83px; transform-origin: 0 50%; }
+  .pop-body { position: absolute; left: 14px; top: 0; width: 72px; height: 74px; z-index: 2;
+    border-radius: 24px 26px 22px 26px; background: var(--ac); border: 3px solid var(--ink); }
+
+  /* 每个表情是一整层，覆盖在同一张脸上 */
+  .pop-mood { position: absolute; left: 0; top: 0; width: 72px; height: 74px;
+    opacity: 0; transform-origin: 50% 42%; }
+  .m-eye { position: absolute; top: 22px; width: 20px; height: 24px;
+    border-radius: 50%; background: var(--ink); }
+  .m-eye-l { left: 12px; }
+  .m-eye-r { left: 40px; }
+  .m-arc { position: absolute; top: 27px; width: 22px; height: 13px;
+    border-bottom: 4px solid var(--ink); border-radius: 0 0 14px 14px; }
+  .m-arc-l { left: 11px; }
+  .m-arc-r { left: 39px; }
+  .m-star-ink { position: absolute; top: 18px; width: 30px; height: 30px;
+    background: var(--ink);
+    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+  .m-star { position: absolute; top: 20px; width: 26px; height: 26px;
+    background: var(--ac2);
+    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+  .m-star-l-ink { left: 7px; }
+  .m-star-r-ink { left: 35px; }
+  .m-star-l { left: 9px; }
+  .m-star-r { left: 37px; }
+  .m-mouth-o { position: absolute; left: 23px; top: 48px; width: 26px; height: 20px;
+    border-radius: 50%; background: var(--ink); }
+  .m-brow { position: absolute; top: 19px; width: 22px; height: 5px;
+    border-radius: 3px; background: var(--ink); }
+  .m-brow-l { left: 10px; transform: rotate(-20deg); }
+  .m-brow-r { left: 40px; transform: rotate(20deg); }
+  .m-pupil { position: absolute; top: 26px; width: 18px; height: 18px;
+    border-radius: 50%; background: var(--ink); }
+  .m-pupil-l { left: 13px; }
+  .m-pupil-r { left: 41px; }
+  .m-smile-m { position: absolute; left: 19px; top: 49px; width: 34px; height: 17px;
+    border-bottom: 5px solid var(--ink); border-radius: 0 0 18px 18px; }
+  .m-frown { position: absolute; left: 20px; top: 55px; width: 32px; height: 14px;
+    border-top: 5px solid var(--ink); border-radius: 18px 18px 0 0; }
+  .m-bar { position: absolute; left: 24px; top: 54px; width: 24px; height: 5px;
+    border-radius: 3px; background: var(--ink); }
+  /* ================= 哈士奇插画版 · 角色件 =================
+     下面这组规则整段覆盖上面的方块版外观；方块版的 class 全部保留，
+     因为时间轴引用的是元素变量不是 class，删 CSS 不会动动画。 */
+  :root {
+    --ink: #3A3540;
+    --line: #4A4550;
+    --fur-lit: #FDFBF7;
+    --fg: #FFF8EE;
+  }
+
+  .pop-shadow {
+    left: 152px; top: 190px; width: 132px; height: 22px; opacity: 0;
+    background: radial-gradient(ellipse at center, rgba(20,18,26,.42) 0%, rgba(20,18,26,.18) 48%, rgba(20,18,26,0) 72%);
+  }
+
+  .pop-hero { left: 152px; top: 52px; width: 176px; height: 146px; }
+  .pop-rig { width: 176px; height: 146px; }
+
+  /* 躯干：胸腔高光 + 斜向渐变 + 内外双阴影 */
+  .pop-torso { position: absolute; left: 46px; top: 84px; width: 82px; height: 50px; z-index: 2;
+    background:
+      radial-gradient(ellipse 60% 45% at 34% 26%, rgba(255,255,255,.85), rgba(255,255,255,0) 70%),
+      linear-gradient(152deg, #FDFBF7 0%, #E9E3D6 44%, #C4BCAC 100%);
+    border: 2.5px solid var(--line); border-radius: 30px 30px 22px 22px;
+    box-shadow: inset -5px -7px 12px rgba(58,53,64,.18), 2px 4px 9px rgba(26,24,32,.3);
+  }
+
+  /* 腿 + 脚掌 + 趾垫 */
+  .pop-leg { position: absolute; top: 126px; width: 21px; height: 26px; z-index: 2;
+    background: linear-gradient(160deg, #F6F2EA 0%, #DCD5C7 68%, #C0B8A8 100%);
+    border: 2.5px solid var(--line); border-radius: 5px 5px 8px 8px; }
+  .pop-leg-l { left: 54px; }
+  .pop-leg-r { left: 82px; }
+  .pop-paw { position: absolute; top: 140px; width: 22px; height: 15px; z-index: 3;
+    background: linear-gradient(180deg, #FDFBF7 0%, #E4DDD0 100%);
+    border: 2.5px solid var(--line); border-radius: 4px 10px 10px 10px; }
+  .pop-paw-l { left: 53px; }
+  .pop-paw-r { left: 81px; }
+  .pop-toe { position: absolute; top: 144px; width: 3.6px; height: 3.6px; z-index: 4;
+    border-radius: 50%; background: rgba(58,53,64,.4); }
+  .pop-leg-gap { position: absolute; left: 76px; top: 126px; width: 3px; height: 26px;
+    background: var(--line); z-index: 4; opacity: .7; }
+
+  /* 双臂：时间轴要摆动，所以保留 .pop-arm-l / -r 的元素与 transform-origin */
+  .pop-arm { position: absolute; width: 26px; height: 15px; z-index: 1;
+    background: linear-gradient(160deg, #F4EFE6 0%, #D4CCBD 100%);
+    border: 2.5px solid var(--line); border-radius: 15px;
+    box-shadow: 1px 2px 5px rgba(26,24,32,.25); }
+  .pop-arm-l { top: 92px; left: 28px; transform-origin: 100% 50%; transform: rotate(22deg); }
+  .pop-arm-r { top: 92px; left: 122px; transform-origin: 0 50%; transform: rotate(-22deg); }
+
+  .pop-head { position: absolute; left: 32px; top: -8px; width: 104px; height: 106px; z-index: 5; }
+  .pop-head svg { width: 100%; height: 100%; display: block; overflow: visible; }
+
+  /* 尾巴：z-index 要高于躯干，否则整条压在身体后面 */
+  .pop-tail { position: absolute; left: 116px; top: 86px; width: 48px; height: 26px; z-index: 3;
+    background: linear-gradient(150deg, #F2EDE4 0%, #CCC4B5 100%);
+    border: 2.5px solid var(--line); border-radius: 24px 24px 7px 24px;
+    transform-origin: 8% 50%; transform: rotate(-36deg);
+    box-shadow: 1px 3px 7px rgba(26,24,32,.3); }
+
+  /* 待机音符跟着放大后的角色重新定位 */
+  .pop-note { left: 156px; width: 24px; height: 24px; opacity: 0; color: #4A4550; }
+  .pop-note-1 { top: 0; }
+  .pop-note-2 { top: 12px; left: 178px; width: 18px; height: 18px; }
+
+  /* ===== expression 专属：容器放大 + 四套表情重画 =====
+     头从 72x74 换成 104x106，原坐标按比例放不下也不好看，
+     所以每套表情的元素是照着新脸重新摆的，不是机械缩放。 */
+  .pop-mood { position: absolute; left: 0; top: 0; width: 104px; height: 106px; }
+  .pop-mood > * { position: absolute; }
+
+  /* 眼（plain / star 底 / angry 瞳共用一个琥珀渐变） */
+  .m-eye { width: 20px; height: 20px; border-radius: 50%; top: 38px;
+    background: radial-gradient(circle at 36% 30%, #8A6434 0%, #4A3520 56%, #241B12 100%);
+    box-shadow: 0 0 0 2.5px #F4F0E7, 0 0 0 4px #4A4550; }
+  .m-eye::after { content: ''; position: absolute; left: 4px; top: 3px;
+    width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,.9); }
+  .m-eye-l { left: 23px; }
+  .m-eye-r { left: 61px; }
+
+  /* plain：一条平的嘴 */
+  .m-bar { left: 40px; top: 71px; width: 24px; height: 5px; border-radius: 3px;
+    background: #3A3540; }
+
+  /* smile：眼角两道笑纹 + 上弯的嘴 */
+  .m-arc { width: 14px; height: 9px; top: 46px;
+    border-top: 3px solid #3A3540; border-radius: 14px 14px 0 0; }
+  .m-arc-l { left: 17px; transform: rotate(-12deg); }
+  .m-arc-r { left: 73px; transform: rotate(12deg); }
+  .m-smile-m { left: 35px; top: 69px; width: 34px; height: 14px;
+    border-bottom: 4px solid #3A3540; border-radius: 0 0 20px 20px; }
+
+  /* star：星星眼（深墨底 + 亮星）+ 张嘴 */
+  .m-star-ink { width: 24px; height: 24px; top: 36px; background: #3A3540;
+    clip-path: polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%); }
+  .m-star-l-ink { left: 21px; }
+  .m-star-r-ink { left: 59px; }
+  .m-star { width: 13px; height: 13px; top: 41px; background: #FFD429;
+    clip-path: polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%); }
+  .m-star-l { left: 26.5px; }
+  .m-star-r { left: 64.5px; }
+  .m-mouth-o { left: 42px; top: 66px; width: 20px; height: 19px; border-radius: 50%;
+    background: radial-gradient(circle at 50% 30%, #8C4A50 0%, #5E3138 100%);
+    box-shadow: 0 0 0 2.5px #3A3540; }
+
+  /* angry：压低的眉 + 缩小的瞳 + 倒着的嘴 */
+  .m-brow { width: 18px; height: 5px; top: 33px; border-radius: 3px; background: #3A3540; }
+  .m-brow-l { left: 21px; transform: rotate(16deg); }
+  .m-brow-r { left: 65px; transform: rotate(-16deg); }
+  .m-pupil { width: 13px; height: 13px; top: 41px; border-radius: 50%;
+    background: radial-gradient(circle at 36% 30%, #7A5A2E 0%, #2A2016 100%);
+    box-shadow: 0 0 0 2.5px #F4F0E7, 0 0 0 4px #4A4550; }
+  .m-pupil-l { left: 26.5px; }
+  .m-pupil-r { left: 64.5px; }
+  .m-frown { left: 35px; top: 70px; width: 34px; height: 12px;
+    border-top: 4px solid #3A3540; border-radius: 20px 20px 0 0; }
+
+  /* 切换时的星星提示：跟着放大后的角色走 */
+  .pop-spark { left: 138px; top: 6px; width: 30px; height: 30px; }
+
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"moods":"plain,smile,star,angry","accent":"#FF6B35","duration":3.4};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || FALLBACK.duration;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  // ——— 方块小角色 ———
+  const hero = put('div', 'pop-hero');
+  put('div', 'pop-leg pop-leg-l', '', null, hero);
+  put('div', 'pop-leg pop-leg-r', '', null, hero);
+  put('div', 'pop-arm pop-arm-l', '', null, hero);
+  put('div', 'pop-arm pop-arm-r', '', null, hero);
+  put('div', 'pop-tail', '', null, hero);
+  put('div', 'pop-torso', '', null, hero);
+  put('div', 'pop-leg pop-leg-l', '', null, hero);
+  put('div', 'pop-leg pop-leg-r', '', null, hero);
+  put('div', 'pop-leg-gap', '', null, hero);
+  put('div', 'pop-paw pop-paw-l', '', null, hero);
+  put('div', 'pop-paw pop-paw-r', '', null, hero);
+  put('div', 'pop-toe', 'left:57px', null, hero);
+  put('div', 'pop-toe', 'left:65px', null, hero);
+  put('div', 'pop-toe', 'left:85px', null, hero);
+  put('div', 'pop-toe', 'left:93px', null, hero);
+  // 容器改名 body -> head 是安全的：时间轴只引用 layers/layer/spark/hero
+  const head = put('div', 'pop-head', '', null, hero);
+  head.innerHTML = [
+
+      '<svg viewBox="0 0 104 106" xmlns="http://www.w3.org/2000/svg">',
+'  <defs>',
+'    <radialGradient id="iFHead" cx="36%" cy="28%" r="78%">',
+'      <stop offset="0%" stop-color="#FFFFFF"/>',
+'      <stop offset="34%" stop-color="#F6F2EA"/>',
+'      <stop offset="68%" stop-color="#E4DED2"/>',
+'      <stop offset="100%" stop-color="#C3BBAB"/>',
+'    </radialGradient>',
+'    <linearGradient id="iFMask" x1="0.3" y1="0" x2="0.7" y2="1">',
+'      <stop offset="0%" stop-color="#63636F"/>',
+'      <stop offset="100%" stop-color="#3E3E4C"/>',
+'    </linearGradient>',
+'    <linearGradient id="iFEar" x1="0.2" y1="0" x2="0.8" y2="1">',
+'      <stop offset="0%" stop-color="#DCA896"/>',
+'      <stop offset="60%" stop-color="#BE8574"/>',
+'      <stop offset="100%" stop-color="#9E6757"/>',
+'    </linearGradient>',
+'    <radialGradient id="iFIris" cx="36%" cy="30%" r="72%">',
+'      <stop offset="0%" stop-color="#7A5A2E"/>',
+'      <stop offset="55%" stop-color="#4A3520"/>',
+'      <stop offset="100%" stop-color="#241B12"/>',
+'    </radialGradient>',
+'    <radialGradient id="iFNose" cx="34%" cy="22%" r="80%">',
+'      <stop offset="0%" stop-color="#7C7889"/>',
+'      <stop offset="45%" stop-color="#454250"/>',
+'      <stop offset="100%" stop-color="#232228"/>',
+'    </radialGradient>',
+'    <linearGradient id="iFEarOut" x1="0.3" y1="0" x2="0.7" y2="1">',
+'      <stop offset="0%" stop-color="#EDE8DE"/>',
+'      <stop offset="70%" stop-color="#D2CABA"/>',
+'      <stop offset="100%" stop-color="#B3AB9A"/>',
+'    </linearGradient>',
+'    <radialGradient id="iBlush" cx="50%" cy="50%" r="50%">',
+'      <stop offset="0%" stop-color="#F2A79C" stop-opacity=".55"/>',
+'      <stop offset="100%" stop-color="#F2A79C" stop-opacity="0"/>',
+'    </radialGradient>',
+'    <filter id="iSoft" x="-40%" y="-40%" width="180%" height="180%">',
+'      <feDropShadow dx="2.4" dy="3.4" stdDeviation="2.6" flood-color="#221F28" flood-opacity="0.34"/>',
+'    </filter>',
+'    <filter id="iSheen" x="-30%" y="-30%" width="160%" height="160%">',
+'      <feGaussianBlur stdDeviation="1.6"/>',
+'    </filter>',
+'  </defs>',
+'  <g filter="url(#iSoft)">',
+'    <path d="M18 34 L9 2 L40 19 Z" fill="url(#iFEarOut)" stroke="#4A4550" stroke-width="2.6" stroke-linejoin="round"/>',
+'    <path d="M22 31 L18 10 L33 18 Z" fill="url(#iFEar)"/>',
+'    <path d="M86 34 L95 2 L64 19 Z" fill="url(#iFEarOut)" stroke="#4A4550" stroke-width="2.6" stroke-linejoin="round"/>',
+'    <path d="M82 31 L86 10 L71 18 Z" fill="url(#iFEar)"/>',
+'  </g>',
+'  <g filter="url(#iSoft)">',
+'    <path d="M52 13 C74 13 92 29 92 52 C92 76 74 90 52 90 C30 90 12 76 12 52 C12 29 30 13 52 13 Z"',
+'          fill="url(#iFHead)" stroke="#4A4550" stroke-width="2.6"/>',
+'  </g>',
+'  <path d="M52 14 C62 14 69 17 73 22 L57 27 L52 23 Z" fill="url(#iFMask)"/>',
+'  <path d="M52 14 C42 14 35 17 31 22 L47 27 L52 23 Z" fill="url(#iFMask)"/>',
+'  <path d="M32 29 C25 34 21 42 21 50 L31 50 C32 42 35 34 41 30 Z" fill="url(#iFMask)"/>',
+'  <path d="M72 29 C79 34 83 42 83 50 L73 50 C72 42 69 34 63 30 Z" fill="url(#iFMask)"/>',
+'  <path d="M48 31 L56 31 L55 54 L49 54 Z" fill="url(#iFMask)" opacity=".92"/>',
+'  <g stroke="#B9B1A0" stroke-width="1.1" fill="none" opacity=".5" stroke-linecap="round">',
+'    <path d="M20 56 Q22 63 25 69"/>',
+'    <path d="M26 62 Q28 68 31 73"/>',
+'    <path d="M34 66 Q36 72 39 76"/>',
+'    <path d="M84 56 Q82 63 79 69"/>',
+'    <path d="M78 62 Q76 68 73 73"/>',
+'    <path d="M70 66 Q68 72 65 76"/>',
+'  </g>',
+'  <g filter="url(#iSheen)" opacity=".62">',
+'    <ellipse cx="40" cy="27" rx="15" ry="7" fill="#FFFFFF" transform="rotate(-24 40 27)"/>',
+'    <ellipse cx="66" cy="30" rx="9" ry="4.5" fill="#FFFFFF" transform="rotate(-16 66 30)"/>',
+'  </g>',
+'  <circle cx="68.6" cy="51.4" r="1.3" fill="#FFFFFF" opacity=".5"/>',
+'  <path d="M42 56 Q52 50 62 56 Q59 68 52 69 Q45 68 42 56 Z" fill="url(#iFNose)"/>',
+'  <ellipse cx="47" cy="57" rx="4" ry="2.4" fill="#FFFFFF" opacity=".55" transform="rotate(-14 47 57)"/>',
+'  <ellipse cx="43.5" cy="62" rx="1.8" ry="2.6" fill="#17161C" opacity=".45"/>',
+'  <ellipse cx="60.5" cy="62" rx="1.8" ry="2.6" fill="#17161C" opacity=".45"/>',
+'        stroke-linecap="round" stroke-linejoin="round"/>',
+'  <ellipse cx="24" cy="62" rx="11" ry="8" fill="url(#iBlush)"/>',
+'  <ellipse cx="80" cy="62" rx="11" ry="8" fill="url(#iBlush)"/>',
+'  <path d="M40 88 Q52 95 64 88 L64 99 L40 99 Z" fill="#F7F4ED" stroke="#4A4550" stroke-width="2.4" stroke-linejoin="round"/>',
+'  <g stroke="#C6BEAD" stroke-width="1" fill="none" opacity=".55" stroke-linecap="round">',
+'    <path d="M46 91 L45 98"/>',
+'    <path d="M52 92 L52 99"/>',
+'    <path d="M58 91 L59 98"/>',
+'  </g>',
+'</svg>'
+
+
+  ].join('\n');
+  const spark = put('div', 'pop-spark', '', null, hero);
+
+  // ——— 表情库：名字 → 一层 DOM ———
+  const KNOWN = ['plain', 'smile', 'star', 'angry'];
+  function buildMood(name, parent) {
+    const layer = put('div', 'pop-mood', '', null, parent);
+    if (name === 'smile') {
+      put('div', 'm-arc m-arc-l', '', null, layer);
+      put('div', 'm-arc m-arc-r', '', null, layer);
+      put('div', 'm-smile-m', '', null, layer);
+    } else if (name === 'star') {
+      put('div', 'm-star-ink m-star-l-ink', '', null, layer);
+      put('div', 'm-star-ink m-star-r-ink', '', null, layer);
+      put('div', 'm-star m-star-l', '', null, layer);
+      put('div', 'm-star m-star-r', '', null, layer);
+      put('div', 'm-mouth-o', '', null, layer);
+    } else if (name === 'angry') {
+      put('div', 'm-brow m-brow-l', '', null, layer);
+      put('div', 'm-brow m-brow-r', '', null, layer);
+      put('div', 'm-pupil m-pupil-l', '', null, layer);
+      put('div', 'm-pupil m-pupil-r', '', null, layer);
+      put('div', 'm-frown', '', null, layer);
+    } else {
+      put('div', 'm-eye m-eye-l', '', null, layer);
+      put('div', 'm-eye m-eye-r', '', null, layer);
+      put('div', 'm-bar', '', null, layer);
+    }
+    return layer;
+  }
+
+  const raw = String(v.moods == null || v.moods === '' ? FALLBACK.moods : v.moods);
+  const names = raw.split(/[,，\s]+/).filter(Boolean).map(s => s.toLowerCase());
+  const list = (names.length ? names : KNOWN.slice()).map(s => (KNOWN.indexOf(s) >= 0 ? s : 'plain'));
+  const layers = list.map(n => buildMood(n, head));
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  // 每个表情停留约 0.5s；表情多时自动压缩，但保证切换过程读得清
+  const INTRO = .34, TAIL = .34, n = layers.length;
+  const step = Math.min(.5, Math.max(n * .26, dur - INTRO - TAIL) / n);
+
+  // 入场
+  tl.fromTo(hero, { scale: .55, opacity: 0, y: 10 },
+    { scale: 1, opacity: 1, y: 0, duration: INTRO, ease: 'back.out(2.6)' }, 0);
+
+  // 逐个表情切换，每步约 0.5s，带一个小弹过渡
+  layers.forEach((layer, i) => {
+    const t = INTRO + i * step;
+    if (i === 0) {
+      tl.fromTo(layer, { scale: .3, opacity: 0, rotate: -12 },
+        { scale: 1, opacity: 1, rotate: 0, duration: .2, ease: 'back.out(3)' }, t);
+      return;
+    }
+    tl.to(layers[i - 1], { scale: .7, opacity: 0, duration: .13, ease: 'power2.in' }, t);
+    tl.fromTo(layer, { scale: .3, opacity: 0, rotate: -12 },
+      { scale: 1, opacity: 1, rotate: 0, duration: .2, ease: 'back.out(3)' }, t + .06);
+    tl.fromTo(spark, { scale: .2, opacity: 0, rotate: -40 },
+      { scale: 1.15, opacity: .95, rotate: 10, duration: .13, ease: 'back.out(3)' }, t + .06);
+    tl.to(spark, { scale: .4, opacity: 0, duration: .2, ease: 'power2.in' }, t + .19);
+    tl.to(hero, { y: -4, duration: .08, repeat: 1, yoyo: true, ease: 'power1.inOut' }, t + .06);
+  });
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

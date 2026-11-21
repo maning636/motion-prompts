@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "titleCn", "type": "string", "label": "中文标题（整句）", "default": "哪怕你完全不懂技术"}, {"id": "titleAccent", "type": "string", "label": "标题高亮词（绿色，须为标题子串）", "default": "完全不懂技术"}, {"id": "imgScreen1", "type": "image", "label": "手机1屏幕截图（留空=内置假UI）", "default": ""}, {"id": "imgScreen2", "type": "image", "label": "手机2屏幕截图（留空=内置假UI）", "default": ""}, {"id": "imgScreen3", "type": "image", "label": "手机3屏幕截图（留空=内置假UI）", "default": ""}, {"id": "imgScreen4", "type": "image", "label": "手机4屏幕截图（留空=内置假UI）", "default": ""}, {"id": "duration", "type": "number", "label": "总时长（秒，演完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12);
+  color: var(--foreground, #F5F5F3); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+/* 顶部居中大标题 */
+.ctitle{ position:absolute; left:160px; right:160px; top:110px; text-align:center;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:76px; line-height:1.3;
+  letter-spacing:3px; color:#FFFFFF; overflow-wrap:break-word; }
+.ctitle .acc{ color:#34D399; text-shadow:0 0 22px rgba(52,211,153,.6); position:relative; padding:0 4px; }
+.ctitle .acc::after{ content:''; position:absolute; left:6px; right:6px; bottom:-10px; height:5px;
+  border-radius:3px; background:#10B981; box-shadow:0 0 14px rgba(16,185,129,.8); }
+
+/* iPhone 样机（320x660），排成一列，底部出血裁切 */
+.phone{ position:absolute; width:320px; height:660px; background:#12161C;
+  border:1px solid rgba(16,185,129,.9); border-radius:52px;
+  box-shadow:0 0 26px rgba(16,185,129,.4), 0 0 70px rgba(16,185,129,.14),
+    inset 0 0 22px rgba(16,185,129,.06); will-change:transform; }
+/* 机身 320×660，整排上移 100px：原来 p1/p4 底边在 1180、下边框被画布切掉 100px
+   （p2/p3 也切 16px）。波浪的高低差仍是 84px。 */
+#p1{ left:230px;  top:420px; }
+#p2{ left:610px;  top:336px; }
+#p3{ left:990px;  top:336px; }
+#p4{ left:1370px; top:420px; }
+.screen{ position:absolute; left:11px; top:11px; width:298px; height:638px;
+  border-radius:42px; overflow:hidden; background:#EEF2F0; }
+.notch{ position:absolute; left:50%; top:20px; width:96px; height:24px; margin-left:-48px;
+  background:#0A0D12; border-radius:12px; z-index:5; }
+.scrimg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; z-index:4; }
+
+/* 屏幕内置假 UI（灰白小卡 + 细条） */
+.fui{ position:absolute; inset:0; padding:54px 16px 16px; }
+.fbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+.fbar .ft{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:17px; color:#111827; }
+.fbar .fd{ width:26px; height:26px; border-radius:50%; background:#10B981;
+  box-shadow:0 0 8px rgba(16,185,129,.5); }
+.fcard{ background:#FFFFFF; border-radius:12px; padding:13px; margin-bottom:12px;
+  box-shadow:0 2px 6px rgba(10,13,18,.06); }
+.frow{ display:flex; align-items:center; gap:10px; }
+.fsq{ width:30px; height:30px; border-radius:8px; background:#D1FAE5; flex:none; }
+.fsq.g2{ background:#A7F3D0; } .fsq.g3{ background:#6EE7B7; } .fsq.gg{ background:#E5E7EB; }
+.flines{ flex:1; }
+.fl{ height:8px; border-radius:4px; background:#E5E7EB; margin-bottom:6px; }
+.fl:last-child{ margin-bottom:0; }
+.fl.w60{ width:60%; } .fl.w40{ width:40%; } .fl.w80{ width:80%; } .fl.w70{ width:70%; }
+.fl.hi{ background:#34D399; }
+.fgrid{ display:flex; gap:10px; margin-bottom:12px; }
+.fmini{ flex:1; background:#FFFFFF; border-radius:12px; padding:12px;
+  box-shadow:0 2px 6px rgba(10,13,18,.06); }
+.fnum{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:20px; color:#111827; margin-bottom:8px; }
+.fnum span{ color:#10B981; }
+.fnote{ font-size:13px; color:#9CA3AF; margin-top:6px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="ctitle" id="tCn"></div>
+
+      <div class="phone" id="p1" data-layout-allow-overflow>
+        <div class="screen">
+          <div class="fui">
+            <div class="fbar"><div class="ft">消息列表</div><div class="fd"></div></div>
+            <div class="fcard"><div class="frow"><div class="fsq"></div><div class="flines"><div class="fl w80"></div><div class="fl w60"></div></div></div></div>
+            <div class="fcard"><div class="frow"><div class="fsq gg"></div><div class="flines"><div class="fl w60 hi"></div><div class="fl w40"></div></div></div></div>
+            <div class="fcard"><div class="frow"><div class="fsq g2"></div><div class="flines"><div class="fl w70"></div><div class="fl w40"></div></div></div></div>
+            <div class="fcard"><div class="frow"><div class="fsq gg"></div><div class="flines"><div class="fl w80"></div><div class="fl w60 hi"></div></div></div></div>
+          </div>
+          <img class="scrimg" id="scrImg1" alt="" />
+        </div>
+        <div class="notch"></div>
+      </div>
+
+      <div class="phone" id="p2" data-layout-allow-overflow>
+        <div class="screen">
+          <div class="fui">
+            <div class="fbar"><div class="ft">我的工作台</div><div class="fd"></div></div>
+            <div class="fgrid">
+              <div class="fmini"><div class="fnum">128<span>+</span></div><div class="fl w60 hi"></div></div>
+              <div class="fmini"><div class="fnum">36<span>%</span></div><div class="fl w60"></div></div>
+            </div>
+            <div class="fcard"><div class="frow"><div class="fsq g2"></div><div class="flines"><div class="fl w60 hi"></div><div class="fl w80"></div></div></div></div>
+            <div class="fcard"><div class="frow"><div class="fsq g3"></div><div class="flines"><div class="fl w80"></div><div class="fl w40"></div></div></div></div>
+            <div class="fcard"><div class="frow"><div class="fsq"></div><div class="flines"><div class="fl w70"></div><div class="fl w60"></div></div></div></div>
+          </div>
+          <img class="scrimg" id="scrImg2" alt="" />
+        </div>
+        <div class="notch"></div>
+      </div>
+
+      <div class="phone" id="p3" data-layout-allow-overflow>
+        <div class="screen">
+          <div class="fui">
+            <div class="fbar"><div class="ft">学习计划</div><div class="fd"></div></div>
+            <div class="fcard"><div class="frow"><div class="fsq g3"></div><div class="flines"><div class="fl w80 hi"></div><div class="fl w60"></div></div></div><div class="fnote">每天 20 分钟，自动排好</div></div>
+            <div class="fgrid">
+              <div class="fmini"><div class="fnum">7<span>天</span></div><div class="fl w60"></div></div>
+              <div class="fmini"><div class="fnum">92<span>%</span></div><div class="fl w60 hi"></div></div>
+            </div>
+            <div class="fcard"><div class="frow"><div class="fsq"></div><div class="flines"><div class="fl w60"></div><div class="fl w80 hi"></div></div></div></div>
+          </div>
+          <img class="scrimg" id="scrImg3" alt="" />
+        </div>
+        <div class="notch"></div>
+      </div>
+
+      <div class="phone" id="p4" data-layout-allow-overflow>
+        <div class="screen">
+          <div class="fui">
+            <div class="fbar"><div class="ft">今日待办</div><div class="fd"></div></div>
+            <div class="fcard"><div class="frow"><div class="fsq g2"></div><div class="flines"><div class="fl w70 hi"></div><div class="fl w40"></div></div></div></div>
+            <div class="fcard"><div class="frow"><div class="fsq gg"></div><div class="flines"><div class="fl w80"></div><div class="fl w60"></div></div></div></div>
+            <div class="fcard"><div class="frow"><div class="fsq"></div><div class="flines"><div class="fl w60"></div><div class="fl w80"></div></div></div></div>
+            <div class="fcard"><div class="frow"><div class="fsq g3"></div><div class="flines"><div class="fl w40 hi"></div><div class="fl w70"></div></div></div></div>
+          </div>
+          <img class="scrimg" id="scrImg4" alt="" />
+        </div>
+        <div class="notch"></div>
+      </div>
+    </div>
+    <script>
+      const FB = {"titleCn": "哪怕你完全不懂技术", "titleAccent": "完全不懂技术", "imgScreen1": "", "imgScreen2": "", "imgScreen3": "", "imgScreen4": "", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $=(s)=>document.querySelector(s);
+      const DUR=+v.duration>0?+v.duration:6;
+      $('[data-composition-id]').setAttribute('data-duration',String(DUR));
+
+      /* 标题：titleCn 中出现 titleAccent 的部分染绿，否则高亮词接在句尾 */
+      const cn=String(v.titleCn??''), acc=String(v.titleAccent??'');
+      const tCn=$('#tCn');
+      if(acc && cn.includes(acc)){
+        const i=cn.indexOf(acc);
+        tCn.textContent='';
+        tCn.append(document.createTextNode(cn.slice(0,i)));
+        const s=document.createElement('span'); s.className='acc'; s.textContent=acc;
+        tCn.append(s, document.createTextNode(cn.slice(i+acc.length)));
+      }else{
+        tCn.textContent=cn;
+        if(acc){ const s=document.createElement('span'); s.className='acc'; s.textContent=acc; tCn.append(s); }
+      }
+
+      /* 屏幕图片槽：填了路径就用图片铺满屏幕，盖住假 UI */
+      ['1','2','3','4'].forEach((n)=>{
+        const img=v['imgScreen'+n]||'';
+        if(img){ const im=$('#scrImg'+n); im.src=img; im.style.display='block'; }
+      });
+
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+
+      /* 1. 标题淡入上移 */
+      tl.fromTo('#tCn',{opacity:0,y:36},{opacity:1,y:0,duration:0.6,ease:'power3.out'},0.25);
+      /* 2. 4 台手机从左到右依次从底部升起（中间两台落位更高） */
+      ['#p1','#p2','#p3','#p4'].forEach((sel,i)=>{
+        tl.fromTo(sel,{y:640,opacity:0},{y:0,opacity:1,duration:0.85,ease:'power3.out'},0.95+i*0.16);
+      });
+      /* 3. 时间线补齐到总时长：避免渲染器 seek 超出时间线末端时状态丢失（实测会回退黑帧） */
+      tl.set('#root',{willChange:'auto'},DUR);
+      /* 演完定格，无收尾出场动画 */
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

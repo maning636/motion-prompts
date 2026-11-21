@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "增长真正的拐点"}, {"id": "subtitle", "type": "string", "label": "副标题", "default": "不是换工具，而是把流程模板化之后"}, {"id": "pointLabel", "type": "string", "label": "拐点标签", "default": "模板化开始"}, {"id": "caption", "type": "string", "label": "结论", "default": "拐点出现后，内容生产从单次项目变成可复用系统。"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+*{ box-sizing: border-box; }
+html, body{ margin:0; width:1920px; height:1080px; overflow:hidden; background: var(--background, #F5F0E6); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #F5F0E6); color: var(--foreground, #1D1D20);
+  font-family:'Noto Sans SC','PingFang SC',sans-serif; }
+.scene{ position:absolute; inset:0; padding:64px 80px; }
+.card{ background:#FFFDF7; border:3px solid #1D1D20; border-radius:16px; box-shadow:6px 6px 0 #2A292B; }
+.tape{ position:absolute; width:120px; height:32px; background:rgba(185,232,51,.6); border:2px solid #1D1D20;
+  border-radius:4px; transform:rotate(-5deg); z-index:5; }
+.tape.pink{ background:rgba(241,59,136,.35); transform:rotate(4deg); }
+.tape.blue{ background:rgba(62,123,242,.3); transform:rotate(-3deg); }
+.chip{ display:inline-flex; align-items:center; gap:8px; padding:6px 14px; background:#FFFDF7; border:3px solid #1D1D20;
+  border-radius:999px; font-family:'Fredoka','Arial Rounded MT Bold',sans-serif; font-weight:700; font-size:18px;
+  letter-spacing:.1em; text-transform:uppercase; white-space:nowrap; box-shadow:4px 4px 0 #2A292B; }
+.chip.lime{ background:#B9E833; } .chip.blue{ background:#3E7BF2; color:#FFFDF7; }
+.chip.pink{ background:#F13B88; color:#FFFDF7; } .chip.orange{ background:#FF9F1C; }
+.num{ font-family:'Fredoka','Arial Rounded MT Bold',sans-serif; font-weight:700; }
+.mono{ font-family:'IBM Plex Mono','JetBrains Mono',monospace; font-weight:700; }
+.dashline{ border:none; border-top:3px dashed #1D1D20; }
+</style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="card" style="position:absolute;left:60px;top:56px;padding:16px 28px;">
+          <span class="chip orange">POINT</span>
+          <h1 id="title" class="num" style="display:inline-block;margin:0 0 0 16px;font-size:40px;vertical-align:middle;"></h1>
+          <p id="subtitle" style="margin:6px 0 0;font-size:18px;color:#4D4A48;"></p>
+        </div>
+        <div class="card" style="position:absolute;left:80px;right:80px;top:230px;bottom:120px;padding:20px;">
+          <span class="tape" style="left:50px;top:-16px;"></span>
+          <svg viewBox="0 0 1720 560" style="width:100%;height:100%;overflow:visible;">
+            <line x1="40" y1="100" x2="1680" y2="100" stroke="#C9C0B2" stroke-width="2" stroke-dasharray="3 9"/>
+            <line x1="40" y1="250" x2="1680" y2="250" stroke="#C9C0B2" stroke-width="2" stroke-dasharray="3 9"/>
+            <line x1="40" y1="400" x2="1680" y2="400" stroke="#C9C0B2" stroke-width="2" stroke-dasharray="3 9"/>
+            <path id="curve" d="M40 420 C 340 420, 460 400, 600 380 C 800 340, 940 200, 1140 140 C 1340 80, 1520 70, 1680 50"
+              fill="none" stroke="#3E7BF2" stroke-width="7" stroke-linecap="round"/>
+            <circle id="dot" cx="600" cy="380" r="13" fill="#B9E833" stroke="#1D1D20" stroke-width="4" opacity="0"/>
+          </svg>
+        </div>
+        <span class="chip lime" id="pointLabel" style="position:absolute;left:640px;top:600px;opacity:0;"></span>
+        <div class="card" style="position:absolute;left:80px;bottom:44px;max-width:1150px;padding:16px 26px;">
+          <p id="caption" style="margin:0;font-size:20px;line-height:1.6;color:#4D4A48;"></p>
+        </div>
+
+      </section>
+    </div>
+    <script>
+      const fallback = {"title": "增长真正的拐点", "subtitle": "不是换工具，而是把流程模板化之后", "pointLabel": "模板化开始", "caption": "拐点出现后，内容生产从单次项目变成可复用系统。", "accent": "#00FF00", "foreground": "#F4EFE7", "exportMode": "transparent"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.documentElement.style.setProperty("--accent", v.accent ?? "#00FF00");
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const DUR = 6;
+      const countTo = (el, target, at, dur = 1.1, dec = 0) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(target) || 0, duration: dur, ease: "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+
+      $("title").textContent = v.title; $("subtitle").textContent = v.subtitle;
+      $("pointLabel").textContent = v.pointLabel; $("caption").textContent = v.caption;
+      const curve = $("curve"), len = curve.getTotalLength();
+      curve.style.strokeDasharray = len; curve.style.strokeDashoffset = len;
+      tl.fromTo(".card", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.15 }, 0.1);
+      tl.to(curve, { strokeDashoffset: 0, duration: 2.2, ease: "power2.inOut" }, 0.5);
+      tl.fromTo("#dot", { opacity: 0, scale: 0.3, transformOrigin: "center" }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(3)" }, 1.3);
+      tl.to("#pointLabel", { opacity: 1, y: -8, duration: 0.4 }, 1.6);
+      tl.to(".scene", { opacity: 0, duration: 0.5 }, DUR - 0.6);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

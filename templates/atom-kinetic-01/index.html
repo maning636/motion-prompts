@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{&quot;id&quot;: &quot;title&quot;, &quot;name&quot;: &quot;主标题&quot;, &quot;type&quot;: &quot;text&quot;, &quot;label&quot;: &quot;画面正中大字&quot;, &quot;default&quot;: &quot;我 知 道 我 想 要 什 么&quot;}, {&quot;id&quot;: &quot;tag&quot;, &quot;name&quot;: &quot;角标&quot;, &quot;type&quot;: &quot;text&quot;, &quot;label&quot;: &quot;左上角小标签&quot;, &quot;default&quot;: &quot;3D 体&quot;}, {&quot;id&quot;: &quot;words&quot;, &quot;name&quot;: &quot;隧道文字&quot;, &quot;type&quot;: &quot;text&quot;, &quot;label&quot;: &quot;隧道里的字（逗号分隔，最多 12 个）&quot;, &quot;default&quot;: &quot;复盘,小红书,造系统,AI,147 天,引爆工厂,1319 条,早上 8 点,想要什么,代码,PPT,12 项目&quot;}, {&quot;id&quot;: &quot;accent&quot;, &quot;name&quot;: &quot;强调色&quot;, &quot;type&quot;: &quot;color&quot;, &quot;label&quot;: &quot;主色（标题块与大字）&quot;, &quot;default&quot;: &quot;#E02020&quot;}, {&quot;id&quot;: &quot;duration&quot;, &quot;name&quot;: &quot;时长&quot;, &quot;type&quot;: &quot;number&quot;, &quot;label&quot;: &quot;时长（秒）&quot;, &quot;default&quot;: 3.0}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<title>滑动变焦字隧道</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: #050508;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+  #cv { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+</style>
+</head>
+<body>
+<div id="stage" data-composition-id="main" data-start="0" data-duration="3.0"
+     data-width="1920" data-height="1080">
+  <canvas id="cv" width="1920" height="1080"></canvas>
+</div>
+<script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {
+    title: "我 知 道 我 想 要 什 么",
+    tag: "3D 体",
+    words: "复盘,小红书,造系统,AI,147 天,引爆工厂,1319 条,早上 8 点,想要什么,代码,PPT,12 项目",
+    accent: "#E02020",
+    duration: 3.0
+  };
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+
+  const W = 1920, H = 1080;
+  const BLACK = [5, 5, 8], WHITE = [245, 245, 245];
+  const accent = (v.accent && String(v.accent).trim()) || FALLBACK.accent;
+  const ACCENT = hex2rgb(accent);
+  const TITLE = (v.title != null && v.title !== '') ? String(v.title) : FALLBACK.title;
+  const TAG = (v.tag != null && v.tag !== '') ? String(v.tag) : FALLBACK.tag;
+  const DURATION = (v.duration != null) ? (parseFloat(v.duration) || FALLBACK.duration) : FALLBACK.duration;
+  const WORDS = String((v.words != null && v.words !== '') ? v.words : FALLBACK.words)
+    .split(/[,，]/).map(s => s.trim()).filter(Boolean).slice(0, 12);
+
+  function hex2rgb(h) {
+    const s = String(h).trim().replace('#', '');
+    const n = s.length === 3
+      ? s.split('').map(c => c + c).join('')
+      : s.padEnd(6, '0').slice(0, 6);
+    return [parseInt(n.slice(0, 2), 16), parseInt(n.slice(2, 4), 16), parseInt(n.slice(4, 6), 16)];
+  }
+  const clamp = (v2, lo, hi) => Math.max(lo, Math.min(hi, v2));
+  const lerp = (a, b, t) => a + (b - a) * clamp(t, 0, 1);
+  const seg = (t, a, b) => clamp((t - a) / Math.max(b - a, 1e-4), 0, 1);
+  const easeInOutCubic = (t) => { t = clamp(t, 0, 1); return 4 * t * t * t < 1 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
+  const fade = (c, f) => 'rgb(' + c.map(x => Math.round(x * f)).join(',') + ')';
+
+  const canvas = document.getElementById('cv');
+  const ctx = canvas.getContext('2d');
+
+  /* 隧道里的每一块字：文字 / 类型 / x / y / z
+     z 越大越远（镜头往里推进 = 越远的块先小后大）。 */
+  const TUNNEL = [
+    ['复盘', 'title', -1.0, -0.4, 7], ['小红书', 'frag', 1.6, -1.0, 10],
+    ['造系统', 'title', 0.8, 0.5, 9], ['AI', 'frag', -2.0, 0.8, 14],
+    ['147 天', 'data', -0.6, 0.9, 6], ['引爆工厂', 'frag', 2.2, 0.3, 16],
+    ['1319 条', 'data', 0.9, -0.8, 8], ['早上 8 点', 'frag', -1.8, -1.2, 12],
+    ['想要什么', 'title', -0.2, -0.9, 11], ['代码', 'frag', 1.2, 1.2, 18],
+    ['PPT', 'frag', -2.4, -0.2, 20], ['12 项目', 'data', 0.2, 1.3, 9]
+  ];
+
+  function proj(x, y, z, fov) {
+    const f = (H / 2) / Math.tan((fov * Math.PI / 180) / 2);
+    const s = f / Math.max(z, 0.05);
+    return [W / 2 + x * s, H / 2 + y * s, s];
+  }
+
+  function drawBlock(text, kind, x, y, z, fov, cz) {
+    z -= cz;
+    if (z <= 0.2) return;
+    const p = proj(x, y, z, fov);
+    const sx = p[0], sy = p[1], sc = p[2];
+    if (!(sx > -300 && sx < W + 300 && sy > -200 && sy < H + 200)) return;
+    const base = kind === 'title' ? 84 : (kind === 'data' ? 56 : 30);
+    const size = Math.max(12, Math.round(base * sc / 90));
+    const f = clamp((30 - z) / 24, 0.25, 1);
+    let bg, fg, bd;
+    if (kind === 'title') { bg = ACCENT; fg = WHITE; bd = BLACK; }
+    else if (kind === 'data') { bg = WHITE; fg = BLACK; bd = BLACK; }
+    else { bg = BLACK; fg = WHITE; bd = WHITE; }
+    const weight = kind === 'frag' ? 400 : 900;
+    ctx.font = weight + ' ' + size + 'px MiSans, "Microsoft YaHei", sans-serif';
+    const m = ctx.measureText(text);
+    const tw = m.width;
+    const th = (m.actualBoundingBoxAscent || size * 0.8) + (m.actualBoundingBoxDescent || size * 0.2);
+    const px = Math.round(size * 0.4), py = Math.round(size * 0.25);
+    const x0 = sx - tw / 2 - px, y0 = sy - th / 2 - py;
+    const x1 = sx + tw / 2 + px, y1 = sy + th / 2 + py;
+    ctx.fillStyle = fade(bg, f);
+    ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.strokeStyle = fade(bd, f);
+    ctx.lineWidth = Math.max(2, Math.round(size / 14));
+    ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.fillStyle = fade(fg, f);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, sx, sy);
+  }
+
+  function drawTag(label, t) {
+    const bp = (t * 2.5) % 8;
+    const shake = bp < 0.35 ? Math.sin(bp * 40) * 3 * (1 - bp / 0.35) : 0;
+    ctx.font = '400 50px MiSans, "Microsoft YaHei", sans-serif';
+    ctx.fillStyle = fade(WHITE, 1);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, 60 + shake, 50);
+  }
+
+  /* 画面是时间的纯函数：给定 t，输出唯一一帧。逐帧 seek 不会打架。 */
+  function render(t) {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = fade(BLACK, 1);
+    ctx.fillRect(0, 0, W, H);
+    const p = easeInOutCubic(seg(t, 0, 2.6));
+    const fov = lerp(2.5, 60, p);
+    const cz = lerp(0, 14, p);
+    for (let i = 0; i < TUNNEL.length; i++) {
+      const w = WORDS[i] || TUNNEL[i][0];
+      drawBlock(w, TUNNEL[i][1], TUNNEL[i][2], TUNNEL[i][3], TUNNEL[i][4], fov, cz);
+    }
+    drawTag(TAG, t);
+    ctx.font = '900 110px MiSans, "Microsoft YaHei", sans-serif';
+    ctx.fillStyle = fade(ACCENT, 1);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(TITLE, W / 2, H / 2);
+  }
+
+  /* 整片只有一条补间：推进 {t:0}，onUpdate 把画面算出来。 */
+  const st = { t: 0 };
+  const tl = gsap.timeline({ paused: true });
+  tl.fromTo(st, { t: 0 }, {
+    t: DURATION, duration: DURATION, ease: 'none',
+    onUpdate: function () { render(st.t); }
+  }, 0);
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 自带 __seekTo：逐帧定位的兜底。
+     为什么必须自带：compose.html 注入的 __seekTo 用的是
+     `var __seekTo=function(t){...}` —— 声明在 load 回调的**闭包作用域**里，
+     不是 window 的属性；而它调用时读的是 `contentWindow.__seekTo`，
+     读到的永远是 undefined → 逐帧定位整条链路是空转。
+     （实测复现：内部诊断脚本（未随仓分发））
+     模板自己把 __seekTo 挂到 window 上，就不依赖注入那套。
+
+     画面是时间的纯函数，所以这里直接 render(t) 即可，
+     不必绕 GSAP 的事件派发（tween 用的是 ease:'none'，st.t === t，两者等价）。 */
+  window.__seekTo = function (t) {
+    if (typeof t !== 'number' || !isFinite(t)) return;
+    const tt = Math.max(0, Math.min(DURATION, t));
+    try { tl.pause(); tl.time(0, false); tl.time(tt, false); } catch (e) { }
+    render(tt);
+  };
+
+  const first = function () {
+    const q = /(?:^|[?&])t=([\d.]+)/.exec(location.search);
+    if (q) { render(parseFloat(q[1])); return; }
+    render(0);
+  };
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(first).catch(first);
+  } else { first(); }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+{
+  "title": "LLM 对话流",
+  "subtitle": "多轮问答如何逐步收敛",
+  "messages": "user: 帮我写一个 Python 爬虫\nassistant: 好的，需要先确定目标网站结构\nuser: 目标是新闻列表页\nassistant: 那我们可以用 requests + BeautifulSoup 提取标题和链接"
+}

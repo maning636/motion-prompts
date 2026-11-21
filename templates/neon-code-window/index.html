@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "titleEn", "type": "string", "label": "英文小标签（全大写）", "default": "BUILD PROGRESS"}, {"id": "titleCn", "type": "string", "label": "中文标题（含高亮词）", "default": "它会一步一步问你"}, {"id": "titleAccent", "type": "string", "label": "标题高亮词（绿色，须为标题子串）", "default": "一步一步"}, {"id": "windowTitle", "type": "string", "label": "代码窗口名", "default": "generator.js"}, {"id": "line1", "type": "string", "label": "代码行1", "default": "const profile = await ask(\"你平时忙什么\")"}, {"id": "line2", "type": "string", "label": "代码行2", "default": "const style = await ask(\"喜欢什么风格\")"}, {"id": "line3", "type": "string", "label": "代码行3", "default": "const draft = generate(profile, style)"}, {"id": "line4", "type": "string", "label": "代码行4", "default": "await confirm(draft) // 一步一步确认"}, {"id": "line5", "type": "string", "label": "代码行5", "default": "return publish(draft) // 完成"}, {"id": "duration", "type": "number", "label": "总时长（秒，演完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12);
+  color: var(--foreground, #F5F5F3); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+/* 左侧标题组 */
+.tgroup{ position:absolute; left:130px; top:400px; width:700px; }
+.ten{ display:inline-flex; align-items:center; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700;
+  font-size:26px; letter-spacing:8px; color:#10B981; text-transform:uppercase;
+  text-shadow:0 0 14px rgba(16,185,129,.5); max-width:700px; overflow:hidden; white-space:nowrap; }
+.ten::before{ content:''; display:inline-block; width:34px; height:6px; border-radius:3px;
+  background:#10B981; box-shadow:0 0 12px rgba(16,185,129,.8); margin-right:18px; }
+.tcn{ margin-top:30px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:64px;
+  letter-spacing:2px; color:#FFFFFF; max-width:700px; overflow-wrap:break-word; }
+.tcn .acc{ color:#34D399; text-shadow:0 0 20px rgba(52,211,153,.6); position:relative; padding:0 4px; }
+.tcn .acc::after{ content:''; position:absolute; left:6px; right:6px; bottom:-12px; height:5px;
+  border-radius:3px; background:#10B981; box-shadow:0 0 14px rgba(16,185,129,.8); }
+
+/* 右侧代码窗口 */
+.codewin{ position:absolute; left:940px; top:250px; width:860px; height:580px;
+  background:#0D1117; border:1px solid rgba(16,185,129,.85); border-radius:16px;
+  box-shadow:0 0 26px rgba(16,185,129,.35), 0 0 60px rgba(16,185,129,.12), inset 0 0 30px rgba(16,185,129,.05);
+  overflow:hidden; will-change:transform; }
+.winbar{ position:relative; height:68px; border-bottom:1px solid rgba(16,185,129,.25);
+  display:flex; align-items:center; }
+.dots{ position:absolute; left:28px; display:flex; gap:12px; }
+.dots i{ width:16px; height:16px; border-radius:50%; }
+.dots i:nth-child(1){ background:#FF5F57; }
+.dots i:nth-child(2){ background:#FEBC2E; }
+.dots i:nth-child(3){ background:#28C840; }
+.winname{ position:absolute; left:0; right:0; text-align:center; font-size:24px;
+  color:#9CA3AF; letter-spacing:1px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+  padding:0 140px; }
+.winbody{ padding:38px 40px; }
+.cline{ display:flex; align-items:flex-start; min-height:66px; margin-bottom:12px; }
+.lno{ flex:0 0 54px; font-size:24px; color:#9CA3AF; opacity:.65; text-align:right;
+  padding-right:24px; line-height:38px; user-select:none; }
+.lcode{ flex:1 1 auto; font-size:25px; line-height:38px; color:#FFFFFF;
+  white-space:pre-wrap; overflow-wrap:anywhere; max-width:690px; }
+.lcode .k{ color:#34D399; text-shadow:0 0 10px rgba(52,211,153,.35); }
+.lcode .s{ color:#34D399; }
+.lcode .c{ color:#9CA3AF; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="tgroup">
+        <div class="ten" id="tEn"></div>
+        <div class="tcn" id="tCn"><span id="tPre"></span><span class="acc" id="tAcc"></span><span id="tPost"></span></div>
+      </div>
+
+      <div class="codewin" id="codewin">
+        <div class="winbar">
+          <div class="dots"><i></i><i></i><i></i></div>
+          <div class="winname" id="winName"></div>
+        </div>
+        <div class="winbody" id="winBody">
+          <div class="cline"><span class="lno">1</span><span class="lcode" id="lc1"></span></div>
+          <div class="cline"><span class="lno">2</span><span class="lcode" id="lc2"></span></div>
+          <div class="cline"><span class="lno">3</span><span class="lcode" id="lc3"></span></div>
+          <div class="cline"><span class="lno">4</span><span class="lcode" id="lc4"></span></div>
+          <div class="cline"><span class="lno">5</span><span class="lcode" id="lc5"></span></div>
+        </div>
+      </div>
+    </div>
+    <script>
+      const FB = {"titleEn": "BUILD PROGRESS", "titleCn": "它会一步一步问你", "titleAccent": "一步一步", "windowTitle": "generator.js", "line1": "const profile = await ask(\"你平时忙什么\")", "line2": "const style = await ask(\"喜欢什么风格\")", "line3": "const draft = generate(profile, style)", "line4": "await confirm(draft) // 一步一步确认", "line5": "return publish(draft) // 完成", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $=(s)=>document.querySelector(s);
+      const DUR=+v.duration>0?+v.duration:6;
+      $('[data-composition-id]').setAttribute('data-duration',String(DUR));
+
+      $('#tEn').textContent=v.titleEn||'';
+
+      /* 标题：高亮词作为子串拆分，找不到则整体前置、高亮词附加在后 */
+      const title=String(v.titleCn??''), acc=String(v.titleAccent??'');
+      const idx=acc?title.indexOf(acc):-1;
+      if(idx>=0){
+        $('#tPre').textContent=title.slice(0,idx);
+        $('#tAcc').textContent=acc;
+        $('#tPost').textContent=title.slice(idx+acc.length);
+      }else{
+        $('#tPre').textContent=title;
+        $('#tAcc').textContent=acc;
+        $('#tPost').textContent='';
+      }
+
+      $('#winName').textContent=v.windowTitle||'';
+
+      /* 简易着色：关键字/字符串=绿，注释=灰，其余=白（仅绿/白/灰三色） */
+      const KW=/^(const|let|var|await|async|function|return|new|import|from|export)$/;
+      const TOK=/(\/\/.*$)|("(?:[^"\\]|\\.)*")|([A-Za-z_$][\w$]*)|(\s+)|(.)/g;
+      function paint(el,line){
+        el.textContent='';
+        const src=String(line??'');
+        let m;
+        TOK.lastIndex=0;
+        while((m=TOK.exec(src))!==null){
+          const sp=document.createElement('span');
+          if(m[1]!==undefined){ sp.className='c'; sp.textContent=m[1]; }
+          else if(m[2]!==undefined){ sp.className='s'; sp.textContent=m[2]; }
+          else if(m[3]!==undefined){ sp.textContent=m[3]; if(KW.test(m[3])) sp.className='k'; }
+          else if(m[4]!==undefined){ sp.textContent=m[4].replace(/ /g,' '); }
+          else { sp.textContent=m[5]; }
+          el.appendChild(sp);
+          if(m[0]==='') break;
+        }
+      }
+      for(let i=1;i<=5;i++) paint($('#lc'+i), v['line'+i]);
+
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+
+      /* 1. 标题组：英文标签 → 中文标题 淡入上移 */
+      tl.fromTo('#tEn',{opacity:0,y:24},{opacity:1,y:0,duration:0.5,ease:'power3.out'},0.25);
+      tl.fromTo('#tCn',{opacity:0,y:32},{opacity:1,y:0,duration:0.6,ease:'power3.out'},0.45);
+      /* 2. 代码窗口从右滑入 */
+      tl.fromTo('#codewin',{x:170,opacity:0},{x:0,opacity:1,duration:0.8,ease:'power3.out'},0.95);
+      /* 3. 代码行逐行 cascade 淡入 */
+      tl.fromTo('#winBody .cline',{opacity:0,y:18},{opacity:1,y:0,duration:0.45,ease:'power2.out',stagger:0.18},1.65);
+      /* 4. 定格：补 set 占满总时长防黑帧 */
+      tl.set('#root',{opacity:1},Math.max(2.8,DUR-0.05));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "img1", "type": "image", "label": "图1（首尾回环）", "default": "./placeholder-1.png"}, {"id": "img2", "type": "image", "label": "图2", "default": "./placeholder-2.png"}, {"id": "img3", "type": "image", "label": "图3", "default": "./placeholder-3.png"}, {"id": "img4", "type": "image", "label": "图4", "default": "./placeholder-4.png"}, {"id": "drops", "type": "string", "label": "落点数组（x,y 百分比分号分隔）", "default": "62,38;30,64;70,66;45,30"}, {"id": "dropDur", "type": "number", "label": "单滴时长(秒)", "default": 2.3}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 9.3}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #000; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+      .rdl-layer{ position: absolute; inset: 0; overflow: hidden; }
+      .rdl-layer img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+      .rdl-tag{ position: absolute; left: 64px; top: 54px; font-size: 22px; letter-spacing: .4em;
+        color: rgba(255,255,255,.65); z-index: 9; font-family: 'IBM Plex Mono', monospace; }
+      .rdl-count{ position: absolute; right: 64px; top: 54px; font-size: 22px; letter-spacing: .3em;
+        color: rgba(255,255,255,.65); z-index: 9; font-family: 'IBM Plex Mono', monospace; }
+      #glint{ position: absolute; width: 180px; height: 180px; margin: -90px 0 0 -90px; border-radius: 50%;
+        background: radial-gradient(circle, #FFFFFF 0%, rgba(200,255,220,.85) 26%, transparent 68%);
+        opacity: 0; pointer-events: none; mix-blend-mode: screen; z-index: 8; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="9.3" data-width="1920" data-height="1080">
+      <div class="rdl-layer" id="L0"><img alt=""></div>
+      <div class="rdl-layer" id="L1"><img alt=""></div>
+      <div class="rdl-layer" id="L2"><img alt=""></div>
+      <div class="rdl-layer" id="L3"><img alt=""></div>
+      <div class="rdl-layer" id="L4"><img alt=""></div>
+      <div id="glint"></div>
+      <div class="rdl-tag">RAINDROP LOOP · 4 DROPS 1 TIMELINE</div>
+      <div class="rdl-count" id="count">DROP 01 / 04</div>
+
+    </div>
+    <script>
+      const fallback = {"img1": "./placeholder-1.png", "img2": "./placeholder-2.png", "img3": "./placeholder-3.png", "img4": "./placeholder-4.png", "drops": "62,38;30,64;70,66;45,30", "dropDur": 2.3, "duration": 9.3};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      const srcs = [V.img1, V.img2, V.img3, V.img4, V.img1];  // L4 = 首图回环
+      srcs.forEach((s, i) => { if (s) $("L" + i).querySelector("img").src = s; });
+      const pts = String(V.drops ?? "").split(";").map((p) => p.split(",").map(Number));
+      const D = Math.max(1.6, Number(V.dropDur) || 2.3);
+      const glint = $("glint"), count = $("count");
+      const HIDE = "radial-gradient(ellipse 24px 46px at 960px -200px, #000 0%, #000 30%, transparent 100%)";
+      for (let i = 1; i <= 4; i++) {
+        gsap.set($("L" + i + " img"), { filter: "blur(16px)", scale: 1.06 });
+        $("L" + i).style.webkitMaskImage = $("L" + i).style.maskImage = HIDE;
+      }
+      pts.slice(0, 4).forEach((pt, k) => {
+        const layer = $("L" + (k + 1)), img = layer.querySelector("img");
+        const px = (pt[0] || 50) / 100 * 1920, py = (pt[1] || 40) / 100 * 1080;
+        const st = { rx: 24, ry: 46, x: px, y: -200, fe: 14 };
+        const applyMask = () => {
+          count.textContent = "DROP 0" + (k + 1) + " / 04";
+          const r = Math.max((st.rx + st.ry) / 2, 1);
+          const inner = Math.max(0, 1 - st.fe / r) * 100;
+          const m = "radial-gradient(ellipse " + st.rx + "px " + st.ry + "px at " + st.x + "px " + st.y +
+            "px, #000 0%, #000 " + inner + "%, transparent 100%)";
+          layer.style.webkitMaskImage = m;
+          layer.style.maskImage = m;
+        };
+        applyMask();
+        const t0 = 0.2 + k * D;
+        // 01 DROP 竖椭圆落下 → 02 IMPACT 收圆 → GLINT 高光一拍 → 03 SPREAD 羽化扩散铺满 → SETTLE
+        tl.to(st, { y: py, duration: 0.5, ease: "power1.in", onUpdate: applyMask }, t0);
+        tl.to(st, { ry: 24, duration: 0.18, ease: "power2.out", onUpdate: applyMask }, t0 + 0.5);
+        tl.set(glint, { left: px, top: py }, t0 + 0.48);
+        tl.fromTo(glint, { opacity: 0, scale: 0.4 }, { opacity: 1, scale: 1, duration: 0.1 }, t0 + 0.52);
+        tl.to(glint, { opacity: 0, scale: 2.4, duration: 0.5, ease: "power2.out" }, t0 + 0.64);
+        const rMax = Math.hypot(Math.max(px, 1920 - px), Math.max(py, 1080 - py)) + 140;
+        tl.to(st, { rx: rMax, ry: rMax, fe: 62, duration: 1.35, ease: "power2.in", onUpdate: applyMask }, t0 + 0.68);
+        tl.to(img, { filter: "blur(0px)", scale: 1, duration: 1.4, ease: "power1.out" }, t0 + 0.68);
+      });
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

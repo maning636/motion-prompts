@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "titleEn", "type": "string", "label": "顶部英文小标签", "default": "FEATURE 02 · YOUR DATA"}, {"id": "titleCn", "type": "string", "label": "中文主标题（含高亮词全文）", "default": "数据只在你自己手机里"}, {"id": "titleAccent", "type": "string", "label": "标题高亮词（绿色，需为主标题子串）", "default": "只在你自己"}, {"id": "titleSub", "type": "string", "label": "灰色副标题", "default": "就算把工作台发到网上也一样"}, {"id": "leftEn", "type": "string", "label": "左卡英文小标签", "default": "ON YOUR PHONE"}, {"id": "leftCn", "type": "string", "label": "左卡中文标题（白色）", "default": "数据在这里"}, {"id": "rightEn", "type": "string", "label": "右卡英文小标签", "default": "ON THE WEB"}, {"id": "rightCn", "type": "string", "label": "右卡中文标题（灰色）", "default": "别人看到的"}, {"id": "chipText", "type": "string", "label": "左卡下方 chip 文字", "default": "你的账目"}, {"id": "duration", "type": "number", "label": "总时长（秒，演完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12);
+  color: var(--foreground, #F5F5F3); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+/* 顶部标题区 */
+.hwrap{ position:absolute; left:0; right:0; top:104px; text-align:center; }
+.hen{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:24px; letter-spacing:8px;
+  color:#10B981; text-transform:uppercase; text-shadow:0 0 12px rgba(16,185,129,.45);
+  max-width:1400px; margin:0 auto; white-space:nowrap; overflow:hidden; }
+.htitle{ margin-top:22px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:62px;
+  letter-spacing:2px; color:#FFFFFF; white-space:nowrap; }
+.htitle .acc{ color:#34D399; text-shadow:0 0 18px rgba(52,211,153,.55); position:relative; padding:0 4px; }
+.htitle .acc::after{ content:''; position:absolute; left:6px; right:6px; bottom:-12px; height:5px;
+  border-radius:3px; background:#10B981; box-shadow:0 0 14px rgba(16,185,129,.8); }
+.hsub{ margin-top:30px; font-size:28px; color:#9CA3AF; max-width:1400px; margin-left:auto;
+  margin-right:auto; overflow-wrap:break-word; }
+
+/* 双卡 */
+.card{ position:absolute; top:420px; width:600px; height:380px; background:#12161C;
+  border-radius:16px; padding:48px 48px; text-align:center; will-change:transform; }
+#cardL{ left:300px; border:1px solid rgba(16,185,129,.85);
+  box-shadow:0 0 26px rgba(16,185,129,.35), 0 0 60px rgba(16,185,129,.12), inset 0 0 30px rgba(16,185,129,.05); }
+#cardR{ left:1020px; border:1px solid rgba(156,163,175,.35);
+  box-shadow:0 0 20px rgba(156,163,175,.10), inset 0 0 30px rgba(156,163,175,.04); }
+.cicon{ width:150px; height:150px; margin:6px auto 26px; }
+.cicon svg{ width:100%; height:100%; overflow:visible; }
+.cen{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:23px; letter-spacing:6px;
+  text-transform:uppercase; max-width:504px; margin:0 auto; white-space:nowrap; overflow:hidden; }
+#cardL .cen{ color:#10B981; text-shadow:0 0 12px rgba(16,185,129,.4); }
+#cardR .cen{ color:#9CA3AF; }
+.ccn{ margin-top:16px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:42px;
+  max-width:504px; margin-left:auto; margin-right:auto; overflow-wrap:break-word; }
+#cardL .ccn{ color:#FFFFFF; }
+#cardR .ccn{ color:#9CA3AF; }
+.cicon .gstroke{ stroke:#34D399; stroke-width:5; fill:none; stroke-linecap:round; stroke-linejoin:round;
+  filter:drop-shadow(0 0 8px rgba(52,211,153,.6)); }
+.cicon .ystroke{ stroke:#9CA3AF; stroke-width:5; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+
+/* 中间竖虚线 */
+.divider{ position:absolute; left:958px; top:420px; width:4px; height:380px;
+  background-image:linear-gradient(to bottom, rgba(52,211,153,.9) 55%, rgba(52,211,153,0) 0%);
+  background-size:4px 26px; background-repeat:repeat-y;
+  filter:drop-shadow(0 0 8px rgba(52,211,153,.55)); transform-origin:50% 0%; }
+
+/* 左卡下方 chip */
+.chipzone{ position:absolute; left:300px; top:860px; width:600px; text-align:center; }
+.chip{ display:inline-block; padding:14px 36px; border-radius:999px;
+  border:1px solid rgba(16,185,129,.8); background:rgba(16,185,129,.08);
+  box-shadow:0 0 18px rgba(16,185,129,.28), inset 0 0 12px rgba(16,185,129,.06);
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:28px; color:#A7F3D0;
+  letter-spacing:2px; max-width:560px; white-space:nowrap; overflow:hidden; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="hwrap" id="hwrap">
+        <div class="hen" id="tEn"></div>
+        <div class="htitle" id="tCn"></div>
+        <div class="hsub" id="tSub"></div>
+      </div>
+
+      <div class="divider" id="divider"></div>
+
+      <div class="card" id="cardL">
+        <div class="cicon e">
+          <svg viewBox="0 0 150 150">
+            <g>
+              <!-- 手机 + 锁 -->
+              <rect class="gstroke" x="46" y="12" width="58" height="126" rx="12"/>
+              <line class="gstroke" x1="66" y1="24" x2="84" y2="24"/>
+              <path class="gstroke" d="M62 78 v-12 a13 13 0 0 1 26 0 v12"/>
+              <rect class="gstroke" x="56" y="78" width="38" height="30" rx="7"/>
+              <circle class="gstroke" cx="75" cy="93" r="4"/>
+            </g>
+          </svg>
+        </div>
+        <div class="cen e" id="enL"></div>
+        <div class="ccn e" id="cnL"></div>
+      </div>
+
+      <div class="card" id="cardR">
+        <div class="cicon e">
+          <svg viewBox="0 0 150 150">
+            <g>
+              <!-- 云 + 斜杠（云端可见/不可控） -->
+              <path class="ystroke" d="M42 108 a22 22 0 0 1 4-43 a27 27 0 0 1 52-7 a20 20 0 0 1 12 50 z"/>
+              <line class="ystroke" x1="46" y1="112" x2="106" y2="52"/>
+            </g>
+          </svg>
+        </div>
+        <div class="cen e" id="enR"></div>
+        <div class="ccn e" id="cnR"></div>
+      </div>
+
+      <div class="chipzone" id="chipzone">
+        <span class="chip" id="chip"></span>
+      </div>
+    </div>
+    <script>
+      const FB = {"titleEn": "FEATURE 02 · YOUR DATA", "titleCn": "数据只在你自己手机里", "titleAccent": "只在你自己", "titleSub": "就算把工作台发到网上也一样", "leftEn": "ON YOUR PHONE", "leftCn": "数据在这里", "rightEn": "ON THE WEB", "rightCn": "别人看到的", "chipText": "你的账目", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $=(s)=>document.querySelector(s);
+      const DUR=+v.duration>0?+v.duration:6;
+      $('[data-composition-id]').setAttribute('data-duration',String(DUR));
+
+      $('#tEn').textContent=v.titleEn||'';
+      // 标题：titleAccent 为 titleCn 子串时高亮该段，否则白字标题 + 追加高亮词
+      const tCn=$('#tCn'); tCn.textContent='';
+      const cn=String(v.titleCn||''), acc=String(v.titleAccent||'');
+      const mk=(txt,cls)=>{ const s=document.createElement('span'); if(cls)s.className=cls; s.textContent=txt; return s; };
+      if(acc && cn.includes(acc)){
+        const i=cn.indexOf(acc);
+        tCn.append(mk(cn.slice(0,i)), mk(acc,'acc'), mk(cn.slice(i+acc.length)));
+      }else{
+        tCn.append(mk(cn)); if(acc) tCn.append(mk(acc,'acc'));
+      }
+      $('#tSub').textContent=v.titleSub||'';
+      $('#enL').textContent=v.leftEn||''; $('#cnL').textContent=v.leftCn||'';
+      $('#enR').textContent=v.rightEn||''; $('#cnR').textContent=v.rightCn||'';
+      $('#chip').textContent=v.chipText||'';
+
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+
+      /* 1. 标题区淡入上移 */
+      tl.fromTo('#hwrap',{opacity:0,y:36},{opacity:1,y:0,duration:0.6,ease:'power3.out'},0.3);
+      /* 2. 左卡从左滑入，内部元素 stagger */
+      tl.fromTo('#cardL',{x:-140,opacity:0},{x:0,opacity:1,duration:0.7,ease:'power3.out'},0.7);
+      tl.fromTo('#cardL .e',{opacity:0,y:22},{opacity:1,y:0,duration:0.4,ease:'power2.out',stagger:0.1},0.85);
+      /* 3. 中间虚线从上往下画出 */
+      tl.fromTo('#divider',{scaleY:0,opacity:0},{scaleY:1,opacity:1,duration:0.5,ease:'power2.out'},1.6);
+      /* 4. 右卡从右滑入，内部元素 stagger */
+      tl.fromTo('#cardR',{x:140,opacity:0},{x:0,opacity:1,duration:0.7,ease:'power3.out'},2.1);
+      tl.fromTo('#cardR .e',{opacity:0,y:22},{opacity:1,y:0,duration:0.4,ease:'power2.out',stagger:0.1},2.25);
+      /* 5. chip 弹入 */
+      tl.fromTo('#chip',{opacity:0,scale:0.5,transformOrigin:'50% 50%'},
+        {opacity:1,scale:1,duration:0.5,ease:'back.out(2.2)'},2.9);
+      /* 演完定格，无收尾出场动画 */
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "id": "docu-stat-grid-2x2",
+  "name": "2x2 数据网格·皮影档案",
+  "description": "2×2 KPI 网格，四格错峰缩放入场+朱砂进度条扫入（B 族皮影·纪录片档案风，2026-08-31）",
+  "category": "口播工厂",
+  "series": "docu",
+  "slot": "docu-puppet",
+  "tags": ["口播工厂","皮影档案","纪录片","docu-stat-grid-2x2"],
+  "duration": 6,
+  "size": "1920×1080",
+  "status": "ready"
+}

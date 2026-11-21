@@ -1,0 +1,49 @@
+{
+  "id": "neon-phone-wall",
+  "name": "霓虹手机阵列升起",
+  "description": "深黑底荧光绿手机阵列：标题关键词绿色高亮，4 台 iPhone 样机从底部 stagger 升起排成一列（中间两台稍高），屏幕可换截图，适合口播展示 App 界面。",
+  "category": "产品演示",
+  "tags": [
+    "手机样机",
+    "App界面",
+    "霓虹",
+    "荧光绿",
+    "口播"
+  ],
+  "duration": 6,
+  "slot": "concept",
+  "when": "口播介绍手机端产品/功能，需要多台手机界面并列展示时",
+  "assets": [
+    {
+      "id": "imgScreen1",
+      "type": "image",
+      "label": "手机1屏幕截图"
+    },
+    {
+      "id": "imgScreen2",
+      "type": "image",
+      "label": "手机2屏幕截图"
+    },
+    {
+      "id": "imgScreen3",
+      "type": "image",
+      "label": "手机3屏幕截图"
+    },
+    {
+      "id": "imgScreen4",
+      "type": "image",
+      "label": "手机4屏幕截图"
+    }
+  ],
+  "path": "templates/neon-phone-wall",
+  "size": "1920×1080",
+  "formats": [
+    "mp4"
+  ],
+  "defaultFormat": "mp4",
+  "preview": "https://maning789link.top/hub/renders/neon-phone-wall/sample.webm",
+  "status": "ready",
+  "tier": "free",
+  "no": null,
+  "series": "shot"
+}

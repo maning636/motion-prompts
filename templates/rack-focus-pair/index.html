@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"leftTag","type":"string","label":"前景小标签","default":"FOREGROUND"},
+  {"id":"leftTitle","type":"string","label":"前景标题","default":"运营·执行"},
+  {"id":"leftDesc","type":"string","label":"前景描述（换行分隔）","default":"当下动作\n稳定产出\n实时反馈"},
+  {"id":"rightTag","type":"string","label":"后景小标签","default":"BACKGROUND"},
+  {"id":"rightTitle","type":"string","label":"后景标题","default":"战略·方向"},
+  {"id":"rightDesc","type":"string","label":"后景描述（换行分隔）","default":"长期目标\n市场位置\n未来路径"},
+  {"id":"focusStart","type":"number","label":"焦点起点（0=前景,100=后景）","default":12},
+  {"id":"focusEnd","type":"number","label":"焦点终点（0=前景,100=后景）","default":88},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity: .55;
+      }
+
+      /* ---------- Eyebrow ---------- */
+      .eyebrow{
+        position:absolute; top: 56px; left: 88px; right: 88px;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.22em; text-transform:uppercase;
+        color: #8A8A85;
+      }
+      .eyebrow .acc{ color: var(--accent, #00FF00); font-weight: 700; letter-spacing:.18em; }
+
+      /* ---------- 场景：双卡（前景左下 / 后景右上） ---------- */
+      .scene{
+        position:absolute; inset:0;
+      }
+      .card{
+        position:absolute;
+        border-radius: 22px;
+        border: 1px solid #2A2A2E;
+        padding: 44px 48px;
+        will-change: transform, filter, opacity;
+      }
+      .card .tag{
+        display:inline-flex; align-items:center; gap:8px;
+        padding: 6px 14px; border:1px solid #2A2A2E; border-radius:999px;
+        font-size: 16px; letter-spacing:.18em; color:#9CA3AF; text-transform:uppercase;
+        white-space: nowrap;
+      }
+      .card .tag b{ color: var(--accent, #00FF00); font-weight:700; letter-spacing:.06em; }
+      .card h2{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight:700; letter-spacing:-.02em;
+        margin: 22px 0 14px;
+      }
+      .card .desc{
+        list-style:none; padding:0; margin: 0;
+        display:flex; flex-direction:column; gap: 12px;
+        font-size: 26px; line-height: 1.4;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 82%, transparent);
+      }
+      .card .desc li{
+        display:flex; gap: 14px; align-items:flex-start;
+      }
+      .card .desc li::before{
+        content:""; flex:none; margin-top: 14px;
+        width: 16px; height: 2px;
+        background: #6B6B66;
+      }
+
+      /* 前景：左下大卡 */
+      .card.fg{
+        left: 88px; bottom: 140px;
+        width: 720px; min-height: 360px;
+        background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.01));
+      }
+      .card.fg h2{
+        font-size: 64px;
+        color: var(--foreground, #F4EFE7);
+      }
+      .card.fg .desc li::before{ background: var(--accent, #00FF00); }
+
+      /* 后景：右上小卡（视觉上更远、更小） */
+      .card.bg{
+        right: 88px; top: 156px;
+        width: 560px; min-height: 280px;
+        background: linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.005));
+      }
+      .card.bg h2{
+        font-size: 46px;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 78%, transparent);
+      }
+      .card.bg .desc{
+        font-size: 22px;
+      }
+
+      /* 卡片自身的「焦点环」（小型 reticle，落在卡片左上角） */
+      .reticle{
+        position:absolute;
+        width: 64px; height: 64px;
+        pointer-events:none;
+        opacity: 0;
+      }
+      .reticle .h1{ position:absolute; top:0; left:0; width:16px; height:2px; background:var(--accent,#00FF00); box-shadow:0 0 12px color-mix(in srgb, var(--accent,#00FF00) 60%, transparent); }
+      .reticle .v1{ position:absolute; top:0; left:0; width:2px; height:16px; background:var(--accent,#00FF00); box-shadow:0 0 12px color-mix(in srgb, var(--accent,#00FF00) 60%, transparent); }
+      .reticle .h2{ position:absolute; top:0; right:0; width:16px; height:2px; background:var(--accent,#00FF00); box-shadow:0 0 12px color-mix(in srgb, var(--accent,#00FF00) 60%, transparent); }
+      .reticle .v2{ position:absolute; top:0; right:0; width:2px; height:16px; background:var(--accent,#00FF00); box-shadow:0 0 12px color-mix(in srgb, var(--accent,#00FF00) 60%, transparent); }
+      .reticle .h3{ position:absolute; bottom:0; left:0; width:16px; height:2px; background:var(--accent,#00FF00); box-shadow:0 0 12px color-mix(in srgb, var(--accent,#00FF00) 60%, transparent); }
+      .reticle .v3{ position:absolute; bottom:0; left:0; width:2px; height:16px; background:var(--accent,#00FF00); box-shadow:0 0 12px color-mix(in srgb, var(--accent,#00FF00) 60%, transparent); }
+      .reticle .h4{ position:absolute; bottom:0; right:0; width:16px; height:2px; background:var(--accent,#00FF00); box-shadow:0 0 12px color-mix(in srgb, var(--accent,#00FF00) 60%, transparent); }
+      .reticle .v4{ position:absolute; bottom:0; right:0; width:2px; height:16px; background:var(--accent,#00FF00); box-shadow:0 0 12px color-mix(in srgb, var(--accent,#00FF00) 60%, transparent); }
+      /* 焦点落在前景卡（左下） */
+      #reticleFg{
+        left: 60px; bottom: 470px; /* 对应前景卡左上角附近 */
+      }
+      /* 焦点落在后景卡（右上） */
+      #reticleBg{
+        right: 60px; top: 128px;
+      }
+
+      /* ---------- 景深刻度指示器（底部居中） ---------- */
+      .dofBar{
+        position:absolute;
+        left: 50%; bottom: 64px;
+        transform: translateX(-50%);
+        width: 880px;
+        height: 56px;
+        opacity: 0;
+      }
+      .dofBar .label{
+        position:absolute; top: -22px; left: 0; right: 0;
+        display:flex; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 14px; letter-spacing:.18em; color:#8A8A85; text-transform:uppercase;
+      }
+      .dofBar .label .acc{ color: var(--accent, #00FF00); }
+      .dofBar .track{
+        position:absolute; top: 50%; transform: translateY(-50%);
+        left: 0; right: 0; height: 2px;
+        background: rgba(255,255,255,.12);
+      }
+      .dofBar .ticks{
+        position:absolute; top: 50%; transform: translateY(-50%);
+        left: 0; right: 0; height: 24px;
+        display:flex; justify-content:space-between; align-items:center;
+        pointer-events:none;
+      }
+      .dofBar .ticks span{
+        display:block; width:2px; height:10px; background:#6B6B66;
+      }
+      .dofBar .ticks span.mid{ height: 14px; background:#9CA3AF; }
+      .dofBar .focusDot{
+        position:absolute; top: 50%; transform: translate(-50%, -50%);
+        width: 28px; height: 28px; border-radius:50%;
+        background: var(--accent, #00FF00);
+        box-shadow:
+          0 0 0 4px rgba(0,0,0,.35),
+          0 0 24px color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+      }
+      .dofBar .focusDot::after{
+        content:""; position:absolute; inset:8px; border-radius:50%;
+        background: var(--background, #12100E);
+      }
+
+      /* 焦点切换完成时一道短闪 */
+      #flashWash{
+        position:absolute; inset:0;
+        background: var(--foreground, #F4EFE7);
+        opacity: 0;
+        pointer-events:none;
+        mix-blend-mode: screen;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+
+        <div class="eyebrow">
+          <span><b class="acc">RACK</b>&nbsp;&nbsp;FOCUS · 01</span>
+          <span>depth-of-field shift</span>
+        </div>
+
+        <!-- 前景（近） -->
+        <div class="card fg" id="cardFg">
+          <span class="tag"><b id="tagFgB">FG</b><span id="tagFgL">FOREGROUND</span></span>
+          <h2 id="titleFg">运营·执行</h2>
+          <ul class="desc" id="descFg">
+            <li><span>当下动作</span></li>
+            <li><span>稳定产出</span></li>
+            <li><span>实时反馈</span></li>
+          </ul>
+          <div class="reticle" id="reticleFg">
+            <span class="h1"></span><span class="v1"></span>
+            <span class="h2"></span><span class="v2"></span>
+            <span class="h3"></span><span class="v3"></span>
+            <span class="h4"></span><span class="v4"></span>
+          </div>
+        </div>
+
+        <!-- 后景（远） -->
+        <div class="card bg" id="cardBg">
+          <span class="tag"><b id="tagBgB">BG</b><span id="tagBgL">BACKGROUND</span></span>
+          <h2 id="titleBg">战略·方向</h2>
+          <ul class="desc" id="descBg">
+            <li><span>长期目标</span></li>
+            <li><span>市场位置</span></li>
+            <li><span>未来路径</span></li>
+          </ul>
+          <div class="reticle" id="reticleBg">
+            <span class="h1"></span><span class="v1"></span>
+            <span class="h2"></span><span class="v2"></span>
+            <span class="h3"></span><span class="v3"></span>
+            <span class="h4"></span><span class="v4"></span>
+          </div>
+        </div>
+
+        <!-- 景深刻度指示器 -->
+        <div class="dofBar" id="dofBar">
+          <div class="label">
+            <span>NEAR · FG</span>
+            <span class="acc">FOCUS</span>
+            <span>BG · FAR</span>
+          </div>
+          <div class="track"></div>
+          <div class="ticks">
+            <span></span><span></span><span></span><span></span><span class="mid"></span><span></span><span></span><span></span><span></span><span></span><span class="mid"></span><span></span><span></span><span></span><span></span><span></span><span class="mid"></span><span></span><span></span><span></span><span></span>
+          </div>
+          <div class="focusDot" id="focusDot"></div>
+        </div>
+
+        <!-- 短闪蒙版 -->
+        <div id="flashWash"></div>
+
+      </section>
+    </div>
+    <script>
+      /* ----- 变量接线 ----- */
+      const fallback = {
+        leftTag: "FOREGROUND",
+        leftTitle: "运营·执行",
+        leftDesc: "当下动作\n稳定产出\n实时反馈",
+        rightTag: "BACKGROUND",
+        rightTitle: "战略·方向",
+        rightDesc: "长期目标\n市场位置\n未来路径",
+        focusStart: 12,
+        focusEnd: 88,
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const $ = (id) => document.getElementById(id);
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      /* ----- 内容回填 ----- */
+      const setDesc = (hostId, raw, klass) => {
+        const ul = $(hostId);
+        if (!ul) return;
+        const lines = String(raw ?? "").split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        const maxN = Math.min(Math.max(lines.length, 1), 3);
+        const padded = lines.slice(0, maxN);
+        while (padded.length < 3) padded.push("");
+        ul.innerHTML = padded.map(t =>
+          `<li><span>${escapeHtml(t)}</span></li>`
+        ).join("");
+      };
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      $("tagFgL").textContent  = v.leftTag  || fallback.leftTag;
+      $("tagFgB").textContent  = "FG";
+      $("tagBgL").textContent  = v.rightTag || fallback.rightTag;
+      $("tagBgB").textContent  = "BG";
+      $("titleFg").textContent = v.leftTitle  || fallback.leftTitle;
+      $("titleBg").textContent = v.rightTitle || fallback.rightTitle;
+      setDesc("descFg", v.leftDesc  || fallback.leftDesc);
+      setDesc("descBg", v.rightDesc || fallback.rightDesc);
+
+      /* ----- 焦点位置换算（0..100 → focusDot 在 dofBar 内 0%..100%）----- */
+      const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+      const startP = clamp(Number(v.focusStart ?? fallback.focusStart), 0, 100);
+      const endP   = clamp(Number(v.focusEnd   ?? fallback.focusEnd),   0, 100);
+      const setFocusX = (pct) => {
+        const p = clamp(Number(pct) || 0, 0, 100);
+        const dot = $("focusDot");
+        if (!dot) return;
+        // dofBar 宽 880px，dot 已 translate(-50%) 锚中心
+        dot.style.left = p + "%";
+      };
+
+      /* ----- 时间线 ----- */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+      const tl = gsap.timeline({ paused: true });
+
+      // 入场：前景 fade+y24，后景 fade+y-24（不同方向感，镜头焦距错觉）
+      tl.fromTo("#cardFg",
+        { opacity: 0, y: 30 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 0.05);
+      tl.fromTo("#cardBg",
+        { opacity: 0, y: -30 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 0.15);
+
+      // 景深刻度指示器淡入
+      tl.fromTo("#dofBar",
+        { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 0.35);
+
+      // 前景 reticle 出现 + 后景 reticle 出现（错峰）
+      tl.fromTo("#reticleFg",
+        { opacity: 0, scale: 0.6, transformOrigin: "50% 50%" },
+        { opacity: 1, scale: 1.0, duration: 0.4, ease: "back.out(1.6)" }, 0.6);
+      tl.fromTo("#reticleBg",
+        { opacity: 0, scale: 0.6, transformOrigin: "50% 50%" },
+        { opacity: 0.5, scale: 0.7, duration: 0.4, ease: "back.out(1.6)" }, 0.85);
+
+      // 初始 blur：前景清、后景虚
+      gsap.set("#cardFg", { filter: "blur(0px)" });
+      gsap.set("#cardBg", { filter: "blur(14px)" });
+      gsap.set("#reticleFg", { opacity: 1, scale: 1.0 });
+      gsap.set("#reticleBg", { opacity: 0.5, scale: 0.7 });
+      setFocusX(startP);
+
+      // 焦点转移 1.6s → 4.6s（占片长 50%，3s）
+      const shiftStart = 1.6, shiftDur = 3.0;
+
+      // 焦点 dot 在景深刻度上滑动
+      tl.to("#focusDot", {
+        left: endP + "%",
+        duration: shiftDur,
+        ease: "power2.inOut"
+      }, shiftStart);
+
+      // 焦点环焦点切换：前景 reticle 缩小失焦 + 后景 reticle 放大合焦
+      tl.to("#reticleFg", {
+        opacity: 0.5, scale: 0.7,
+        duration: shiftDur, ease: "power2.inOut"
+      }, shiftStart);
+      tl.to("#reticleBg", {
+        opacity: 1.0, scale: 1.0,
+        duration: shiftDur, ease: "power2.inOut"
+      }, shiftStart);
+
+      // 前后景 blur 反向：前景 0→14px（失焦），后景 14→0px（合焦）
+      tl.to("#cardFg", {
+        filter: "blur(14px)",
+        duration: shiftDur, ease: "power2.inOut"
+      }, shiftStart);
+      tl.to("#cardBg", {
+        filter: "blur(0px)",
+        duration: shiftDur, ease: "power2.inOut"
+      }, shiftStart);
+
+      // 咬合帧 t=4.7s：轻微白闪 + 后景 reticle back 弹出强调
+      tl.fromTo("#flashWash",
+        { opacity: 0 },
+        { opacity: 0.18, duration: 0.08, ease: "power2.out" }, 4.6);
+      tl.to("#flashWash",
+        { opacity: 0, duration: 0.35, ease: "power2.in" }, 4.7);
+      tl.fromTo("#reticleBg",
+        { scale: 1.0 },
+        { scale: 1.18, duration: 0.18, ease: "power2.out" }, 4.6);
+      tl.to("#reticleBg",
+        { scale: 1.0, duration: 0.35, ease: "back.out(1.4)" }, 4.78);
+
+      // 停留可读 ~0.7s（4.85 → 5.55）
+      tl.to({}, { duration: 0.7 }, 4.85);
+
+      // 结尾微收：reticle 缩小消失、卡片轻微复位（不抢戏）
+      tl.to("#reticleFg", { opacity: 0.35, scale: 0.6, duration: 0.4, ease: "power2.out" }, 5.3);
+      tl.to("#reticleBg", { opacity: 0.7,  scale: 0.85, duration: 0.4, ease: "power2.out" }, 5.3);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

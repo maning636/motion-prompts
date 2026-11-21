@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"text","name":"文案","type":"string","label":"字幕文案","default":"手一抖灵感就来了"},{"id":"accent","name":"强调色","type":"color","label":"字幕条颜色","default":"#FFC93C"},{"id":"ink","name":"字色","type":"color","label":"字幕字色","default":"#1B1B24"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>字幕条弹入</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+
+  /* 底部字幕条：从画布下缘整条滑入 */
+  .p-cap-bar {
+    position: absolute; left: 16px; right: 16px; bottom: 14px; height: 46px;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+    background: var(--ac, #FFC93C);
+    border-radius: 12px;
+    box-shadow: 0 5px 0 rgba(0, 0, 0, .30), 0 12px 24px rgba(0, 0, 0, .34);
+    transform-origin: 50% 100%;
+    will-change: transform, opacity;
+  }
+  /* 条面上方一道手绘短划，跟着条一起进场 */
+  .p-cap-tick {
+    position: absolute; left: 20px; bottom: 66px; width: 28px; height: 5px;
+    background: var(--ac, #FFC93C); border-radius: 3px;
+    transform-origin: 0 50%;
+    will-change: transform, opacity;
+  }
+  .p-cap-chars {
+    flex: 0 0 auto; display: inline-block; white-space: nowrap;
+    font-size: 22px; line-height: 1; font-weight: 800; letter-spacing: .02em;
+    color: var(--ink, #1B1B24);
+  }
+  .p-cap-ch {
+    display: inline-block; color: var(--ink, #1B1B24);
+    will-change: transform, opacity;
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"手一抖灵感就来了","accent":"#FFC93C","ink":"#1B1B24","duration":3};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--ink', v.ink || FALLBACK.ink);
+  const dur = parseFloat(v.duration) || 3;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  const text = (v.text == null || v.text === '' ? FALLBACK.text : v.text)
+    .toString().replace(/\s+/g, ' ').trim().slice(0, 24);
+
+  put('div', 'p-cap-tick');
+  const bar = put('div', 'p-cap-bar');
+  const chars = put('div', 'p-cap-chars', null, null, bar);
+
+  /* §3.2 中文溢出防护：不折行量自然宽度，超出则按比例压字号 */
+  const MAXFS = 22, MINFS = 11, AVAIL = 400;
+  chars.style.whiteSpace = 'nowrap';
+  const natural = chars.scrollWidth;
+  if (natural > AVAIL && natural > 0) {
+    chars.style.fontSize = String(Math.max(MINFS, Math.floor(MAXFS * AVAIL / natural))) + 'px';
+  }
+
+  const chEls = [];
+  Array.from(text).forEach(function (c) {
+    chEls.push(put('span', 'p-cap-ch', null, c, chars));
+  });
+
+  const tick = stage.querySelector('.p-cap-tick');
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* ① 字幕条从 y:100% 滑入（back.out(1.6) 轻微过冲） */
+  tl.fromTo(bar,
+    { yPercent: 110, opacity: 0 },
+    { yPercent: 0, opacity: 1, duration: .52, ease: 'back.out(1.6)' }, 0);
+
+  /* ② 手绘短划错拍跟上 */
+  tl.fromTo(tick,
+    { scaleX: 0, opacity: 0 },
+    { scaleX: 1, opacity: 1, duration: .30, ease: 'back.out(2.4)' }, .12);
+
+  /* ③ 文字逐字顶出来 */
+  tl.from(chEls,
+    { y: 15, opacity: 0, duration: .30, ease: 'back.out(3.2)', stagger: .035 }, .20);
+
+  /* ④ 落定后轻微回弹：上浮一拍 + 横向压一下再弹回 */
+  const bob = Math.max(1.05, dur - .55);
+  tl.to(bar, { y: -2.5, scaleX: 1.012, duration: .15, ease: 'sine.inOut' }, bob);
+  tl.to(bar, { y: 0, scaleX: .985, duration: .10, ease: 'sine.inOut' }, bob + .15);
+  tl.to(bar, { y: 0, scaleX: 1, duration: .18, ease: 'back.out(2.4)' }, bob + .25);
+  tl.to(tick, { x: 3, duration: .43, ease: 'sine.inOut' }, bob);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

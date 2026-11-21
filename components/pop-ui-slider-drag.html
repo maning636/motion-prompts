@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"label","name":"控件文案","type":"string","label":"控件说明文案","default":"画面亮度"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.2}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>滑块拖动</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  /* 深底件托字用的局部软晕——只护住控件，不铺满屏 */
+  .p-halo { position: absolute; inset: 0;
+    background: radial-gradient(62% 74% at 50% 50%,
+      rgba(0,0,0,.56) 0%, rgba(0,0,0,.30) 54%, rgba(0,0,0,0) 84%); }
+  .p-label { position: absolute; font-size: 11px; font-weight: 700; letter-spacing: .18em;
+    color: rgba(255,248,238,.6); white-space: nowrap; }
+  .p-track { position: absolute; left: 90px; top: 132px; width: 300px; height: 14px;
+    border-radius: 7px; background: rgba(255,248,238,.13);
+    border: 1.5px solid rgba(255,248,238,.3); }
+  .p-fill { position: absolute; left: 0; top: 0; height: 100%; width: 0;
+    border-radius: 7px; background: linear-gradient(90deg, #FFC93C, var(--ac)); }
+  .p-knob { position: absolute; left: 105px; top: 124px; width: 30px; height: 30px;
+    border-radius: 50%; background: var(--ac); border: 3px solid #FFF8EE;
+    box-shadow: 0 3px 9px rgba(0,0,0,.42); }
+  /* 数值必须 tabular-nums，否则两位数→三位数时整行左右晃 */
+  .p-val { position: absolute; left: 90px; top: 88px; width: 300px; text-align: right;
+    font-size: 23px; font-weight: 900; color: #FFF8EE;
+    font-variant-numeric: tabular-nums; letter-spacing: .01em; white-space: nowrap; }
+  .p-caret { position: absolute; left: 80px; top: 100px; width: 13px; height: 17px;
+    border-radius: 7px 7px 10px 10px; background: #FFF8EE; border: 2px solid var(--ac);
+    transform: rotate(-20deg); box-shadow: 0 2px 5px rgba(0,0,0,.35); }
+  .p-caret-dot { position: absolute; left: 4px; top: 6px; width: 3px; height: 3px;
+    border-radius: 50%; background: var(--ac); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"label":"画面亮度","accent":"#FF6B35","duration":3.2};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || 3.2;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  const fits = [];
+  function fit(list) { fits.push.apply(fits, list); }
+  function runFit() {
+    fits.forEach((f) => {
+      const el = f.el;
+      el.style.fontSize = f.max + 'px';
+      const avail = f.box || el.clientWidth;
+      const ws = el.style.whiteSpace;
+      el.style.whiteSpace = 'nowrap';
+      const natural = el.scrollWidth;
+      el.style.whiteSpace = ws;
+      if (natural > avail) {
+        el.style.fontSize = Math.max(f.min, Math.floor(f.max * avail / natural)) + 'px';
+      }
+    });
+  }
+
+  put('div', 'p-halo');
+  const label = put('div', 'p-label', 'left:90px; top:166px;', v.label || FALLBACK.label);
+  const track = put('div', 'p-track');
+  const fill  = put('div', 'p-fill', '', null, track);
+  const knob  = put('div', 'p-knob');
+  const valEl = put('div', 'p-val', '', '10%');
+  const caret = put('div', 'p-caret');
+  put('div', 'p-caret-dot', '', null, caret);
+
+  fit([{ el: label, max: 11, min: 9, box: 300 },
+       { el: valEl, max: 23, min: 15, box: 300 }]);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 拖动量 = 时间 → 位置的纯函数：手柄、填充、数值三处读同一个 p，
+     不会出现「手柄到了但数字还没跳」的错帧。 */
+  const TRACK_X = 90, TRACK_W = 300, R0 = 0.10, R1 = 0.82;
+  const T0 = 0.72, T1 = 1.88;
+  const clamp01 = (x) => x < 0 ? 0 : (x > 1 ? 1 : x);
+  function paint() {
+    const t = tl.time();
+    const k = clamp01((t - T0) / (T1 - T0));
+    const e = 1 - Math.pow(1 - k, 2);
+    const base = R0 * clamp01(t / 0.22);
+    const r = base + (R1 - R0) * e;
+    const hx = TRACK_X + TRACK_W * r;
+    knob.style.left = (hx - 15).toFixed(2) + 'px';
+    fill.style.width = (TRACK_W * r).toFixed(2) + 'px';
+    const txt = Math.round(r * 100) + '%';
+    if (valEl.textContent !== txt) valEl.textContent = txt;
+    caret.style.left = (hx - 26).toFixed(2) + 'px';
+    const press = clamp01((t - 0.46) / 0.16) * (1 - clamp01((t - 1.98) / 0.22));
+    caret.style.top = (100 + press * 15).toFixed(2) + 'px';
+    caret.style.opacity = clamp01((t - 0.30) / 0.16).toFixed(3);
+  }
+  /* 这条覆盖全程，任意时间点都能重算出画面（settle 会来回扫时间轴） */
+  tl.to({}, { duration: dur, onUpdate: paint }, 0);
+
+  tl.fromTo(track, { opacity: 0, scaleX: 0.72 },
+    { opacity: 1, scaleX: 1, duration: .34, ease: 'power3.out' }, 0);
+  tl.fromTo(label, { opacity: 0, y: 8 },
+    { opacity: 1, y: 0, duration: .3 }, .08);
+  tl.fromTo(valEl, { opacity: 0, y: -8 },
+    { opacity: 1, y: 0, duration: .3, ease: 'power3.out' }, .06);
+  tl.fromTo(knob, { opacity: 0, scale: 0 },
+    { opacity: 1, scale: 1, duration: .42, ease: 'back.out(2.4)' }, .18);
+  /* 按下手柄：先压大一点，再拖 */
+  tl.to(knob, { scale: 1.16, duration: .14, ease: 'back.out(3)' }, .64);
+  /* 松手回弹 */
+  tl.to(knob, { scale: 1, duration: .34, ease: 'elastic.out(1,.5)' }, 1.96);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  runFit();
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

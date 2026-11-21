@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"label","name":"控件文案","type":"string","label":"控件说明文案","default":"播放头定位"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.4}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>播放头拖动</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-halo { position: absolute; inset: 0;
+    background: radial-gradient(62% 74% at 50% 50%,
+      rgba(0,0,0,.56) 0%, rgba(0,0,0,.30) 54%, rgba(0,0,0,0) 84%); }
+  .p-label { position: absolute; font-size: 11px; font-weight: 700; letter-spacing: .18em;
+    color: rgba(255,248,238,.6); white-space: nowrap; }
+  .p-track { position: absolute; left: 88px; top: 116px; width: 304px; height: 40px;
+    border-radius: 8px; background: rgba(255,248,238,.05); }
+  /* top 必须是 0，不是 116。
+     .p-clip 是 append 进 .p-track 的（put(..., track)），而 .p-track 自己
+     已经在 top:116px。写成 top:116px 就是**双重偏移**，实际落到 y=232 ——
+     轨道空着，片段整排被画布下边缘切掉一半。
+     这个错 DOM 读数完全正常（元素在、尺寸对、只是位置错），
+     8×8 联络表里也只是一排「底部的方块」，不放大根本看不出是被切的。
+     最后是出框探针（pop_overflow.py，只扫落定期）把它抓出来的。 */
+  .p-clip { position: absolute; top: 0; width: 73px; height: 40px; border-radius: 7px;
+    background: rgba(255,248,238,.12); border: 1.5px solid rgba(255,248,238,.2); }
+  /* 经过高亮单独一层：颜色走 --ac，透明度由 paint 算 */
+  .p-clip-on { position: absolute; left: -1.5px; top: -1.5px; width: 73px; height: 40px;
+    border-radius: 7px; opacity: 0; background: rgba(255,107,53,.26);
+    border: 1.5px solid var(--ac); }
+  .p-head { position: absolute; left: 86.75px; top: 106px; width: 2.5px; height: 60px;
+    background: #FF3B30; border-radius: 2px; box-shadow: 0 0 10px 2px rgba(255,59,48,.5); }
+  .p-headcap { position: absolute; left: 80px; top: 96px; width: 16px; height: 12px;
+    border-radius: 5px; background: #FF3B30; }
+  .p-tc { position: absolute; left: 88px; top: 166px; width: 304px; text-align: center;
+    font-size: 13px; font-weight: 800; letter-spacing: .06em; color: #FFF8EE;
+    font-variant-numeric: tabular-nums; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"label":"播放头定位","accent":"#FF6B35","duration":3.4};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || 3.4;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  const fits = [];
+  function fit(list) { fits.push.apply(fits, list); }
+  function runFit() {
+    fits.forEach((f) => {
+      const el = f.el;
+      el.style.fontSize = f.max + 'px';
+      const avail = f.box || el.clientWidth;
+      const ws = el.style.whiteSpace;
+      el.style.whiteSpace = 'nowrap';
+      const natural = el.scrollWidth;
+      el.style.whiteSpace = ws;
+      if (natural > avail) {
+        el.style.fontSize = Math.max(f.min, Math.floor(f.max * avail / natural)) + 'px';
+      }
+    });
+  }
+
+  put('div', 'p-halo');
+  const label = put('div', 'p-label', 'left:88px; top:58px;', v.label || FALLBACK.label);
+  const track = put('div', 'p-track');
+  const hl = [];
+  for (let i = 0; i < 4; i++) {
+    const c = put('div', 'p-clip', 'left:' + (i * 77) + 'px;', null, track);
+    put('div', 'p-clip-on', '', null, c);
+    hl.push(c.firstChild);
+  }
+  const head = put('div', 'p-head');
+  const cap  = put('div', 'p-headcap');
+  const tc   = put('div', 'p-tc', '', '00:00.0');
+
+  /* box 要等于容器自身宽度：scrollWidth 永远不小于 clientWidth，
+     传一个更小的数会让每次 fit 都误判成溢出、白白缩字号。 */
+  fit([{ el: label, max: 11, min: 9, box: 304 },
+       { el: tc, max: 13, min: 10, box: 304 }]);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 播放头位置、时间码、经过高亮都从同一个时间算出，三者不会错帧。 */
+  const TX0 = 88, TW = 304, A0 = 0.52, A1 = 2.72;
+  const clamp01 = (x) => x < 0 ? 0 : (x > 1 ? 1 : x);
+  const pad2 = (n) => (n < 10 ? '0' + n : '' + n);
+  function paint() {
+    const t = tl.time();
+    const k = clamp01((t - A0) / (A1 - A0));
+    const e = k * k * (3 - 2 * k);
+    const px = TW * e;
+    head.style.left = (TX0 + px - 1.25).toFixed(2) + 'px';
+    cap.style.left  = (TX0 + px - 8).toFixed(2) + 'px';
+    /* 时间码跟着头走，但夹在轨道内，别飘出画面 */
+    const fx = px - TW / 2;
+    const lim = Math.max(-64, Math.min(64, fx));
+    tc.style.transform = 'translateX(' + lim.toFixed(2) + 'px)';
+    const secs = 5 * e;
+    const s = Math.floor(secs);
+    const txt = '00:' + pad2(s) + '.' + Math.floor((secs - s) * 10);
+    if (tc.textContent !== txt) tc.textContent = txt;
+    for (let i = 0; i < 4; i++) {
+      const a = i * 77, b = a + 73;
+      const tin = A0 + (a / TW) * (A1 - A0);
+      const tout = A0 + (b / TW) * (A1 - A0);
+      const o = clamp01((t - tin) / 0.14) * (1 - clamp01((t - tout) / 0.14));
+      hl[i].style.opacity = o.toFixed(3);
+    }
+    const on = clamp01((t - (A0 - 0.14)) / 0.16);
+    head.style.opacity = on.toFixed(3);
+    cap.style.opacity = on.toFixed(3);
+  }
+  tl.to({}, { duration: dur, onUpdate: paint }, 0);
+
+  tl.fromTo(label, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .3 }, .04);
+  tl.fromTo(track, { opacity: 0, scaleX: .82 },
+    { opacity: 1, scaleX: 1, duration: .34, ease: 'back.out(2)' }, .1);
+  /* tc 的 transform 由 paint 独占（时间码要跟着播放头横向走），
+     这里只补一个淡入，两边都写 transform 会互相覆盖。 */
+  tl.fromTo(tc, { opacity: 0 }, { opacity: 1, duration: .28 }, .16);
+  /* 拖到头后停一下，头顶轻轻弹一下 */
+  tl.fromTo(cap, { scale: 1 }, { scale: 1.24, duration: .14, ease: 'power2.out' }, A1);
+  tl.to(cap, { scale: 1, duration: .34, ease: 'elastic.out(1,.5)' }, A1 + 0.14);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  runFit();
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

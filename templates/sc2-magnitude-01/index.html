@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "kicker", "type": "string", "label": "眉题", "default": "METRICS · 一组数字的赛跑"}, {"id": "items", "type": "string", "label": "数值项（标签|数值，分号分隔）", "default": "模板复用|1284;渲染提速|936;团队协作|2015;交付周期|672"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #F6F5EF; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #141414;
+        background-image: linear-gradient(rgba(20,20,20,.045) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(20,20,20,.045) 1px, transparent 1px);
+        background-size: 36px 36px; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      /* 顶部细线页眉 */
+      .vs-head{ position: absolute; left: 90px; right: 90px; top: 48px; height: 44px; z-index: 6; }
+      .vs-head .rule{ position: absolute; left: 0; right: 0; top: 0; height: 2px; background: #141414;
+        transform: scaleX(0); transform-origin: 0 50%; }
+      .vs-head .l{ position: absolute; left: 0; top: 12px; font-size: 19px; letter-spacing: .22em; color: #141414; }
+      .vs-head .r{ position: absolute; right: 0; top: 12px; font-size: 19px; letter-spacing: .22em; color: #9A9A92; }
+      .vs-kicker{ position: absolute; left: 0; right: 0; top: 150px; text-align: center; z-index: 5;
+        font-size: 24px; letter-spacing: .34em; color: #141414; }
+      .vs-kicker b{ color: #9A9A92; font-weight: 400; }
+      /* 数值卡行 */
+      .vs-row{ position: absolute; left: 90px; right: 90px; top: 240px; bottom: 110px; z-index: 4;
+        display: flex; align-items: center; justify-content: center; gap: 44px; }
+      .vs-card{ position: relative; width: 372px; height: 480px; background: #fff;
+        border: 3px solid #141414; box-shadow: 10px 10px 0 #141414;
+        display: flex; flex-direction: column; justify-content: space-between; padding: 34px 32px 40px; }
+      .vs-idx{ font-size: 18px; letter-spacing: .26em; color: #9A9A92; }
+      .vs-num{ font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-weight: 900; font-size: 92px; line-height: 1;
+        letter-spacing: .01em; color: #141414; text-align: center; font-variant-numeric: tabular-nums; }
+      .vs-label{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 28px; color: #55554E; text-align: center; }
+      .vs-tick{ height: 8px; background: var(--ac, #00FF00); width: 64px; margin: 0 auto;
+        transform: scaleX(0); transform-origin: 0 50%; }
+      /* 底部荧光绿署名条 */
+      .vs-foot{ position: absolute; left: 0; right: 0; bottom: 0; height: 64px; background: var(--ac, #00FF00);
+        z-index: 6; display: flex; align-items: center; justify-content: space-between; padding: 0 90px;
+        transform: translateY(64px); }
+      .vs-foot .f1{ font-size: 22px; font-weight: 900; letter-spacing: .12em; color: #141414; }
+      .vs-foot .f2{ font-size: 18px; letter-spacing: .26em; color: #141414; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="vs-head">
+        <div class="rule" id="rule"></div>
+        <div class="l mono" id="vol">SC2 · 视觉动效库</div>
+        <div class="r mono" id="pageno">P.302 / 400</div>
+      </div>
+      <div class="vs-kicker mono" id="kicker"></div>
+      <div class="vs-row" id="row"></div>
+      <div class="vs-foot" id="foot">
+        <div class="f1">@老马AI研习社</div>
+        <div class="f2 mono">MOTION LIBRARY · VALUE STAGGER</div>
+      </div>
+    </div>
+    <script>
+      const fallback = {"kicker": "METRICS · 一组数字的赛跑", "items": "模板复用|1284;渲染提速|936;团队协作|2015;交付周期|672", "accent": "#00FF00", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      document.documentElement.style.setProperty("--ac", V.accent ?? "#00FF00");
+      const kc = String(V.kicker).split("·");
+      $("kicker").textContent = kc[0].trim();
+      if (kc[1]) { const b = document.createElement("b"); b.textContent = " · " + kc.slice(1).join("·").trim(); $("kicker").appendChild(b); }
+      // 解析数值项
+      const items = String(V.items).split(";").map(s => s.trim()).filter(Boolean).slice(0, 4).map((s) => {
+        const [label, val] = s.split("|").map(x => x.trim());
+        return { label: label || "—", val: Number(val) || 0 };
+      });
+      let maxI = 0;
+      items.forEach((it, i) => { if (it.val > items[maxI].val) maxI = i; });
+      const fmt = (n) => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      // 页眉 + 眉题 + 署名条
+      tl.to("#rule", { scaleX: 1, duration: 0.5, ease: "power3.out" }, 0);
+      tl.fromTo(["#vol", "#pageno"], { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.4, stagger: 0.08 }, 0.25);
+      tl.fromTo("#kicker", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.45 }, 0.3);
+      tl.to("#foot", { y: 0, duration: 0.5, ease: "expo.out" }, 0.8);
+      tl.fromTo([".vs-foot .f1", ".vs-foot .f2"], { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.35, stagger: 0.08 }, 1.05);
+      // 卡片错峰升起 + 数值充能
+      const riseStart = 0.7, riseStep = 0.28, countDur = 1.4;
+      items.forEach((it, i) => {
+        const card = document.createElement("div");
+        card.className = "vs-card";
+        const idx = document.createElement("div");
+        idx.className = "vs-idx mono";
+        idx.textContent = "0" + (i + 1) + " /";
+        const num = document.createElement("div");
+        num.className = "vs-num";
+        num.textContent = "0";
+        const label = document.createElement("div");
+        label.className = "vs-label";
+        label.textContent = it.label;
+        const tick = document.createElement("div");
+        tick.className = "vs-tick";
+        card.appendChild(idx); card.appendChild(num); card.appendChild(label); card.appendChild(tick);
+        $("row").appendChild(card);
+        const t0 = riseStart + i * riseStep;
+        tl.fromTo(card, { y: 260, opacity: 0 }, { y: 0, opacity: 1, duration: 0.85, ease: "expo.out" }, t0);
+        // 数值从 0 充能
+        const prog = { v: 0 };
+        tl.to(prog, { v: it.val, duration: countDur, ease: "power2.out",
+          onUpdate: () => { num.textContent = fmt(prog.v); } }, t0 + 0.3);
+        // 底部绿刻度线扫入
+        tl.to(tick, { scaleX: 1, duration: 0.35, ease: "power2.inOut" }, t0 + countDur + 0.2);
+      });
+      // 最大者定格：荧光绿描边 + 绿影 + 轻微放大（纯 tween，钉帧安全）
+      const winT = riseStart + (items.length - 1) * riseStep + countDur + 0.35;
+      const winCard = $("row").children[maxI];
+      const ac = V.accent ?? "#00FF00";
+      tl.to(winCard, { borderColor: ac, boxShadow: "10px 10px 0 " + ac, duration: 0.35, ease: "power2.out" }, winT);
+      tl.fromTo(winCard, { scale: 1 }, { scale: 1.045, duration: 0.5, ease: "back.out(2)" }, winT);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

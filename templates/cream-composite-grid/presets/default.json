@@ -1,0 +1,12 @@
+{
+  "title": "组合视图",
+  "subtitle": "多个组件同屏展示",
+  "mediaTL": "../composite-grid/assets/bar-chart-grow.webm",
+  "mediaTR": "../composite-grid/assets/number-counter.webm",
+  "mediaBL": "../composite-grid/assets/simple-flow-chart.webm",
+  "mediaBR": "../composite-grid/assets/pull-quote-hero.webm",
+  "scaleTL": 0.5,
+  "scaleTR": 0.5,
+  "scaleBL": 0.5,
+  "scaleBR": 0.5
+}

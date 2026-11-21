@@ -1,0 +1,7 @@
+{
+  "name": "spectrum-map",
+  "private": true,
+  "scripts": {
+    "render": "cd ../.. && npm run render -- spectrum-map"
+  }
+}

@@ -1,0 +1,21 @@
+﻿{
+  "name": "docu-title-fade-line",
+  "title": "下划线扫光标题·皮影档案",
+  "category": "口播工厂",
+  "series": "docu",
+  "sub-series": "title",
+  "attribution": "HyperFrames",
+  "license": "internal-paid-member",
+  "clip-ref": null,
+  "source-template": "docu-puppet",
+  "use-case": ["demo"],
+  "tags": ["docu-title-fade-line", "docu", "title", "archival"],
+  "duration": 6,
+  "fps": 30,
+  "resolution": "1920x1080",
+  "data-composition-id": "docu-title-fade-line-2026-08-31",
+  "created": "2026-08-31",
+  "updated": "2026-08-31",
+  "author": "maning",
+  "status": "draft"
+}

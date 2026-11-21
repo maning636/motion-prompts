@@ -1,0 +1,16 @@
+{
+ "name": "四象限 · 出门干活带这几样就够",
+ "description": "十字轴把画面切成四块，每块一个象限指标，轴标签压在交界处",
+ "category": "数据可视化",
+ "tags": [
+  "积木社",
+  "cube",
+  "sun",
+  "snappy"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "card",
+ "when": "数据卡片 / 四象限"
+}

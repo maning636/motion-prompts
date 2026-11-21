@@ -1,0 +1,7 @@
+{
+  "name": "scene-launch",
+  "private": true,
+  "scripts": {
+    "render": "cd ../.. && npm run render -- scene-launch"
+  }
+}

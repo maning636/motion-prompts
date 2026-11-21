@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "row1", "type": "string", "label": "第一行内容", "default": "本周选题会定在周三"}, {"id": "row2", "type": "string", "label": "第二行内容", "default": "新片头用品牌墨印开场"}, {"id": "row3", "type": "string", "label": "第三行内容", "default": "渲染队列全部跑通了"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#doodle{ position:absolute; inset:0; }
+#win{ position:absolute; left:560px; top:180px; width:800px; height:720px; border-radius:20px;
+  background:#14141B; border:1px solid rgba(255,255,255,.12); opacity:0; overflow:hidden; }
+.srow{ position:absolute; left:44px; width:712px; height:120px; display:flex; align-items:center; gap:24px; }
+.skel{ border-radius:12px; background:rgba(255,255,255,.14); }
+.real{ opacity:0; }
+.ava{ width:76px; height:76px; border-radius:50%; flex:none; }
+.ava.skel{ background:rgba(255,255,255,.18); }
+.ava.real{ background:linear-gradient(135deg,var(--accent),#0a5); }
+.rtxt{ font-size:30px; color:var(--fg); }
+.rtxt span{ display:inline-block; opacity:0; margin-right:12px; }
+.rname{ font-size:20px; color:rgba(255,255,255,.45); margin-bottom:10px; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+<svg id="doodle" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <path id="d1" fill="none" stroke="#F4F4F2" stroke-width="12" stroke-linecap="round" opacity=".8"/>
+  <path id="d2" fill="none" stroke="#F4F4F2" stroke-width="11" stroke-linecap="round" opacity=".6"/>
+  <path id="d3" fill="none" stroke="#00FF00" stroke-width="12" stroke-linecap="round" opacity=".8"/>
+</svg>
+<div id="win"><div class="srow" id="sr0" style="top:60px"><div class="ava skel"></div><div style="flex:1"><div class="skel" style="width:180px;height:20px;margin-bottom:14px"></div><div class="skel" style="width:88%;height:26px"></div></div></div><div class="srow real" id="rr0" style="top:60px"><div class="ava real"></div><div style="flex:1"><div class="rname">创作助手</div><div class="rtxt" id="rt0"></div></div></div><div class="srow" id="sr1" style="top:220px"><div class="ava skel"></div><div style="flex:1"><div class="skel" style="width:180px;height:20px;margin-bottom:14px"></div><div class="skel" style="width:74%;height:26px"></div></div></div><div class="srow real" id="rr1" style="top:220px"><div class="ava real"></div><div style="flex:1"><div class="rname">创作助手</div><div class="rtxt" id="rt1"></div></div></div><div class="srow" id="sr2" style="top:380px"><div class="ava skel"></div><div style="flex:1"><div class="skel" style="width:180px;height:20px;margin-bottom:14px"></div><div class="skel" style="width:60%;height:26px"></div></div></div><div class="srow real" id="rr2" style="top:380px"><div class="ava real"></div><div style="flex:1"><div class="rname">创作助手</div><div class="rtxt" id="rt2"></div></div></div></div>
+    </div>
+    <script>
+      const FB = {"row1": "本周选题会定在周三", "row2": "新片头用品牌墨印开场", "row3": "渲染队列全部跑通了", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+// 涂鸦煮沸：种子抖动波浪线，每 5f 换种子
+let seed=5;const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+const boil=()=>{
+  [['#d1',540,300,840],['#d2',620,760,620],['#d3',960,470,400]].forEach(([id,cx,cy,w])=>{
+    let d='M'+(cx-w/2)+','+cy;
+    for(let i=1;i<=8;i++){ d+=' Q'+(cx-w/2+w*i/8-w/16)+','+(cy+(rnd()*24-12))+' '+(cx-w/2+w*i/8)+','+(cy+(rnd()*20-10)); }
+    document.querySelector(id).setAttribute('d',d);
+  });
+};
+boil();
+for(let f=0;f<25;f+=5) tl.call(boil,[],F(f));
+// 换真一拍：涂鸦 8f 加速缩退，骨架窗 spring 弹入
+tl.to('#doodle',{scale:.86,opacity:0,transformOrigin:'960px 540px',duration:F(8),ease:'power2.in'},F(25));
+tl.fromTo('#win',{opacity:0,scale:.9},{opacity:1,scale:1,duration:F(16),ease:'back.out(1.5)'},F(25));
+// 骨架行滚入（错峰 6f）——骨架行就是定位行，直接淡入+上浮
+for(let i=0;i<3;i++){
+  tl.fromTo('#sr'+i,{opacity:0,y:60},{opacity:1,y:0,duration:F(22),ease:'power3.out'},F(33)+F(i*6));
+}
+// 文字逐词准备
+const texts=[v.row1||'',v.row2||'',v.row3||''];
+texts.forEach((t,i)=>{
+  const box=$('#rt'+i);
+  t.split('').forEach(ch=>{ const s=document.createElement('span'); s.textContent=ch; box.appendChild(s); });
+});
+// 显影：镜头推近 + 逐行（错峰 13f）骨架/内容互换 + 逐字 2.5f 上浮；末行末字 +14f 晚半拍
+tl.to('#win',{scale:1.34,transformOrigin:'960px 480px',duration:F(76),ease:'power2.inOut'},F(90));
+for(let i=0;i<3;i++){
+  const t0=F(90)+F(i*13);
+  tl.to('#sr'+i,{opacity:0,duration:F(8)},t0);
+  tl.set('#rr'+i,{opacity:1},t0+F(4));
+  tl.fromTo('#rr'+i+' .ava',{scale:.7},{scale:1,duration:F(10),ease:'back.out(2)'},t0+F(4));
+  const chars=$('#rt'+i).children;
+  for(let c=0;c<chars.length;c++){
+    let st=t0+F(4)+F(c*2.5);
+    if(i===2&&c===chars.length-1) st+=F(14); // 末字晚半拍
+    tl.fromTo(chars[c],{opacity:0,y:14},{opacity:1,y:0,duration:F(6)},st);
+  }
+}
+tl.to({},{duration:F(20)},F(160));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

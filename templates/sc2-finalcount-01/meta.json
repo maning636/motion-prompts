@@ -1,0 +1,14 @@
+{
+  "id": "sc2-finalcount-01",
+  "name": "倒计时弧线散点",
+  "series": "sc2",
+  "createdAt": "2026-08-16T08:00:00.000Z",
+  "energy": "高",
+  "suggestedDuration": 6,
+  "knownPitfalls": [
+    "倒数数字是预建的 FROM 个叠层元素按拍切换，不要改成 onUpdate 改文本——钉帧跳采会拿到错误数字",
+    "from 限制 2-5：超过 5 拍每拍不足 1 秒，刻度点亮会糊成一片",
+    "散点粒子用固定种子伪随机，改了 TICKS 或 R 后粒子轨迹全变，需重新抽帧回验",
+    "时间轴末尾必须盖过 data-duration：hyperframes 渲染超出时间轴的帧是空白"
+  ]
+}

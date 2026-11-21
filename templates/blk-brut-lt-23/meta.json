@@ -1,0 +1,16 @@
+{
+ "name": "话题标签条",
+ "description": "ink 长轨内三枚 pill 标签依次自左错峰装上，轨头上方一枚强调色方块先落位，两层反向做匀速往返位移",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "tags",
+  "topics",
+  "yellow"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "知识口播、栏目包装、社媒分发，需要在画面下方长期挂一组话题标签时"
+}

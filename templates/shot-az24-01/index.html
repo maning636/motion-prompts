@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "brand", "type": "string", "label": "字标", "default": "SHIPIT"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#bg{ position:absolute; inset:0; background:#262622; }
+#ui{ position:absolute; inset:0; }
+#sidebar{ position:absolute; left:0; top:0; width:260px; height:1080px; background:#2E2E2B;
+  border-right:1px solid rgba(255,255,255,.06); }
+#panel{ position:absolute; right:0; top:70px; width:300px; height:1010px; background:#2E2E2B;
+  border-left:1px solid rgba(255,255,255,.06); }
+#toolbar{ position:absolute; left:260px; top:0; right:0; height:70px; background:#32322F;
+  border-bottom:1px solid rgba(255,255,255,.06); }
+#tbL{ position:absolute; left:290px; top:22px; width:180px; height:26px; border-radius:13px;
+  background:rgba(255,255,255,.12); }
+#tbR{ position:absolute; right:330px; top:22px; width:120px; height:26px; border-radius:13px;
+  background:rgba(255,255,255,.12); }
+#canvas{ position:absolute; left:260px; top:70px; right:300px; bottom:60px; }
+#cBottom{ position:absolute; left:260px; right:300px; bottom:0; height:60px; background:#2A2A28; }
+.cc{ position:absolute; width:480px; height:300px; border-radius:16px; background:#383836;
+  border:1px solid rgba(255,255,255,.07); }
+#pub{ position:absolute; left:1480px; top:14px; width:170px; height:42px; border-radius:21px;
+  background:var(--accent); color:#0A0A0A; font-size:20px; font-weight:900; text-align:center;
+  line-height:42px; z-index:50; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; will-change:transform; }
+#cursor{ position:absolute; left:1400px; top:820px; width:0; height:0; z-index:60;
+  border-left:16px solid #FFF; border-top:10px solid transparent; border-bottom:10px solid transparent;
+  transform:rotate(-20deg); filter:drop-shadow(0 2px 6px rgba(0,0,0,.5)); }
+#brand{ position:absolute; left:0; right:0; top:470px; text-align:center; font-size:110px;
+  font-weight:900; letter-spacing:14px; color:var(--fg); opacity:0; will-change:transform,opacity; }
+.sk{ position:absolute; border-radius:8px; background:rgba(255,255,255,.10); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4.3" data-width="1920" data-height="1080">
+
+<div id="bg"></div>
+<div id="ui">
+  <div id="sidebar"></div><div id="panel"></div>
+  <div id="canvas"><div class="cc" id="cc0" style="left:320px;top:130px"><div class="sk" style="left:30px;top:30px;width:55%;height:18px"></div><div class="sk" style="left:30px;top:66px;width:40%;height:12px"></div><div class="sk" style="left:30px;top:96px;width:48%;height:12px"></div></div><div class="cc" id="cc1" style="left:860px;top:130px"><div class="sk" style="left:30px;top:30px;width:55%;height:18px"></div><div class="sk" style="left:30px;top:66px;width:40%;height:12px"></div><div class="sk" style="left:30px;top:96px;width:48%;height:12px"></div></div><div class="cc" id="cc2" style="left:320px;top:480px"><div class="sk" style="left:30px;top:30px;width:55%;height:18px"></div><div class="sk" style="left:30px;top:66px;width:40%;height:12px"></div><div class="sk" style="left:30px;top:96px;width:48%;height:12px"></div></div><div class="cc" id="cc3" style="left:860px;top:480px"><div class="sk" style="left:30px;top:30px;width:55%;height:18px"></div><div class="sk" style="left:30px;top:66px;width:40%;height:12px"></div><div class="sk" style="left:30px;top:96px;width:48%;height:12px"></div></div></div>
+  <div id="cBottom"></div>
+  <div id="toolbar"></div><div id="tbL"></div><div id="tbR"></div>
+</div>
+<div id="pub">Publish</div>
+<div id="cursor"></div>
+<div id="brand"></div>
+
+    </div>
+    <script>
+      const FB = {"brand": "SHIPIT", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#brand').textContent=v.brand||'SHIPIT';
+const CLICK=30;
+const cur=$('#cursor'), pub=$('#pub'), brand=$('#brand'), bg=$('#bg'), ui=$('#ui');
+// 蒸发层定义：[元素, dx, dy] 外围→中心，按钮所在工具条中段最后
+const LAYERS=[
+  [$('#sidebar'),-140,0], [$('#panel'),140,10],
+  [$('#cc0'),-70,0], [$('#cc1'),70,0], [$('#cc2'),-70,0], [$('#cc3'),70,0],
+  [$('#tbL'),-80,-60], [$('#tbR'),80,-60],
+  [$('#cBottom'),0,40], [$('#canvas'),0,30], [$('#toolbar'),0,-50],
+];
+function cl(x){return Math.max(0,Math.min(1,x));}
+function lp(a,b,p){return a+(b-a)*p;}
+// 按钮全程位置：从 (1480,14) 滑向屏心 (875,480) 并 ×1.5
+const BTN={x0:1480,y0:14,x1:875,y1:480};
+const sim={f:0};
+function paint(){
+  const f=sim.f;
+  // 光标：f0-26 移向按钮，CLICK 点击压缩，+10f 内淡出
+  const cp=cl(f/26), ce=1-Math.pow(1-cp,3);
+  const cx=lp(1400,1540,ce), cy=lp(820,40,ce);
+  const click=f>=CLICK?1:0;
+  cur.style.transform='translate('+cx.toFixed(0)+'px,'+cy.toFixed(0)+'px) rotate(-20deg) scale('+(click?0.85:1)+')';
+  cur.style.opacity=f>CLICK?(1-cl((f-CLICK)/10)).toFixed(2):1;
+  // 蒸发：CLICK+4 起每 4f 一层，14f ease-in 加速
+  LAYERS.forEach((L,i)=>{
+    const a=CLICK+4+i*4, p=cl((f-a)/14), e=p*p;
+    L[0].style.opacity=(1-e).toFixed(3);
+    L[0].style.transform='translate('+(L[1]*e).toFixed(0)+'px,'+(L[2]*e).toFixed(0)+'px)';
+  });
+  // 背景压黑：CLICK+20 起 20f
+  const bp=cl((f-CLICK-20)/20);
+  const g=Math.round(lp(38,17,bp));
+  bg.style.background='rgb('+g+','+g+','+(g-1)+')';
+  // 按钮：蒸发期滑向屏心 ×1.5，白晕随黑场增强；CLICK+52 起 12f 淡出
+  const mp=cl((f-CLICK-4)/18), me=mp<.5?4*mp*mp*mp:1-Math.pow(-2*mp+2,3)/2;
+  const bx=lp(BTN.x0,BTN.x1,me), by=lp(BTN.y0,BTN.y1,me), bs=lp(1,1.5,me);
+  const glow=lp(0,70,cl((f-CLICK-10)/25));
+  const bo=1-cl((f-CLICK-52)/12);
+  pub.style.transform='translate('+(bx-BTN.x0).toFixed(0)+'px,'+(by-BTN.y0).toFixed(0)+'px) scale('+bs.toFixed(3)+')';
+  pub.style.opacity=bo.toFixed(3);
+  pub.style.boxShadow='0 0 '+glow.toFixed(0)+'px rgba(255,255,255,'+(0.10+0.25*bp).toFixed(2)+')';
+  // 字标接棒：CLICK+62 起淡入 + 86%→100%
+  const wp=cl((f-CLICK-62)/14), we=1-Math.pow(1-wp,3);
+  brand.style.opacity=we.toFixed(3);
+  brand.style.transform='scale('+lp(0.86,1,we).toFixed(3)+')';
+}
+paint();
+tl.to(sim,{f:130,duration:F(130),ease:'none',onUpdate:paint},0);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

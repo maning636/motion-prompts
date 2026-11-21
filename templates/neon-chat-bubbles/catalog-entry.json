@@ -1,0 +1,28 @@
+{
+  "id": "neon-chat-bubbles",
+  "name": "荧光聊天气泡对话卡",
+  "description": "深黑底荧光绿聊天气泡对话：英文小标签+白色标题，用户泡靠右绿描边发光、AI泡靠左灰蓝描边，依次弹入，末条带绿色✓定格，适合演示与AI多轮对话调整。",
+  "category": "信息卡片",
+  "tags": [
+    "聊天气泡",
+    "对话",
+    "荧光绿",
+    "AI交互",
+    "口播"
+  ],
+  "duration": 6,
+  "slot": "concept",
+  "when": "口播演示用户与AI多轮对话、用一句话让AI反复调整结果的场景时",
+  "assets": [],
+  "path": "templates/neon-chat-bubbles",
+  "size": "1920×1080",
+  "formats": [
+    "mp4"
+  ],
+  "defaultFormat": "mp4",
+  "preview": "https://maning789link.top/hub/renders/neon-chat-bubbles/sample.webm",
+  "status": "ready",
+  "tier": "free",
+  "no": null,
+  "series": "shot"
+}

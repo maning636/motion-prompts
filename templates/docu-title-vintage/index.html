@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-composition-variables='[{"id": "studio", "type": "string", "label": "制片厂", "default": "MANING STUDIO"}, {"id": "chapterTitle", "type": "string", "label": "主标题", "default": "档案系列"}, {"id": "subtitle", "type": "string", "label": "副标题", "default": "Documentary Series"}, {"id": "present", "type": "string", "label": "呈现", "default": "Presents"}, {"id": "year", "type": "string", "label": "年份", "default": "MMXXVI"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#b91c1c"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+<head>
+  <meta charset="UTF-8">
+  <title>老式片头标题·皮影档案</title>
+  <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+  <style>
+    :root { --accent: #b91c1c; --ink: #0a0a0a; --paper: #e8d9b5; --warm: #5d4e37; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: var(--paper); color: var(--ink); font-family: "Source Han Serif", "Songti SC", "PingFang SC", serif; }
+    .composition { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+    .layer { position: absolute; inset: 0; }
+    .l1-bg { z-index: 1; }
+    .paper-base { position: absolute; inset: 0; background: var(--paper); }
+    /* 米黄纸纹理+深色斑驳做旧 */
+    .age-spots {
+      position: absolute; inset: 0;
+      background-image:
+        radial-gradient(ellipse at 20% 30%, rgba(93,78,55,0.18) 0%, transparent 35%),
+        radial-gradient(ellipse at 80% 70%, rgba(93,78,55,0.15) 0%, transparent 30%),
+        radial-gradient(ellipse at 60% 20%, rgba(93,78,55,0.10) 0%, transparent 25%);
+    }
+    .grain-layer { position: absolute; inset: 0; background-image: url("./assets/grain.png"); background-size: 320px 320px; opacity: 0.45; mix-blend-mode: multiply; }
+    .paper-age { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 50%, rgba(61,40,23,0.35) 100%); }
+
+    /* 装饰：四角花边框 */
+    .frame-deco {
+      position: absolute; inset: 60px;
+      border: 3px solid var(--warm);
+      pointer-events: none;
+      z-index: 5;
+    }
+    .frame-deco::before, .frame-deco::after {
+      content: ""; position: absolute;
+      width: 80px; height: 80px;
+      border: 6px double var(--warm);
+    }
+    .frame-deco::before { top: -6px; left: -6px; border-right: none; border-bottom: none; }
+    .frame-deco::after { bottom: -6px; right: -6px; border-left: none; border-top: none; }
+
+    .l2-content { z-index: 10; }
+
+    /* 顶部 "PRESENTS" */
+    .present {
+      position: absolute; left: 50%; top: 360px;
+      transform: translateX(-50%);
+      font-family: "Source Han Serif", "Songti SC", serif;
+      font-size: 36px;
+      letter-spacing: 1em;
+      padding-left: 1em;
+      color: var(--warm);
+      font-style: italic;
+    }
+
+    /* 中央主标题 */
+    .chapter-title {
+      position: absolute; left: 50%; top: 460px;
+      transform: translateX(-50%);
+      font-family: "Source Han Serif", "Songti SC", "STSong", serif;
+      font-size: 180px;
+      font-weight: 900;
+      color: var(--ink);
+      letter-spacing: 0.15em;
+      padding-left: 0.15em;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    /* 朱砂装饰横条 */
+    .accent-bar {
+      position: absolute; left: 50%; top: 700px;
+      transform: translateX(-50%);
+      width: 800px; height: 6px;
+      background: var(--accent);
+    }
+
+    /* 副标题 */
+    .subtitle {
+      position: absolute; left: 50%; top: 760px;
+      transform: translateX(-50%);
+      font-family: "Source Han Serif", "Songti SC", serif;
+      font-size: 32px;
+      letter-spacing: 0.4em;
+      padding-left: 0.4em;
+      color: var(--warm);
+    }
+
+    /* 顶部片厂 */
+    .studio {
+      position: absolute; left: 50%; top: 200px;
+      transform: translateX(-50%);
+      font-family: "Courier New", monospace;
+      font-size: 22px;
+      letter-spacing: 0.4em;
+      padding-left: 0.4em;
+      color: var(--ink);
+      font-weight: 700;
+    }
+    .studio::before, .studio::after {
+      content: "★"; color: var(--accent); margin: 0 24px;
+    }
+
+    /* 底部年份 */
+    .year {
+      position: absolute; left: 50%; bottom: 200px;
+      transform: translateX(-50%);
+      font-family: "Source Han Serif", "Songti SC", serif;
+      font-size: 28px;
+      letter-spacing: 0.5em;
+      padding-left: 0.5em;
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .l6-environment { z-index: 50; pointer-events: none; }
+    .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.25) 100%); }
+    .progress-bar { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--accent); width: 0%; z-index: 60; }
+
+    .studio, .present, .chapter-title, .accent-bar, .subtitle, .year, .frame-deco { opacity: 0; }
+  </style>
+</head>
+<body>
+  <div id="composition" class="composition" data-composition-id="docu-title-vintage-2026-08-31" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+    <div class="layer l1-bg">
+      <div class="paper-base"></div>
+      <div class="age-spots"></div>
+      <div class="grain-layer"></div>
+      <div class="paper-age"></div>
+    </div>
+    <div class="frame-deco"></div>
+    <div class="layer l2-content">
+      <div class="studio" data-composition-variable="studio">MANING STUDIO</div>
+      <div class="present" data-composition-variable="present">Presents</div>
+      <div class="chapter-title" data-composition-variable="chapterTitle">档案系列</div>
+      <div class="accent-bar"></div>
+      <div class="subtitle" data-composition-variable="subtitle">Documentary Series</div>
+      <div class="year" data-composition-variable="year">MMXXVI</div>
+    </div>
+    <div class="layer l6-environment">
+      <div class="vignette"></div>
+    </div>
+    <div class="progress-bar"></div>
+  </div>
+  <script>
+    window.addEventListener("load", () => {
+      const vars = window.__hyperframes?.getVariables?.() || {};
+      const duration = Math.max(1, Number(vars.duration) || 6);
+      const tl = gsap.timeline({ paused: true, defaults: { ease: "power3.out" } });
+          // 注册到 window.__timelines：云渲染的 settle/逐帧定位靠它驱动时间轴。
+          // 此前有一批素材没注册，导致渲染停在第 0 帧（主体初始 opacity:0 → 整层空）。
+          // gsap 时间轴就地 mutate，先存引用即可，后续 tl.to() 作用在同一对象上。
+          window.__timelines = window.__timelines || {};
+          window.__timelines.main = tl;
+      window.__timelines = window.__timelines || {};
+      tl.to(".frame-deco", { opacity: 1, duration: 0.6 }, 0);
+      tl.to(".studio", { opacity: 1, duration: 0.5 }, 0.3);
+      tl.to(".present", { opacity: 1, duration: 0.5 }, 0.6);
+      tl.to(".chapter-title", { opacity: 1, duration: 0.7 }, 0.9);
+      tl.to(".accent-bar", { opacity: 1, scaleX: 1, duration: 0.5, transformOrigin: "center" }, 1.4);
+      tl.to(".subtitle", { opacity: 1, duration: 0.5 }, 1.7);
+      tl.to(".year", { opacity: 1, duration: 0.5 }, 2.0);
+      const exitAt = Math.max(3.0, duration - 0.6);
+      tl.to(".subtitle", { opacity: 0, duration: 0.4 }, exitAt);
+      tl.to(".year", { opacity: 0, duration: 0.4 }, exitAt);
+      tl.to(".progress-bar", { width: "100%", duration: duration, ease: "none" }, 0);
+      window.__timelines["docu-title-vintage-2026-08-31"] = tl;
+      window.__hyperframes?.ready?.();
+    });
+  </script>
+</body>
+</html>

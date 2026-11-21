@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"pack","name":"规格包","type":"enum","label":"规格包（配色 / 字体 / 曲线）","options":[{"label":"暗色科技","value":"dark"},{"label":"奶油贴纸","value":"cream"},{"label":"单色克制","value":"mono"},{"label":"夜航","value":"night"}],"default":"night"},{"id":"video1","name":"素材1","type":"string","label":"第 1 镜素材（留空用内置画面）","default":""},{"id":"en1","name":"英文1","type":"string","label":"第 1 句 英文","default":"so what do you think you will do"},{"id":"cn1","name":"中文1","type":"string","label":"第 1 句 中文","default":"所以 你打算怎么做"},{"id":"video2","name":"素材2","type":"string","label":"第 2 镜素材（留空用内置画面）","default":""},{"id":"en2","name":"英文2","type":"string","label":"第 2 句 英文","default":"how are you gonna spend your life"},{"id":"cn2","name":"中文2","type":"string","label":"第 2 句 中文","default":"你将怎么度过你的人生"},{"id":"video3","name":"素材3","type":"string","label":"第 3 镜素材（留空用内置画面）","default":""},{"id":"en3","name":"英文3","type":"string","label":"第 3 句 英文","default":"not sure — but I do know"},{"id":"cn3","name":"中文3","type":"string","label":"第 3 句 中文","default":"我不确定 但是 我知道"}]'>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="句子即剪辑点：一句占一镜、句末直切、底部固定英上中下双语字幕。改文案就等于改节奏。">
+<title>双语字幕独白 · 一句一镜</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<link rel="stylesheet" href="../_lib/packs.css">
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script>
+<!-- packs.js 必须排在 blocks.js **之后**：blocks.js 结尾是 global.BBlocks = BB，
+     会把它整个替换掉。谁先加载谁的东西就没了，表现是 B.pack is not a function。 -->
+<script src="../_lib/packs.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<style>
+  /* 底色和字色**必须来自规格包**，不能写死。
+     写死 #000 + #F4F1EA 的时候，四个包里只有 dark / night 正常：
+     cream 的 --pk-fg 是 #2A2118、mono 是 #14140F，两个都是**深字**，
+     压在这个写死的黑底上 → 标题、标签、说明全糊掉。
+     而写死字面量色的元素（比如 rgba(244,241,234,.82)）反而还看得见，
+     画面上就成了一半能看一半不能看——比全黑更难认。
+     一共 33 条模板中招（混剪 5 + 认知 22 + 节拍 6）。
+
+     注意区分两层契约（packs.css 顶部注释里写过）：
+       --pk-bg / --pk-fg      = 包自带底板，舞台自己用它
+       --pk-*-media           = 压在用户素材上的那一层
+     这里改的是前者。 */
+  html,body{margin:0;padding:0;background:var(--pk-bg,#000)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--pk-bg,#000);
+        color:var(--pk-fg,#F4F1EA);font-family:"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+        -webkit-font-smoothing:antialiased}
+  /* 统一安全区：混剪里所有贴边元素都从 72/88 起，不贴 0 */
+  
+  /* 素材位：用 CSS 画一个「像镜头」的抽象画面。
+     真视频在当前渲染管线里不播（compose.html 不处理 <video>），
+     预览会全黑——所以默认走 CSS，逻辑才看得见。 */
+  .shot{position:absolute;inset:0;overflow:hidden;opacity:0}
+  .shot .sky{position:absolute;inset:-12%;background:
+      linear-gradient(180deg,var(--c1) 0%,var(--c2) 52%,var(--c3) 100%)}
+  .shot .glow{position:absolute;left:56%;top:26%;width:340px;height:340px;border-radius:50%;
+      background:radial-gradient(circle,var(--c4) 0%,rgba(0,0,0,0) 68%);filter:blur(12px)}
+  .shot .haze{position:absolute;left:-10%;right:-10%;top:52%;height:26%;
+      background:linear-gradient(180deg,rgba(0,0,0,0),var(--c3) 78%,rgba(0,0,0,0));opacity:.55}
+  .shot .ridge{position:absolute;left:-8%;right:-8%;bottom:0;height:46%;
+      background:linear-gradient(180deg,var(--c5),var(--c6))}
+  .shot .ridge.r1{clip-path:polygon(0 44%,13% 27%,26% 41%,40% 19%,55% 37%,69% 24%,85% 40%,100% 26%,100% 100%,0 100%)}
+  .shot .ridge.r2{height:28%;opacity:.92;
+      clip-path:polygon(0 58%,12% 40%,25% 57%,38% 35%,52% 55%,66% 37%,80% 53%,100% 39%,100% 100%,0 100%)}
+  .shot .grain{position:absolute;inset:0;opacity:.10;background-image:
+      repeating-linear-gradient(0deg,rgba(255,255,255,.10) 0 1px,rgba(0,0,0,0) 1px 3px),
+      repeating-linear-gradient(90deg,rgba(0,0,0,.10) 0 1px,rgba(0,0,0,0) 1px 4px)}
+  .shot .vig{position:absolute;inset:0;box-shadow:inset 0 0 260px 80px rgba(0,0,0,.52)}
+  .shot video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+  .shot.live .sky,.shot.live .glow,.shot.live .haze,
+  .shot.live .ridge,.shot.live .grain{display:none}
+  .shot.live video{display:block}
+
+  /* 顶部镜号：三句三镜，镜号跟着切。
+     三个号预先叠好、各自一条透明度补间——不用 tl.call 改文字：
+     settle 会把时间轴来回扫，call 是越点越累加的，扫完会停在错号上。 */
+  .idx{position:absolute;left:96px;top:84px;z-index:20;opacity:0;
+      display:flex;align-items:center;gap:14px}
+  .idx .nums{position:relative;width:56px;height:30px}
+  .idx .nums b{position:absolute;inset:0;display:flex;align-items:center;opacity:0;
+      font-family:ui-monospace,Consolas,monospace;font-size:22px;font-weight:700;
+      letter-spacing:.14em;color:var(--pk-accent-media)}
+  .idx s{text-decoration:none;width:34px;height:2px;background:rgba(244,241,234,.35)}
+  .idx i{font-style:normal;font-family:ui-monospace,Consolas,monospace;font-size:22px;
+      font-weight:600;letter-spacing:.14em;color:var(--pk-muted-media)}
+
+  /* 底部双语字幕：英上中下，位置固定，全片不动 */
+  .sub{position:absolute;left:120px;right:120px;bottom:112px;z-index:20;opacity:0;
+      display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+  /* 字幕压在实拍上：素材亮度未知，只能用 media 安全值。
+     原来写死 #FFF，等于脱离包的管辖——mono 包下整个模板的 UI 层
+     都会被判成「不是这个包的规格」。 */
+  .sub .en{display:block;width:100%;font-family:ui-monospace,Consolas,monospace;
+      font-size:26px;font-weight:700;letter-spacing:.06em;color:var(--pk-fg-media);
+      text-shadow:0 2px 14px rgba(0,0,0,.9)}
+  .sub .cn{display:block;width:100%;font-size:44px;font-weight:800;line-height:1.22;
+      color:var(--pk-fg-media);text-shadow:0 3px 22px rgba(0,0,0,.92)}
+  .sub .bar{width:0;height:3px;background:var(--c4,#E08A3C)}
+
+  /* 底部渐变压暗：白字在任何画面上都读得出来，不靠运气 */
+  .scrim{position:absolute;left:0;right:0;bottom:0;height:380px;z-index:15;opacity:0;
+      background:linear-gradient(180deg,rgba(0,0,0,0) 0%,rgba(0,0,0,.42) 46%,rgba(0,0,0,.86) 100%)}
+
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <div class="shot" id="s0" data-media-layer style="--c1:#101A2E;--c2:#2C4A6E;--c3:#4E6E8F;--c4:#E08A3C;--c5:#1B2A44;--c6:#0E1626"><span class="sky"></span><span class="glow"></span><span class="haze"></span><span class="ridge r1"></span><span class="ridge r2"></span><span class="grain"></span><span class="vig"></span><video id="v0" muted playsinline preload="auto"></video></div><div class="shot" id="s1" data-media-layer style="--c1:#0B1220;--c2:#1B2A44;--c3:#3C4A63;--c4:#C97A2B;--c5:#141C2C;--c6:#0A0F1A"><span class="sky"></span><span class="glow"></span><span class="haze"></span><span class="ridge r1"></span><span class="ridge r2"></span><span class="grain"></span><span class="vig"></span><video id="v1" muted playsinline preload="auto"></video></div><div class="shot" id="s2" data-media-layer style="--c1:#070C18;--c2:#16233D;--c3:#22375C;--c4:#3E5F8A;--c5:#0C1424;--c6:#060A12"><span class="sky"></span><span class="glow"></span><span class="haze"></span><span class="ridge r1"></span><span class="ridge r2"></span><span class="grain"></span><span class="vig"></span><video id="v2" muted playsinline preload="auto"></video></div>
+  <div class="scrim" id="scrim"></div>
+  <div class="idx" id="idx" style="--c4:#E08A3C">
+    <span class="nums"><b id="m0">01</b><b id="m1">02</b><b id="m2">03</b></span><s></s><i id="it">/ 03</i>
+  </div>
+    <div class="sub" id="sub1" style="--c4:#E08A3C"><span class="en" id="en1" data-fit-max="26" data-fit-min="15"></span><span class="cn" id="cn1" data-fit-max="44" data-fit-min="24"></span><span class="bar" id="bar1"></span></div>  <div class="sub" id="sub2" style="--c4:#C97A2B"><span class="en" id="en2" data-fit-max="26" data-fit-min="15"></span><span class="cn" id="cn2" data-fit-max="44" data-fit-min="24"></span><span class="bar" id="bar2"></span></div>  <div class="sub" id="sub3" style="--c4:#3E5F8A"><span class="en" id="en3" data-fit-max="26" data-fit-min="15"></span><span class="cn" id="cn3" data-fit-max="44" data-fit-min="24"></span><span class="bar" id="bar3"></span></div>
+
+</div>
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+  var tl = B.tl();
+  /* 规格包：先定风格，再建任何元素。
+     画面素材的配色**不跟着包走**——那是"底片"，用户自己的东西不能被模板改色；
+     跟着包走的只有 UI 层（字色、强调色、描边、圆角、曲线）。这个边界必须守住。 */
+  B.pack(v.pack);
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  function q(s) { return document.querySelector(s); }
+  /* 素材位接真视频：留空就继续用 CSS 画面 */
+  function live(n, src) {
+    if (!src) return;
+    var s = document.getElementById('s' + n), e = document.getElementById('v' + n);
+    if (!s || !e) return;
+    s.classList.add('live'); e.src = src;
+    e.play().catch(function () {});
+  }
+  /* 景别缓推：v1/v3 里画面始终在极慢地动，这是「像镜头」的关键 */
+  function push(n, at, dur, from, to, ease) {
+    var s = q('#s' + n + ' .sky'), g = q('#s' + n + ' .glow'), r = q('#s' + n + ' .r2');
+    if (s) tl.fromTo(s, { scale: from, y: '0%' },
+      { scale: to, y: '-2%', duration: dur, ease: ease || 'none' }, at);
+    if (g) tl.fromTo(g, { xPercent: -4, opacity: .8 },
+      { xPercent: 5, opacity: 1, duration: dur, ease: 'none' }, at);
+    if (r) tl.fromTo(r, { xPercent: 0 },
+      { xPercent: -2.5, duration: dur, ease: 'none' }, at);
+  }
+  /* clip-path 形状插值。
+     两个坑都在这里踩过：
+       1. GSAP 各版本对 clipPath 字符串补间的处理不一致，所以不直接补间它，
+          改成补间一个 {t:0→1} 的代理对象，onUpdate 里自己算 8 个点；
+       2. **from 必须是编译期常量，不能从元素当前状态读。**
+          settle 会把时间轴来回扫；一旦回退越过一个已完成的补间，
+          GSAP 会把它按 ratio 0 重渲——onUpdate 拿到的就是起点，
+          形状会「弹回矩形」。写成常量后，形状是 t 的纯函数，
+          停在任何一帧算出来都一样。
+     相邻两段的 from 必须等于上一段的 to，这条由 Python 侧保证。 */
+  function polyStr(pts) {
+    return 'polygon(' + pts.map(function (p) {
+      return p[0].toFixed(2) + '% ' + p[1].toFixed(2) + '%'; }).join(',') + ')';
+  }
+  function morph(el, from, to, at, dur, ease) {
+    if (!el || !to || !from || from.length !== to.length) return;
+    var st = { t: 0 };
+    tl.to(st, { t: 1, duration: dur == null ? .7 : dur, ease: ease || 'power2.inOut',
+      onUpdate: function () {
+        el.style.clipPath = polyStr(from.map(function (p, i) {
+          return [p[0] + (to[i][0] - p[0]) * st.t,
+                  p[1] + (to[i][1] - p[1]) * st.t];
+        }));
+      } }, at);
+  }
+  /* 句子 → 剪辑表：时间轴由句子推出来，不写死 */
+  var LINES = [{"en":"so what do you think you will do","cn":"所以 你打算怎么做","pal":"blue","d":4.2},{"en":"how are you gonna spend your life","cn":"你将怎么度过你的人生","pal":"dusk","d":4.2},{"en":"not sure — but I do know","cn":"我不确定 但是 我知道","pal":"night","d":4.2}];
+  var CUTS = [], t = 0, i;
+  for (i = 0; i < LINES.length; i++) {
+    CUTS.push({ i: i, at: t, d: LINES[i].d, en: LINES[i].en, cn: LINES[i].cn });
+    t += LINES[i].d;
+  }
+  var TOTAL = t;
+  ['en1','cn1','en2','cn2','en3','cn3'].forEach(function (k) { set(k, v[k]); });
+  set('it', '/ 0' + LINES.length);
+
+  tl.set('#scrim', { opacity: 1 }, 0);
+  tl.fromTo('#idx', { opacity: 0, x: -16 },
+      { opacity: 1, x: 0, duration: .5, ease: 'power3.out' }, .1);
+
+  for (i = 0; i < CUTS.length; i++) {
+    (function (c) {
+      live(c.i, v['video' + (c.i + 1)]);
+      /* 硬切。v3 是直切，不做叠化——叠化会把「一句一镜」的节奏糊掉 */
+      tl.set('#s' + c.i, { opacity: 1 }, c.at);
+      for (var k = 0; k < LINES.length; k++) {
+        if (k !== c.i) tl.set('#s' + k, { opacity: 0 }, c.at);
+      }
+      /* 镜号跟着切镜点走 */
+      tl.set('#m' + c.i, { opacity: 1 }, c.at);
+      for (var m = 0; m < LINES.length; m++) {
+        if (m !== c.i) tl.set('#m' + m, { opacity: 0 }, c.at);
+      }
+      /* 字幕跟着句子走，不跟着画面走：切镜后 0.16s 进 */
+      var n = c.i + 1;
+      tl.fromTo('#sub' + n, { opacity: 0, y: 22 },
+          { opacity: 1, y: 0, duration: .42, ease: 'power3.out' }, c.at + .16);
+      tl.fromTo('#bar' + n, { width: 0 },
+          { width: 120, duration: .5, ease: 'power3.out' }, c.at + .22);
+      /* 末句不出，让 settle 停在成品帧上（参考片的尾句也是留着的） */
+      if (c.i !== 2) {
+        tl.to('#sub' + n, { opacity: 0, y: -14, duration: .28, ease: 'power2.in' },
+            c.at + c.d - .22);
+      }
+      /* 景别缓推：画面一直在极慢地动 */
+      push(c.i, c.at, c.d, 1.02, 1.09);
+    })(CUTS[i]);
+  }
+
+  B.hold(tl, TOTAL, .5);
+  B.fitAll();
+
+})();
+</script>
+</body>
+</html>

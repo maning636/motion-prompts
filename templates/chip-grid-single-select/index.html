@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"eyebrow","type":"string","label":"眉标","default":"SELECT · ONE"},
+  {"id":"heading","type":"string","label":"主标题","default":"单选决策演示"},
+  {"id":"subheading","type":"string","label":"副标题","default":"逐一亮起 → 最终项高亮放大 → 其余压暗"},
+  {"id":"chips","type":"string","label":"芯片标签（每行一个）","default":"数据接入\n语义抽取\n知识图谱\n向量检索\n推理执行"},
+  {"id":"selectedIndex","type":"number","label":"最终选中项（1-based）","default":3},
+  {"id":"columns","type":"number","label":"网格列数","default":3},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+
+      /* 点阵底 */
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.045) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity: .55;
+      }
+
+      /* 顶头 eyebrow */
+      .eyebrow{
+        position:absolute; top: 96px; left: 96px; right: 96px;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 18px; letter-spacing:.24em; text-transform:uppercase;
+        color: #8A8A85;
+      }
+      .eyebrow .acc{ color: var(--accent, #00FF00); font-weight:700; letter-spacing:.22em; }
+      .eyebrow .dot{
+        display:inline-block; width:8px; height:8px; border-radius:50%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+        margin-right: 12px; vertical-align: middle;
+      }
+
+      /* 标题 */
+      .header{
+        position:absolute; top: 168px; left: 96px; right: 96px;
+      }
+      .header .title{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight: 700; letter-spacing:-.02em;
+        font-size: 92px; line-height: 1.04;
+        color: var(--foreground, #F4EFE7);
+        margin: 0;
+      }
+      .header .subtitle{
+        font-size: 24px; line-height: 1.5;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 62%, transparent);
+        margin: 20px 0 0;
+        letter-spacing: .02em;
+      }
+
+      /* 芯片网格 */
+      .stage{ position:absolute; inset:0; }
+      #grid{
+        position:absolute;
+        left: 96px; right: 96px;
+        top: 480px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-auto-rows: 132px;
+        gap: 28px 32px;
+        opacity: 0;
+      }
+      .chip{
+        position: relative;
+        border: 1.5px solid rgba(255,255,255,.14);
+        border-radius: 18px;
+        background: color-mix(in srgb, var(--foreground, #F4EFE7) 4%, transparent);
+        padding: 22px 30px;
+        display: flex; align-items: center; gap: 22px;
+        overflow: hidden;
+        opacity: 0;
+        transform: translateY(20px);
+        will-change: transform, opacity, box-shadow, background-color, border-color;
+      }
+      .chip .idx{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 26px; font-weight: 700;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 42%, transparent);
+        letter-spacing: .04em;
+        min-width: 56px;
+        font-variant-numeric: tabular-nums;
+      }
+      .chip .lab{
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+        font-size: 32px; font-weight: 600;
+        color: var(--foreground, #F4EFE7);
+        letter-spacing: .04em;
+        flex: 1;
+      }
+      .chip .tick{
+        width: 30px; height: 30px; border-radius: 50%;
+        border: 1.5px solid rgba(255,255,255,.2);
+        display: grid; place-items: center;
+        flex: none;
+        transition: background-color .2s;
+      }
+      .chip .tick svg{ width: 16px; height: 16px; opacity: 0; }
+
+      /* 中间态：亮一次 */
+      .chip.pulse{
+        border-color: color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+        box-shadow: 0 0 24px color-mix(in srgb, var(--accent, #00FF00) 30%, transparent);
+      }
+
+      /* 选中态：放大 + accent 描边 + 内部高亮 */
+      .chip.selected{
+        border-color: var(--accent, #00FF00);
+        background: color-mix(in srgb, var(--accent, #00FF00) 10%, transparent);
+        box-shadow:
+          0 0 0 2px var(--accent, #00FF00),
+          0 0 60px color-mix(in srgb, var(--accent, #00FF00) 45%, transparent);
+      }
+      .chip.selected .idx{ color: var(--accent, #00FF00); }
+      .chip.selected .tick{
+        border-color: var(--accent, #00FF00);
+        background: var(--accent, #00FF00);
+      }
+      .chip.selected .tick svg{ opacity: 1; }
+      .chip.selected .tick svg path{ stroke: var(--background, #12100E); }
+
+      /* 未选中压暗 */
+      .chip.dimmed{
+        opacity: .28 !important;
+        filter: saturate(.6);
+      }
+
+      /* 选中指示：外圈光环 */
+      .chip.selected::after{
+        content: "";
+        position: absolute; inset: -3px;
+        border-radius: 20px;
+        border: 2px solid color-mix(in srgb, var(--accent, #00FF00) 65%, transparent);
+        pointer-events: none;
+        animation: none;
+      }
+
+      /* 底栏：结果标签 */
+      .footer{
+        position:absolute; bottom: 96px; left: 96px; right: 96px;
+        display: flex; align-items: center; justify-content: space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+      }
+      .footer .res{
+        display: inline-flex; align-items: center; gap: 14px;
+        padding: 14px 24px;
+        border: 1.5px solid color-mix(in srgb, var(--accent, #00FF00) 55%, transparent);
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--accent, #00FF00) 8%, transparent);
+        opacity: 0;
+      }
+      .footer .res .r-tag{
+        font-size: 14px; letter-spacing: .22em; color: var(--accent, #00FF00); font-weight: 700;
+      }
+      .footer .res .r-lab{
+        font-size: 22px; color: var(--foreground, #F4EFE7); font-weight: 600;
+      }
+      .footer .counter{
+        font-size: 16px; letter-spacing: .2em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 45%, transparent);
+      }
+      .footer .counter b{
+        color: var(--accent, #00FF00); font-weight: 700; font-size: 18px;
+        font-variant-numeric: tabular-nums;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="stage" data-start="0" data-duration="6" data-track-index="1">
+        <div class="gridbg"></div>
+
+        <div class="eyebrow">
+          <span><span class="dot"></span><b class="acc" id="eyebrowText">SELECT · ONE</b></span>
+          <span>chip · grid · single-select</span>
+        </div>
+
+        <div class="header">
+          <h1 class="title" id="titleText">单选决策演示</h1>
+          <p class="subtitle" id="subText">逐一亮起 → 最终项高亮放大 → 其余压暗</p>
+        </div>
+
+        <div id="grid"></div>
+
+        <div class="footer">
+          <span class="res" id="resBadge">
+            <span class="r-tag">SELECTED</span>
+            <span class="r-lab" id="resLab">—</span>
+          </span>
+          <span class="counter">SCAN <b id="scanIdx">0</b> / <span id="scanTotal">0</span></span>
+        </div>
+      </section>
+    </div>
+    <script>
+      /* ----- 变量接线 ----- */
+      const fallback = {
+        eyebrow: "SELECT · ONE",
+        heading: "单选决策演示",
+        subheading: "逐一亮起 → 最终项高亮放大 → 其余压暗",
+        chips: "数据接入\n语义抽取\n知识图谱\n向量检索\n推理执行",
+        selectedIndex: 3,
+        columns: 3,
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      const $ = (id) => document.getElementById(id);
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      $("eyebrowText").textContent = v.eyebrow || fallback.eyebrow;
+      $("titleText").textContent   = v.heading || fallback.heading;
+      $("subText").textContent     = v.subheading || fallback.subheading;
+
+      /* ----- 建网格 ----- */
+      const chipsRaw = String(v.chips ?? fallback.chips).split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      const chips = chipsRaw.slice(0, 9);
+      while (chips.length < 3) chips.push("");
+      const cols = Math.max(2, Math.min(4, Math.round(Number(v.columns ?? 3)) || 3));
+      const grid = $("grid");
+      grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+      grid.innerHTML = chips.map((t, i) => {
+        const num = String(i+1).padStart(2, "0");
+        return `<div class="chip" data-i="${i}" id="chip-${i}">
+          <span class="idx">${num}</span>
+          <span class="lab">${escapeHtml(t)}</span>
+          <span class="tick">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5 12.5 L10 17 L19 7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </div>`;
+      }).join("");
+
+      /* ----- 选中项 & 结果标签 ----- */
+      const rawIdx = Math.max(1, Math.min(chips.length, Math.round(Number(v.selectedIndex ?? 3)) || 3));
+      const selIdx = rawIdx - 1;
+      const selLabel = chips[selIdx] || `芯片 ${rawIdx}`;
+      $("scanTotal").textContent = String(chips.length);
+      $("resLab").textContent = selLabel;
+
+      /* ----- 时间线 ----- */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+      const tl = gsap.timeline({ paused: true });
+
+      // 入场：eyebrow / 标题 / 副标
+      tl.fromTo(".eyebrow", { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 0.05);
+      tl.fromTo("#titleText", { opacity: 0, y: 22 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.15);
+      tl.fromTo("#subText", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 0.35);
+
+      // 网格容器淡入
+      tl.fromTo("#grid", { opacity: 0 }, { opacity: 1, duration: 0.1, ease: "none" }, 0.5);
+
+      // 芯片逐个入场 + 逐个脉动
+      const chipsEls = grid.querySelectorAll(".chip");
+      const scanIdxEl = $("scanIdx");
+      const stagger = 0.16;
+      const perItemDur = 0.34;
+      chipsEls.forEach((el, i) => {
+        const t0 = 0.55 + i * stagger;
+        // 入场
+        tl.fromTo(el, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: perItemDur, ease: "power3.out" }, t0);
+        // 依次亮起（pulse 环 + accent 边）
+        tl.call(() => {
+          el.classList.add("pulse");
+          scanIdxEl.textContent = String(i + 1);
+        }, [], t0 + perItemDur + 0.05);
+        // 亮起 ~0.5s 后熄灭（除选中项）
+        if (i !== selIdx) {
+          tl.call(() => { el.classList.remove("pulse"); }, [], t0 + perItemDur + 0.6);
+        }
+      });
+
+      // 扫描结束（约 3.2s 时，最后一个扫完）
+      const scanEnd = 0.55 + chipsEls.length * stagger + 1.0;
+
+      // 选中项：高亮放大 + 光环
+      const selectedEl = chipsEls[selIdx];
+      if (selectedEl) {
+        tl.call(() => {
+          selectedEl.classList.add("selected");
+          selectedEl.classList.remove("pulse");
+        }, [], scanEnd);
+        // 选中项 scale 放大 (back.out 弹入)
+        tl.fromTo(selectedEl, { scale: 0.94 }, { scale: 1.05, duration: 0.55, ease: "back.out(1.8)" }, scanEnd);
+        // 微呼吸
+        tl.to(selectedEl, { scale: 1.02, duration: 0.8, ease: "sine.inOut", yoyo: true, repeat: 1 }, scanEnd + 0.55);
+      }
+
+      // 未选中项压暗（错峰）
+      const dimStart = scanEnd + 0.35;
+      chipsEls.forEach((el, i) => {
+        if (i === selIdx) return;
+        tl.to(el, { opacity: 0.28, duration: 0.45, ease: "power2.out" }, dimStart + i * 0.04);
+      });
+      tl.call(() => {
+        chipsEls.forEach((el, i) => {
+          if (i !== selIdx) el.classList.add("dimmed");
+        });
+      }, [], dimStart + 0.45);
+
+      // 底栏结果标签弹入
+      tl.fromTo("#resBadge",
+        { opacity: 0, y: 16, scale: 0.92 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.55, ease: "back.out(1.6)" },
+        dimStart + 0.35
+      );
+
+      // 结尾停留：让最终态可读至少 1s（scanEnd≈2.25s，dimStart≈2.6s，dim+0.45≈3.05s，res 3.35s，剩 2.65s 可读）
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "label", "type": "string", "label": "确认标签", "default": "部署成功"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#chk{ position:absolute; left:760px; top:300px; width:400px; height:400px; will-change:transform; }
+#chk .cc{ position:absolute; inset:0; border-radius:50%; background:var(--accent); }
+#chk svg{ position:absolute; inset:0; }
+.pt{ position:absolute; left:954px; top:494px; width:12px; height:52px; border-radius:6px;
+  background:var(--accent); transform-origin:6px 6px; opacity:0; }
+#ring{ position:absolute; left:760px; top:300px; width:400px; height:400px; border-radius:50%;
+  border:8px solid var(--accent); opacity:0; }
+#lb{ position:absolute; left:0; right:0; top:760px; text-align:center; font-size:56px; color:var(--fg); opacity:0; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="3.5" data-width="1920" data-height="1080">
+<div id="chk"><div class="cc"></div><svg viewBox="0 0 400 400"><path d="M110 205 L178 273 L292 152" fill="none" stroke="#0A0A0F" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="pt" id="p0"></div><div class="pt" id="p1"></div><div class="pt" id="p2"></div><div class="pt" id="p3"></div><div class="pt" id="p4"></div><div class="pt" id="p5"></div><div class="pt" id="p6"></div><div class="pt" id="p7"></div><div class="pt" id="p8"></div><div class="pt" id="p9"></div><div id="ring"></div><div id="lb"></div>
+    </div>
+    <script>
+      const FB = {"label": "部署成功", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#lb').textContent=v.label||'';
+// 蓄力 0.6x 停 3f → 弹 1.35x 过冲落回
+gsap.set('#chk',{scale:0});
+tl.to('#chk',{scale:.6,duration:F(4),ease:'power2.out'},F(4));
+tl.to('#chk',{scale:1.35,duration:F(6),ease:'back.out(2.2)'},F(11));
+tl.to('#chk',{scale:1,duration:F(8),ease:'elastic.out(1,0.45)'},F(17));
+// 爆花帧 f17：10 根径向粒子 + 描边环 2.5x 同帧齐发
+for(let i=0;i<10;i++){
+  const a=i*36*Math.PI/180;
+  gsap.set('#p'+i,{rotation:i*36});
+  tl.set('#p'+i,{opacity:1},F(17));
+  tl.to('#p'+i,{x:Math.cos(a)*210,y:Math.sin(a)*210,opacity:0,duration:F(10),ease:'power2.out'},F(17));
+}
+tl.set('#ring',{opacity:.9},F(17));
+tl.to('#ring',{scale:2.5,opacity:0,duration:F(12),ease:'power2.out'},F(17));
+// 标签弹出
+tl.fromTo('#lb',{opacity:0,y:24},{opacity:1,y:0,duration:F(8),ease:'back.out(1.6)'},F(21));
+tl.to({},{duration:F(66)},F(39)); // 真静止
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

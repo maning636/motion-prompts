@@ -1,0 +1,13 @@
+{
+  "id": "title-demote-to-label",
+  "name": "标题降级为角标",
+  "description": "大标题居中呈现后缩小位移到左上角，变成小 chip 角标让位给新进入的主内容；强调层级交接与视觉重心迁移。",
+  "category": "层级交接",
+  "tags": ["层级交接", "标题降级", "角标", "主内容入场"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-20T00:00:00.000Z"
+}

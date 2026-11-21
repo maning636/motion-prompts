@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"hostName","type":"string","label":"主讲人姓名","default":"林川"},
+  {"id":"hostRole","type":"string","label":"主讲人身份","default":"产品负责人 · 十年一线"},
+  {"id":"title","type":"string","label":"主标题","default":"四点并行推进"},
+  {"id":"items","type":"string","label":"并行条目（换行分隔，3-4 条）","default":"目标：季度 DAU 破百万\n人群：先打 Z 世代白领\n渠道：小红书 + 抖音双开\n转化：直播首发限量秒杀"},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity: .55;
+      }
+
+      /* 顶头 eyebrow */
+      .eyebrow{
+        position:absolute; top: 56px; left: 96px; right: 96px;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.22em; text-transform:uppercase;
+        color: #8A8A85;
+      }
+      .eyebrow .acc{ color: var(--accent, #00FF00); font-weight: 700; letter-spacing:.18em; }
+
+      /* 主标题条 */
+      .headline{
+        position:absolute; top: 108px; left: 96px; right: 96px;
+        display:flex; align-items:baseline; gap: 20px;
+        opacity:0;
+      }
+      .headline .bar{
+        width: 6px; height: 68px; align-self:stretch;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--accent, #00FF00) 55%, transparent);
+      }
+      .headline .txt{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight: 700; letter-spacing:-.02em;
+        font-size: 54px; line-height: 1.1;
+        color: var(--foreground, #F4EFE7);
+      }
+
+      /* 舞台容器（铺满 root） */
+      .stage{
+        position:absolute; inset:0;
+      }
+      /* 主讲人 + 条目的实际网格 */
+      .grid{
+        position:absolute; left: 96px; right: 96px; top: 220px; bottom: 140px;
+        display:grid; grid-template-columns: 380px 1fr; gap: 56px;
+      }
+
+      /* ---- 主讲人卡 ---- */
+      #host{
+        position:relative; height:100%;
+        background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 22px;
+        padding: 40px 32px 32px;
+        display:flex; flex-direction:column;
+        opacity:0; will-change: transform, opacity;
+      }
+      #host::before{
+        content:""; position:absolute; inset:0; border-radius:22px;
+        background: radial-gradient(140% 60% at 50% 0%,
+          color-mix(in srgb, var(--accent, #00FF00) 18%, transparent),
+          transparent 60%);
+        pointer-events:none;
+      }
+      .avatar-wrap{
+        position:relative; width:160px; height:160px; margin: 8px auto 22px;
+        display:grid; place-items:center;
+      }
+      .avatar-ring{
+        position:absolute; inset:0; border-radius:50%;
+        border: 2px solid color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+        box-shadow:
+          0 0 0 1px rgba(0,0,0,.35) inset,
+          0 0 24px color-mix(in srgb, var(--accent, #00FF00) 45%, transparent);
+      }
+      .avatar-ring.outer{
+        inset: -10px; border-style: dashed;
+        border-color: color-mix(in srgb, var(--accent, #00FF00) 25%, transparent);
+        box-shadow: none;
+      }
+      .avatar{
+        position:relative; width:100%; height:100%; border-radius:50%;
+        background: color-mix(in srgb, var(--accent, #00FF00) 16%, #1a1815);
+        display:grid; place-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 78px; font-weight: 800;
+        color: var(--accent, #00FF00);
+        letter-spacing: -.02em;
+      }
+      .host-name{
+        text-align:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight: 700; letter-spacing: -.01em;
+        font-size: 40px; line-height: 1.15;
+        color: var(--foreground, #F4EFE7);
+      }
+      .host-role{
+        margin: 16px auto 0;
+        align-self: center;
+        display:inline-flex; align-items:center; gap: 10px;
+        padding: 8px 16px;
+        border: 1px solid color-mix(in srgb, var(--accent, #00FF00) 45%, transparent);
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--accent, #00FF00) 8%, transparent);
+        font-size: 17px; letter-spacing: .04em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 92%, transparent);
+        max-width: 100%;
+        white-space: nowrap;
+        overflow: hidden; text-overflow: ellipsis;
+      }
+      .host-role .dot{
+        width: 8px; height: 8px; border-radius: 50%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 8px var(--accent, #00FF00);
+        flex: none;
+      }
+      .host-tag{
+        position:absolute; left: 32px; right: 32px; bottom: 28px;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 14px; letter-spacing:.22em; text-transform:uppercase;
+        color: #6B6B66;
+      }
+      .host-tag .live{ color: var(--accent, #00FF00); font-weight:700; }
+
+      /* ---- 并行条目 ---- */
+      #items{
+        position:relative; height:100%;
+        display:grid; grid-template-columns: 1fr 1fr;
+        grid-auto-rows: 1fr;
+        gap: 20px;
+      }
+      .item{
+        position:relative;
+        padding: 24px 26px 22px;
+        border-radius: 18px;
+        border: 1px solid rgba(255,255,255,.10);
+        background: linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.005));
+        display:flex; flex-direction:column;
+        opacity: 0;
+        will-change: transform, opacity, box-shadow;
+        overflow:hidden;
+      }
+      .item .head{
+        display:flex; align-items:center; justify-content:space-between;
+        margin-bottom: 14px;
+      }
+      .item .num{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 22px; font-weight: 800; letter-spacing: .04em;
+        color: #6B6B66;
+      }
+      .item .tag{
+        display:inline-flex; align-items:center; gap:8px;
+        padding: 4px 12px; border-radius:999px;
+        border: 1px solid rgba(255,255,255,.14);
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 13px; letter-spacing: .14em; text-transform: uppercase;
+        color: #8A8A85;
+      }
+      .item .body{
+        flex: 1;
+        display:flex; flex-direction:column; justify-content:center;
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+        font-size: 30px; line-height: 1.35;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 88%, transparent);
+        font-weight: 500;
+      }
+      .item .body .lead{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight: 700;
+        color: var(--foreground, #F4EFE7);
+        letter-spacing: -.01em;
+      }
+      .item .foot{
+        margin-top: 10px;
+        display:flex; align-items:center; gap: 10px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 13px; letter-spacing: .18em; text-transform:uppercase;
+        color: #6B6B66;
+      }
+      .item .foot .bar{
+        flex:1; height: 2px; border-radius: 2px;
+        background: rgba(255,255,255,.08);
+        position:relative; overflow:hidden;
+      }
+      .item .foot .bar .fill{
+        position:absolute; inset:0 auto 0 0; width: 0%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+        transition: width .3s ease;
+      }
+
+      /* 当前讲到 */
+      .item.active{
+        border-color: var(--accent, #00FF00);
+        background:
+          linear-gradient(180deg,
+            color-mix(in srgb, var(--accent, #00FF00) 14%, transparent),
+            color-mix(in srgb, var(--accent, #00FF00) 4%, transparent));
+        box-shadow:
+          0 0 0 1px color-mix(in srgb, var(--accent, #00FF00) 55%, transparent) inset,
+          0 0 32px color-mix(in srgb, var(--accent, #00FF00) 40%, transparent);
+      }
+      .item.active .num{ color: var(--accent, #00FF00); }
+      .item.active .tag{
+        border-color: var(--accent, #00FF00);
+        color: var(--accent, #00FF00);
+        background: color-mix(in srgb, var(--accent, #00FF00) 10%, transparent);
+      }
+      .item.active .body{ color: var(--foreground, #F4EFE7); }
+
+      /* 讲过/未讲 */
+      .item.past{ opacity: .55; }
+      .item.future{ opacity: 1; }
+
+      /* 脚注 */
+      .footnote{
+        position:absolute; bottom: 56px; left: 96px; right: 96px;
+        display:flex; align-items:center; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 18px; letter-spacing:.06em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+      }
+      .footnote .now{
+        display:inline-flex; align-items:center; gap: 10px;
+      }
+      .footnote .now .dot{
+        width: 8px; height: 8px; border-radius: 50%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 8px var(--accent, #00FF00);
+      }
+      .footnote .now b{
+        color: var(--accent, #00FF00); font-weight: 800; letter-spacing:.02em;
+        font-size: 22px;
+      }
+      .footnote .count{
+        font-size: 22px; font-weight: 700;
+        color: var(--accent, #00FF00);
+        letter-spacing: -.01em;
+      }
+      .footnote .count small{
+        font-size: 14px; font-weight:500;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+        margin-left: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="stage" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+
+        <div class="eyebrow">
+          <span><b class="acc">LIVE</b>&nbsp;&nbsp;PARALLEL ITEMS</span>
+          <span>host · 4 items</span>
+        </div>
+
+        <div class="headline" id="headline">
+          <div class="bar"></div>
+          <div class="txt" id="titleTxt">四点并行推进</div>
+        </div>
+
+        <div class="grid" id="grid">
+          <div id="host">
+            <div class="avatar-wrap">
+              <div class="avatar-ring outer"></div>
+              <div class="avatar-ring"></div>
+              <div class="avatar" id="avatarLetter">林</div>
+            </div>
+            <div class="host-name" id="hostName">林川</div>
+            <span class="host-role" id="hostRole"><span class="dot"></span><span id="hostRoleTxt">产品负责人 · 十年一线</span></span>
+            <div class="host-tag">
+              <span>HOST</span>
+              <span class="live">ON AIR</span>
+            </div>
+          </div>
+
+          <div id="items">
+            <div class="item active" data-idx="0">
+              <div class="head">
+                <span class="num">01</span>
+                <span class="tag">ITEM · 01</span>
+              </div>
+              <div class="body"><span class="lead" data-body="0">目标</span><span data-body="0d">：季度 DAU 破百万</span></div>
+              <div class="foot"><span>NOW</span><span class="bar"><span class="fill" style="width:50%"></span></span><span>1/4</span></div>
+            </div>
+            <div class="item future" data-idx="1">
+              <div class="head">
+                <span class="num">02</span>
+                <span class="tag">ITEM · 02</span>
+              </div>
+              <div class="body"><span class="lead" data-body="1">人群</span><span data-body="1d">：先打 Z 世代白领</span></div>
+              <div class="foot"><span>NOW</span><span class="bar"><span class="fill"></span></span><span>2/4</span></div>
+            </div>
+            <div class="item future" data-idx="2">
+              <div class="head">
+                <span class="num">03</span>
+                <span class="tag">ITEM · 03</span>
+              </div>
+              <div class="body"><span class="lead" data-body="2">渠道</span><span data-body="2d">：小红书 + 抖音双开</span></div>
+              <div class="foot"><span>NOW</span><span class="bar"><span class="fill"></span></span><span>3/4</span></div>
+            </div>
+            <div class="item future" data-idx="3">
+              <div class="head">
+                <span class="num">04</span>
+                <span class="tag">ITEM · 04</span>
+              </div>
+              <div class="body"><span class="lead" data-body="3">转化</span><span data-body="3d">：直播首发限量秒杀</span></div>
+              <div class="foot"><span>NOW</span><span class="bar"><span class="fill"></span></span><span>4/4</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="footnote">
+          <span class="now"><span class="dot"></span><span id="nowLabel">当前讲到</span><b id="nowItem">01 · 目标</b></span>
+          <span><span class="count"><span id="nowIdx">1</span><small>/ 4</small></span></span>
+        </div>
+
+      </section>
+    </div>
+    <script>
+      /* ----- 变量接线 ----- */
+      const fallback = {
+        hostName: "林川",
+        hostRole: "产品负责人 · 十年一线",
+        title:    "四点并行推进",
+        items:    "目标：季度 DAU 破百万\n人群：先打 Z 世代白领\n渠道：小红书 + 抖音双开\n转化：直播首发限量秒杀",
+        accent:   "#00FF00",
+        background:"#12100E",
+        foreground:"#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const $ = (id) => document.getElementById(id);
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      /* ----- 内容回填 ----- */
+      const hostName = String(v.hostName || fallback.hostName).trim() || fallback.hostName;
+      const hostRole = String(v.hostRole || fallback.hostRole).trim() || fallback.hostRole;
+      $("hostName").textContent = hostName;
+      $("hostRoleTxt").textContent = hostRole;
+      $("avatarLetter").textContent = hostName.slice(0, 1) || "主";
+      $("titleTxt").textContent = String(v.title || fallback.title).trim() || fallback.title;
+
+      const lines = String(v.items ?? fallback.items)
+        .split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      const maxN = 4;
+      const items = lines.slice(0, maxN);
+      while (items.length < maxN) items.push("");
+
+      const itemEls = Array.from(document.querySelectorAll("#items .item"));
+      itemEls.forEach((el, i) => {
+        const raw = items[i] || "";
+        // 前段作为 lead（"目标" / "人群" 等），"：" 或 ":" 后作为正文
+        const sepIdx = raw.search(/[：:]/);
+        let lead = "", rest = "";
+        if (sepIdx > 0 && sepIdx <= 6) {
+          lead = raw.slice(0, sepIdx);
+          rest = raw.slice(sepIdx + 1).trim();
+        } else {
+          lead = raw.slice(0, Math.min(4, raw.length));
+          rest = raw.slice(lead.length);
+        }
+        const leadEl = el.querySelector('[data-body="' + i + '"]');
+        const restEl = el.querySelector('[data-body="' + i + 'd"]');
+        if (leadEl) leadEl.textContent = escapeHtml(lead);
+        if (restEl) restEl.textContent = escapeHtml(rest);
+        el.querySelector(".num").textContent = String(i+1).padStart(2,"0");
+        el.querySelector(".tag").textContent = "ITEM · " + String(i+1).padStart(2,"0");
+        const footCnt = el.querySelector(".foot span:last-child");
+        if (footCnt) footCnt.textContent = (i+1) + "/" + items.length;
+      });
+      // 空条目隐藏
+      itemEls.forEach((el, i) => {
+        el.style.display = items[i] ? "" : "none";
+      });
+
+      /* ----- 时间线 ----- */
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      const N = items.filter(Boolean).length; // 实际条目数
+      const itemVisible = itemEls.filter(el => el.style.display !== "none");
+
+      // 顶部 eyebrow + 主标题入场
+      tl.fromTo(".eyebrow", { opacity: 0, y: -8 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 0);
+      tl.fromTo("#headline", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.1);
+
+      // 主讲人卡入场
+      tl.fromTo("#host",
+        { opacity: 0, x: -32, scale: 0.96 },
+        { opacity: 1, x: 0, scale: 1, duration: 0.55, ease: "power3.out" }, 0.15);
+      // 头像外圈缓慢旋转（贯穿全程）
+      tl.to(".avatar-ring.outer", { rotation: 360, duration: 12, ease: "none" }, 0.15);
+      // 头像呼吸光晕
+      tl.fromTo(".avatar-ring",
+        { boxShadow: "0 0 18px color-mix(in srgb, var(--accent, #00FF00) 30%, transparent)" },
+        { boxShadow: "0 0 32px color-mix(in srgb, var(--accent, #00FF00) 55%, transparent)",
+          duration: 1.4, ease: "sine.inOut", yoyo: true, repeat: 3 }, 0.5);
+
+      // 条目错峰入场（横向推进）
+      const entranceStagger = 0.14;
+      const entranceDur = 0.5;
+      const entranceStart = 0.35;
+      itemVisible.forEach((el, i) => {
+        tl.fromTo(el,
+          { opacity: 0, x: 24 },
+          { opacity: 1, x: 0, duration: entranceDur, ease: "power3.out" },
+          entranceStart + i * entranceStagger);
+      });
+
+      // 高亮推进：每条高亮一段时间，按序切换到下一条
+      // 4 条 → 每条约 1.0s，从 1.6s 开始 → 到 5.6s 结束
+      const hlStart = 1.6;
+      const hlDur = 1.0;
+      let activeIndex = -1;
+      const setActive = (idx) => {
+        if (idx < 0 || idx >= itemVisible.length) return;
+        activeIndex = idx;
+        itemVisible.forEach((el, i) => {
+          el.classList.remove("active", "past", "future");
+          if (i === idx) el.classList.add("active");
+          else if (i < idx) el.classList.add("past");
+          else el.classList.add("future");
+          // 强制 inline opacity：
+          // - past 条目压到 0.55（避免 GSAP 入场留下的 inline opacity:1 覆盖 .past 规则）
+          // - 其它条目写回 1.0（避免 GSAP tween 结束后清掉 inline 导致 CSS opacity:0 生效）
+          if (i < idx) el.style.opacity = "0.55";
+          else el.style.opacity = "1";
+        });
+        // 更新进度条 + 脚注
+        itemVisible.forEach((el, i) => {
+          const fill = el.querySelector(".foot .fill");
+          if (fill) {
+            if (i < idx) fill.style.width = "100%";
+            else if (i === idx) fill.style.width = "50%";
+            else fill.style.width = "0%";
+          }
+        });
+        const nowIdx = $("nowIdx");
+        if (nowIdx) nowIdx.textContent = String(idx + 1);
+        const nowItem = $("nowItem");
+        if (nowItem) {
+          const leadEl = itemVisible[idx] && itemVisible[idx].querySelector('[data-body^="' + idx + '"]');
+          const txt = leadEl ? leadEl.textContent : "";
+          nowItem.textContent = String(idx+1).padStart(2,"0") + " · " + (txt || items[idx] || "");
+        }
+      };
+      // 供外部（selftest / lab 播放器）显式同步用
+      window.__setActive = setActive;
+      // 暴露：给定时间 → 计算当前 idx（便于外部主动同步）
+      window.__setActiveAtTime = (t) => {
+        const N = itemVisible.length;
+        if (N === 0) return;
+        if (t < hlStart) setActive(0);
+        else if (t >= hlStart + N * hlDur) setActive(N - 1);
+        else setActive(Math.min(N - 1, Math.floor((t - hlStart) / hlDur)));
+      };
+
+      // 首条 pop 入场高亮（scale 动画）
+      if (N >= 1) {
+        tl.fromTo(itemVisible[0],
+          { scale: 0.96 },
+          { scale: 1.04, duration: 0.35, ease: "back.out(1.6)" }, hlStart);
+        tl.to(itemVisible[0],
+          { scale: 1.00, duration: 0.6, ease: "power2.inOut" }, hlStart + 0.35);
+      }
+      // 后续条目切换 pop
+      for (let i = 1; i < N; i++) {
+        tl.fromTo(itemVisible[i],
+          { scale: 0.98 },
+          { scale: 1.04, duration: 0.35, ease: "back.out(1.6)" }, hlStart + i * hlDur);
+        tl.to(itemVisible[i],
+          { scale: 1.00, duration: 0.6, ease: "power2.inOut" }, hlStart + i * hlDur + 0.35);
+      }
+
+      // onUpdate：根据 timeline.time 决定当前 active（seek 与 play 都能同步）
+      tl.eventCallback("onUpdate", () => {
+        const t = tl.time();
+        const N = itemVisible.length;
+        let idx = 0;
+        if (N >= 1) {
+          if (t < hlStart) idx = 0;
+          else if (t >= hlStart + N * hlDur) idx = N - 1;
+          else idx = Math.min(N - 1, Math.floor((t - hlStart) / hlDur));
+        }
+        setActive(idx);
+      });
+
+      window.__timelines.main = tl;
+      // 首次同步：确保 timeline 处于 paused 时 UI 也反映当前状态
+      window.__setActiveAtTime(0);
+    </script>
+  </body>
+</html>

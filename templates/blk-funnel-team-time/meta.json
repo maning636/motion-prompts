@@ -1,0 +1,16 @@
+{
+ "name": "漏斗 · 把一周切成格子再塞进去",
+ "description": "逐级收窄的层带，每层写清名称、绝对值与对上一层的转化率",
+ "category": "数据可视化",
+ "tags": [
+  "积木社",
+  "flame",
+  "night",
+  "calm"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "card",
+ "when": "数据卡片 / 漏斗"
+}

@@ -1,0 +1,19 @@
+{
+ "id": "beatfull-sections",
+ "name": "段落标记 · 四段按拍数分配",
+ "description": "intro / build / drop / out 四段，每段宽度按它实际占几拍算，不是各占 25%。改 BPM 时四段的宽度一起变。",
+ "category": "图解与流程",
+ "tags": [
+  "节拍",
+  "结构",
+  "分段",
+  "BPM"
+ ],
+ "duration": 4.8,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "",
+ "when": "讲一段片子的结构 / 剪辑分段",
+ "series": "night",
+ "createdAt": "2026-10-03T10:20:00.000Z"
+}

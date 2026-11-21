@@ -1,0 +1,19 @@
+{
+ "id": "cogni-regression-full",
+ "name": "回归均值 · 第二遍会更好是错觉",
+ "description": "两条虚线：本来普通的那次冲到高处又落回，本来好的那次回落。两次都会回到正常水平。",
+ "category": "数据与图表",
+ "tags": [
+  "认知类",
+  "回归均值",
+  "统计",
+  "复盘"
+ ],
+ "duration": 3.8,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "",
+ "when": "讲复盘 / 讲考核 / 讲波动",
+ "series": "night",
+ "createdAt": "2026-10-03T10:20:00.000Z"
+}

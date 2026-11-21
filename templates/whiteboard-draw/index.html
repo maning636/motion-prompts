@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "复利是怎么工作的"}, {"id": "xlabel", "type": "string", "label": "横轴标注", "default": "时间"}, {"id": "ylabel", "type": "string", "label": "纵轴标注", "default": "收益"}, {"id": "note", "type": "string", "label": "图旁批注", "default": "后半段才是真相"}, {"id": "caption", "type": "string", "label": "底部字幕", "default": "前 10 年几乎看不出区别"}, {"id": "ink", "type": "color", "label": "墨色", "default": "#1D1D20"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#E53935"}, {"id": "duration", "type": "number", "label": "总时长（秒，画完定格）", "default": 7}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #FAF7EF); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #FAF7EF);
+  color: var(--foreground, #1D1D20); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.wtitle{ position:absolute; left:0; right:0; top:90px; text-align:center; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  font-weight:700; font-size:66px; color:var(--ink); }
+.board{ position:absolute; left:50%; top:240px; width:1200px; height:640px; margin-left:-600px; }
+.axis-note{ position:absolute; font-size:30px; fill:var(--ink); }
+.red-note{ position:absolute; left:1180px; top:300px; max-width:340px; font-size:38px; line-height:1.4;
+  color:var(--accent); transform:rotate(-4deg); }
+.wcap{ position:absolute; left:0; right:0; bottom:64px; text-align:center; font-size:38px;
+  letter-spacing:.1em; color:var(--ink); opacity:.8; }
+path, circle, line{ vector-effect:non-scaling-stroke; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="7" data-width="1920" data-height="1080">
+<div class="wtitle" id="t"></div>
+<svg class="board" viewBox="0 0 1200 640">
+  <line id="ax1" x1="60" y1="580" x2="1140" y2="580" stroke="var(--ink)" stroke-width="6" stroke-linecap="round"/>
+  <line id="ax2" x1="60" y1="580" x2="60" y2="40" stroke="var(--ink)" stroke-width="6" stroke-linecap="round"/>
+  <path id="curve" d="M 80 560 C 400 545, 620 500, 780 400 S 1020 160, 1110 70" fill="none" stroke="var(--accent)" stroke-width="9" stroke-linecap="round"/>
+  <path id="arrow" d="M 1070 90 L 1110 70 L 1092 116" fill="none" stroke="var(--accent)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle id="circ" cx="900" cy="270" r="90" fill="none" stroke="var(--accent)" stroke-width="6" stroke-dasharray="14 12"/>
+  <line id="tick" x1="700" y1="580" x2="700" y2="600" stroke="var(--ink)" stroke-width="6"/>
+  <text class="axis-note" id="tx" x="1120" y="630" text-anchor="end"></text>
+  <text class="axis-note" id="ty" x="30" y="40" text-anchor="start"></text>
+</svg>
+<div class="red-note" id="note"></div>
+<div class="wcap" id="cap"></div>
+    </div>
+    <script>
+      const FB = {"title": "复利是怎么工作的", "xlabel": "时间", "ylabel": "收益", "note": "后半段才是真相", "caption": "前 10 年几乎看不出区别", "ink": "#1D1D20", "accent": "#E53935", "duration": 7};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+const $=(s)=>document.querySelector(s);
+const F=(f)=>f/30;
+const DUR=+v.duration>0?+v.duration:7;
+$('[data-composition-id]').setAttribute('data-duration',String(DUR));
+const de=document.documentElement;
+de.style.setProperty('--ink',v.ink||'#1D1D20');
+de.style.setProperty('--accent',v.accent||'#E53935');
+$('#t').textContent=v.title||''; $('#cap').textContent=v.caption||''; $('#note').textContent=v.note||'';
+$('#tx').textContent=v.xlabel||''; $('#ty').textContent=v.ylabel||'';
+
+function prep(sel){const el=$(sel);const len=el.getTotalLength();el.style.strokeDasharray=len;el.style.strokeDashoffset=len;return len;}
+
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+const keep=new Set(['curve','arrow','circ']);
+for(const id of ['ax1','ax2','curve','arrow','circ','tick']) prep('#'+id);
+// circ 原本是虚线样式，prep 覆盖了 dasharray，画完恢复虚线
+const circEl=$('#circ');
+
+tl.fromTo('#t',{opacity:0,y:24},{opacity:1,y:0,duration:F(12),ease:'power3.out'},0);
+tl.to('#ax1',{strokeDashoffset:0,duration:F(14),ease:'power1.inOut'},F(6));
+tl.to('#ax2',{strokeDashoffset:0,duration:F(12),ease:'power1.inOut'},F(12));
+tl.to('#tick',{strokeDashoffset:0,duration:F(4)},F(22));
+tl.to('#curve',{strokeDashoffset:0,duration:F(40),ease:'power1.inOut'},F(24));
+tl.to('#arrow',{strokeDashoffset:0,duration:F(8),ease:'power1.out'},F(62));
+tl.to('#circ',{strokeDashoffset:0,duration:F(18),ease:'power1.inOut',onComplete:()=>{circEl.style.strokeDasharray='14 12';}},F(66));
+tl.fromTo('#note',{opacity:0,scale:.8,rotation:-10},{opacity:1,scale:1,rotation:-4,duration:F(10),ease:'back.out(1.8)'},F(76));
+tl.fromTo('#tx,#ty',{opacity:0},{opacity:1,duration:F(8)},F(20));
+tl.fromTo('#cap',{opacity:0},{opacity:1,duration:F(12),ease:'power2.out'},F(84));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

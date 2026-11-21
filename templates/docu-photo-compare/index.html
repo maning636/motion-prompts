@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-composition-variables='[{"id":"title","type":"string","label":"标题","default":"前后对比·皮影档案"},{"id":"yearBefore","type":"string","label":"前年份","default":"1998"},{"id":"yearAfter","type":"string","label":"后年份","default":"2026"},{"id":"capBefore","type":"string","label":"前描述","default":"档案编号 T-001 · 原始状态记录"},{"id":"capAfter","type":"string","label":"后描述","default":"档案编号 T-002 · 重制版本发布"},{"id":"ref","type":"string","label":"档案编号","default":"REF. 447 / DOCU-PUPPET"},{"id":"duration","type":"number","label":"总时长(秒)","default":6}]'>
+<head>
+<meta charset="UTF-8">
+<title>前后对比·皮影档案</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;font-family:"Source Han Sans SC","Noto Sans SC","PingFang SC",sans-serif;overflow:hidden;background:#0e0c0a}
+.frame{position:relative;width:1920px;height:1080px;background:#0e0c0a;overflow:hidden}
+.grain{position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.04) 1px,transparent 1px);background-size:3px 3px;pointer-events:none;z-index:5}
+.vignette{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55) 100%);pointer-events:none;z-index:6}
+.scanline{position:absolute;left:0;right:0;top:0;height:3px;background:rgba(212,175,110,.35);animation:scan 6s linear infinite;z-index:7}
+@keyframes scan{0%{top:-10px}100%{top:1090px}}
+.header{position:absolute;top:40px;left:80px;right:80px;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:16px;border-bottom:1px solid rgba(212,175,110,.35);z-index:8}
+.meta{font-family:"Courier New",monospace;font-size:13px;letter-spacing:.15em;color:#c8a070;opacity:.85}
+.title{font-family:"Source Han Serif SC","Noto Serif SC",serif;font-size:44px;font-weight:700;color:#e8d5b0;letter-spacing:.08em}
+.title .en{font-family:"Courier New",monospace;font-size:14px;letter-spacing:.25em;color:#a07840;font-weight:400;display:block;margin-top:8px}
+.grid{position:absolute;top:170px;left:80px;right:80px;bottom:170px;display:grid;grid-template-columns:1fr 1fr;gap:36px;z-index:4}
+.cell{position:relative;background:#15110c;border:1px solid rgba(212,175,110,.32);padding:30px;display:flex;flex-direction:column;animation:rise 1.2s ease-out both}
+.cell.a{animation-delay:.1s}
+.cell.b{animation-delay:.5s}
+@keyframes rise{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+.cell .label{font-family:"Courier New",monospace;font-size:12px;letter-spacing:.3em;color:#d4af6e;margin-bottom:14px}
+.cell .year{font-family:"Times New Roman",serif;font-size:110px;font-weight:700;color:#e8d5b0;line-height:1;letter-spacing:.02em;margin-bottom:18px}
+.cell.b .year{color:#d4af6e}
+.cell .cap{font-family:"Source Han Sans SC",sans-serif;font-size:22px;color:#c8a070;line-height:1.7;margin-bottom:20px;border-left:2px solid #d4af6e;padding-left:16px}
+.cell .img{flex:1;background:#1a1612;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;border:1px solid rgba(212,175,110,.18)}
+.cell .img .bg{position:absolute;inset:0;background:linear-gradient(135deg,#2a2018 0%,#0f0b08 60%,#1f1a14 100%)}
+.cell .img .frame2{position:absolute;inset:14px;border:1px solid rgba(212,175,110,.18)}
+.cell.a .img .icon{font-size:160px;color:rgba(212,175,110,.18);position:relative;z-index:2}
+.cell.b .img .icon{font-size:160px;color:rgba(212,175,110,.28);position:relative;z-index:2}
+.cell .img .stamp{position:absolute;top:14px;left:14px;font-family:"Courier New",monospace;font-size:11px;letter-spacing:.2em;color:#8a6a3a;z-index:3}
+.cell .img .stamp-r{position:absolute;bottom:14px;right:14px;font-family:"Courier New",monospace;font-size:11px;letter-spacing:.2em;color:#8a6a3a;z-index:3}
+.footer{position:absolute;left:80px;right:80px;bottom:30px;display:flex;justify-content:space-between;align-items:center;padding-top:16px;border-top:1px solid rgba(212,175,110,.35);z-index:8}
+.foot-l{font-family:"Source Han Sans SC",sans-serif;font-size:16px;color:#c8a070;letter-spacing:.1em}
+.foot-r{font-family:"Courier New",monospace;font-size:12px;color:#8a6a3a;letter-spacing:.2em;text-align:right;line-height:1.7}
+.divider{position:absolute;top:170px;left:50%;bottom:170px;width:1px;background:linear-gradient(to bottom,transparent,rgba(212,175,110,.55),transparent);z-index:9;transform:translateX(-.5px)}
+.arrow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:86px;height:86px;border:1px solid #d4af6e;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#0e0c0a;font-family:"Times New Roman",serif;font-size:30px;color:#d4af6e;z-index:10;animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.9}50%{transform:translate(-50%,-50%) scale(1.12);opacity:1}}
+</style>
+</head>
+<body>
+<div class="frame" id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+<div class="header">
+  <div class="title">
+    <span>前后对比</span>
+    <span class="en">FILE · BEFORE / AFTER</span>
+  </div>
+  <div class="meta">REF. 447 / DOCU-PUPPET</div>
+</div>
+<div class="grid">
+  <div class="cell a">
+    <div class="label">BEFORE · 改造前</div>
+    <div class="year">1998</div>
+    <div class="cap">档案编号 T-001 · 原始状态记录<br/>拍摄现场原始素材存档</div>
+    <div class="img">
+      <div class="bg"></div>
+      <div class="frame2"></div>
+      <span class="icon">◐</span>
+      <span class="stamp">FILE-A / 001</span>
+      <span class="stamp-r">35mm / 24fps</span>
+    </div>
+  </div>
+  <div class="cell b">
+    <div class="label">AFTER · 改造后</div>
+    <div class="year">2026</div>
+    <div class="cap">档案编号 T-002 · 重制版本发布<br/>数字化修复 · 高保真输出</div>
+    <div class="img">
+      <div class="bg"></div>
+      <div class="frame2"></div>
+      <span class="icon">◑</span>
+      <span class="stamp">FILE-B / 002</span>
+      <span class="stamp-r">4K / HDR</span>
+    </div>
+  </div>
+</div>
+<div class="divider"></div>
+<div class="arrow">→</div>
+<div class="footer">
+  <div class="foot-l">档案室 · 影像修复中心 / 出品</div>
+  <div class="foot-r">
+    CLASSIFIED · INTERNAL<br/>
+    SHEET 0447 / 2026-08-31
+  </div>
+</div>
+<div class="grain"></div>
+<div class="vignette"></div>
+<div class="scanline"></div>
+</div>
+</body>
+</html>

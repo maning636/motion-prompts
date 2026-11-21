@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#dash{ position:absolute; inset:0; padding:110px 120px; display:flex; flex-wrap:wrap;
+  gap:28px; align-content:flex-start; opacity:.9; }
+.slot{ width:524px; height:454px; border-radius:14px; background:#141720;
+  border:1px dashed color-mix(in srgb, var(--fg) 18%, transparent); }
+#target{ border:2px dashed var(--accent); background:color-mix(in srgb, var(--accent) 6%, transparent); }
+#card{ position:absolute; left:0; top:0; width:1400px; height:800px; border-radius:6px;
+  background:#1C2130; border:1px solid color-mix(in srgb, var(--fg) 14%, transparent);
+  overflow:hidden; will-change:transform; transform-origin:left top; }
+#cardIn{ width:1400px; height:800px; padding:60px 70px; transform-origin:left top; }
+#cardIn .k{ font-size:24px; letter-spacing:7px; color:var(--accent); font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+#cardIn h2{ margin-top:26px; font-size:84px; font-weight:900; }
+#cardIn .l{ margin-top:34px; height:16px; border-radius:8px; background:color-mix(in srgb, var(--fg) 18%, transparent); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4.5" data-width="1920" data-height="1080">
+
+<div id="dash">
+  <div class="slot"></div><div class="slot"></div><div class="slot"></div>
+  <div class="slot"></div><div class="slot" id="target"></div><div class="slot"></div>
+</div>
+<div id="card"><div id="cardIn">
+  <div class="k">DETAIL</div><h2>详情页归位</h2>
+  <div class="l" style="width:60%"></div><div class="l" style="width:45%"></div><div class="l" style="width:52%"></div>
+</div></div>
+
+    </div>
+    <script>
+      const FB = {"accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+// 共享元素归位：全屏详情卡收缩+位移+长圆角，严丝合缝飞落 dashboard 槽位
+const dash=$('#dash'), card=$('#card'), cardIn=$('#cardIn'), target=$('#target');
+// 槽位像素坐标（dash padding 110/120 + 第一行高度 454 + gap 28 → 第二行；第 2 列）
+const SLOT={x:120+524+28, y:110+454+28, w:524, h:454, r:14};
+const FULL={x:260, y:140, w:1400, h:800, r:6};
+function cb(x1,y1,x2,y2){return function(x){
+  let t=x;
+  const cx=3*x1,bx=3*(x2-x1)-cx,ax=1-cx-bx;
+  for(let i=0;i<5;i++){
+    const f=((ax*t+bx)*t+cx)*t-x, d=(3*ax*t+2*bx)*t+cx;
+    if(Math.abs(d)<1e-4)break; t-=f/d;
+  }
+  t=Math.max(0,Math.min(1,t));
+  const cy=3*y1,by=3*(y2-y1)-cy,ay=1-cy-by;
+  return ((ay*t+by)*t+cy)*t;
+};}
+const ease=cb(0.4,0,0.2,1);
+const T0=15, MORPH=25, SETTLE=10;
+function lp(a,b,p){return a+(b-a)*p;}
+const sim={f:0};
+function paint(){
+  const f=sim.f;
+  let p;
+  if(f<T0)p=0;
+  else if(f<T0+MORPH)p=ease((f-T0)/MORPH)*1.03;         // 3% 过冲
+  else if(f<T0+MORPH+SETTLE){const q=(f-T0-MORPH)/SETTLE;p=1.03-0.03*(1-Math.pow(1-q,3));}
+  else p=1;
+  const x=lp(FULL.x,SLOT.x,p), y=lp(FULL.y,SLOT.y,p);
+  const w=lp(FULL.w,SLOT.w,p), h=lp(FULL.h,SLOT.h,p), r=lp(FULL.r,SLOT.r,p);
+  const s=w/FULL.w;
+  card.style.transform='translate('+x.toFixed(1)+'px,'+y.toFixed(1)+'px)';
+  card.style.width=w.toFixed(1)+'px'; card.style.height=h.toFixed(1)+'px';
+  card.style.borderRadius=r.toFixed(1)+'px';
+  cardIn.style.transform='scale('+s.toFixed(4)+')';
+  // 投影随 p 收敛：悬空大卡 → 落座贴底
+  card.style.boxShadow='0 '+lp(36,2,p).toFixed(1)+'px '+lp(110,8,p).toFixed(1)+'px rgba(0,0,0,'+lp(0.32,0.06,p).toFixed(3)+')';
+}
+paint();
+tl.to(sim,{f:135,duration:F(135),ease:'none',onUpdate:paint},0);
+// 落座仪式：背景 0.9 → 1 提亮 5f 跨骑落座帧（f50）
+tl.to(dash,{opacity:1,duration:F(5)},F(48));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

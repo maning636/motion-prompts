@@ -1,0 +1,13 @@
+{
+  "id": "sc2-plate-01",
+  "name": "卡堆抽拉翻览",
+  "series": "sc2",
+  "createdAt": "2026-08-16T08:00:00.000Z",
+  "energy": "中高",
+  "suggestedDuration": 6,
+  "knownPitfalls": [
+    "cards 用「标题|说明」分号分隔，固定取 3 条；少给了会补占位卡",
+    "抽拉分两段（先左上扬起再 expo.out 落台前）模拟弧线，别用单段直线，会读作平移",
+    "压回堆底时必须同时 set zIndex 到底层，只靠位移会压错叠压顺序"
+  ]
+}

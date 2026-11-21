@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"label","name":"端头标签","type":"string","label":"左端标签（2–6 字）","default":"LIVE"},{"id":"ticker","name":"滚动文案","type":"string","label":"滚动文案（一段，建议 8–16 字）","default":"接单中 · 本周还剩 2 席"},{"id":"accent","name":"强调色","type":"color","label":"强调色（端头色块 / 斜纹带）","default":"#FFD429"},{"id":"brand","name":"右端落款","type":"string","label":"右端落款 mono 字","default":"BLOCKBRUT"},{"id":"speed","name":"滚动速度","type":"number","label":"每圈秒数（越大越慢）","default":5},{"id":"position","name":"位置","type":"enum","label":"跑马灯位置（底部 / 顶部）","default":"bottom","options":[{"label":"底部","value":"bottom"},{"label":"顶部","value":"top"}]},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","hidden":true,"default":"transparent","options":[{"value":"transparent","label":"透明底"},{"value":"mp4","label":"MP4 纯底"},{"value":"webm","label":"WebM 纯底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="底部跑马灯：ink 底黄字，上下两条反向匀速斜纹带，中段无缝跑马，窗口宽度按实测文案长度反推">
+<title>底部跑马灯 · 接单中</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 透明底贴片：--paper 全程不出现，底色与阴影色收进变量（风格规范 §7.1 / §7.2 规则 A） */
+  :root{ --shadow:#FFFFFF; --background:transparent; }
+
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--background);color:var(--ink);font-family:var(--sans)}
+
+  /* 四档硬阴影，X 恒等于 Y，第三值恒 0（基因 2） */
+  .sh-s {box-shadow:4px 4px 0 var(--shadow)}
+
+  .tk{position:absolute;left:0;width:1920px;display:flex;flex-direction:column}
+  .tk.on-bottom{bottom:72px}
+  .tk.on-top   {top:72px}
+
+  /* 斜纹带：全系列唯一合法渐变，周期 10px + 10px（基因 4 / §3.9）。
+     上下两条反向滚，砖带两端各留 160px——通栏件没有余量让砖带滚出画布，
+     平移 80px（4 个图案周期）即无缝，几何全程留在画布内。 */
+  /* 每行固定 21 块（几何常量，别改）：窗口内容盒 1594px，(21-1)*80 = 1600 ≥ 1594 才不露缝；
+     21*80 = 1680，加左端 163px 仍留在 1920 内（余 77px）。 */
+  .stripe{margin:0 160px;height:20px;border:var(--bw) solid var(--ink);overflow:hidden;
+      box-shadow:4px 4px 0 var(--shadow)}
+  .stripe.dn{border-top:0}
+  .tiles{display:flex;width:max-content;height:20px}
+  .tiles i{display:block;flex:0 0 80px;height:20px;
+      background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+  .stripe.dn .tiles i{background:repeating-linear-gradient(-45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+
+  /* 跑马灯条：ink 底 + yellow 字，这一组组合是全系列唯一写法（§3.10 / 基因 10） */
+  .bar{height:82px;border:var(--bw) solid var(--ink);display:flex;align-items:stretch;
+      background:var(--ink);color:var(--yellow)}
+  /* 左端色块：高饱和块自带对比，是透明底的首选填充（§7.3.2） */
+  .lb{flex:0 0 320px;display:flex;align-items:center;justify-content:center;
+      background:var(--accent);color:var(--ink);border-right:3px solid var(--ink);
+      font-family:var(--mono);font-weight:700;font-size:32px;letter-spacing:.1em;
+      box-shadow:4px 4px 0 var(--shadow);white-space:nowrap;overflow:hidden}
+  /* 右端落款：与滚动文案之间用「裸字符件」分隔——无底无边无影，只带文字硬投影
+     （§3.11 / §3.8 的 text-shadow:2px 2px 0 ink 写法）。不用 3px 描边，
+     因为基因 1 规定描边色恒为 --ink，黄色描边会破规。 */
+  /* 内边距挂在文字自己身上，fit() 量到的 scrollWidth 才是「文字 + 内边距」 */
+  .rb{flex:0 0 320px;display:flex;align-items:center;justify-content:flex-end;
+      font-family:var(--mono);font-weight:700;font-size:30px;letter-spacing:.12em;
+      white-space:nowrap;overflow:hidden}
+  .rb .sep{color:var(--yellow);text-shadow:2px 2px 0 var(--ink);margin-right:20px;font-size:26px}
+  .rb #brand{display:inline-block;padding:0 32px 0 20px}
+  /* 窗口宽度、左右固定块宽度由 JS 按实测段宽反推，见脚本里的几何说明 */
+  .win{flex:0 0 960px;overflow:hidden;display:flex;align-items:center}
+  .track{display:flex;align-items:center;width:max-content;height:100%}
+  /* .seg 是有意不挂 data-fit 的：跑马灯的每一段必须完全等宽等内容，
+     单段缩放会让接缝错开；文案过长由上面那段「字号回缩」兜住。 */
+  .seg{display:block;padding-right:56px;white-space:nowrap;
+      font-family:var(--mono);font-weight:700;font-size:32px;letter-spacing:.02em}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="tk on-bottom" id="tk">
+    <div class="stripe up"><div class="tiles" id="tilesA"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+    <div class="bar" id="bar">
+      <div class="lb" id="lb"><span id="label" data-fit-max="32" data-fit-min="16">LIVE</span></div>
+      <div class="win" id="win"><div class="track" id="track"><span class="seg">接单中 · 本周还剩 2 席</span><span class="seg">接单中 · 本周还剩 2 席</span><span class="seg">接单中 · 本周还剩 2 席</span><span class="seg">接单中 · 本周还剩 2 席</span><span class="seg">接单中 · 本周还剩 2 席</span><span class="seg">接单中 · 本周还剩 2 席</span><span class="seg">接单中 · 本周还剩 2 席</span><span class="seg">接单中 · 本周还剩 2 席</span></div></div>
+      <div class="rb" id="rb"><span class="sep">■</span><span id="brand" data-fit-max="30" data-fit-min="14">BLOCKBRUT</span></div>
+    </div>
+    <div class="stripe dn"><div class="tiles" id="tilesB"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+  </div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  /* 透明底分支（风格规范 §7.5） */
+  var isT = (v.exportMode || 'transparent') === 'transparent';
+  var r = document.documentElement.style;
+  r.setProperty('--background', isT ? 'transparent' : '#0F0F0F');
+  r.setProperty('--shadow', isT ? '#FFFFFF' : '#0F0F0F');
+  if (v.accent) r.setProperty('--accent', v.accent);
+
+  var tk = document.getElementById('tk');
+  tk.className = (v.position || 'bottom') === 'top' ? 'tk on-top' : 'tk on-bottom';
+
+  var bar = document.getElementById('bar');
+  var lb = document.getElementById('lb');
+  var win = document.getElementById('win');
+  var rb = document.getElementById('rb');
+  var track = document.getElementById('track');
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+  set('label', v.label);
+  set('brand', v.brand);
+  /* 每一段必须完全一致，滚到 -S 时首尾才能严丝合缝接上 */
+  if (v.ticker != null && v.ticker !== '') {
+    Array.prototype.forEach.call(track.children, function (s) { s.textContent = v.ticker; });
+  }
+
+  /* 跑马灯的几何约束：轨道的左右边必须全程留在画布内，否则落定期会被判出框。
+     通栏条没有余量让内容「滚出去再滚回来」，所以这里先量出一段文字的真实宽度 S，
+     再反推三块的宽度——左块 S、窗口 (n-1)S、右块 CW-nS（CW 是条的内容盒宽度，
+     条自己还占 3px 描边）：
+       · 滚到 x = 6-S 时轨道左边缘落在画布 9px 处，右边缘不越过 CW；
+       · 轨道内容 = n 个等宽等内容的段，滚一整段后与开头完全重合，接缝不可见。
+     段数取满足 (n+1)S ≤ 1900 的最大值；文案太长时先把字号降到 S ≤ 500 再算。 */
+  var segs = track.children;
+  var fs = parseFloat(window.getComputedStyle(track).fontSize) || 32;
+  var S = segs[0].getBoundingClientRect().width;
+  while (S > 500 && fs > 15) {
+    fs -= 2;
+    segs[0].style.fontSize = fs + 'px';
+    S = segs[0].getBoundingClientRect().width;
+  }
+  var CW = bar.clientWidth;
+  var n = Math.max(2, Math.min(12, Math.floor(1900 / S) - 1));
+  while (track.children.length > n) track.removeChild(track.lastChild);
+  while (track.children.length < n) track.appendChild(segs[0].cloneNode(true));
+  lb.style.flex = '0 0 ' + S + 'px';
+  win.style.flex = '0 0 ' + ((n - 1) * S) + 'px';
+  rb.style.flex = '0 0 ' + (CW - n * S) + 'px';
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：跑马灯与斜纹带全部停住，只留终态 + ≤8px 微位移淡入（§13.5） */
+    gsap.set('#tk', { opacity: 1, y: 0 });
+    gsap.set('#track', { x: 6 });
+    gsap.set('#tilesA', { x: 0 });
+    gsap.set('#tilesB', { x: -80 });
+
+    tl.fromTo('#tk', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power2.out' }, 0);
+    tl.fromTo('.bar', { opacity: 0 },
+        { opacity: 1, duration: .5, ease: 'power2.out' }, .08);
+    tl.fromTo('.stripe', { opacity: 0 },
+        { opacity: 1, duration: .45, ease: 'power2.out' }, .24);
+
+    B.hold(tl, 1.25, 1.15);
+    return;
+  }
+
+  var TOTAL = parseFloat(v.duration) > 0 ? parseFloat(v.duration) : 5;
+  var HOLD = 0.5;
+  var WIN = Math.max(1.6, TOTAL - HOLD);
+
+  /* 入场：整条从上方 28px 硬落位。纯位移，opacity 恒为 1——
+     BLOCKBRUT 不用 opacity 淡入当入场手段（Do #7 / §7.4）。 */
+  tl.fromTo('#tk', { y: -28 }, { y: 0, duration: .24, ease: 'power4.out' }, 0);
+
+  /* 模 5 · 匀速跑马灯：缓动恒 none，位移恒等于一整段，接缝不可见。
+     repeat 必须是有限的：repeat:-1 会把 tl.duration() 撑到 1e10s，settle 取帧直接失效。 */
+  var spd = parseFloat(v.speed) > 0 ? parseFloat(v.speed) : 5;
+  var RUN = WIN - .3;
+  var laps = Math.max(1, Math.round(RUN / spd));
+  tl.fromTo('#track', { x: 6 },
+      { x: 6 - S, duration: RUN / laps, ease: 'none', repeat: laps - 1 }, .3);
+
+  /* 模 6 · 斜纹带滚动：上下两条反向，一格 80px = 4 个图案周期 */
+  var A = 4, aper = RUN / A;
+  tl.fromTo('#tilesA', { x: 0 },
+      { x: -80, duration: aper, ease: 'none', repeat: A - 1 }, .3);
+  tl.fromTo('#tilesB', { x: -80 },
+      { x: 0, duration: aper, ease: 'none', repeat: A - 1 }, .3);
+
+  var end = tl.duration();
+  B.hold(tl, end, Math.max(HOLD, TOTAL - end));
+})();
+</script>
+</body></html>

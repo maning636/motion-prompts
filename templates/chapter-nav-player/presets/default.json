@@ -1,0 +1,10 @@
+{
+  "chapters": "三维数据,3D 地图,时间轴,竞速图,3D 饼图",
+  "current": 3,
+  "title": "时间轴指针",
+  "sub": "TIMELINE · FIXED CURSOR",
+  "desc": "不是指针在跑，是刻度在跑——整条连续时间尺在固定光标下滑动。",
+  "img1": "./placeholder-1.png",
+  "accent": "#00FF00",
+  "duration": 6
+}

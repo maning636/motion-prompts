@@ -1,0 +1,19 @@
+{
+ "id": "cogni-scopecreep-full",
+ "name": "范围蔓延 · 就加一点点",
+ "description": "一根柱子一格一格往上长，每一次都只加一周。问题不是有人做错了，是没有人守着一个总量。",
+ "category": "数据与图表",
+ "tags": [
+  "认知类",
+  "范围蔓延",
+  "需求",
+  "职场"
+ ],
+ "duration": 3.9,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "",
+ "when": "讲需求 / 讲工期 / 讲产品经理的日常",
+ "series": "night",
+ "createdAt": "2026-10-03T10:20:00.000Z"
+}

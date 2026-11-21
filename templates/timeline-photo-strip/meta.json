@@ -1,0 +1,13 @@
+{
+  "id": "timeline-photo-strip",
+  "name": "时间轴照片条",
+  "description": "横向时间轴上的照片节点依次点亮，已经过的节点压暗成灰，当前节点微放大强调。",
+  "category": "序列进程",
+  "tags": ["时间轴", "照片", "历程", "序列进程", "点亮"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-05T00:00:00.000Z"
+}

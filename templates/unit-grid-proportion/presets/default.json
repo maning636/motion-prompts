@@ -1,0 +1,10 @@
+{
+  "title": "用户构成占比",
+  "subtitle": "按来源渠道拆解的 100 个样本单元",
+  "rows": 10,
+  "cols": 10,
+  "categories": "自然搜索,#00FF00,32\n付费投放,#7CFFC4,24\n社交裂变,#9CA3AF,18\n私域回流,#6B6B66,14\n其他来源,#4A4A48,12",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"title","type":"string","label":"标题","default":"实时数据仪表盘"},{"id":"subtitle","type":"string","label":"副标题","default":"关键指标与趋势一览"},{"id":"kpi1","type":"string","label":"KPI1 数值","default":"12.8K"},{"id":"label1","type":"string","label":"KPI1 标签","default":"日活用户"},{"id":"kpi2","type":"string","label":"KPI2 数值","default":"¥42.5K"},{"id":"label2","type":"string","label":"KPI2 标签","default":"日收入"},{"id":"kpi3","type":"string","label":"KPI3 数值","default":"4.2%"},{"id":"label3","type":"string","label":"KPI3 标签","default":"转化率"},{"id":"chartLabel","type":"string","label":"图表标签","default":"过去 7 天活跃用户趋势"},{"id":"accent","type":"color","label":"强调色","default":"#00FF00"},{"id":"background","type":"color","label":"背景色","default":"#12100E"},{"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+*{ box-sizing: border-box;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      html, body{ margin: 0; width: 1920px; height: 1080px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .scene{ position: absolute; inset: 0; width: 100%; height: 100%; padding: 96px 112px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .header{ margin-bottom: 40px;font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+      .title{ margin: 0; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 64px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; }
+      .subtitle{ margin: 12px 0 0; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-size: 24px; font-weight: 400; opacity: 0.55; }
+      .kpis{ display: flex; gap: 32px; margin-bottom: 40px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .kpi{ flex: 1; padding: 32px; background: rgba(244,239,231,0.04); border: 1px solid rgba(244,239,231,0.12); border-radius: 12px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .kpi-value{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 56px; font-weight: 800; color: var(--accent); margin-bottom: 8px; }
+      .kpi-label{ font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-size: 18px; opacity: 0.65; }
+      .chart-card{ padding: 32px; background: rgba(244,239,231,0.04); border: 1px solid rgba(244,239,231,0.12); border-radius: 12px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .chart-label{ font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-size: 18px; opacity: 0.7; margin-bottom: 20px; }
+      .chart-svg{ width: 100%; height: 220px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .chart-line{ fill: none; stroke: var(--accent); stroke-width: 3;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .chart-area{ fill: color-mix(in srgb, var(--accent) 12%, transparent); stroke: none;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .chart-grid{ stroke: rgba(244,239,231,0.08); stroke-width: 1;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene clip" data-start="0" data-duration="6" data-track-index="1">
+        <div class="header">
+          <h1 class="title" id="title"></h1>
+          <p class="subtitle" id="subtitle"></p>
+        </div>
+        <div class="kpis" id="kpis"></div>
+        <div class="chart-card">
+          <div class="chart-label" id="chartLabel"></div>
+          <svg class="chart-svg" id="chart-svg" viewBox="0 0 1600 220" preserveAspectRatio="none">
+            <line class="chart-grid" x1="0" y1="180" x2="1600" y2="180" />
+            <line class="chart-grid" x1="0" y1="110" x2="1600" y2="110" />
+            <line class="chart-grid" x1="0" y1="40" x2="1600" y2="40" />
+            <path class="chart-area" id="chart-area" />
+            <path class="chart-line" id="chart-line" />
+          </svg>
+        </div>
+      </section>
+    </div>
+    <script>
+      const fallback = { title: "实时数据仪表盘", subtitle: "关键指标与趋势一览", kpi1: "12.8K", label1: "日活用户", kpi2: "¥42.5K", label2: "日收入", kpi3: "4.2%", label3: "转化率", chartLabel: "过去 7 天活跃用户趋势", accent: "#00FF00", background: "#12100E", foreground: "#F4EFE7" };
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4EFE7");
+      document.documentElement.style.setProperty("--background", v.background ?? "#12100E");
+      const root = document.getElementById("root");
+      root.style.backgroundColor = v.background;
+      root.style.color = v.foreground;
+      root.style.setProperty("--accent", v.accent);
+      document.getElementById("title").textContent = v.title;
+      document.getElementById("subtitle").textContent = v.subtitle;
+      document.getElementById("chartLabel").textContent = v.chartLabel;
+      const kpis = document.getElementById("kpis");
+      [[v.kpi1, v.label1], [v.kpi2, v.label2], [v.kpi3, v.label3]].forEach(([val, label], i) => {
+        const div = document.createElement("div");
+        div.className = "kpi";
+        div.innerHTML = `<div class="kpi-value">${val}</div><div class="kpi-label">${label}</div>`;
+        kpis.appendChild(div);
+      });
+      const data = [30, 45, 40, 60, 75, 65, 90];
+      const W = 1600, H = 220, pad = 40;
+      const xStep = (W - pad * 2) / (data.length - 1);
+      const max = Math.max(...data);
+      const points = data.map((d, i) => [pad + i * xStep, H - pad - (d / max) * (H - pad * 2)]);
+      const lineD = "M" + points.map(p => p.join(",")).join(" L");
+      const areaD = lineD + ` L${W - pad},${H} L${pad},${H} Z`;
+      document.getElementById("chart-line").setAttribute("d", lineD);
+      document.getElementById("chart-area").setAttribute("d", areaD);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(".title", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.1);
+      tl.fromTo(".subtitle", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.25);
+      document.querySelectorAll(".kpi").forEach((k, i) => {
+        tl.fromTo(k, { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 0.45 + i * 0.12);
+      });
+      tl.fromTo(".chart-card", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 0.9);
+      const line = document.getElementById("chart-line");
+      const len = line.getTotalLength ? line.getTotalLength() : 1000;
+      line.style.strokeDasharray = len; line.style.strokeDashoffset = len;
+      tl.to(line, { strokeDashoffset: 0, duration: 1.2, ease: "power2.out" }, 1.2);
+      tl.fromTo(".chart-area", { opacity: 0 }, { opacity: 1, duration: 0.8 }, 1.4);
+      tl.to(".scene", { opacity: 0, y: -16, duration: 0.5, ease: "power2.in" }, 5.3);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

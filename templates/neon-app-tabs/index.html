@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "titleEn", "type": "string", "label": "顶部英文小标签", "default": "WHERE TO FIND"}, {"id": "titleCn", "type": "string", "label": "中文标题（含高亮词）", "default": "同一个东西，各家叫法不同"}, {"id": "titleAccent", "type": "string", "label": "标题高亮词（绿色，须为标题子串）", "default": "各家"}, {"id": "titleSub", "type": "string", "label": "灰色副标题", "default": "一个入口，两种打开方式"}, {"id": "tab1Main", "type": "string", "label": "Tab1 主标签", "default": "手机版"}, {"id": "tab1Sub", "type": "string", "label": "Tab1 副标签（灰小字）", "default": "App 内打开"}, {"id": "tab2Main", "type": "string", "label": "Tab2 主标签", "default": "桌面版"}, {"id": "tab2Sub", "type": "string", "label": "Tab2 副标签（灰小字）", "default": "网页也能用"}, {"id": "noteText", "type": "string", "label": "下方说明字（切换后淡入）", "default": "两边数据是通的"}, {"id": "duration", "type": "number", "label": "总时长（秒，演完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+:root{
+  --acc:#10B981; --accHi:#34D399;
+  --accA85:rgba(16,185,129,.85); --accA80:rgba(16,185,129,.8);
+  --accA50:rgba(16,185,129,.5);  --accA40:rgba(16,185,129,.4);
+  --accA35:rgba(16,185,129,.35); --accA12:rgba(16,185,129,.12);
+  --accHiA55:rgba(52,211,153,.55); --accHiA80:rgba(52,211,153,.8); --accHiA25:rgba(52,211,153,.25);
+}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12);
+  color: var(--foreground, #F5F5F3); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+/* 顶部标题组 */
+.ten{ position:absolute; left:0; right:0; top:128px; text-align:center;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:26px; letter-spacing:8px;
+  color:var(--acc); text-transform:uppercase; text-shadow:0 0 12px var(--accA40);
+  white-space:nowrap; }
+.ten::before{ content:'— '; } .ten::after{ content:' —'; }
+.tcn{ position:absolute; left:0; right:0; top:180px; text-align:center;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:66px; letter-spacing:2px;
+  white-space:nowrap; }
+.tcn .acc{ color:var(--accHi); text-shadow:0 0 18px var(--accHiA55); position:relative; padding:0 4px; }
+.tcn .acc::after{ content:''; position:absolute; left:6px; right:6px; bottom:-12px; height:5px;
+  border-radius:3px; background:var(--acc); box-shadow:0 0 14px var(--accA80); }
+.tsub{ position:absolute; left:0; right:0; top:302px; text-align:center;
+  font-size:28px; color:#9CA3AF; letter-spacing:2px; white-space:nowrap; }
+
+/* Tab 按钮 */
+.tab{ position:absolute; top:460px; width:560px; height:150px; background:#12161C;
+  border-radius:16px; overflow:hidden; will-change:transform;
+  display:flex; align-items:center; justify-content:center; }
+#tab1{ left:360px;
+  border:1px solid var(--accA85);
+  box-shadow:0 0 26px var(--accA35), 0 0 60px var(--accA12); }
+#tab2{ left:1000px;
+  border:1px solid rgba(156,163,175,.35);
+  box-shadow:0 0 0 rgba(16,185,129,0), 0 0 0 rgba(16,185,129,0); }
+.tin{ display:flex; align-items:baseline; justify-content:center; gap:18px;
+  padding:0 40px; max-width:520px; }
+#tab2 .tin{ opacity:.45; }
+.dot{ flex:0 0 auto; width:16px; height:16px; border-radius:50%; align-self:center; }
+#tab1 .dot{ background:var(--accHi); box-shadow:0 0 10px var(--accHiA80); }
+#tab2 .dot{ background:#6B7280; box-shadow:0 0 0 rgba(0,0,0,0); }
+.tmain{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:46px; color:#FFFFFF;
+  white-space:nowrap; }
+.tsub2{ font-size:24px; color:#9CA3AF; white-space:nowrap; }
+.sweep{ position:absolute; top:0; bottom:0; left:0; width:220px; pointer-events:none;
+  background:linear-gradient(105deg, rgba(52,211,153,0) 0%, var(--accHiA25) 50%, rgba(52,211,153,0) 100%);
+  transform:translateX(-260px) skewX(-12deg); }
+
+/* 下方说明字 */
+.note{ position:absolute; left:0; right:0; top:706px; text-align:center;
+  font-size:30px; color:#9CA3AF; letter-spacing:2px; white-space:nowrap; }
+.note::before{ content:''; display:inline-block; width:12px; height:12px; border-radius:50%;
+  background:var(--acc); box-shadow:0 0 10px var(--accA50); margin-right:16px; vertical-align:middle; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="ten" id="tEn"></div>
+      <div class="tcn" id="tCnWrap"><span id="tPre"></span><span class="acc" id="tAcc"></span><span id="tPost"></span></div>
+      <div class="tsub" id="tSub"></div>
+
+      <div class="tab" id="tab1">
+        <div class="tin"><span class="dot"></span><span class="tmain" id="t1Main"></span><span class="tsub2" id="t1Sub"></span></div>
+      </div>
+      <div class="tab" id="tab2">
+        <div class="tin"><span class="dot"></span><span class="tmain" id="t2Main"></span><span class="tsub2" id="t2Sub"></span></div>
+        <div class="sweep" id="sweep2" data-layout-allow-overflow></div>
+      </div>
+
+      <div class="note" id="noteTxt"></div>
+    </div>
+    <script>
+      const FB = {"titleEn": "WHERE TO FIND", "titleCn": "同一个东西，各家叫法不同", "titleAccent": "各家", "titleSub": "一个入口，两种打开方式", "tab1Main": "手机版", "tab1Sub": "App 内打开", "tab2Main": "桌面版", "tab2Sub": "网页也能用", "noteText": "两边数据是通的", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $=(s)=>document.querySelector(s);
+      const DUR=+v.duration>0?+v.duration:6;
+      $('[data-composition-id]').setAttribute('data-duration',String(DUR));
+
+      $('#tEn').textContent=v.titleEn||'';
+      $('#tSub').textContent=v.titleSub||'';
+      $('#t1Main').textContent=v.tab1Main||''; $('#t1Sub').textContent=v.tab1Sub||'';
+      $('#t2Main').textContent=v.tab2Main||''; $('#t2Sub').textContent=v.tab2Sub||'';
+      $('#noteTxt').textContent=v.noteText||'';
+
+      /* 标题：高亮词作为子串拆分，找不到则整体前置、高亮词附加在后 */
+      const title=String(v.titleCn??''), acc=String(v.titleAccent??'');
+      const idx=acc?title.indexOf(acc):-1;
+      if(idx>=0){
+        $('#tPre').textContent=title.slice(0,idx);
+        $('#tAcc').textContent=acc;
+        $('#tPost').textContent=title.slice(idx+acc.length);
+      }else{
+        $('#tPre').textContent=title;
+        $('#tAcc').textContent=acc;
+        $('#tPost').textContent='';
+      }
+
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+
+      /* 1. 标题组：英文小标签 → 中文标题 → 灰副标题 */
+      tl.fromTo('#tEn',{opacity:0,y:20},{opacity:1,y:0,duration:0.5,ease:'power2.out'},0.2);
+      tl.fromTo('#tCnWrap',{opacity:0,y:36},{opacity:1,y:0,duration:0.6,ease:'power3.out'},0.4);
+      tl.fromTo('#tSub',{opacity:0,y:18},{opacity:1,y:0,duration:0.5,ease:'power2.out'},0.65);
+      /* 2. 两个 tab 依次上浮入场（tab1 绿描边激活态，tab2 灰色未激活） */
+      tl.fromTo('#tab1',{opacity:0,y:46},{opacity:1,y:0,duration:0.6,ease:'power3.out'},0.95);
+      tl.fromTo('#tab2',{opacity:0,y:46},{opacity:1,y:0,duration:0.6,ease:'power3.out'},1.2);
+      /* 3. t≈2.2s 激活态切换：tab1 变灰 ← tab2 变绿发光 */
+      tl.to('#tab1',{borderColor:'rgba(156,163,175,.35)',
+        boxShadow:'0 0 0 rgba(16,185,129,0), 0 0 0 rgba(16,185,129,0)',
+        duration:0.5,ease:'power2.inOut'},2.2);
+      tl.to('#tab1 .tin',{opacity:0.45,duration:0.5,ease:'power2.inOut'},2.2);
+      tl.to('#tab1 .dot',{backgroundColor:'#6B7280',boxShadow:'0 0 0 rgba(0,0,0,0)',
+        duration:0.5,ease:'power2.inOut'},2.2);
+      tl.to('#tab2',{borderColor:'rgba(16,185,129,.85)',
+        boxShadow:'0 0 26px rgba(16,185,129,.35), 0 0 60px rgba(16,185,129,.12)',
+        duration:0.5,ease:'power2.inOut'},2.2);
+      tl.to('#tab2 .tin',{opacity:1,duration:0.5,ease:'power2.inOut'},2.2);
+      tl.to('#tab2 .dot',{backgroundColor:'#34D399',boxShadow:'0 0 10px rgba(52,211,153,.8)',
+        duration:0.5,ease:'power2.inOut'},2.2);
+      /* 4. tab2 马克笔横扫闪光（系列签名动作） */
+      tl.fromTo('#sweep2',{x:-260},{x:620,duration:0.7,ease:'power1.inOut'},2.3);
+      /* 5. 下方说明字同步淡入 */
+      tl.fromTo('#noteTxt',{opacity:0,y:18},{opacity:1,y:0,duration:0.5,ease:'power2.out'},2.55);
+      /* 演完定格：占满 data-duration 防黑帧 */
+      tl.set({},{},DUR);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

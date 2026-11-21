@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "API 调用示例"}, {"id": "subtitle", "type": "string", "label": "副标题", "default": "请求与响应的实时 Mock"}, {"id": "method", "type": "string", "label": "HTTP 方法", "default": "POST"}, {"id": "endpoint", "type": "string", "label": "接口路径", "default": "/v1/chat/completions"}, {"id": "request", "type": "string", "label": "请求 JSON", "default": "{\"model\":\"gpt-4o\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}]}"}, {"id": "response", "type": "string", "label": "响应 JSON", "default": "{\"id\":\"chatcmpl-xxx\",\"model\":\"gpt-4o\",\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"Hi there!\"}}]}"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      /* ===== 奶油纸面贴纸工作台 · 设计令牌（见 design-systems/sticker-workbench/DESIGN.md） ===== */
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden;
+        font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden;
+        background: var(--background, #F5F0E6); color: var(--foreground, #1D1D20); }
+      .outer-frame{ position: absolute; inset: 0; border: 10px solid #1D1D20; pointer-events: none; z-index: 40; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; font-weight: 700; }
+      .fredoka{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; }
+      .corner-tag{ position: absolute; top: 74px; left: 120px; z-index: 30;
+        background: #FFFDF7; border: 4px solid #1D1D20; border-radius: 8px;
+        box-shadow: 10px 10px 0 #2A292B; padding: 14px 22px; transform: rotate(-2deg); }
+      .corner-tag span{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; font-weight: 700;
+        font-size: 24px; letter-spacing: 0.06em; text-transform: uppercase; }
+      .corner-index{ position: absolute; top: 84px; right: 120px; z-index: 30;
+        font-size: 20px; color: #4D4A48; }
+      .scene{ position: absolute; inset: 0; }
+      .panel{ background: #FFFDF7; border: 4px solid #1D1D20; border-radius: 10px;
+        box-shadow: 10px 10px 0 #2A292B; }
+      .chip{ display: inline-block; padding: 8px 20px; border: 4px solid #1D1D20; border-radius: 8px;
+        box-shadow: 6px 6px 0 #2A292B; font-size: 26px; font-weight: 800; line-height: 1.1; }
+      .chip-blue{ background: #3E7BF2; color: #FFFDF7; }
+      .chip-pink{ background: #F13B88; color: #FFFDF7; }
+      .chip-orange{ background: #FF9F1C; color: #1D1D20; }
+      .chip-lime{ background: #B9E833; color: #1D1D20; }
+      .chip-violet{ background: #B99AF7; color: #1D1D20; }
+      .chip-paper{ background: #FFFDF7; color: #1D1D20; }
+      .ttl{ font-size: 52px; font-weight: 900; line-height: 1.2; }
+      .sub{ font-size: 30px; font-weight: 700; line-height: 1.35; color: #4D4A48; }
+      .num{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; font-weight: 700; }
+      .title-center{ position: absolute; top: 200px; left: 0; width: 100%; text-align: center; z-index: 20; }
+      .sub-center{ position: absolute; top: 286px; left: 0; width: 100%; text-align: center; z-index: 20; }
+
+      .cmp{ position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+        gap: 110px; padding: 40px 120px 0; }
+      .ccard{ position: relative; width: 700px; padding: 80px 52px 48px; }
+      .ccard .ct{ position: absolute; top: -26px; left: 40px; white-space: nowrap; }
+      .ccard .cl{ font-size: 44px; font-weight: 900; line-height: 1.2; margin-bottom: 14px; }
+      .ccard .cs{ font-size: 30px; font-weight: 700; color: #4D4A48; line-height: 1.4; }
+      .ccard .cb{ font-size: 96px; line-height: 1; color: #3E7BF2; margin: 10px 0 4px; }
+      .ccard .cu{ font-size: 40px; font-weight: 900; }
+      .cbadge{ position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 5;
+        width: 110px; height: 110px; border-radius: 50%; background: #FFFDF7; border: 4px solid #1D1D20;
+        box-shadow: 8px 8px 0 #2A292B; display: flex; align-items: center; justify-content: center; }
+      .cbadge span{ font-family: 'Fredoka', sans-serif; font-size: 44px; font-weight: 700; }
+      .cseal{ position: absolute; right: -18px; top: -18px; width: 44px; height: 44px; border-radius: 50%;
+        background: #B9E833; border: 4px solid #1D1D20; display: flex; align-items: center; justify-content: center;
+        font-family: 'Fredoka', sans-serif; font-size: 24px; font-weight: 700; z-index: 6; }
+      .strip{ position: absolute; left: 50%; bottom: 200px; transform: translateX(-50%) rotate(-1deg);
+        padding: 18px 36px; z-index: 20; }
+      .strip .sl{ display: inline-block; margin-right: 14px; }
+      .strip .st{ font-size: 30px; font-weight: 800; }
+      .crow{ display: flex; justify-content: space-between; padding: 10px 0;
+        border-bottom: 3px solid #C9C0B2; font-size: 26px; font-weight: 700; }
+      .crow b{ font-weight: 900; }
+      .bar-row{ margin: 18px 0; }
+      .bar-row .bl{ font-size: 28px; font-weight: 800; margin-bottom: 8px; }
+      .bar-track{ height: 44px; background: #FFFDF7; border: 4px solid #1D1D20; border-radius: 8px; overflow: hidden; }
+      .bar-fill{ height: 100%; width: 0; }
+      .json{ font-family: 'IBM Plex Mono', monospace; font-weight: 700; font-size: 22px; line-height: 1.5;
+        color: #4D4A48; white-space: pre-wrap; text-align: left; }
+      .strike{ position: relative; }
+      .strike:after{ content: ""; position: absolute; left: -4%; right: -4%; top: 52%;
+        border-top: 6px solid #F13B88; transform: rotate(-2deg); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="outer-frame" id="frame"></div>
+      <div class="corner-tag" id="cornerTag"><span>API CALL MOCK</span></div>
+      <div class="corner-index mono" id="cornerIndex">09 / COMPARE</div>
+      <svg width="0" height="0" style="position:absolute"><defs>
+        <marker id="arrowHead" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto">
+          <path d="M1 1 L11 6 L1 11 Z" fill="#1D1D20" />
+        </marker>
+      </defs></svg>
+        <h2 class="ttl title-center" id="mTitle"></h2>
+      <section class="scene" id="rootScene" data-start="0" data-duration="6" data-track-index="1">
+        <div class="cmp" id="mCmp"></div>
+      </section>
+    </div>
+    <script>
+      const FB = {"title": "API 调用示例", "subtitle": "请求与响应的实时 Mock", "method": "POST", "endpoint": "/v1/chat/completions", "request": "{\"model\":\"gpt-4o\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}]}", "response": "{\"id\":\"chatcmpl-xxx\",\"model\":\"gpt-4o\",\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"Hi there!\"}}]}"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $ = (id) => document.getElementById(id);
+      const T = (id, val) => { const el = $(id); if (el) el.textContent = val; };
+      const SP = (s) => String(s ?? '').split(',').map(x => x.trim()).filter(Boolean);
+      const SPN = (s) => SP(s).map(Number);
+      const scene = () => $('rootScene');
+      function el(tag, cls, parent, text){ const e = document.createElement(tag);
+        if (cls) e.className = cls; if (text != null) e.textContent = text;
+        (parent || scene()).appendChild(e); return e; }
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const SPRING = "back.out(1.4)";
+      function pop(sel, at, dx){ tl.fromTo(sel, { opacity: 0, x: dx || 0, scale: 0.88 },
+        { opacity: 1, x: 0, scale: 1, duration: 0.38, ease: SPRING }, at); }
+      function fade(sel, at){ tl.fromTo(sel, { opacity: 0 }, { opacity: 1, duration: 0.24 }, at); }
+      function drawArrow(line, at){ const len = line.getAttribute('stroke-dasharray');
+        tl.set(line, { attr: { "marker-end": "url(#arrowHead)" } }, at);
+        tl.fromTo(line, { strokeDashoffset: len }, { strokeDashoffset: 0, duration: 0.4, ease: "power2.inOut" }, at); }
+      tl.fromTo("#frame", { opacity: 0 }, { opacity: 1, duration: 0.18 }, 0);
+      tl.fromTo(["#cornerTag", "#cornerIndex"], { opacity: 0 }, { opacity: 1, duration: 0.18 }, 0);
+      T("mTitle", v.title);
+      const cmp = $("mCmp");
+      function ccard(tag, tagCls) { const c = el("article", "panel ccard", cmp);
+        if (tag) { const t = el("span", "chip " + tagCls + " ct", c, tag);
+          t.style.transform = "rotate(-2deg)"; } return c; }
+      function seal(c) { return el("div", "cseal", c, "✓"); }
+      function badge(txt) { const b = el("div", "cbadge", cmp); el("span", "", b, txt); return b; }
+      function strip(label, text) { const s = el("div", "panel strip", $("rootScene"));
+        el("span", "chip chip-lime sl", s, label); el("span", "st", s, text); return s; }
+      const ca = ccard(v.method, "chip-blue");
+      const ep = el("p", "mono", ca, v.endpoint); ep.style.cssText = "font-size:24px;margin-bottom:14px";
+      el("div", "json", ca, v.request);
+      const cb = ccard("RESPONSE", "chip-lime");
+      el("div", "json", cb, v.response);
+      badge("⇄");
+      T("mTitle", v.title || "");
+      pop(ca, 0.3, -56); pop(cb, 0.7, 56);
+      tl.fromTo(".cbadge", { opacity: 0, scale: 0.76 }, { opacity: 1, scale: 1, duration: 0.28, ease: SPRING }, 1.1);
+      tl.to("#rootScene", { opacity: 0, duration: 0.28, ease: "power2.in" }, 5.5);
+      tl.to(["#cornerTag", "#cornerIndex"], { opacity: 0, duration: 0.28 }, 5.5);
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

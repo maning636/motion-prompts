@@ -1,0 +1,11 @@
+{
+  "leftTitle": "预训练",
+  "rightTitle": "微调",
+  "dimensions": "数据需求,成本,灵活性,上线周期",
+  "leftValues": "极大,低,差,短",
+  "rightValues": "小,中,好,中",
+  "recommendedSide": "right",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

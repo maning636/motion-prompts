@@ -1,0 +1,13 @@
+{
+  "leftLabel": "主叙事",
+  "leftEyebrow": "主标题 / CORE NARRATIVE",
+  "leftTitle": "把 60% 的注意力给结论，把 40% 留给证据",
+  "leftPoints": "主信息占左 60%，权重最大\n要点短句、单条一行、强对齐\n错峰入场，先讲结论再讲证据\n末段停留 ≥0.8s 让读者读得完",
+  "rightLabel": "辅助信息",
+  "rightHeadline": "60 / 40",
+  "rightSub": "非对称权重 · 信息层级",
+  "rightMeta": "viewbox 1920×1080 · margin 96px\n字号 76 / 26 · 行高 1.45",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

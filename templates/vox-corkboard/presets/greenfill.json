@@ -1,0 +1,14 @@
+{
+  "kicker": "深挖 · CASE FILES",
+  "title": "我扒了一下这件事的来龙去脉",
+  "imgBg": "./assets/_gf0.png",
+  "img1": "./assets/_gf1.png",
+  "img2": "./assets/_gf2.png",
+  "img3": "./assets/_gf3.png",
+  "label1": "起点：一份文件",
+  "label2": "路径：三次转向",
+  "label3": "关键人",
+  "stringColor": "#D32F2F",
+  "caption": "线索都连上了",
+  "duration": 7
+}

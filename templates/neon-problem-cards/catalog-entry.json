@@ -1,0 +1,28 @@
+{
+  "id": "neon-problem-cards",
+  "name": "荧光绿问题三卡",
+  "description": "荧光绿暗底三卡横排递进卡，左上标题组+编号问题卡逐张入场、细节行跟随出现，红叉标注否定项，适合口播痛点拆解。",
+  "category": "信息卡片",
+  "tags": [
+    "编号卡片",
+    "荧光绿",
+    "问题拆解",
+    "递进",
+    "口播"
+  ],
+  "duration": 6,
+  "slot": "concept",
+  "when": "口播拆解某方案的三个问题或短板，需要逐条递进呈现并标注否定语义时",
+  "assets": [],
+  "path": "templates/neon-problem-cards",
+  "size": "1920×1080",
+  "formats": [
+    "mp4"
+  ],
+  "defaultFormat": "mp4",
+  "preview": "https://maning789link.top/hub/renders/neon-problem-cards/sample.webm",
+  "status": "ready",
+  "tier": "free",
+  "no": null,
+  "series": "shot"
+}

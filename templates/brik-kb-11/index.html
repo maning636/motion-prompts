@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（本期讲法标签）","default":"两边都在跑"},
+{"id":"title","name":"主标题","type":"string","label":"主标题（8–16 字）","default":"跑得久的和跑得快的，差的不是速度"},
+{"id":"la","name":"左塔上","type":"string","label":"左塔 · 上层（≤6 字）","default":"堆功能"},
+{"id":"lb","name":"左塔下","type":"string","label":"左塔 · 下层（≤6 字）","default":"越加越重"},
+{"id":"ra","name":"右塔上","type":"string","label":"右塔 · 上层（≤6 字）","default":"长能力"},
+{"id":"rb","name":"右塔下","type":"string","label":"右塔 · 下层（≤6 字）","default":"越用越轻"},
+{"id":"verdict","name":"判词","type":"string","label":"判词块（4–8 字）","default":"轻的跑得久"},
+{"id":"accent","name":"强调色","type":"color","label":"强调色（凸点亮起色 / 斜纹带 / 页脚计数）","default":"#FFD429"},
+{"id":"brickColor","name":"配色包","type":"enum","label":"配色包（块面轮转顺序）","default":"mixed","options":[{"value":"yellow","label":"暖黄主调"},{"value":"pink","label":"桃粉主调"},{"value":"green","label":"薄荷主调"},{"value":"blue","label":"靛蓝主调"},{"value":"mixed","label":"四色轮转"}]},
+{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–6）","default":5.5},
+{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}],"hidden":true}
+]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>双塔对照判词</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 积木风 · 知识口播 · 双塔对照判词
+     左右各一座 480×120 两层塔自画布两沿对撞进来，中间 240 的中缝由一块 240×360 承重判词块填上；三组凸点各随自己那组落位硬切亮起。
+     块宽只用 120/240/480/720，块高只用 120/240/360/480；普通块恒 8px 硬影，
+     承重件 10px；相邻块用 margin -3px 合流成单线缝；凸点是内联 SVG circle。 */
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --mod:240px; --mod-h:120px; --shadow:#0F0F0F; --background:var(--paper); --accent:#FFD429;
+  }
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--background);color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased}
+  /* 纸面网点：全族唯一允许的 rgba 例外，必须铺满 #stage */
+  .blk-noise{background-image:radial-gradient(rgba(15,15,15,.12) 1px,transparent 1px);
+    background-size:10px 10px}
+  .sh-s{box-shadow:4px 4px 0 var(--shadow)}
+  .sh-l{box-shadow:8px 8px 0 var(--shadow)}
+  .sh-xl{box-shadow:10px 10px 0 var(--shadow)}
+
+  /* 桌沿铭牌：贴在桌面之外，不许浮在块上面 */
+  .promo{position:absolute;left:0;top:0;width:1920px;height:56px;display:flex;
+    align-items:center;justify-content:space-between;padding:0 72px;
+    background:var(--ink);color:var(--white);font-family:var(--mono);
+    font-size:24px;font-weight:700;letter-spacing:.14em}
+  .promo .pc{color:var(--accent)}
+  .foot{position:absolute;left:0;bottom:0;width:1920px;height:64px;display:flex;
+    align-items:center;justify-content:space-between;padding:0 72px;
+    background:var(--ink);color:var(--white);font-family:var(--mono);
+    font-size:26px;font-weight:700;letter-spacing:.1em}
+  .foot em{font-style:normal;color:var(--accent)}
+  /* 斜纹带：全族唯一合法渐变，周期 10+10=20px */
+  .divline{position:absolute;left:0;bottom:64px;width:1920px;height:20px;
+    border-top:3px solid var(--ink);border-bottom:3px solid var(--ink);
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+
+  .head{position:absolute;left:360px;top:120px;width:1200px;display:flex;
+    flex-direction:column;gap:12px}
+  .head .eb{font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:.14em;
+    color:var(--ink);white-space:nowrap}
+  .head .ti{font-size:52px;font-weight:900;line-height:1.2;letter-spacing:0;
+    color:var(--ink);white-space:nowrap}
+
+  /* 两座塔：每座两层 480×120，逐层 -3px 合缝；塔间中缝正好 240 */
+  .tw{position:absolute;top:384px;width:480px;min-width:0;height:243px}
+  .tw.l{left:360px}
+  .tw.r{left:1080px}
+  .blk{position:absolute;left:0;width:480px;min-width:0;height:120px;display:flex;
+    align-items:center;justify-content:center;box-sizing:border-box;
+    border:var(--bw) solid var(--ink);border-radius:4px;box-shadow:8px 8px 0 var(--shadow)}
+  .blk.b1{top:123px}
+  .blk.b2{top:0}
+  .blk .x{font-size:36px;font-weight:900;line-height:1.15;letter-spacing:0;color:inherit;
+    white-space:nowrap}
+
+  /* 判词块 240×360，sh-xl 承重件，填满两塔之间的中缝 */
+  .verdict{position:absolute;left:840px;top:404px;width:240px;min-width:0;height:360px;
+    display:flex;align-items:center;justify-content:center;box-sizing:border-box;
+    background:var(--white);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:10px 10px 0 var(--shadow)}
+  .verdict .v{font-size:48px;font-weight:900;line-height:1.25;letter-spacing:0;
+    color:var(--ink);text-align:center;white-space:nowrap}
+
+  /* 三组 2 联凸点：左塔顶 / 右塔顶 / 判词块顶，各贴各的顶面 */
+  .stL{position:absolute;left:360px;top:324px;width:240px;height:60px}
+  .stR{position:absolute;left:1080px;top:324px;width:240px;height:60px}
+  .stV{position:absolute;left:840px;top:344px;width:240px;height:60px}
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="promo">
+    <span class="pc">BRICK / 积木风</span>
+    <span>对照双塔 · 中缝判词</span>
+  </div>
+
+  <div class="head" id="head">
+    <span class="eb" id="eyebrow" data-fit-max="30" data-fit-min="16">两边都在跑</span>
+    <h1 class="ti" id="title" data-fit-max="52" data-fit-min="26">跑得久的和跑得快的，差的不是速度</h1>
+  </div>
+
+  <div class="tw l" id="twL">
+    <div class="blk b2" id="lb"><span class="x" id="lbTx" data-fit-max="36" data-fit-min="18">越加越重</span></div>
+    <div class="blk b1" id="la"><span class="x" id="laTx" data-fit-max="36" data-fit-min="18">堆功能</span></div>
+  </div>
+
+  <div class="tw r" id="twR">
+    <div class="blk b2" id="rb"><span class="x" id="rbTx" data-fit-max="36" data-fit-min="18">越用越轻</span></div>
+    <div class="blk b1" id="ra"><span class="x" id="raTx" data-fit-max="36" data-fit-min="18">长能力</span></div>
+  </div>
+
+  <div class="verdict" id="verdict">
+    <span class="v" id="verdictTx" data-fit-max="48" data-fit-min="24">轻的跑得久</span>
+  </div>
+
+  <div class="stL" id="stL">
+    <svg width="180" height="60" viewBox="0 0 180 60" fill="none" aria-hidden="true"><circle class="sc" id="c1" cx="60" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/><circle class="sc" id="c2" cx="180" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/></svg>
+  </div>
+  <div class="stR" id="stR">
+    <svg width="240" height="60" viewBox="0 0 240 60" fill="none" aria-hidden="true">
+      <circle class="sc" id="c3" cx="60"  cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+      <circle class="sc" id="c4" cx="180" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+    </svg>
+  </div>
+  <div class="stV" id="stV">
+    <svg width="240" height="60" viewBox="0 0 240 60" fill="none" aria-hidden="true">
+      <circle class="sc" id="c5" cx="60"  cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+      <circle class="sc" id="c6" cx="180" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+    </svg>
+  </div>
+
+  <div class="divline"></div>
+  <div class="foot">
+    <span>KB / 知识口播</span>
+    <span id="meta">双塔 4 · 判词 1 · 凸点 6</span>
+  </div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+['eyebrow', 'title', 'la', 'lb', 'ra', 'rb', 'verdict'].forEach(function (k) { set(k, v[k]); });
+
+  var rs = document.documentElement.style;
+  if (v.accent) rs.setProperty('--accent', v.accent);
+  var ACC = v.accent || '#FFD429';
+
+  /* 配色包：yellow → pink → blue → green 是全族轮转序，同屏不重色 */
+  var PACK = {
+    yellow: ['#FFD429', '#FF5FA2', '#3D7BFF', '#2FD07A'],
+    pink:   ['#FF5FA2', '#FFD429', '#2FD07A', '#3D7BFF'],
+    green:  ['#2FD07A', '#3D7BFF', '#FFD429', '#FF5FA2'],
+    blue:   ['#3D7BFF', '#2FD07A', '#FF5FA2', '#FFD429'],
+    mixed:  ['#FFD429', '#FF5FA2', '#3D7BFF', '#2FD07A']
+  };
+  /* 明度判定：亮底压墨字、暗底压白字，不造灰色阶 */
+  function inkOn(hex) {
+    var h = String(hex || '').replace('#', '');
+    if (h.length !== 6) return '#0F0F0F';
+    var f = function (c) { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    var L = 0.2126 * f(parseInt(h.slice(0, 2), 16)) +
+            0.7152 * f(parseInt(h.slice(2, 4), 16)) +
+            0.0722 * f(parseInt(h.slice(4, 6), 16));
+    return L > 0.42 ? '#0F0F0F' : '#FFFFFF';
+  }
+  var pack = PACK[v.brickColor] || PACK.mixed;
+  /* 左塔两色、右塔两色，四块一色一变，同屏不重色 */
+  [['#la', pack[0]], ['#lb', pack[1]], ['#ra', pack[2]], ['#rb', pack[3]]]
+    .forEach(function (pair) {
+      var el = document.querySelector(pair[0]);
+      if (!el) return;
+      el.style.background = pair[1];
+      var t = el.querySelector('.x');
+      if (t) t.style.color = inkOn(pair[1]);
+    });
+
+  var studs = [].slice.call(document.querySelectorAll('#stL .sc, #stR .sc, #stV .sc'));
+  var gap = document.querySelector('#twL').getBoundingClientRect();
+  var gap2 = document.querySelector('#twR').getBoundingClientRect();
+  var seam = Math.round(gap2.left - gap.right);
+  var meta = document.getElementById('meta');
+  if (meta) {
+    meta.innerHTML = '双塔 <em>4</em> 块 · 中缝 <em>' + seam + '</em>px · 凸点 <em>' +
+      studs.length + '</em>';
+  }
+
+  /* reduce 短路：这一行必须逐字节保持不变，QC 工具靠字符串匹配把它替换成常量 true */
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：搬移与压影全撤掉，只给终态 + 一段 8px 微位移淡入 */
+    gsap.set('#head',    { x: 0, y: 0, opacity: 1 });
+    gsap.set('#twL',     { x: 0, y: 0, opacity: 1 });
+    gsap.set('#twR',     { x: 0, y: 0, opacity: 1 });
+    gsap.set('#verdict', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#stL', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#stR', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#stV', { x: 0, y: 0, opacity: 1 });
+    if (studs.length) gsap.set(studs, { attr: { fill: ACC } });
+    tl.fromTo('#head',    { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .55, ease: 'power3.out' }, 0);
+    tl.fromTo('#twL',     { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .60, ease: 'power3.out' }, .16);
+    tl.fromTo('#twR',     { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .60, ease: 'power3.out' }, .22);
+    tl.fromTo('#verdict', { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .50, ease: 'power3.out' }, .34);
+    tl.fromTo('#stL', { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .45, ease: 'power3.out' }, .40);
+    tl.fromTo('#stR', { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .45, ease: 'power3.out' }, .46);
+    tl.fromTo('#stV', { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .45, ease: 'power3.out' }, .52);
+    B.hold(tl, 1.15, 1.05);
+    return;
+  }
+
+  var SHADOW = '8px 8px 0 #0F0F0F';
+  var stageRect = document.getElementById('stage').getBoundingClientRect();
+  var promoEl = document.querySelector('.promo');
+  var CEIL = promoEl ? Math.round(promoEl.getBoundingClientRect().bottom - stageRect.top) : 0;
+
+  /* 起跳点一律现算，保证任何一帧都不越框；onUpdate 里绝不做 DOM 测量 */
+  function topOf(sel) {
+    var e = document.querySelector(sel);
+    return e ? Math.round(e.getBoundingClientRect().top - stageRect.top) : 0;
+  }
+  function bottomOf(sel) {
+    var e = document.querySelector(sel);
+    return e ? Math.round(stageRect.bottom - e.getBoundingClientRect().bottom) : 0;
+  }
+  function leftOf(sel) {
+    var e = document.querySelector(sel);
+    return e ? Math.round(stageRect.left - e.getBoundingClientRect().left) : 0;
+  }
+  function rightOf(sel) {
+    var e = document.querySelector(sel);
+    return e ? Math.round(stageRect.right - e.getBoundingClientRect().right) : 0;
+  }
+  function fromCeil(sel) { return CEIL - topOf(sel); }
+
+  /* 式 1/2/4/6 通用落位：单轴直落或顶出，零 overshoot，落定沿 Y 多压 3px 打 2 帧再回原档 */
+  function slam(sel, at, from, dur, shadow) {
+    var S = shadow || SHADOW;
+    var d = dur || 0.24;
+    var p = String(S).split(' ');
+    var press = p[0] + ' ' + (parseFloat(p[1]) + 3) + 'px 0 ' + p.slice(3).join(' ');
+    tl.fromTo(sel, { x: from.x || 0, y: from.y || 0 },
+      { x: 0, y: 0, duration: d, ease: 'power4.out' }, at);
+    tl.set(sel, { boxShadow: press, immediateRender: false }, at + d);
+    tl.to(sel, { boxShadow: S, duration: 0.04, ease: 'steps(2)' }, at + d + 0.04);
+    return at + d + 0.04;
+  }
+  /* 式 8 凸点扫描：单枚间隔 ≥0.12s，fill 硬切，不补间 */
+  function scanStuds(list, at, mode) {
+    if (mode === 'none' || !list.length) return;
+    list.forEach(function (c, i) {
+      tl.set(c, { attr: { fill: ACC }, immediateRender: false },
+        mode === 'top' ? at : at + i * 0.12);
+    });
+  }
+
+  slam('#head', 0.00, { x: 0, y: fromCeil('#head') }, 0.26);
+
+  /* 式 7 对撞：两座塔各自沿水平轴从画布外沿推进终点格位，单轴、零斜向 */
+  slam('#twL', 0.52, { x: leftOf('#twL'), y: 0 }, 0.26);
+  slam('#twR', 0.70, { x: -rightOf('#twR'), y: 0 }, 0.26);
+
+  /* 判词块自桌沿铭牌下方直落填进中缝 */
+  slam('#verdict', 1.16, { x: 0, y: fromCeil('#verdict') }, 0.26, '10px 10px 0 #0F0F0F');
+
+  /* 三组凸点各随自己那组落位，直落进各自顶面后同时硬切亮起 */
+  [['#stL', 1.52], ['#stR', 1.64], ['#stV', 1.76]].forEach(function (pair) {
+    var at = pair[1];
+    slam(pair[0], at, { x: 0, y: -60 }, 0.24);
+    var list = [].slice.call(document.querySelectorAll(pair[0] + ' .sc'));
+    list.forEach(function (c) {
+      tl.set(c, { attr: { fill: ACC }, immediateRender: false }, at + 0.30);
+    });
+  });
+
+  var introEnd = tl.duration();
+  var TOTAL = Math.min(6, Math.max(5, Number(v.duration) || 5.5));
+  var holdAt = Math.min(introEnd, TOTAL - 0.8);
+  B.hold(tl, holdAt, Math.max(0.8, TOTAL - holdAt));
+})();
+</script>
+</body></html>

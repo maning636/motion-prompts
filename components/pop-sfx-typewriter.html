@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"text","name":"拟声词","type":"string","label":"要逐字打出来的文案","default":"唰唰唰！"},{"id":"accent","name":"强调色","type":"color","label":"字色 / 强调","default":"#F15A26"},{"id":"color","name":"硬阴影色","type":"color","label":"描边硬阴影深色","default":"#241C18"},{"id":"fontSize","name":"字号","type":"number","label":"字号 px（超出画面自动缩）","default":54},{"id":"speed","name":"打字间隔","type":"number","label":"每字间隔（秒）","default":0.11},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":2.8}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>打字机拟声词</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    /* 透明底：这层是挂件，底下是用户自己的实拍 */
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+
+  .p-core { position: absolute; inset: 0; display: flex;
+            align-items: center; justify-content: center; }
+  /* 整行是 shrink-to-fit（inline-block）：量 scrollWidth 得到的才是文字自然宽。
+     position:relative 是给绝对定位的光标当锚点的 */
+  .p-line { position: relative; display: inline-block; text-align: center;
+            transform: rotate(-3deg); }
+  .p-row { display: flex; align-items: flex-end; justify-content: center;
+            white-space: nowrap; }
+  .p-ch {
+    display: inline-block; font-size: var(--fs, 54px); font-weight: 900;
+    line-height: 1; color: var(--ac); opacity: 0;
+    transform-origin: 50% 100%;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* 方块光标：不用 emoji 字形，自己画一个实心方块。
+     必须绝对定位在行尾，不能塞进 .p-chars 里——
+     塞进去它就成了 flex 的一项，整行「文字+光标」一起居中，
+     结果字偏左、光标孤零零掉在右边一大截（第一版就长这样）。 */
+  .p-caret {
+    position: absolute; left: 50%; top: .1em;
+    width: .26em; height: .8em;
+    background: var(--ac); border-radius: .05em; opacity: 1;
+  }
+  /* 打完之后长出来的一道手绘下划线。左右不加 margin：
+     加了它就比文字宽 8px，shrink-to-fit 的行会按它算宽度，整行文字偏出去几像素 */
+  .p-rule {
+    height: 6px; margin: 14px 0 0; border-radius: 3px;
+    background: var(--ac2); transform-origin: 0 50%; transform: scaleX(0); opacity: 0;
+    filter: drop-shadow(1.5px 2px 0 var(--ink));
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"唰唰唰！","accent":"#F15A26","color":"#241C18","fontSize":60,"speed":0.11,"duration":2.8};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--ink', v.color || FALLBACK.color);
+  root.style.setProperty('--ac2', '#FFC93C');
+  const dur = parseFloat(v.duration) || 2.8;
+  const fs = parseFloat(v.fontSize) || 60;
+  root.style.setProperty('--fs', fs + 'px');
+  const speedRaw = parseFloat(v.speed);
+  const speed = isNaN(speedRaw) ? 0.11 : Math.max(0.03, Math.min(0.6, speedRaw));
+  const text = String(v.text == null ? FALLBACK.text : v.text);
+  const chars = Array.from(text);
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text_, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text_ != null) el.textContent = text_;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  /* 8 方向白描边 + 硬阴影。全程字符串拼接，不用 % 格式化 */
+  function outlineShadow(r, d, off, ink) {
+    const W = 'rgba(255,255,255,1)';
+    return [
+      off + 'px ' + off + 'px 0 ' + ink,
+      r + 'px 0 0 ' + W, (0 - r) + 'px 0 0 ' + W,
+      '0 ' + r + 'px 0 ' + W, '0 ' + (0 - r) + 'px 0 ' + W,
+      d + 'px ' + d + 'px 0 ' + W, (0 - d) + 'px ' + d + 'px 0 ' + W,
+      d + 'px ' + (0 - d) + 'px 0 ' + W, (0 - d) + 'px ' + (0 - d) + 'px 0 ' + W
+    ].join(',');
+  }
+
+  const core = put('div', 'p-core', '');
+  const line = put('div', 'p-line', '', null, core);
+  const row = put('div', 'p-row', '', null, line);
+  const rule = put('div', 'p-rule', '', null, line);
+  const glyphs = chars.map((c) => {
+    const el = put('span', 'p-ch', '', c === ' ' ? '\u00a0' : c, row);
+    el.style.textShadow = outlineShadow(2.6, 2, 4, v.color || FALLBACK.color);
+    return el;
+  });
+  const caret = put('span', 'p-caret', '', null, line);
+  caret.style.filter = 'drop-shadow(1.5px 1.5px 0 ' + (v.color || FALLBACK.color) + ')';
+
+  const tl = gsap.timeline({ paused: true });
+  /* 注册：云渲染的 settle / 逐帧定位靠 window.__timelines 驱动时间轴 */
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 收口：量整行自然宽，超了缩字号，再把光标贴到行尾。
+     必须同时改两处：字用的是 var(--fs)，光标用的是 em（跟着自己的 font-size 走），
+     只改一处会出现「字缩了、光标还是原来粗」的穿帮。 */
+  (function fit() {
+    let f = fs;
+    root.style.setProperty('--fs', f + 'px');
+    const natural = row.scrollWidth;
+    const avail = 410;
+    if (natural > avail) {
+      f = Math.max(20, Math.floor(fs * avail / natural));
+      root.style.setProperty('--fs', f + 'px');
+    }
+    caret.style.fontSize = f + 'px';
+    const cw = caret.offsetWidth;
+    const tw = row.scrollWidth;
+    /* 光标紧贴行尾（不额外留白）：中文标点「！」左右各有很宽的边距，
+       留 6px 的话光标会离上一个字老远，看着像掉队了 */
+    caret.style.marginLeft = Math.max(0, Math.round(tw / 2 - cw / 2)) + 'px';
+  })();
+
+  const n = glyphs.length;
+  const T0 = 0.12;
+  const endAt = T0 + n * speed;
+  /* 每字落点错落一点点，固定数组取模——确定性的「手抖」，这里不做任何随机 */
+  const dyPat = [0, 3, -3, 2, 0, -2, 4, -1];
+  const ePat = [2.6, 3, 2.2, 2.8, 2.4, 3, 2.6, 2.2];
+
+  glyphs.forEach((g, i) => {
+    const at = T0 + i * speed;
+    tl.fromTo(g, { scale: .2, y: dyPat[i % dyPat.length], opacity: 0 },
+      { scale: 1, y: 0, opacity: 1, duration: .26,
+        ease: 'back.out(' + ePat[i % ePat.length] + ')', immediateRender: false }, at);
+  });
+
+  // 光标：打字期间一直闪；repeat 取奇数 = 最后停在"亮"上
+  const half = .11;
+  let rep = Math.max(3, Math.round((endAt - T0) / half));
+  if (rep % 2 === 0) rep += 1;
+  tl.fromTo(caret, { opacity: 1 },
+    { opacity: 0, duration: half, yoyo: true, repeat: rep, ease: 'none',
+      immediateRender: false }, T0);
+
+  // 最后一个字按重一点：压一下再弹回
+  if (n) {
+    tl.to(glyphs[n - 1], { scaleY: .82, scaleX: 1.1, duration: .09, yoyo: true,
+      repeat: 1, ease: 'power2.inOut' }, endAt + .04);
+    // 整行跟着顿一下
+    tl.fromTo(line, { x: 0 }, {
+      keyframes: [
+        { x: 2, duration: .04, ease: 'none' },
+        { x: -1.8, duration: .04, ease: 'none' },
+        { x: 1.2, duration: .04, ease: 'none' },
+        { x: 0, duration: .04, ease: 'none' }
+      ], immediateRender: false
+    }, endAt + .04);
+  }
+
+  // 下划线从左往右长出来
+  tl.fromTo(rule, { scaleX: 0, opacity: 0 },
+    { scaleX: 1, opacity: 1, duration: .34, ease: 'back.out(2.4)',
+      immediateRender: false }, endAt + .1);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

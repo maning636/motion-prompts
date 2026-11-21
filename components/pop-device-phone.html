@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"title","name":"标题","type":"string","label":"屏内标题","default":"今天拍这条"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"accent2","name":"次强调","type":"color","label":"次强调色","default":"#2EC4B6"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.2}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>手机模型载入</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+
+  /* pop-device-* 需要一层局部软晕把字托起来，不铺满屏 */
+  .p-ph-halo {
+    position: absolute; left: 120px; top: 6px; width: 240px; height: 258px;
+    background: radial-gradient(58% 62% at 50% 50%,
+      rgba(0, 0, 0, .52) 0%, rgba(0, 0, 0, .26) 56%, rgba(0, 0, 0, 0) 86%);
+  }
+  /* 通用圆角矩形机身，不抄任何具体品牌 */
+  .p-ph-body {
+    position: absolute; left: 50%; top: 14px; width: 128px; height: 242px;
+    margin-left: -64px; padding: 6px;
+    background: linear-gradient(160deg, #34343F 0%, #1B1B24 42%, #101017 100%);
+    border-radius: 26px;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(255, 255, 255, .10);
+    will-change: transform, opacity;
+  }
+  .p-ph-screen {
+    position: relative; width: 100%; height: 100%;
+    border-radius: 21px; overflow: hidden;
+    background: linear-gradient(170deg, #26262F 0%, #191921 100%);
+  }
+  /* 顶部灵动岛 */
+  .p-ph-island {
+    position: absolute; z-index: 6; left: 50%; top: 8px;
+    width: 44px; height: 12px; margin-left: -22px;
+    background: #05050A; border-radius: 7px;
+  }
+  /* 底部 home 条 */
+  .p-ph-home {
+    position: absolute; z-index: 6; left: 50%; bottom: 7px;
+    width: 42px; height: 3px; margin-left: -21px;
+    background: rgba(255, 248, 238, .55); border-radius: 2px;
+    transform-origin: 50% 50%;
+  }
+  /* 状态栏：从上缘滑入 */
+  .p-ph-status {
+    position: absolute; z-index: 5; left: 0; right: 0; top: 9px; height: 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 13px; will-change: transform, opacity;
+  }
+  /* 9px 是 D5 的下限。此前写 8px：手机状态栏时间确实是小字，
+     但 480×270 渲出来只有 1920 宽的 1/4，8px 在封面帧上已经糊成一团。 */
+  .p-ph-time { font-size: 9px; line-height: 1; font-weight: 800; letter-spacing: .04em; color: #FFF8EE; }
+  .p-ph-sig { display: flex; align-items: flex-end; gap: 1.5px; }
+  .p-ph-sig i { display: block; width: 2px; background: #FFF8EE; border-radius: 1px; }
+  .p-ph-batt {
+    width: 13px; height: 6px; border: 1px solid #FFF8EE; border-radius: 1.5px;
+    position: relative; padding: 0.5px;
+  }
+  .p-ph-batt::after {
+    content: ""; position: absolute; right: -2.5px; top: 1px;
+    width: 1.5px; height: 4px; background: #FFF8EE; border-radius: 0 1px 1px 0;
+  }
+  .p-ph-batt i { display: block; width: 70%; height: 100%; background: #FFF8EE; border-radius: 1px; }
+
+  /* 屏内内容：一堆抽象色块 + 文字，只占位不模仿任何 App */
+  .p-ph-card {
+    position: absolute; left: 9px; right: 9px; top: 30px; height: 44px;
+    background: rgba(255, 248, 238, .07); border-radius: 9px;
+    will-change: transform, opacity;
+  }
+  .p-ph-thumb {
+    position: absolute; left: 14px; top: 34px; width: 36px; height: 36px;
+    border-radius: 7px; background: var(--ac2, #2EC4B6);
+    will-change: transform, opacity;
+  }
+  .p-ph-l1 {
+    position: absolute; left: 56px; top: 40px; width: 52px; height: 6px;
+    background: var(--ac, #FF6B35); border-radius: 3px;
+    will-change: transform, opacity;
+  }
+  .p-ph-l2 {
+    position: absolute; left: 56px; top: 52px; width: 38px; height: 4px;
+    background: rgba(255, 248, 238, .34); border-radius: 2px;
+    will-change: transform, opacity;
+  }
+  .p-ph-title {
+    position: absolute; left: 0; right: 0; top: 86px; text-align: center;
+    font-size: 15px; line-height: 1.2; font-weight: 800; letter-spacing: .02em;
+    color: #FFF8EE; white-space: nowrap; padding: 0 8px;
+    will-change: transform, opacity;
+  }
+  .p-ph-row {
+    position: absolute; left: 12px; right: 12px; height: 18px;
+    background: rgba(255, 248, 238, .07); border-radius: 5px;
+    will-change: transform, opacity;
+  }
+  .p-ph-row.r1 { top: 114px; }
+  .p-ph-row.r2 { top: 138px; }
+  .p-ph-row.r3 { top: 162px; }
+  .p-ph-row i {
+    position: absolute; left: 5px; top: 5px; width: 8px; height: 8px;
+    border-radius: 2px; background: var(--ac, #FF6B35);
+  }
+  .p-ph-row.r2 i { background: var(--ac2, #2EC4B6); }
+  .p-ph-row.r3 i { background: #FFC93C; }
+  .p-ph-row b {
+    position: absolute; left: 19px; top: 6px; width: 46px; height: 4px;
+    background: rgba(255, 248, 238, .30); border-radius: 2px;
+  }
+  .p-ph-row b::after {
+    content: ""; position: absolute; right: -30px; top: 0;
+    width: 22px; height: 4px; background: rgba(255, 248, 238, .18); border-radius: 2px;
+  }
+  /* 机身落地影 */
+  .p-ph-shadow {
+    position: absolute; left: 50%; bottom: 6px; width: 128px; height: 16px;
+    margin-left: -64px; background: rgba(0, 0, 0, .45);
+    border-radius: 50%; filter: blur(7px);
+    transform-origin: 50% 50%; will-change: transform, opacity;
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"title":"今天拍这条","accent":"#FF6B35","accent2":"#2EC4B6","duration":3.2};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--ac2', v.accent2 || FALLBACK.accent2);
+  const dur = parseFloat(v.duration) || 3.2;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  const title = (v.title == null || v.title === '' ? FALLBACK.title : v.title)
+    .toString().replace(/\s+/g, ' ').trim().slice(0, 10);
+
+  put('div', 'p-ph-halo');
+  const shadow = put('div', 'p-ph-shadow');
+  const body = put('div', 'p-ph-body');
+  const screen = put('div', 'p-ph-screen', null, null, body);
+
+  const status = put('div', 'p-ph-status', null, null, screen);
+  put('div', 'p-ph-time', null, '9:41', status);
+  const sig = put('div', 'p-ph-sig', null, null, status);
+  [3, 5, 7, 9].forEach(function (h) { put('i', null, 'height:' + h + 'px', null, sig); });
+  const batt = put('div', 'p-ph-batt', null, null, status);
+  put('i', null, null, null, batt);
+
+  put('div', 'p-ph-island');
+
+  const card = put('div', 'p-ph-card', null, null, screen);
+  put('div', 'p-ph-thumb', null, null, card);
+  put('div', 'p-ph-l1', null, null, card);
+  put('div', 'p-ph-l2', null, null, card);
+
+  const titleEl = put('div', 'p-ph-title', null, title, screen);
+
+  const rows = [];
+  ['r1', 'r2', 'r3'].forEach(function (c) {
+    const r = put('div', 'p-ph-row ' + c, null, null, screen);
+    put('i', null, null, null, r);
+    put('b', null, null, null, r);
+    rows.push(r);
+  });
+
+  const home = put('div', 'p-ph-home', null, null, screen);
+
+  /* §3.2 中文溢出防护：屏内标题可用宽约 112px */
+  const MAXFS = 15, MINFS = 8, AVAIL = 108;
+  titleEl.style.whiteSpace = 'nowrap';
+  const natural = titleEl.scrollWidth;
+  if (natural > AVAIL && natural > 0) {
+    titleEl.style.fontSize = String(Math.max(MINFS, Math.floor(MAXFS * AVAIL / natural))) + 'px';
+  }
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* ① 机身弹入（back.out 过冲一点） */
+  tl.fromTo(body, { y: 96, scale: .80, opacity: 0 },
+    { y: 0, scale: 1, opacity: 1, duration: .55, ease: 'back.out(1.7)' }, 0);
+  tl.fromTo(shadow, { scaleX: .30, opacity: 0 },
+    { scaleX: 1, opacity: 1, duration: .45, ease: 'power2.out' }, .10);
+
+  /* ② 状态栏从屏幕顶缘滑入 */
+  tl.fromTo(status, { y: -18, opacity: 0 },
+    { y: 0, opacity: 1, duration: .34, ease: 'power3.out' }, .40);
+
+  /* ③ 屏内内容淡入 + 轻微上浮 */
+  const blocks = [card, titleEl].concat(rows);
+  tl.fromTo(blocks, { y: 9, opacity: 0 },
+    { y: 0, opacity: 1, duration: .32, ease: 'back.out(2.2)', stagger: .06 }, .50);
+
+  /* ④ home 条最后补上 */
+  tl.fromTo(home, { scaleX: 0, opacity: 0 },
+    { scaleX: 1, opacity: 1, duration: .34, ease: 'back.out(2.6)' }, .78);
+
+  /* ⑤ 落定后整机轻微呼吸一拍 */
+  const tail = Math.max(1.5, dur - .85);
+  tl.to(body, { y: -3, duration: .34, ease: 'sine.inOut' }, tail);
+  tl.to(body, { y: 0, duration: .38, ease: 'sine.inOut' }, tail + .34);
+  tl.to(shadow, { scaleX: .88, opacity: .7, duration: .36, ease: 'sine.inOut' }, tail);
+  tl.to(shadow, { scaleX: 1, opacity: 1, duration: .36, ease: 'sine.inOut' }, tail + .36);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+    {"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"}]}
+  ]'>
+<head><meta charset="utf-8"><title>计数器·皮影档案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+// §F-proxy-wrap v5: auto-register gsap.timeline into __timelines[compositionId] and .main
+(function(){
+  if(!window.gsap || window.gsap.__hooked) return;
+  var g = window.gsap;
+  var orig = g.timeline;
+  g.timeline = function(){
+    var tl = orig.apply(g, arguments);
+    try { tl.pause(); } catch(e){}
+    try { window.__timelines = window.__timelines || {}; } catch(e){}
+    try { window.__timelines.main = tl; } catch(e){}
+    try {
+      var root = document.getElementById('composition') || document.getElementById('stage');
+      if (root) {
+        var cid = root.getAttribute('data-composition-id');
+        if (cid && cid !== 'main') window.__timelines[cid] = tl;
+      }
+    } catch(e){}
+    return tl;
+  };
+  g.__hooked = true;
+})();
+</script>
+<style>:root{--bg:#faf6ed;--ink:#1c1712;--red:#b91c1c;--muted:#8a7e6e;--grid:rgba(28,23,18,.08);--paper:#f5ecd8}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);color:var(--ink);font-family:"Source Han Serif SC","Noto Serif SC","SimSun","Songti SC",serif;-webkit-font-smoothing:antialiased}
+.composition{position:relative;width:1920px;height:1080px;overflow:hidden;background:var(--bg)}
+.composition::before{content:"";position:absolute;inset:0;background:
+  radial-gradient(ellipse at 12% 18%, rgba(185,28,28,.05), transparent 40%),
+  radial-gradient(ellipse at 88% 82%, rgba(185,28,28,.04), transparent 45%),
+  linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(245,236,216,.35) 100%);pointer-events:none}
+.composition::after{content:"";position:absolute;inset:0;background-image:radial-gradient(rgba(28,23,18,.12) 1px, transparent 1.5px);background-size:5px 5px;opacity:.35;pointer-events:none;mix-blend-mode:multiply}
+.layer{position:absolute;inset:0}
+.paper{position:absolute;inset:80px 100px 160px 100px;background:var(--paper);border:1px solid var(--ink);box-shadow:0 2px 0 rgba(28,23,18,.05), 0 24px 48px rgba(28,23,18,.10);overflow:hidden}
+.paper::before{content:"";position:absolute;inset:12px;border:1px solid rgba(28,23,18,.25);pointer-events:none}
+.corner-orn{position:absolute;width:64px;height:64px}
+.corner-orn.tl{top:32px;left:32px}
+.corner-orn.tr{top:32px;right:32px;transform:scaleX(-1)}
+.corner-orn.bl{bottom:44px;left:32px;transform:scaleY(-1)}
+.corner-orn.br{bottom:44px;right:32px;transform:scale(-1,-1)}
+.footer{position:absolute;bottom:32px;left:100px;right:100px;height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-family:"IBM Plex Mono","Courier New",monospace;font-size:13px;color:var(--muted);letter-spacing:.15em;border-top:1px solid var(--ink);border-bottom:1px solid var(--ink)}
+.footer .film{flex:1;margin:0 24px;height:20px;background:repeating-linear-gradient(90deg, var(--ink) 0 4px, transparent 4px 20px);opacity:.4}
+.stamp{position:absolute;width:120px;height:120px;border:2px solid var(--red);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:"Source Han Serif SC","SimSun",serif;font-size:14px;color:var(--red);letter-spacing:.15em;transform:rotate(-14deg);opacity:0}
+.eyebrow{font-family:"IBM Plex Mono","Courier New",monospace;font-size:14px;color:var(--muted);letter-spacing:.25em}
+.divider{height:1px;background:var(--ink);opacity:.6}
+.divider-thin{height:1px;background:var(--red);opacity:.9}</style></head>
+<body>
+<div id="composition" class="composition" data-composition-id="docu-stat-counter" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+<div class="layer layer-bg"></div>
+<div class="layer layer-paper">
+  <div class="paper">
+    <svg class="corner-orn tl" viewBox="0 0 64 64"><path d="M2 32 V2 H32" stroke="#b91c1c" stroke-width="2" fill="none"/><path d="M8 32 V8 H32" stroke="#1c1712" stroke-width="1" fill="none" opacity=".6"/></svg>
+    <svg class="corner-orn tr" viewBox="0 0 64 64"><path d="M2 32 V2 H32" stroke="#b91c1c" stroke-width="2" fill="none"/><path d="M8 32 V8 H32" stroke="#1c1712" stroke-width="1" fill="none" opacity=".6"/></svg>
+    <svg class="corner-orn bl" viewBox="0 0 64 64"><path d="M2 32 V2 H32" stroke="#b91c1c" stroke-width="2" fill="none"/><path d="M8 32 V8 H32" stroke="#1c1712" stroke-width="1" fill="none" opacity=".6"/></svg>
+    <svg class="corner-orn br" viewBox="0 0 64 64"><path d="M2 32 V2 H32" stroke="#b91c1c" stroke-width="2" fill="none"/><path d="M8 32 V8 H32" stroke="#1c1712" stroke-width="1" fill="none" opacity=".6"/></svg>
+    
+<div style="position:absolute;top:70px;left:80px;right:80px;display:flex;align-items:center;justify-content:space-between">
+  <div class="eyebrow">// PROGRESS · 1992 — 2026  ·  COUNTER</div>
+  <div class="eyebrow" style="text-align:right">78% COMPLETED</div>
+</div>
+<div class="divider-thin" style="position:absolute;top:110px;left:80px;right:80px"></div>
+<div style="position:absolute;top:200px;left:120px;right:120px;font-size:52px;font-weight:700;letter-spacing:.15em;text-align:center">整 体 完 成 率</div>
+
+<div style="position:absolute;top:380px;left:120px;right:120px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:40px;align-items:center">
+  <div style="text-align:center;opacity:0" id="gauge1">
+    <svg viewBox="0 0 200 110" width="260" height="140">
+      <path d="M20 100 A80 80 0 0 1 180 100" stroke="rgba(28,23,18,.15)" stroke-width="14" fill="none" stroke-linecap="round"/>
+      <path id="g1arc" d="M20 100 A80 80 0 0 1 180 100" stroke="var(--ink)" stroke-width="14" fill="none" stroke-linecap="round" stroke-dasharray="252" stroke-dashoffset="252"/>
+    </svg>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--muted);margin-top:-30px">SAMPLED</div>
+    <div id="g1num" style="font-size:48px;font-weight:900;color:var(--ink);margin-top:6px">0</div>
+    <div style="font-size:14px;color:var(--muted);font-family:'IBM Plex Mono',monospace">份  ·  SAMPLES</div>
+  </div>
+
+  <div style="text-align:center">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);letter-spacing:.2em">OVERALL</div>
+    <div id="bigPct" style="font-size:180px;line-height:1;font-weight:900;color:var(--red);letter-spacing:-.03em">0%</div>
+    <div id="pctBar" style="width:0;height:6px;background:var(--red);margin:12px auto 0"></div>
+    <div style="font-size:20px;margin-top:24px;color:var(--ink);max-width:400px;margin-left:auto;margin-right:auto;line-height:1.5">1992 年 启 动 至 今 已 完 成 <span style="color:var(--red);font-weight:700">78%</span></div>
+  </div>
+
+  <div style="text-align:center;opacity:0" id="gauge2">
+    <svg viewBox="0 0 200 110" width="260" height="140">
+      <path d="M20 100 A80 80 0 0 1 180 100" stroke="rgba(28,23,18,.15)" stroke-width="14" fill="none" stroke-linecap="round"/>
+      <path id="g2arc" d="M20 100 A80 80 0 0 1 180 100" stroke="var(--red)" stroke-width="14" fill="none" stroke-linecap="round" stroke-dasharray="252" stroke-dashoffset="252"/>
+    </svg>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--muted);margin-top:-30px">ARCHIVED</div>
+    <div id="g2num" style="font-size:48px;font-weight:900;color:var(--red);margin-top:6px">0</div>
+    <div style="font-size:14px;color:var(--muted);font-family:'IBM Plex Mono',monospace">卷  ·  VOLUMES</div>
+  </div>
+</div>
+
+<div style="position:absolute;bottom:60px;left:120px;right:120px;display:flex;justify-content:space-between;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--muted)">
+  <span>// 2 GAGES  ·  1 COUNTER</span><span>34 YEARS · 78% COMPLETED</span>
+</div>
+
+  </div>
+</div>
+<div class="layer layer-stamp">
+  <div class="stamp">皮 影 档 案</div>
+</div>
+<div class="layer layer-footer">
+  <div class="footer">
+    <span>·  · TALKING STUDIO · DOCU-STAT B07-B12  ·  ·</span>
+    <div class="film"></div>
+    <span>01/18  ·  1920×1080  ·  6.0s  ·  30fps</span>
+  </div>
+</div>
+<div class="layer layer-vignette"></div>
+<div class="layer layer-grain"></div>
+<div class="layer layer-meta"></div>
+</div>
+<script>
+const fallback = { duration: 6, exportMode: "mp4" };
+const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+const DUR = Number(v.duration) || 6;
+const t = gsap.timeline();
+t.from('.layer-bg', {duration:0.4, opacity:0})
+ .from('.corner-orn', {duration:0.6, opacity:0, scale:0.8, stagger:0.08}, 0.15)
+ .from('.layer-paper .paper', {duration:0.7, opacity:0, scale:1.02}, 0.1)
+ .from('.layer-footer', {duration:0.5, opacity:0, y:20}, 0.6);
+t.add('entrance', 0);
+t.add('hold', DUR * 0.65);
+t.add('exit', DUR * 0.85);
+t.to('#gauge1,#gauge2', {duration:0.5, opacity:1}, 'entrance+=0.2')
+ .to('#g1arc', {duration:1.6, strokeDashoffset: 63, ease:'power2.inOut'}, 'entrance+=0.4')
+ .to('#g2arc', {duration:1.6, strokeDashoffset: 55, ease:'power2.inOut'}, 'entrance+=0.6')
+ .from('#bigPct', {duration:1.4, opacity:0, scale:0.9, ease:'power2.out'}, 'entrance+=0.3')
+ .to('#pctBar', {duration:1.4, width:260, ease:'power2.out'}, 'entrance+=1.0');
+gsap.to('#g1num', {duration:1.6, textContent:1260, snap:{textContent:1}, ease:'power2.out'}, 'entrance+=0.4');
+gsap.to('#g2num', {duration:1.6, textContent:420, snap:{textContent:1}, ease:'power2.out'}, 'entrance+=0.6');
+gsap.to('#bigPct', {duration:1.6, textContent:78, ease:'power2.out',
+  onUpdate:function(){this.targets()[0].textContent=Math.round(Number(this.targets()[0].textContent||0))+'%';}}, 'entrance+=0.3');
+t.from('.layer-stamp', {duration:0.5, opacity:0, scale:1.6, rotate:-45}, 'entrance+=1.8');
+t.from('.layer-vignette', {duration:1.4, opacity:0}, 'hold+=0.2')
+ .to(['.layer-paper','.layer-footer'], {duration:0.35, opacity:0, scale:0.98}, 'exit')
+ .to('.layer-stamp', {duration:0.4, opacity:0, rotate:-30}, 'exit+=0.05');
+</script>
+</body></html>

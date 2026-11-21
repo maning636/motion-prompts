@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="zh-CN" data-audit-offcanvas="马赛克反向散开时格子飞出画布，是「合并→散开」的收尾动作" data-composition-variables='[{"id":"text","name":"文案","type":"string","label":"主文案","default":"放大看细节"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"accent2","name":"次强调色","type":"color","label":"次强调色","default":"#FFC93C"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":2.8}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>马赛克推进</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-tint { position: absolute; inset: 0; background: rgba(12, 12, 18, .42); }
+  .p-halo { position: absolute; inset: 0; z-index: 3;
+    background: radial-gradient(70% 80% at 50% 50%, rgba(0,0,0,.46) 0%, rgba(0,0,0,.24) 54%, rgba(0,0,0,0) 84%); }
+  .p-cell { position: absolute; left: 0; top: 0; opacity: 0; will-change: transform, opacity;
+    transform-origin: 50% 50%; }
+  .p-wordrow { position: absolute; left: 0; right: 0; top: 104px; z-index: 4; display: flex; justify-content: center; }
+  .p-word { display: inline-block; white-space: nowrap; font-size: 46px; font-weight: 900;
+    line-height: 1.08; color: var(--fg); -webkit-text-stroke: 3px var(--ink);
+    text-shadow: 5px 5px 0 rgba(0,0,0,.9); }
+  .p-bot { position: absolute; left: 50%; top: 176px; z-index: 4; margin-left: -18px; width: 36px; height: 33px;
+    background: var(--ac2); border: 3px solid var(--ink); border-radius: 6px 6px 3px 3px; }
+  .p-bot::before, .p-bot::after { content: ''; position: absolute; top: 7px; width: 6px; height: 8px;
+    background: var(--ink); border-radius: 50%; }
+  .p-bot::before { left: 6px; }
+  .p-bot::after { right: 6px; }
+  .p-bot i { position: absolute; left: 8px; bottom: 4px; width: 20px; height: 9px;
+    border-bottom: 3px solid var(--ink); border-radius: 0 0 12px 12px; }
+  .p-gridline { position: absolute; inset: 0; z-index: 2; opacity: 0; pointer-events: none;
+    background: repeating-linear-gradient(90deg, rgba(0,0,0,.28) 0px, rgba(0,0,0,.28) 1px, rgba(0,0,0,0) 1px, rgba(0,0,0,0) 32px),
+                repeating-linear-gradient(180deg, rgba(0,0,0,.28) 0px, rgba(0,0,0,.28) 1px, rgba(0,0,0,0) 1px, rgba(0,0,0,0) 30px); }
+  /* 散开之后的留白段不能是一张死帧：给标题垫一圈随时间缓慢呼吸的光晕 */
+  .p-hold { position: absolute; left: 50%; top: 130px; z-index: 2; width: 320px; height: 190px;
+    margin: -95px 0 0 -160px; border-radius: 50%; opacity: 0; pointer-events: none;
+    background: radial-gradient(50% 50% at 50% 50%, rgba(255,201,60,.42) 0%, rgba(255,107,53,.16) 46%, rgba(255,107,53,0) 74%); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"放大看细节","accent":"#FF6B35","accent2":"#FFC93C","duration":2.8};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  const dur = parseFloat(v.duration) || 2.8;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--ac2', v.accent2 || FALLBACK.accent2);
+  root.style.setProperty('--fg', '#FFF8EE');
+  root.style.setProperty('--ink', '#1B1B24');
+  const text = String(v.text == null ? FALLBACK.text : v.text);
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, tx, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (tx != null) el.textContent = tx;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  put('div', 'p-tint');
+
+  /* 15 × 9 = 135 格，正好铺满 480 × 270（每格 32 × 30）。
+     格子颜色由格子的中心坐标推出，形成一张连续色场——放大合并之后
+     是一整片渐变，而不是一堆互相打架的色块。 */
+  const COLS = 15, ROWS = 9, CW = 32, CH = 30;
+  const cells = [];
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const x = c * CW, y = r * CH;
+      const nx = ((x + CW / 2) - 240) / 240;
+      const ny = ((y + CH / 2) - 135) / 135;
+      const ring = Math.max(Math.abs(nx), Math.abs(ny));           /* 0 中心 → 1 外圈 */
+      const hue = 14 + 52 * (0.5 + 0.5 * nx) + 22 * ny;
+      const lum = 44 + 10 * ((r + c) % 2) + 7 * (0.5 + 0.5 * ny);
+      const el = put('div', 'p-cell',
+        'left:' + x + 'px;top:' + y + 'px;width:' + CW + 'px;height:' + CH + 'px;' +
+        'background:hsl(' + hue.toFixed(1) + ', 88%, ' + lum.toFixed(1) + '%);');
+      cells.push({ el: el, ring: ring, nx: nx, ny: ny, ox: x + CW / 2 - 240, oy: y + CH / 2 - 135 });
+    }
+  }
+  const gridline = put('div', 'p-gridline');
+
+  const row = put('div', 'p-wordrow');
+  const hold = put('div', 'p-hold');
+  const word = put('div', 'p-word', '', text, row);
+  const bot = put('div', 'p-bot');
+  put('i', '', '', null, bot);
+  put('div', 'p-halo');
+
+  function fitText(el, maxPx, avail, minPx) {
+    el.style.fontSize = maxPx + 'px';
+    el.style.whiteSpace = 'nowrap';
+    const natural = el.scrollWidth;
+    if (natural > avail && natural > 0) {
+      el.style.fontSize = Math.max(minPx, Math.floor(maxPx * avail / natural)) + 'px';
+    }
+  }
+  fitText(word, 46, 400, 18);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+  tl.fromTo(word, { scale: .2, opacity: 0, y: 16 },
+    { scale: 1, opacity: 1, y: 0, duration: .42, ease: 'back.out(2.4)' }, .5);
+  tl.fromTo(bot, { scale: .2, opacity: 0 },
+    { scale: 1, opacity: 1, duration: .36, ease: 'back.out(3)' }, .62);
+
+  /* 三段式：逐级放大合并 → 合成停留 → 反向散开。
+     每一格的每一帧状态都是 (t) 的纯函数：没有随机、没有累加，
+     所以时间轴来回扫多少遍，这 135 格的画面完全一致。 */
+  const IN0 = .04, IN_STEP = .30, IN_RING = .34;
+  const OUT0 = .92, OUT_STEP = .42, OUT_RING = .36;
+  const back = (x) => { const c1 = 1.70158, c3 = c1 + 1, k = x - 1; return 1 + c3 * k * k * k + c1 * k * k; };
+
+  const P = { t: 0 };
+  const paint = (t) => {
+    let gridO = 0;
+    for (let i = 0; i < cells.length; i++) {
+      const c = cells[i];
+      const uIn = Math.max(0, Math.min(1, (t - IN0 - c.ring * IN_RING) / IN_STEP));
+      const sIn = uIn <= 0 ? .06 : back(uIn);
+      const uOut = Math.max(0, Math.min(1, (t - OUT0 - (1 - c.ring) * OUT_RING) / OUT_STEP));
+      const eOut = 1 - Math.pow(1 - uOut, 2);
+      const scale = sIn * (1 - eOut * .92);
+      const dx = c.nx * 250 * eOut;
+      const dy = c.ny * 190 * eOut;
+      const o = Math.min(1, uIn * 1.2) * (1 - uOut) * .88;
+      c.el.style.transform = 'translate3d(' + (c.ox * (1 - sIn) + dx).toFixed(2) + 'px,' +
+        (c.oy * (1 - sIn) + dy).toFixed(2) + 'px,0) scale(' + scale.toFixed(3) + ')';
+      c.el.style.opacity = o.toFixed(3);
+      if (uOut > 0 && uOut < 1) gridO = Math.max(gridO, 1 - eOut);
+    }
+    gridline.style.opacity = (gridO * .7).toFixed(3);
+    /* 收尾留白段的光晕呼吸（正弦，t 的纯函数） */
+    const hu = Math.max(0, Math.min(1, (t - .95) / .35));
+    const breath = hu * (0.62 + 0.38 * (0.5 + 0.5 * Math.sin((t - .95) * 2.2)));
+    hold.style.opacity = breath.toFixed(3);
+    hold.style.transform = 'scale(' + (0.92 + 0.14 * (0.5 + 0.5 * Math.sin((t - .95) * 2.2))).toFixed(3) + ')';
+  };
+  tl.fromTo(P, { t: 0 }, {
+    t: dur, duration: dur, ease: 'none',
+    onUpdate() { paint(P.t); }
+  }, 0);
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+  paint(0);
+})();
+</script>
+</body>
+</html>

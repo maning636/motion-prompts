@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"title","type":"string","label":"图表标题","default":"用户构成占比"},
+  {"id":"subtitle","type":"string","label":"副标题","default":"按来源渠道拆解的 100 个样本单元"},
+  {"id":"rows","type":"number","label":"行数（4–10）","default":10},
+  {"id":"cols","type":"number","label":"列数（4–10）","default":10},
+  {"id":"categories","type":"string","label":"分组（换行分隔，每行：名称,颜色,百分比）","default":"自然搜索,#00FF00,32\n付费投放,#7CFFC4,24\n社交裂变,#9CA3AF,18\n私域回流,#6B6B66,14\n其他来源,#4A4A48,12"},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+      }
+
+      /* ---- 头部 ---- */
+      .eyebrow{
+        position:absolute; top:64px; left:96px; right:96px;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:18px; letter-spacing:.22em; text-transform:uppercase;
+        color:#8A8A85;
+      }
+      .eyebrow .acc{ color:var(--accent,#00FF00); font-weight:700; letter-spacing:.18em; }
+
+      .head{
+        position:absolute; left:96px; right:96px; top:118px;
+        display:flex; align-items:flex-end; justify-content:space-between;
+      }
+      .head .title{
+        margin:0;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight:700; letter-spacing:-.02em;
+        font-size:64px; line-height:1.05;
+        color:var(--foreground,#F4EFE7);
+      }
+      .head .subtitle{
+        margin:0;
+        font-size:22px; letter-spacing:.02em;
+        color:#9CA3AF;
+        max-width: 720px;
+      }
+      .head .total{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:24px; letter-spacing:.12em;
+        color:#8A8A85; text-transform:uppercase;
+      }
+      .head .total b{
+        display:block; margin-top:6px;
+        font-size:54px; font-weight:700; letter-spacing:-.02em;
+        color:var(--foreground,#F4EFE7);
+      }
+
+      /* ---- 网格阵 ---- */
+      .grid{
+        position:absolute;
+        left:96px; right:520px; top:300px; bottom:140px;
+        display:grid;
+        gap:10px;
+        opacity:0;
+      }
+      .cell{
+        border-radius:6px;
+        background:#1F1E1B;
+        opacity:0;
+        transform: scale(.6);
+        transform-origin:center;
+      }
+      .cell.on{
+        opacity:1; transform: scale(1);
+        box-shadow: 0 0 14px color-mix(in srgb, var(--cell-color, var(--accent,#00FF00)) 28%, transparent);
+      }
+
+      /* ---- 右侧 legend ---- */
+      .legend{
+        position:absolute; right:96px; top:300px; bottom:140px; width:380px;
+        display:flex; flex-direction:column; justify-content:center; gap:18px;
+      }
+      .legend-row{
+        display:flex; align-items:center; gap:14px;
+        padding:14px 18px;
+        border:1px solid #2A2A2E;
+        border-radius:12px;
+        background: color-mix(in srgb, var(--foreground,#F4EFE7) 4%, transparent);
+        opacity:0; transform: translateX(20px);
+      }
+      .legend-swatch{
+        width:14px; height:14px; border-radius:4px; flex:none;
+        background:var(--row-color, var(--accent,#00FF00));
+        box-shadow: 0 0 8px color-mix(in srgb, var(--row-color, var(--accent,#00FF00)) 55%, transparent);
+      }
+      .legend-name{
+        flex:1;
+        font-size:22px; letter-spacing:.02em;
+        color:var(--foreground,#F4EFE7);
+      }
+      .legend-pct{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:30px; font-weight:700; letter-spacing:-.02em;
+        color:var(--row-color, var(--accent,#00FF00));
+        min-width:78px; text-align:right;
+      }
+      .legend-pct small{
+        font-size:14px; font-weight:500;
+        color:#8A8A85; margin-left:2px;
+      }
+
+      /* ---- 脚注 ---- */
+      .footnote{
+        position:absolute; left:96px; right:96px; bottom:56px;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:16px; letter-spacing:.16em; text-transform:uppercase;
+        color:#6B6B66;
+      }
+      .footnote b{ color:var(--accent,#00FF00); font-weight:700; letter-spacing:.18em; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+
+        <div class="eyebrow">
+          <span><b class="acc">PROP</b>&nbsp;&nbsp;UNIT&nbsp;GRID</span>
+          <span>构成比例 · 点亮</span>
+        </div>
+
+        <div class="head">
+          <div>
+            <h1 id="title" class="title">用户构成占比</h1>
+            <p id="subtitle" class="subtitle">按来源渠道拆解的 100 个样本单元</p>
+          </div>
+          <div class="total">样本单元<b id="totalN">100</b></div>
+        </div>
+
+        <div id="grid" class="grid"></div>
+
+        <div id="legend" class="legend"></div>
+
+        <div class="footnote">
+          <span>每格 = 1 / <b id="fnPct">1%</b></span>
+          <span id="fnCat">5 类</span>
+          <span>合计 <b id="fnSum">100</b></span>
+        </div>
+
+      </section>
+    </div>
+    <script>
+      /* ===== 变量接线 ===== */
+      const fallback = {
+        title: "用户构成占比",
+        subtitle: "按来源渠道拆解的 100 个样本单元",
+        rows: 10,
+        cols: 10,
+        categories: "自然搜索,#00FF00,32\n付费投放,#7CFFC4,24\n社交裂变,#9CA3AF,18\n私域回流,#6B6B66,14\n其他来源,#4A4A48,12",
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const $ = (id) => document.getElementById(id);
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      /* ===== 解析 categories ===== */
+      const parseCats = (raw) => {
+        const lines = String(raw ?? "").split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        const out = [];
+        for (const line of lines) {
+          const parts = line.split(",").map(s => s.trim());
+          const name = parts[0] || "未命名";
+          const color = parts[1] || "#00FF00";
+          const pct = Math.max(0, Math.min(100, Number(parts[2]) || 0));
+          out.push({ name, color, pct });
+        }
+        return out;
+      };
+      const cats = parseCats(v.categories || fallback.categories);
+
+      /* ===== 内容回填 ===== */
+      $("title").textContent = v.title || fallback.title;
+      $("subtitle").textContent = v.subtitle || fallback.subtitle;
+
+      const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+      const ROWS = clamp(Math.round(Number(v.rows) || 10), 4, 10);
+      const COLS = clamp(Math.round(Number(v.cols) || 10), 4, 10);
+      const TOTAL = ROWS * COLS;
+
+      // 把百分比按比例折算成实际单元格数（按 rows*cols 四舍五入，补差保证 sum=TOTAL）
+      const rawUnits = cats.map(c => (c.pct / 100) * TOTAL);
+      const floored = rawUnits.map(Math.floor);
+      let used = floored.reduce((a, b) => a + b, 0);
+      const remainders = rawUnits.map((u, i) => ({ i, r: u - Math.floor(u) }))
+                                 .sort((a, b) => b.r - a.r);
+      for (let k = 0; used < TOTAL && k < remainders.length * 100; k++) {
+        const idx = remainders[k % remainders.length].i;
+        floored[idx] += 1;
+        used += 1;
+      }
+      cats.forEach((c, i) => c.units = floored[i] || 0);
+
+      /* ===== 构建网格 ===== */
+      const grid = $("grid");
+      grid.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`;
+      grid.style.gridTemplateRows = `repeat(${ROWS}, 1fr)`;
+
+      const cells = [];
+      let idx = 0;
+      for (let catI = 0; catI < cats.length; catI++) {
+        const cat = cats[catI];
+        for (let n = 0; n < cat.units; n++) {
+          const cell = document.createElement("div");
+          cell.className = "cell";
+          cell.dataset.idx = String(idx);
+          cell.style.setProperty("--cell-color", cat.color);
+          cell.style.background = cat.color;
+          grid.appendChild(cell);
+          cells.push({ el: cell, order: idx, color: cat.color });
+          idx += 1;
+        }
+      }
+      // 剩余灰格（若 cats 合计 < TOTAL）
+      while (idx < TOTAL) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        cell.dataset.idx = String(idx);
+        cell.style.background = "#1F1E1B";
+        cell.style.boxShadow = "none";
+        grid.appendChild(cell);
+        cells.push({ el: cell, order: idx, color: null });
+        idx += 1;
+      }
+
+      /* ===== 构建 legend ===== */
+      const legend = $("legend");
+      legend.innerHTML = "";
+      const legendRows = [];
+      cats.forEach((cat, i) => {
+        const row = document.createElement("div");
+        row.className = "legend-row";
+        row.style.setProperty("--row-color", cat.color);
+        row.innerHTML = `
+          <span class="legend-swatch"></span>
+          <span class="legend-name"></span>
+          <span class="legend-pct"><span class="pct-num">0</span><small>%</small></span>
+        `;
+        row.querySelector(".legend-name").textContent = cat.name;
+        legend.appendChild(row);
+        legendRows.push({ el: row, pctEl: row.querySelector(".pct-num"), target: cat.pct, color: cat.color });
+      });
+
+      /* ===== 脚注 ===== */
+      $("fnPct").textContent = `${(100 / TOTAL).toFixed(2).replace(/\.?0+$/, "") || "1"}%`;
+      $("fnCat").textContent = `${cats.length} 类`;
+      $("fnSum").textContent = String(TOTAL);
+      $("totalN").textContent = String(TOTAL);
+
+      /* ===== 时间线 ===== */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+      const tl = gsap.timeline({ paused: true });
+
+      // 入场：eyebrow / 标题 / 副标题
+      tl.fromTo("#scene .eyebrow", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 0.05);
+      tl.fromTo(".head .title",     { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 0.18);
+      tl.fromTo(".head .subtitle",  { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.32);
+      tl.fromTo(".head .total",     { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.42);
+
+      // 网格整体淡入
+      tl.fromTo("#grid", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 0.55);
+
+      // 单元格按 idx 顺序依次点亮（power2.out，stagger≈0.015s，100格约 1.5s）
+      const cellEls = cells.map(c => c.el);
+      tl.to(cellEls, {
+        opacity: 1,
+        scale: 1,
+        duration: 0.32,
+        ease: "power2.out",
+        stagger: { each: 0.014, from: "start" },
+      }, 0.7);
+
+      // legend 行错峰入场 + 数字滚动
+      const totalCells = cells.length;
+      const lightStart = 0.7;
+      const lightStagger = 0.014;
+      const lightDur = 0.32;
+      const lightEnd = lightStart + lightStagger * (totalCells - 1) + lightDur; // ≈ 2.42
+
+      tl.to(".legend-row", {
+        opacity: 1, x: 0, duration: 0.4, ease: "power2.out", stagger: 0.1
+      }, lightEnd);
+
+      // 百分比数字滚动（每个 legend 数字 count up）
+      // 关键：用全局 onUpdate 每帧计算数字，这样 pause/seek 时 GSAP 也会同步刷新，
+      // 避免 Playwright pause(5.5) 一次性 seek 不到位导致截图数字卡在 0。
+      const countStartBase = lightEnd + 0.1;
+      const countStep = 0.08;
+      const countDur = 0.9;
+      legendRows.forEach((row, i) => {
+        const startAt = countStartBase + i * countStep;
+        const o = { n: 0 };
+        tl.to(o, {
+          n: row.target,
+          duration: countDur,
+          ease: "power2.out",
+          onUpdate: () => { row.pctEl.textContent = String(Math.round(o.n)); },
+          onComplete: () => { row.pctEl.textContent = String(Math.round(row.target)); },
+        }, startAt);
+      });
+      // 全局派生 UI 同步：每次 timeline 更新（包括 seek）都按当前 t 重算 legend pct
+      tl.eventCallback("onUpdate", () => {
+        const t = tl.time();
+        for (let i = 0; i < legendRows.length; i++) {
+          const row = legendRows[i];
+          const startAt = countStartBase + i * countStep;
+          if (t <= startAt) {
+            row.pctEl.textContent = "0";
+          } else if (t >= startAt + countDur) {
+            row.pctEl.textContent = String(Math.round(row.target));
+          } else {
+            const p = 1 - Math.pow(1 - (t - startAt) / countDur, 3); // power3.out mirror ≈ power2.out
+            row.pctEl.textContent = String(Math.round(row.target * p));
+          }
+        }
+      });
+
+      // 结尾停留 ~1s：单元格呼吸 + 第一个 legend 行轻微发光
+      tl.to(cellEls, {
+        scale: 1.04,
+        duration: 1.2,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+        stagger: { each: 0.004, from: "start" },
+      }, DUR - 1.6);
+
+      tl.fromTo(legendRows[0]?.el, { boxShadow: "0 0 0 0 rgba(0,0,0,0)" }, { boxShadow: "0 0 0 0 rgba(0,0,0,0)", duration: 0.001 }, DUR - 0.6);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

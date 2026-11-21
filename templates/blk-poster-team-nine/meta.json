@@ -1,0 +1,16 @@
+{
+ "name": "数据海报 · 九个位子，九种脾气",
+ "description": "左边一个巨数压住三分之二，右边一列事实条，信息量最密的一版",
+ "category": "信息卡片",
+ "tags": [
+  "积木社",
+  "poster",
+  "night",
+  "snappy"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "card",
+ "when": "数据卡片 / 数据海报"
+}

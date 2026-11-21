@@ -1,0 +1,7 @@
+{
+  "title": "RAG 检索流水线",
+  "steps": "Query,Retrieve,Rank,Prompt,Generate",
+  "latencies": "80,220,150,90,1200",
+  "highlightStart": 3,
+  "highlightEnd": 4
+}

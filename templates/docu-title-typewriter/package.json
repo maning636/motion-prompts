@@ -1,0 +1,10 @@
+﻿{
+  "name": "docu-title-typewriter",
+  "version": "1.0.0",
+  "description": "皮影档案族 docu-title-* 子族模板",
+  "main": "index.html",
+  "hyperframes": "0.7.109",
+  "scripts": { "render": "node ../../scripts/render.mjs" },
+  "author": "maning",
+  "license": "UNLICENSED"
+}

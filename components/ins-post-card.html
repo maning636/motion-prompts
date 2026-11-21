@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"nickname","type":"string","label":"昵称（@账号）","default":"yelaoshan.hike"},{"id":"displayName","type":"string","label":"显示名","default":"叶老山"},{"id":"likeCount","type":"string","label":"点赞数","default":"4,217"},{"id":"commentCount","type":"string","label":"评论数","default":"186"},{"id":"cardCount","type":"number","label":"轮播卡片数（1-3）","default":"3"},{"id":"accentColor","type":"color","label":"强调色（点赞/巡游光）","default":"#39FF85"},{"id":"cardBg","type":"color","label":"图片位主色","default":"#1A2433"},{"id":"cardBg2","type":"color","label":"图片位辅色","default":"#0E1A22"},{"id":"location","type":"string","label":"定位文本","default":"香格里拉 · 海拔 3300m"},{"id":"timeText","type":"string","label":"时间戳","default":"2 HOURS AGO"},{"id":"slideDirection","type":"enum","label":"滑入方向","options":[{"label":"从右滑入","value":"right"},{"label":"从左滑入","value":"left"}],"default":"right"}]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=480, height=270" />
+    <style>
+      @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MiSans Mono','Sarasa Mono SC','Consolas','Microsoft YaHei Mono','Noto Sans Mono',monospace;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body {
+        width: 480px; height: 270px; overflow: hidden;
+        background: transparent;
+        font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+      }
+      /* ==== 舞台深底（族⑥玻璃拟态：暗底托玻璃）==== */
+      #stage {
+        position: absolute; inset: 0;
+        background:
+          radial-gradient(ellipse 70% 60% at 28% 36%, rgba(57,255,133,0.08) 0%, transparent 60%),
+          radial-gradient(ellipse 60% 50% at 78% 72%, rgba(168,85,247,0.07) 0%, transparent 60%),
+          linear-gradient(135deg, #0B0F0E 0%, #131A22 55%, #0E1418 100%);
+        overflow: hidden;
+      }
+      /* 微噪点材质（同歌词卡口径）*/
+      #stage::before {
+        content: ""; position: absolute; inset: 0;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='5'/><feColorMatrix values='0 0 0 0 0.22 0 0 0 0 1 0 0 0 0 0.52 0 0 0 0.12 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+        opacity: 0.45;
+        mix-blend-mode: screen;
+        pointer-events: none;
+      }
+      /* ==== 主玻璃卡（族⑥招牌 blur + slab）==== */
+      .glass {
+        position: absolute;
+        width: 256px;
+        height: 240px;
+        left: 24px; top: 14px;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.10);
+        box-shadow:
+          0 18px 40px -12px rgba(0,0,0,0.55),
+          0 2px 8px rgba(0,0,0,0.35),
+          inset 0 1px 0 rgba(255,255,255,0.22),
+          inset 0 -1px 0 rgba(255,255,255,0.04);
+        backdrop-filter: blur(18px) saturate(140%);
+        -webkit-backdrop-filter: blur(18px) saturate(140%);
+        overflow: hidden;
+        will-change: transform;
+      }
+      /* 边缘巡游光（族⑥招牌） */
+      .glass .border-tour {
+        position: absolute; inset: -1px;
+        border-radius: 18px;
+        padding: 1px;
+        background: conic-gradient(
+          from var(--tour-angle, 0deg),
+          transparent 0%,
+          var(--ac, #39FF85) 18%,
+          #6EE7F9 30%,
+          #B985FF 42%,
+          transparent 56%,
+          transparent 100%
+        );
+        -webkit-mask:
+          linear-gradient(#000 0 0) content-box,
+          linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor;
+                mask-composite: exclude;
+        opacity: 0;
+        pointer-events: none;
+        filter: blur(0.4px);
+      }
+      /* 高光边（顶部反光） */
+      .glass .hi {
+        position: absolute;
+        top: 0; left: 16px; right: 16px;
+        height: 1px;
+        background: linear-gradient(to right,
+          transparent,
+          rgba(255,255,255,0.42) 30%,
+          rgba(255,255,255,0.6) 50%,
+          rgba(255,255,255,0.42) 70%,
+          transparent);
+        opacity: 0.55;
+      }
+
+      /* ==== 顶部栏：头像 + 昵称 + 定位 + 时间 ==== */
+      .top-bar {
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 56px;
+        padding: 10px 14px 0 14px;
+        display: flex; flex-direction: column;
+        gap: 4px;
+        z-index: 5;
+      }
+      .row1 { display: flex; align-items: center; gap: 8px; }
+      .avatar {
+        width: 30px; height: 30px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #F59E0B, #DC2626);
+        flex-shrink: 0;
+        overflow: hidden;
+        border: 1.5px solid rgba(255,255,255,0.85);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      }
+      .avatar svg { width: 100%; height: 100%; display: block; }
+      .name-block { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+      .name-line { display: flex; align-items: center; gap: 4px; min-width: 0; }
+      .nickname {
+        font-size: 12px;
+        font-weight: 600;
+        color: rgba(255,255,255,0.96);
+        letter-spacing: 0.01em;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        max-width: 138px;
+      }
+      .verified {
+        width: 12px; height: 12px;
+        flex-shrink: 0;
+      }
+      .location {
+        font-size: 9.5px;
+        font-weight: 500;
+        color: rgba(255,255,255,0.62);
+        letter-spacing: 0.04em;
+        display: flex; align-items: center; gap: 4px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .location .pin {
+        width: 9px; height: 9px; flex-shrink: 0;
+        opacity: 0.7;
+      }
+      .more {
+        margin-left: auto;
+        color: rgba(255,255,255,0.5);
+        font-size: 18px;
+        letter-spacing: 1px;
+        line-height: 1;
+        padding: 0 4px;
+      }
+
+      /* ==== 图片位（轮播容器）==== */
+      .photo-stage {
+        position: absolute;
+        top: 60px; left: 14px; right: 14px;
+        height: 124px;
+        border-radius: 12px;
+        overflow: hidden;
+        z-index: 2;
+      }
+      .photo {
+        position: absolute; inset: 0;
+        opacity: 0;
+        will-change: transform, opacity;
+      }
+      .photo.photo-1 {
+        background:
+          radial-gradient(circle at 30% 32%, rgba(255,180,90,0.65) 0%, transparent 50%),
+          radial-gradient(circle at 78% 78%, rgba(168,85,247,0.5) 0%, transparent 55%),
+          linear-gradient(160deg, #F59E0B 0%, #B91C1C 55%, #5B21B6 100%);
+      }
+      .photo.photo-2 {
+        background:
+          radial-gradient(circle at 70% 38%, rgba(110,231,249,0.55) 0%, transparent 55%),
+          radial-gradient(circle at 22% 78%, rgba(57,255,133,0.4) 0%, transparent 50%),
+          linear-gradient(160deg, #064E3B 0%, #1F2937 55%, #0F172A 100%);
+      }
+      .photo.photo-3 {
+        background:
+          radial-gradient(circle at 50% 30%, rgba(255,255,255,0.45) 0%, transparent 50%),
+          radial-gradient(circle at 50% 88%, rgba(57,255,133,0.4) 0%, transparent 55%),
+          linear-gradient(180deg, #1E1B4B 0%, #312E81 50%, #064E3B 100%);
+      }
+      /* 每张照片：噪点 + 取景框四角 */
+      .photo::before {
+        content: ""; position: absolute; inset: 0;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' seed='9'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.18 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+        opacity: 0.5;
+        mix-blend-mode: overlay;
+        pointer-events: none;
+      }
+      .photo::after {
+        content: ""; position: absolute; inset: 8px;
+        background:
+          linear-gradient(to right, rgba(255,255,255,0.85) 0, rgba(255,255,255,0.85) 14px, transparent 14px, transparent calc(100% - 14px), rgba(255,255,255,0.85) calc(100% - 14px)) top left / 100% 1px no-repeat,
+          linear-gradient(to right, rgba(255,255,255,0.85) 0, rgba(255,255,255,0.85) 14px, transparent 14px, transparent calc(100% - 14px), rgba(255,255,255,0.85) calc(100% - 14px)) bottom left / 100% 1px no-repeat,
+          linear-gradient(to bottom, rgba(255,255,255,0.85) 0, rgba(255,255,255,0.85) 14px, transparent 14px, transparent calc(100% - 14px), rgba(255,255,255,0.85) calc(100% - 14px)) top left / 1px 100% no-repeat,
+          linear-gradient(to bottom, rgba(255,255,255,0.85) 0, rgba(255,255,255,0.85) 14px, transparent 14px, transparent calc(100% - 14px), rgba(255,255,255,0.85) calc(100% - 14px)) top right / 1px 100% no-repeat;
+        opacity: 0.9;
+        pointer-events: none;
+      }
+      /* 单张照片上的小标识（拍摄信息，细节） */
+      .photo .badge {
+        position: absolute;
+        top: 10px; left: 10px;
+        display: flex; align-items: center; gap: 4px;
+        padding: 3px 7px;
+        background: rgba(0,0,0,0.45);
+        backdrop-filter: blur(6px);
+        border: 1px solid rgba(255,255,255,0.18);
+        border-radius: 4px;
+        font-size: 8.5px;
+        letter-spacing: 0.08em;
+        color: rgba(255,255,255,0.92);
+        font-weight: 600;
+      }
+      .photo .badge .dot-live {
+        width: 5px; height: 5px; border-radius: 50%;
+        background: var(--ac, #39FF85);
+        box-shadow: 0 0 6px var(--ac, #39FF85);
+        animation: pulseDot 1.4s ease-in-out infinite;
+      }
+      @keyframes pulseDot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.55; transform: scale(0.8); }
+      }
+      .photo .coord {
+        position: absolute;
+        bottom: 8px; right: 10px;
+        font-size: 8.5px;
+        letter-spacing: 0.06em;
+        color: rgba(255,255,255,0.78);
+        font-variant-numeric: tabular-nums;
+        font-family:'MiSans Mono','Sarasa Mono SC','Consolas','Microsoft YaHei Mono','Noto Sans Mono',monospace;
+      }
+      .photo .frame-num {
+        position: absolute;
+        bottom: 8px; left: 12px;
+        font-size: 8.5px;
+        letter-spacing: 0.16em;
+        color: rgba(255,255,255,0.78);
+        font-variant-numeric: tabular-nums;
+        font-family:'MiSans Mono','Sarasa Mono SC','Consolas','Microsoft YaHei Mono','Noto Sans Mono',monospace;
+      }
+
+      /* ==== 轮播指示点 ==== */
+      .dots {
+        position: absolute;
+        top: 188px; left: 14px;
+        display: flex; gap: 4px;
+        z-index: 4;
+      }
+      .dot {
+        width: 5px; height: 5px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.22);
+        transition: background 0.3s, transform 0.3s;
+      }
+      .dot.active {
+        background: var(--ac, #39FF85);
+        box-shadow: 0 0 6px var(--ac, #39FF85);
+        transform: scaleX(2.2);
+        border-radius: 2px;
+      }
+
+      /* ==== 底部操作栏 ==== */
+      .actions {
+        position: absolute;
+        bottom: 10px; left: 14px; right: 14px;
+        height: 32px;
+        display: flex; align-items: center; gap: 12px;
+        z-index: 5;
+      }
+      .act {
+        display: flex; align-items: center; gap: 4px;
+        color: rgba(255,255,255,0.82);
+        font-size: 11px;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+      }
+      .act svg { width: 16px; height: 16px; }
+      .act.liked { color: var(--ac, #39FF85); }
+      .act.liked .heart-fill {
+        transform-origin: center;
+        animation: heartPop 0.5s ease-out;
+      }
+      @keyframes heartPop {
+        0% { transform: scale(0.5); }
+        50% { transform: scale(1.35); }
+        100% { transform: scale(1); }
+      }
+      .spacer { flex: 1; }
+      .time {
+        font-size: 9.5px;
+        color: rgba(255,255,255,0.5);
+        letter-spacing: 0.08em;
+        font-variant-numeric: tabular-nums;
+        font-family:'MiSans Mono','Sarasa Mono SC','Consolas','Microsoft YaHei Mono','Noto Sans Mono',monospace;
+      }
+
+      /* ==== 悬浮光斑（玻璃拟态家族氛围） ==== */
+      .orb {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(20px);
+        pointer-events: none;
+        opacity: 0;
+      }
+      .orb.o1 {
+        width: 80px; height: 80px;
+        left: -20px; top: -20px;
+        background: var(--ac, #39FF85);
+      }
+      .orb.o2 {
+        width: 90px; height: 90px;
+        right: -30px; bottom: -30px;
+        background: #B985FF;
+      }
+
+      /* ==== 角标 · 右上 INSTAGRAM ==== */
+      .corner-mark {
+        position: absolute;
+        top: 8px; right: 10px;
+        display: flex; align-items: center; gap: 4px;
+        font-size: 8.5px;
+        letter-spacing: 0.18em;
+        color: rgba(255,255,255,0.45);
+        font-family:'MiSans Mono','Sarasa Mono SC','Consolas','Microsoft YaHei Mono','Noto Sans Mono',monospace;
+        z-index: 1;
+      }
+      .corner-mark .ig-dot {
+        width: 4px; height: 4px; border-radius: 50%;
+        background: var(--ac, #39FF85);
+        box-shadow: 0 0 4px var(--ac, #39FF85);
+      }
+
+      /* 玻璃卡入场的内层模糊（确保卡片未就位时背景干净）*/
+      .glass * { -webkit-user-select: none; user-select: none; }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <!-- 氛围光斑 -->
+      <div class="orb o1"></div>
+      <div class="orb o2"></div>
+
+      <!-- 右上角标 -->
+      <div class="corner-mark"><span class="ig-dot"></span><span>FEED · 03</span></div>
+
+      <!-- 主玻璃卡 -->
+      <div class="glass" id="card">
+        <div class="border-tour" id="tour"></div>
+        <div class="hi"></div>
+
+        <!-- 顶部头像栏 -->
+        <div class="top-bar">
+          <div class="row1">
+            <div class="avatar">
+              <!-- 自绘徒步女孩头像 -->
+              <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <defs>
+                  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#FED7AA"/>
+                    <stop offset="100%" stop-color="#F59E0B"/>
+                  </linearGradient>
+                </defs>
+                <!-- 远山 -->
+                <path d="M0 26 L7 18 L13 22 L20 14 L26 19 L36 16 L36 36 L0 36 Z" fill="rgba(0,0,0,0.35)"/>
+                <path d="M0 30 L9 24 L17 28 L24 22 L30 26 L36 24 L36 36 L0 36 Z" fill="rgba(0,0,0,0.55)"/>
+                <!-- 人物剪影：戴帽徒步 -->
+                <g fill="#1A1A1A">
+                  <!-- 头 -->
+                  <circle cx="18" cy="13" r="3.4"/>
+                  <!-- 帽檐 -->
+                  <path d="M12.5 10.5 Q18 6.5 23.5 10.5 L23 12 L13 12 Z"/>
+                  <!-- 背包（橙色块） -->
+                  <rect x="14.5" y="17.5" width="6" height="7" rx="1" fill="#EA580C"/>
+                  <!-- 身体 -->
+                  <path d="M15 17 L21 17 L22 26 L14 26 Z"/>
+                  <!-- 登山杖 -->
+                  <line x1="23.5" y1="18" x2="26" y2="29" stroke="#1A1A1A" stroke-width="0.8"/>
+                  <!-- 腿 -->
+                  <rect x="15" y="26" width="2.4" height="6"/>
+                  <rect x="18.6" y="26" width="2.4" height="6"/>
+                </g>
+                <!-- 帽高光 -->
+                <ellipse cx="17" cy="9" rx="2" ry="0.8" fill="rgba(255,255,255,0.5)"/>
+              </svg>
+            </div>
+            <div class="name-block">
+              <div class="name-line">
+                <span class="nickname" id="nickname">yelaoshan.hike</span>
+                <!-- 已认证蓝勾 -->
+                <svg class="verified" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2 L14.5 4.5 L18 4 L18.5 7.5 L22 9 L20.5 12 L22 15 L18.5 16.5 L18 20 L14.5 19.5 L12 22 L9.5 19.5 L6 20 L5.5 16.5 L2 15 L3.5 12 L2 9 L5.5 7.5 L6 4 L9.5 4.5 Z" fill="#6EE7F9"/>
+                  <path d="M8 12 L11 15 L16 9" stroke="#0B0F0E" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="location">
+                <svg class="pin" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M6 1 C3.8 1 2 2.8 2 5 C2 8 6 11 6 11 C6 11 10 8 10 5 C10 2.8 8.2 1 6 1 Z" fill="none" stroke="currentColor" stroke-width="1.2"/>
+                  <circle cx="6" cy="5" r="1.6" fill="currentColor"/>
+                </svg>
+                <span id="location">香格里拉 · 海拔 3300m</span>
+              </div>
+            </div>
+            <span class="more">···</span>
+          </div>
+        </div>
+
+        <!-- 图片位（轮播容器）-->
+        <div class="photo-stage">
+          <div class="photo photo-1" data-idx="1">
+            <div class="badge"><span class="dot-live"></span><span>SHANDONG-LA · LIVE</span></div>
+            <div class="frame-num">F 01/03</div>
+            <div class="coord">27°50'N · 99°55'E</div>
+          </div>
+          <div class="photo photo-2" data-idx="2">
+            <div class="badge"><span class="dot-live"></span><span>MOON-LAKE · LIVE</span></div>
+            <div class="frame-num">F 02/03</div>
+            <div class="coord">27°52'N · 99°58'E</div>
+          </div>
+          <div class="photo photo-3" data-idx="3">
+            <div class="badge"><span class="dot-live"></span><span>SNOW-PASS · LIVE</span></div>
+            <div class="frame-num">F 03/03</div>
+            <div class="coord">27°54'N · 100°01'E</div>
+          </div>
+        </div>
+
+        <!-- 轮播指示点 -->
+        <div class="dots" id="dots"></div>
+
+        <!-- 底部操作栏 -->
+        <div class="actions">
+          <div class="act liked" id="act-like">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" class="heart-fill">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" fill="currentColor"/>
+            </svg>
+            <span id="like-count">4,217</span>
+          </div>
+          <div class="act">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span id="comment-count">186</span>
+          </div>
+          <div class="act">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+            <span>42</span>
+          </div>
+          <div class="act" style="margin-left:auto">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- 时间戳（右下小字，族徽风格）-->
+        <div class="time" id="time" style="position:absolute; bottom:9px; right:14px; z-index:5;">2 HOURS AGO</div>
+      </div>
+    </div>
+
+    <script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <script>
+      (() => {
+        const fallback = {
+          nickname: "yelaoshan.hike",
+          displayName: "叶老山",
+          likeCount: "4,217",
+          commentCount: "186",
+          cardCount: "3",
+          accentColor: "#39FF85",
+          cardBg: "#1A2433",
+          cardBg2: "#0E1A22",
+          location: "香格里拉 · 海拔 3300m",
+          timeText: "2 HOURS AGO",
+          slideDirection: "right"
+        };
+        const v = (window.__hyperframes && window.__hyperframes.getVariables)
+          ? window.__hyperframes.getVariables() : fallback;
+
+        const nickname = v.nickname || fallback.nickname;
+        const likeCount = v.likeCount || fallback.likeCount;
+        const commentCount = v.commentCount || fallback.commentCount;
+        const cardCount = Math.min(3, Math.max(1, parseInt(v.cardCount) || 3));
+        const accentColor = v.accentColor || fallback.accentColor;
+        const cardBg = v.cardBg || fallback.cardBg;
+        const cardBg2 = v.cardBg2 || fallback.cardBg2;
+        const location = v.location || fallback.location;
+        const timeText = v.timeText || fallback.timeText;
+        const slideDir = v.slideDirection || "right";
+
+        document.documentElement.style.setProperty('--ac', accentColor);
+
+        // 写入文字
+        document.getElementById('nickname').textContent = nickname;
+        document.getElementById('like-count').textContent = likeCount;
+        document.getElementById('comment-count').textContent = commentCount;
+        document.getElementById('location').textContent = location;
+        document.getElementById('time').textContent = timeText;
+
+        // 生成轮播指示点
+        const dotsEl = document.getElementById('dots');
+        for (let i = 0; i < cardCount; i++) {
+          const dot = document.createElement('div');
+          dot.className = 'dot' + (i === 0 ? ' active' : '');
+          dotsEl.appendChild(dot);
+        }
+        const dots = dotsEl.querySelectorAll('.dot');
+
+        // 仅渲染 cardCount 张照片
+        const photos = document.querySelectorAll('.photo');
+        photos.forEach((p, i) => {
+          p.style.display = i < cardCount ? 'block' : 'none';
+        });
+
+        // === 动效编排 ===
+        const card = document.getElementById('card');
+        const tour = document.getElementById('tour');
+        const stageEl = document.getElementById('stage');
+        const orbs = stageEl.querySelectorAll('.orb');
+
+        const canvasW = 480;
+        const cardW = 256;
+        const startX = slideDir === 'right' ? canvasW + 30 : -(cardW + 30);
+        const endX = slideDir === 'right' ? -(cardW + 30) : canvasW + 30;
+        const centerX = (canvasW - cardW) / 2; // 112
+
+        // 初始：玻璃卡在画布外，巡游光不可见
+        // 但首先设一个"开箱即美"的默认终态：玻璃卡已经在中央、不透明。
+        // 这样如果 GSAP 没正常调度（如 chrome-headless 截图），静态就能看到设计。
+        // GSAP 跑起来后会在第一个 fromTo 时把它们拉回 startX。
+        gsap.set(card, { x: centerX, y: 0, opacity: 1, scale: 1 });
+        gsap.set(tour, { opacity: 0.85, '--tour-angle': '0deg' });
+        gsap.set(orbs, { opacity: 0.5, scale: 1 });
+        photos.forEach((p, i) => {
+          // 让第一张照片默认显示
+          gsap.set(p, i === 0 ? { opacity: 1, scale: 1, x: 0, y: 0 } : { opacity: 0, scale: 1, x: 0, y: 0 });
+        });
+
+        // 巡游光周期
+        const tourDuration = 2.4;
+
+        function runLoop() {
+          const N = cardCount;
+          const totalDur = 0.75 + N * 1.2 + 0.95; // ~4.5s for N=3
+
+          // 巡游光是独立的持续循环（与主循环并行）
+          const tourTl = gsap.timeline({ repeat: -1 });
+          tourTl.fromTo(tour, { '--tour-angle': '0deg' }, {
+            '--tour-angle': '360deg',
+            duration: tourDuration,
+            ease: 'none',
+            modifiers: { '--tour-angle': v => (parseFloat(v) % 360) + 'deg' }
+          });
+
+          // 主循环
+          const tl = gsap.timeline({ repeat: -1, delay: 0.25 });
+          // 注册到 window.__timelines：云渲染的 settle/逐帧定位靠它驱动时间轴。
+          // 组件此前全部没注册，导致渲染停在第 0 帧（主体初始 opacity:0 → 整层空）。
+          // gsap 时间轴就地 mutate，先存引用即可，后续 tl.to() 作用在同一对象上。
+          window.__timelines = window.__timelines || {};
+          window.__timelines.main = tl;
+          /* [公开版] 移除 tl.duration(totalDur)：在 repeat:-1 的时间轴上调用 duration()
+   setter 会把 timeScale 归零（totalDuration 撑成 1e10），时间轴再也不推进，
+   组件停在初始态（卡片 opacity:0 且 x 偏出画布）→ 看起来整层空白。
+   children 加完后时间轴的自然时长本就约等于 totalDur，无需强制设置。 */
+
+          // 入场：玻璃卡从右侧滑入带 back.out
+          tl.fromTo(card,
+            { x: startX, y: 8, opacity: 0, scale: 0.96 },
+            { x: centerX, y: 0, opacity: 1, scale: 1, duration: 0.75, ease: 'back.out(1.6)' },
+            0
+          );
+
+          // 巡游光开关（仅控制 opacity）
+          tl.fromTo(tour, { opacity: 0 }, { opacity: 0.95, duration: 0.3, ease: 'power2.out' }, 0.05);
+          tl.to(tour, { opacity: 0, duration: 0.25 }, totalDur - 0.4);
+
+          // 氛围光斑淡入
+          tl.fromTo(orbs,
+            { opacity: 0, scale: 0.6 },
+            { opacity: 0.55, scale: 1, duration: 0.8, ease: 'power2.out', stagger: 0.08 },
+            0.2
+          );
+
+          // 主循环：N 张照片依次切换
+          const photoStart = 0.6;
+          const photoInterval = 1.2;
+          for (let i = 0; i < N; i++) {
+            const ph = photos[i];
+            if (!ph) break;
+            const t0 = photoStart + i * photoInterval;
+
+            tl.fromTo(ph,
+              { opacity: 0, scale: 1.08, x: 30 },
+              { opacity: 1, scale: 1, x: 0, duration: 0.55, ease: 'power2.out' },
+              t0
+            );
+            if (i > 0) {
+              const prev = photos[i - 1];
+              tl.to(prev, { opacity: 0, scale: 0.96, x: -20, duration: 0.45, ease: 'power2.in' }, t0);
+            }
+            tl.call(() => {
+              dots.forEach((d, k) => d.classList.toggle('active', k === i));
+            }, [], t0);
+            tl.to(ph, { y: -3, duration: photoInterval * 0.55, ease: 'sine.inOut' }, t0);
+            tl.to(ph, { y: 0, duration: photoInterval * 0.45, ease: 'sine.inOut' }, t0 + photoInterval * 0.55);
+          }
+
+          // 收尾：最后一张淡出 + 卡片左滑出 + 巡游光收
+          const tailStart = photoStart + N * photoInterval + 0.1;
+          if (photos[N - 1]) {
+            tl.to(photos[N - 1], { opacity: 0, scale: 0.96, x: -20, duration: 0.4, ease: 'power2.in' }, tailStart);
+          }
+          tl.to(orbs, { opacity: 0, duration: 0.4 }, tailStart);
+          tl.to(card, {
+            x: endX,
+            y: 8,
+            opacity: 0,
+            scale: 0.97,
+            duration: 0.55,
+            ease: 'power2.in'
+          }, tailStart + 0.05);
+
+          return tl;
+        }
+
+        try {
+          runLoop();
+        } catch(e) {
+          console.error('[ins-post-card] timeline error:', e && (e.message || e));
+        }
+      })();
+    </script>
+  </body>
+</html>

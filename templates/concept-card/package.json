@@ -1,0 +1,7 @@
+{
+  "name": "concept-card",
+  "private": true,
+  "scripts": {
+    "render": "cd ../.. && npm run render -- concept-card"
+  }
+}

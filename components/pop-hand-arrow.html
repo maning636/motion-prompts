@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"from","name":"起点文字","type":"string","label":"起点标签","default":"旧版"},{"id":"to","name":"终点文字","type":"string","label":"终点标签","default":"新版"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#2EC4B6"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":2.8}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>手绘弧形箭头</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-chip { position: absolute; width: 78px; height: 36px; background: #FFFDF5;
+    border: 2.5px solid #241C18; border-radius: 7px;
+    box-shadow: 3px 3px 0 rgba(36, 28, 24, .85); display: flex;
+    align-items: center; justify-content: center; }
+  .p-chip-t { font-size: 15px; font-weight: 800; color: #241C18; white-space: nowrap; }
+  .p-arc { position: absolute; left: 0; top: 0; width: 480px; height: 270px; }
+  .p-arrow-svg { position: absolute; left: 0; top: 0; width: 480px; height: 270px; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"from":"旧版","to":"新版","accent":"#2EC4B6","duration":2.8};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || FALLBACK.duration;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  function fit(el, avail, maxPx, minPx) {
+    const prev = el.style.whiteSpace;
+    el.style.whiteSpace = 'nowrap';
+    const nat = el.scrollWidth;
+    el.style.whiteSpace = prev;
+    if (nat > avail && nat > 0) {
+      el.style.fontSize = Math.max(minPx, Math.floor(maxPx * avail / nat)) + 'px';
+    }
+  }
+
+  /* ── 两端各一个落点，箭头才有「从哪到哪」 ───────────────── */
+  const src = put('div', 'p-chip', 'left:70px;top:184px;transform: rotate(-3deg)');
+  const srcT = put('div', 'p-chip-t', '', String(v.from || FALLBACK.from), src);
+  fit(srcT, 62, 15, 9);
+  const dst = put('div', 'p-chip', 'left:332px;top:56px;transform: rotate(3deg);opacity:0');
+  const dstT = put('div', 'p-chip-t', '', String(v.to || FALLBACK.to), dst);
+  fit(dstT, 62, 15, 9);
+
+  /* ── 弧线 + 箭头两笔 ───────────────────────────────────── */
+  const X0 = 152, Y0 = 194, CX = 156, CY2 = 36, X1 = 328, Y1 = 86;
+  const headAng = Math.atan2(Y1 - CY2, X1 - CX) * 180 / Math.PI;   // 终点切线角
+
+  const arc = put('div', 'p-arc');
+  arc.innerHTML =
+    '<svg width="480" height="270" viewBox="0 0 480 270">' +
+    '<path d="M ' + X0 + ' ' + Y0 + ' Q ' + CX + ' ' + CY2 + ' ' + X1 + ' ' + Y1 +
+    '" fill="none" stroke="#241C18" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '</svg>';
+  const arcPath = arc.querySelector('path');
+  const len = arcPath.getTotalLength ? arcPath.getTotalLength() : 240;
+  arcPath.style.strokeDasharray = len + ' ' + len;
+  arcPath.style.strokeDashoffset = String(len);
+
+  const head = put('div', 'p-arrow-svg');
+  head.innerHTML =
+    '<svg width="480" height="270" viewBox="0 0 480 270">' +
+    '<g transform="translate(' + X1 + ' ' + Y1 + ') rotate(' + headAng.toFixed(2) + ')">' +
+    '<path d="M -27 -15 L 0 0" fill="none" stroke="#241C18" stroke-width="3.4" ' +
+    'stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<path d="M -27 15 L 0 0" fill="none" stroke="#241C18" stroke-width="3.4" ' +
+    'stroke-linecap="round" stroke-linejoin="round"/>' +
+    '</g></svg>';
+  const hp = head.querySelectorAll('path');
+  const h1 = hp[0].getTotalLength(), h2 = hp[1].getTotalLength();
+  hp[0].style.strokeDasharray = h1 + ' ' + h1; hp[0].style.strokeDashoffset = String(h1);
+  hp[1].style.strokeDasharray = h2 + ' ' + h2; hp[1].style.strokeDashoffset = String(h2);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  tl.fromTo(src, { scale: .6, opacity: 0 }, { scale: 1, opacity: 1, duration: .36, ease: 'back.out(2.6)' }, 0);
+  /* 弧线一笔长出来 */
+  tl.to(arcPath, { strokeDashoffset: 0, duration: .62, ease: 'power2.inOut' }, .26);
+  /* 到点 */
+  tl.fromTo(dst, { scale: .6, opacity: 0, rotate: -14 },
+    { scale: 1, opacity: 1, rotate: 3, duration: .38, ease: 'back.out(3.2)' }, .86);
+  tl.fromTo(dst, { scale: 1 }, { scale: 1.14, duration: .12, ease: 'power2.out', yoyo: true, repeat: 1 }, .86);
+  /* 箭头两笔依次画出：先上撇，再下撇 */
+  tl.to(hp[0], { strokeDashoffset: 0, duration: .13, ease: 'power1.out' }, .94);
+  tl.to(hp[1], { strokeDashoffset: 0, duration: .15, ease: 'power1.out' }, 1.06);
+  /* 收笔抖一下 */
+  tl.fromTo(arc, { rotate: 0 }, { rotate: .8, duration: .09, ease: 'power2.out' }, .88);
+  tl.to(arc, { rotate: 0, duration: .24, ease: 'power2.out' }, .97);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

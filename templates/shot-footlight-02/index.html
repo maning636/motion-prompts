@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "accent", "type": "color", "label": "辉光色", "default": "#A855F7"}, {"id": "background", "type": "color", "label": "背景色", "default": "#050508"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#panelWrap{ position:absolute; inset:0; will-change:transform; }
+#panel{ position:absolute; left:360px; top:220px; width:1200px; height:640px; border-radius:20px;
+  background:#101018; border:1px solid color-mix(in srgb, var(--fg) 12%, transparent); overflow:hidden; }
+#pTop{ height:64px; background:#181824; display:flex; align-items:center; padding:0 26px; gap:14px; }
+#pTop .dot{ width:18px; height:18px; border-radius:50%; background:var(--accent); }
+#pTop .pill{ height:16px; width:90px; border-radius:8px; background:color-mix(in srgb, var(--fg) 18%, transparent); }
+#pBody{ display:flex; height:576px; }
+#pSide{ width:230px; border-right:1px solid color-mix(in srgb, var(--fg) 8%, transparent); padding:26px 22px; }
+#pSide .sr{ height:14px; border-radius:7px; margin-bottom:24px; background:color-mix(in srgb, var(--fg) 15%, transparent); }
+#pMain{ flex:1; padding:30px 34px; }
+#pMain .blk{ border-radius:12px; background:color-mix(in srgb, var(--fg) 8%, transparent); }
+#chart{ height:250px; margin-bottom:26px; display:flex; align-items:flex-end; gap:18px; padding:24px; }
+#chart .cb{ flex:1; border-radius:6px 6px 0 0; background:color-mix(in srgb, var(--accent) 55%, transparent); }
+#statRow{ display:flex; gap:22px; }
+#statRow .blk{ height:120px; flex:1; }
+#bleed{ position:absolute; left:360px; top:220px; width:1200px; height:130px; border-radius:20px 20px 0 0;
+  background:linear-gradient(color-mix(in srgb, var(--accent) 30%, transparent), transparent);
+  opacity:0; pointer-events:none; }
+#glow{ position:absolute; left:315px; top:175px; width:90px; height:90px; will-change:transform,opacity; }
+#glowA{ position:absolute; inset:0; border-radius:50%; filter:blur(26px);
+  background:radial-gradient(circle, var(--accent) 0%, transparent 65%); }
+#glowB{ position:absolute; inset:18px; border-radius:50%; filter:blur(9px);
+  background:radial-gradient(circle, #FFFFFF 0%, var(--accent) 30%, transparent 68%);
+  box-shadow:8px -8px 46px rgba(240,171,252,.8); }
+#shade{ position:absolute; inset:0; background:var(--bg); opacity:.97; will-change:opacity; }
+#cap{ position:absolute; left:0; right:0; bottom:90px; text-align:center; font-size:24px;
+  letter-spacing:6px; opacity:.5; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4.5" data-width="1920" data-height="1080">
+
+<div id="panelWrap">
+  <div id="panel">
+    <div id="pTop"><div class="dot"></div><div class="pill"></div><div class="pill" style="width:60px"></div><div class="pill" style="width:110px"></div></div>
+    <div id="pBody">
+      <div id="pSide"><div class="sr"></div><div class="sr" style="width:70%"></div><div class="sr"></div><div class="sr" style="width:55%"></div><div class="sr" style="width:80%"></div></div>
+      <div id="pMain">
+        <div class="blk" id="chart">
+          <div class="cb" style="height:40%"></div><div class="cb" style="height:65%"></div>
+          <div class="cb" style="height:52%"></div><div class="cb" style="height:85%"></div>
+          <div class="cb" style="height:70%"></div><div class="cb" style="height:95%"></div>
+        </div>
+        <div id="statRow"><div class="blk"></div><div class="blk"></div><div class="blk"></div></div>
+      </div>
+    </div>
+  </div>
+  <div id="bleed"></div>
+  <div id="glow"><div id="glowA"></div><div id="glowB"></div></div>
+</div>
+<div id="shade"></div>
+<div id="cap">SPOTLIGHT · 贴边泛光横摇</div>
+
+    </div>
+    <script>
+      const FB = {"accent": "#A855F7", "background": "#050508", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#050508");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+const pw=$('#panelWrap'), shade=$('#shade'), glow=$('#glow'), bleed=$('#bleed');
+const T0=15, T1=115;
+function cl(x){return Math.max(0,Math.min(1,x));}
+const sim={f:0};
+function paint(){
+  const f=sim.f;
+  const g=cl((f-T0)/(T1-T0));           // 全程 linear 匀速（命门）
+  const sx=-100+2200*g;                   // 聚光头横扫
+  pw.style.transform='translateX('+(80-200*g)+'px)'; // 面板匀速左滑 = 相机右摇
+  const m='radial-gradient(circle 420px at '+sx.toFixed(0)+'px 540px, transparent 32%, black 64%)';
+  shade.style.webkitMaskImage=m; shade.style.maskImage=m;
+  // 贴边光线：先沿左竖缘上行，转角后沿顶边横走
+  let gx, gy;
+  if(g<0.3){ gx=0; gy=640-(g/0.3)*640; }
+  else{ gx=((g-0.3)/0.7)*1200; gy=0; }
+  glow.style.transform='translate('+gx.toFixed(1)+'px,'+gy.toFixed(1)+'px)';
+  bleed.style.opacity=cl((g-0.3)/0.7).toFixed(3); // 紫光渗入 UI 顶部内侧
+}
+paint();
+tl.to(sim,{f:135,duration:F(135),ease:'none',onUpdate:paint},0);
+// 横摇结束：暗罩与光线一同淡出，全景显影
+tl.to(shade,{opacity:0,duration:F(10)},F(115));
+tl.to(glow,{opacity:0,duration:F(10)},F(115));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

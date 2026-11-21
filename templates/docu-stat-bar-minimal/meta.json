@@ -1,0 +1,12 @@
+{
+  "id": "docu-stat-bar-minimal",
+  "name": "极简条形·皮影档案",
+  "description": "4 行水平条形对比图，行错峰入场+条形扫入，高峰期朱砂高亮（B 族皮影·纪录片档案风，2026-08-31）",
+  "category": "口播工厂",
+  "series": "docu",
+  "slot": "docu-puppet",
+  "tags": ["口播工厂","皮影档案","纪录片","docu-stat-bar-minimal"],
+  "duration": 6,
+  "size": "1920×1080",
+  "status": "ready"
+}

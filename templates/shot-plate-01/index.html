@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "段落标题", "default": "功能与成果"}, {"id": "front1", "type": "string", "label": "卡一功能", "default": "自动剪辑"}, {"id": "num1", "type": "string", "label": "卡一数字", "default": "10×"}, {"id": "label1", "type": "string", "label": "卡一标签", "default": "产能提升"}, {"id": "front2", "type": "string", "label": "卡二功能", "default": "一键配音"}, {"id": "num2", "type": "string", "label": "卡二数字", "default": "3 分钟"}, {"id": "label2", "type": "string", "label": "卡二标签", "default": "成片耗时"}, {"id": "front3", "type": "string", "label": "卡三功能", "default": "模板市场"}, {"id": "num3", "type": "string", "label": "卡三数字", "default": "180+"}, {"id": "label3", "type": "string", "label": "卡三标签", "default": "可用模板"}, {"id": "img1", "type": "image", "label": "卡一图片（留空用默认图形）", "default": ""}, {"id": "img2", "type": "image", "label": "卡二图片（留空用默认图形）", "default": ""}, {"id": "img3", "type": "image", "label": "卡三图片（留空用默认图形）", "default": ""}, {"id": "duration", "type": "number", "label": "总时长（秒，动效约2.7秒后定格）", "default": 6}, {"id": "caption", "type": "string", "label": "底部小字", "default": "功能 × 成果 一一对应"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script>
+    <script src="../_lib/CustomEase.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+.fttl{ position:absolute; left:0; right:0; top:150px; text-align:center; font-size:64px; color:var(--fg); letter-spacing:.06em; }
+.frow{ position:absolute; left:0; right:0; top:300px; display:flex; justify-content:center; gap:60px; perspective:1200px; }
+.fcard{ position:relative; width:380px; height:460px; transform-style:preserve-3d; }
+.face{ position:absolute; inset:0; border-radius:24px; backface-visibility:hidden; -webkit-backface-visibility:hidden; overflow:hidden; }
+.face.front{ background:#14141B; border:1px solid rgba(255,255,255,.12); padding:28px; }
+.face.back{ background:linear-gradient(150deg, #17171F, #0D0D12); border:1px solid var(--accent);
+  transform:rotateY(180deg); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; }
+.fbar{ height:44px; border-radius:12px; background:linear-gradient(90deg, var(--accent), rgba(255,255,255,.08)); opacity:.9; margin-bottom:26px; }
+.fline{ height:18px; border-radius:9px; background:rgba(255,255,255,.14); margin-bottom:16px; }
+.fline.s{ width:62%; }
+.fchart{ display:flex; align-items:flex-end; gap:14px; height:120px; margin-top:30px; }
+.fchart i{ flex:1; border-radius:8px 8px 0 0; background:rgba(255,255,255,.18); }
+.fchart i:nth-child(2){ background:var(--accent); opacity:.85; }
+.fname{ position:absolute; left:28px; bottom:24px; font-size:34px; color:rgba(255,255,255,.85); }
+.fimg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.fshade{ position:absolute; left:0; right:0; bottom:0; height:46%; background:linear-gradient(to top, rgba(0,0,0,.72), transparent); }
+.fnum{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:96px; color:var(--accent); line-height:1; }
+.flabel{ font-size:30px; letter-spacing:.2em; color:rgba(255,255,255,.7); }
+.sheen{ position:absolute; inset:0; border-radius:24px; pointer-events:none; opacity:0;
+  background:linear-gradient(105deg, transparent 32%, rgba(255,255,255,.38) 50%, transparent 68%); }
+.fcap{ position:absolute; left:0; right:0; top:830px; text-align:center; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  font-size:26px; letter-spacing:.3em; color:rgba(255,255,255,.45); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+<div class="fttl" id="t"></div>
+<div class="frow" id="row"></div>
+<div class="fcap" id="cap">功能 × 成果 一一对应</div>
+    </div>
+    <script>
+      const FB = {"title": "功能与成果", "front1": "自动剪辑", "num1": "10×", "label1": "产能提升", "front2": "一键配音", "num2": "3 分钟", "label2": "成片耗时", "front3": "模板市场", "num3": "180+", "label3": "可用模板", "img1": "", "img2": "", "img3": "", "duration": 6, "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+// 总时长变量化：动效约 2.7 秒演完后定格，镜头停留多久由剪辑层决定
+const DUR=+v.duration>0?+v.duration:6;
+$('[data-composition-id]').setAttribute('data-duration',String(DUR));
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#t').textContent=v.title||'';
+$('#cap').textContent=v.caption||'功能 × 成果 一一对应';
+const row=$('#row');
+const cards=[];
+for(let i=1;i<=3;i++){
+  const img=v['img'+i];
+  const front=img
+    ? '<img class="fimg" src="'+img+'" alt=""><div class="fshade"></div><div class="fname">'+v['front'+i]+'</div>'
+    : '<div class="fbar"></div><div class="fline"></div><div class="fline s"></div>'
+      +'<div class="fchart"><i style="height:45%"></i><i style="height:80%"></i><i style="height:60%"></i></div>'
+      +'<div class="fname">'+v['front'+i]+'</div>';
+  const c=document.createElement('div');c.className='fcard';
+  c.innerHTML='<div class="face front">'+front+'</div>'
+    +'<div class="face back"><div class="fnum">'+v['num'+i]+'</div><div class="flabel">'+v['label'+i]+'</div></div>'
+    +'<div class="sheen"></div>';
+  row.appendChild(c);cards.push(c);
+}
+tl.fromTo('.fttl',{opacity:0,y:24},{opacity:1,y:0,duration:F(12),ease:'power3.out'},0);
+cards.forEach((c,i)=>{
+  const at=F(16)+i*F(10);
+  tl.fromTo(c,{rotateY:0},{rotateY:192,duration:F(18),ease:'power3.inOut'},at);
+  tl.to(c,{rotateY:180,duration:F(8),ease:'power2.out'},at+F(18));
+  const sh=c.querySelector('.sheen');
+  tl.fromTo(sh,{opacity:0},{opacity:.55,duration:F(9),ease:'power2.in'},at);
+  tl.to(sh,{opacity:0,duration:F(9),ease:'power2.out'},at+F(9));
+  tl.fromTo(c,{y:0},{y:-10,duration:F(9),ease:'power2.out'},at);
+  tl.to(c,{y:0,duration:F(9),ease:'power2.in'},at+F(9));
+});
+const tDone=F(16)+2*F(10)+F(26);
+tl.fromTo('.fcap',{opacity:0},{opacity:1,duration:F(12)},tDone+F(6));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,16 @@
+{
+ "name": "来源引用贴",
+ "description": "蓝色整卡内 mono 眉标 + 白色引号 + 900 引文 + 3px 规则 + 原始出处行，右侧 ink 出处块分格擦出后两块反向微位移",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "source",
+  "citation",
+  "blue"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "资讯解读、行业分析、观点类内容，需要把出处与原话一起挂在画面上时"
+}

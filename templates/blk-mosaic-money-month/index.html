@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "eyebrow", "name": "眉标", "type": "string", "label": "顶部眉标", "default": "REVENUE / 月度账"}, {"id": "title", "name": "主标题", "type": "string", "label": "主标题", "default": "把收入拆开看才不慌"}, {"id": "note", "name": "注释", "type": "string", "label": "右上角注释", "default": "单位：万元"}, {"id": "accent", "name": "强调色", "type": "color", "label": "强调色", "default": "#FF5FA2"}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>华夫图 · 把收入拆开看才不慌</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--paper);color:var(--ink);font-family:var(--sans);
+        display:flex;flex-direction:column;padding:58px 72px 0}
+  #stage.on-ink{background:var(--ink);color:var(--paper)}
+
+  .hd{flex:0 0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:36px}
+  .hd h1{font-size:60px;font-weight:900;line-height:1.04;margin:8px 0 0;letter-spacing:-.015em}
+  .hd .note{font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:.1em;
+        border:var(--bw) solid var(--ink);border-radius:9999px;padding:9px 20px;
+        background:var(--white);color:var(--ink);box-shadow:4px 4px 0 var(--ink);white-space:nowrap}
+  #stage.on-ink .hd .note{background:var(--paper);color:var(--ink);box-shadow:4px 4px 0 var(--accent)}
+
+  /* 底部色带：把画面「压」住，不然上面排得再满底部都是飘的 */
+  .ft{flex:0 0 auto;height:18px;border-top:var(--bw) solid var(--ink);
+      border-bottom:var(--bw) solid var(--ink);
+      background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+  #stage.on-ink .ft{border-color:var(--paper)}
+
+  .body{flex:1 1 auto;min-height:0;display:flex;margin-top:32px;padding-bottom:26px}
+
+  /* 图标必须锁死尺寸。只写 viewBox 而不写 width/height 的 SVG，浏览器会按
+     「默认替换元素尺寸」给它 300px——图标从 52px 的底座里横着冲出去，
+     把整张卡片撑破。版图上表现为卡片右边被顶掉一截，而溢出检测只报"出框"，
+     看不出是被一个看不见的图标顶的。 */
+  .ico{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .ico svg{width:100%;height:100%;display:block}
+
+  .body{display:flex;align-items:flex-end;gap:26px}
+  .wcol{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:14px}
+  .wcol .wl{font-weight:900;font-size:24px;text-align:center;white-space:nowrap;
+        overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  /* 5 列 × 8 行 = 40 格。gap 固定，格子用 1fr 自适应，整列等宽。 */
+  /* 4 列 × 8 行。5 列挤在 250px 宽的列里格子只有 40px，
+     再加一圈虚线空框，整张图像二维码而不是图表。 */
+  .wcol .wg{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:1fr;
+        gap:8px;width:100%;aspect-ratio:4/8;border:var(--bw) solid var(--ink);
+        background:var(--paper);padding:10px}
+  .wcol .wg i{display:block;width:100%;height:100%;border:2px solid var(--ink);opacity:0}
+  /* 空格子只留极浅的实线，不要描边：40 个描边框会把画面切碎 */
+  .wcol .wg i.e{background:transparent;opacity:1;border-color:rgba(15,15,15,.13)}
+  .wcol .wv{font-family:var(--mono);font-weight:700;font-size:46px;line-height:.9;
+        letter-spacing:-.04em;font-variant-numeric:tabular-nums;white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="blk-corner tl"></div><div class="blk-corner tr"></div>
+  <div class="blk-corner bl"></div><div class="blk-corner br"></div>
+
+  <div class="hd"><div><div class="blk-eyebrow" id="eyebrow">REVENUE / 月度账</div>
+    <h1 id="title" data-fit-max="60" data-fit-min="32">把收入拆开看才不慌</h1></div><div class="note" id="note" data-fit-max="15" data-fit-min="11">单位：万元</div></div>
+  <div class="body"><div class="wcol" id="wc0"><span class="wl" id="k0" data-fit-max="24" data-fit-min="13">主业交付</span><span class="wg"><i id="w0_0" style="background:var(--yellow);border-color:var(--ink)"></i><i id="w0_1" style="background:var(--yellow);border-color:var(--ink)"></i><i id="w0_2" style="background:var(--yellow);border-color:var(--ink)"></i><i id="w0_3" style="background:var(--yellow);border-color:var(--ink)"></i><i id="w0_4" style="background:var(--yellow);border-color:var(--ink)"></i><i id="w0_5" style="background:var(--yellow);border-color:var(--ink)"></i><i id="w0_6" style="background:var(--yellow);border-color:var(--ink)"></i><i id="w0_7" style="background:var(--yellow);border-color:var(--ink)"></i><i id="w0_8" style="background:var(--yellow);border-color:var(--ink)"></i><i id="w0_9" style="background:var(--yellow);border-color:var(--ink)"></i><i id="w0_10" style="background:var(--yellow);border-color:var(--ink)"></i><i id="w0_11" style="background:var(--yellow);border-color:var(--ink)"></i><i id="w0_12" style="background:var(--yellow);border-color:var(--ink)"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i></span><span class="wv" id="v0" data-fit-max="46" data-fit-min="23">3.2</span></div><div class="wcol" id="wc1"><span class="wl" id="k1" data-fit-max="24" data-fit-min="13">内容分成</span><span class="wg"><i id="w1_0" style="background:var(--blue);border-color:var(--ink)"></i><i id="w1_1" style="background:var(--blue);border-color:var(--ink)"></i><i id="w1_2" style="background:var(--blue);border-color:var(--ink)"></i><i id="w1_3" style="background:var(--blue);border-color:var(--ink)"></i><i id="w1_4" style="background:var(--blue);border-color:var(--ink)"></i><i id="w1_5" style="background:var(--blue);border-color:var(--ink)"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i></span><span class="wv" id="v1" data-fit-max="46" data-fit-min="23">1.4</span></div><div class="wcol" id="wc2"><span class="wl" id="k2" data-fit-max="24" data-fit-min="13">咨询顾问</span><span class="wg"><i id="w2_0" style="background:var(--green);border-color:var(--ink)"></i><i id="w2_1" style="background:var(--green);border-color:var(--ink)"></i><i id="w2_2" style="background:var(--green);border-color:var(--ink)"></i><i id="w2_3" style="background:var(--green);border-color:var(--ink)"></i><i id="w2_4" style="background:var(--green);border-color:var(--ink)"></i><i id="w2_5" style="background:var(--green);border-color:var(--ink)"></i><i id="w2_6" style="background:var(--green);border-color:var(--ink)"></i><i id="w2_7" style="background:var(--green);border-color:var(--ink)"></i><i id="w2_8" style="background:var(--green);border-color:var(--ink)"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i></span><span class="wv" id="v2" data-fit-max="46" data-fit-min="23">2.1</span></div><div class="wcol" id="wc3"><span class="wl" id="k3" data-fit-max="24" data-fit-min="13">培训场次</span><span class="wg"><i id="w3_0" style="background:var(--pink);border-color:var(--ink)"></i><i id="w3_1" style="background:var(--pink);border-color:var(--ink)"></i><i id="w3_2" style="background:var(--pink);border-color:var(--ink)"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i></span><span class="wv" id="v3" data-fit-max="46" data-fit-min="23">0.8</span></div><div class="wcol" id="wc4"><span class="wl" id="k4" data-fit-max="24" data-fit-min="13">杂项</span><span class="wg"><i id="w4_0" style="background:var(--orange);border-color:var(--ink)"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i><i class="e"></i></span><span class="wv" id="v4" data-fit-max="46" data-fit-min="23">0.3</span></div></div>
+  <div class="ft"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+    ["eyebrow", "title", "note", "accent", "k0", "v0", "k1", "v1", "k2", "v2", "k3", "v3", "k4", "v4"]
+.forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+  B.fitAll();
+  var tl = B.tl();
+
+  document.querySelectorAll('.wcol').forEach(function (c, i) {
+    tl.from(c, { opacity: 0, y: 30, duration: 0.62 * 0.8, ease: 'power3.out' }, 0.1 + i * 0.08);
+    var cells = c.querySelectorAll('.wg i:not(.e)');
+    for (var j = 0; j < cells.length; j++) {
+      tl.fromTo(cells[j], { opacity: 0, scale: .3 },
+        { opacity: 1, scale: 1, duration: 0.16, ease: 'back.out(2.4)' }, 0.28 + i * 0.08 + j * 0.022);
+    }
+  });
+  B.finish(tl);
+  B.hold(tl);
+})();
+</script>
+</body></html>

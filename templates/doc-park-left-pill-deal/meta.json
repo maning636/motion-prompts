@@ -1,0 +1,13 @@
+{
+  "id": "doc-park-left-pill-deal",
+  "name": "文档停靠左侧 + 结论交易 pill",
+  "description": "文档面板停靠左侧展示源材料，右侧结论 pill 与交易 pill 依次滑入定格，形成「文档 → 结论 → 交易」的三段式叙事。",
+  "category": "文档叙事",
+  "tags": ["文档", "pill", "结论", "交易", "左侧停靠", "叙事"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-20T00:00:00.000Z"
+}

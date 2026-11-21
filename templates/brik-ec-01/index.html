@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（本期主题标签）","default":"限时到手"},
+{"id":"title","name":"主标题","type":"string","label":"主标题（8–16 字）","default":"同一件外套，这个价格只到今天"},
+{"id":"was","name":"划线原价","type":"string","label":"划线原价（string，不要用 number 拼小数位）","default":"¥399"},
+{"id":"price","name":"到手价","type":"string","label":"到手价（string，带不带货币符号都行）","default":"¥199"},
+{"id":"spec1","name":"规格一","type":"string","label":"规格一（≤6 字）","default":"藏青色"},
+{"id":"spec2","name":"规格二","type":"string","label":"规格二（≤6 字）","default":"M 码"},
+{"id":"spec3","name":"规格三","type":"string","label":"规格三（≤6 字）","default":"三天发货"},
+{"id":"unit","name":"单位","type":"string","label":"单位（2–4 字，拼在价格后）","default":"件"},
+{"id":"accent","name":"强调色","type":"color","label":"强调色（到底价 pill 底色 / 凸点亮起色 / 页脚计数色）","default":"#FFD429"},
+{"id":"brickColor","name":"配色包","type":"enum","label":"配色包（到手价块面色；与强调色撞色时自动退回薄荷绿）","default":"mixed","options":[{"value":"yellow","label":"暖黄"},{"value":"pink","label":"桃粉"},{"value":"green","label":"薄荷"},{"value":"blue","label":"靛蓝"},{"value":"mixed","label":"薄荷绿"}]},
+{"id":"studMode","name":"凸点","type":"enum","label":"凸点（不显示 / 三枚同时亮 / 逐枚硬切）","default":"scan","options":[{"value":"none","label":"不显示"},{"value":"top","label":"整排同时亮"},{"value":"scan","label":"逐枚硬切"}]},
+{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–6）","default":5.5},
+{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}
+]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>价格砸换三凸点</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 积木风 · 电商带货 · 价格砸换
+     划线原价块被上方砸下的到手价块顶掉、原价块向下退场；到手价块落定压 2 帧后，
+     底座顶出一枚胶囊 pill 写到手价，规格项用三枚凸点硬切逐个点亮。
+     金额一律按 string 处理：不做数字跳、不拼小数位与千分位（任务书 §3.4 纪律）。
+     块宽只用 480 / 720 / 240，块高只用 120 / 240。 */
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --mod:240px; --mod-h:120px; --shadow:#0F0F0F; --background:var(--paper); --accent:#FFD429;
+  }
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--background);color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased}
+  .blk-noise{background-image:radial-gradient(rgba(15,15,15,.12) 1px,transparent 1px);
+    background-size:10px 10px}
+  .sh-s{box-shadow:4px 4px 0 var(--shadow)}
+  .sh-l{box-shadow:8px 8px 0 var(--shadow)}
+  .sh-xl{box-shadow:10px 10px 0 var(--shadow)}
+
+  .promo{position:absolute;left:0;top:0;width:1920px;height:56px;display:flex;
+    align-items:center;justify-content:space-between;padding:0 72px;
+    background:var(--ink);color:var(--white);font-family:var(--mono);
+    font-size:24px;font-weight:700;letter-spacing:.14em}
+  .promo .pc{color:var(--accent)}
+
+  /* 标题牌：1440×120 白块，z-index 高一层——砸下的到手价块从它背后钻出来，
+     两块是「叠压」关系（基因 8），不是互相穿模。 */
+  .head{position:absolute;left:240px;top:130px;width:1440px;height:120px;z-index:2;
+    display:flex;align-items:center;gap:32px;padding:0 28px;background:var(--white);
+    border:var(--bw) solid var(--ink);border-radius:4px;box-shadow:8px 8px 0 var(--shadow)}
+  .head .eb{flex:0 0 auto;font-family:var(--mono);font-size:30px;font-weight:700;
+    letter-spacing:.14em;color:var(--ink);white-space:nowrap}
+  .head .ti{margin:0;font-size:56px;font-weight:900;line-height:1.2;letter-spacing:0;
+    color:var(--ink);white-space:nowrap}
+
+  /* 划线原价块：白块，数字带删除线。落到 y=0 时正好被到手价块整块盖住 */
+  .was{position:absolute;left:600px;top:330px;width:720px;height:120px;z-index:1;
+    display:flex;align-items:center;justify-content:center;gap:16px;
+    background:var(--white);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  .was .lb{font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:.14em;
+    color:var(--ink);white-space:nowrap}
+  .was .tx{font-family:var(--mono);font-size:56px;font-weight:700;line-height:1;
+    letter-spacing:0;color:var(--ink);white-space:nowrap;text-decoration:line-through}
+
+  /* 到手价块：720×240 承重件，与原价块占同一个卡位 */
+  .price{position:absolute;left:600px;top:330px;width:720px;height:240px;z-index:1;
+    display:flex;align-items:center;justify-content:center;gap:20px;
+    border:var(--bw) solid var(--ink);border-radius:4px;box-shadow:10px 10px 0 var(--shadow)}
+  .price .tx{font-family:var(--mono);font-size:112px;font-weight:900;line-height:1;
+    letter-spacing:0;white-space:nowrap}
+  .price .un{font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:.14em;
+    white-space:nowrap}
+
+  /* 到底价胶囊：480×120，圆角 9999px */
+  .pill{position:absolute;left:720px;top:620px;width:480px;height:120px;z-index:3;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--accent);border:var(--bw) solid var(--ink);border-radius:9999px;
+    box-shadow:4px 4px 0 var(--shadow);font-family:var(--mono);font-size:34px;
+    font-weight:700;letter-spacing:.1em;color:var(--ink);white-space:nowrap}
+
+  /* 规格三块：240×120，间距 48；合缝后总宽 714，用 justify-content:center 居中。
+     min-width:0 必须写：flex 项目默认 min-width:auto，标签比 240 宽时会把块撑到 250，
+     三块就不再等宽、也破了模数。min-width:0 + overflow:hidden 让块恒定 240，
+     超长标签在本块内截断（ellipsis），不越到邻居身上。 */
+  .specs{position:absolute;left:0;top:790px;width:1920px;height:120px;
+    display:flex;justify-content:center}
+  .sp{flex:0 0 240px;min-width:0;height:120px;display:flex;align-items:center;gap:16px;
+    padding:0 14px;background:var(--white);border:var(--bw) solid var(--ink);
+    border-radius:4px;box-shadow:8px 8px 0 var(--shadow);overflow:hidden}
+  .sp + .sp{margin-left:-3px}
+  .sp .st{flex:0 0 auto;width:60px;height:60px;display:block}
+  .sp .tx{flex:0 0 auto;font-size:32px;font-weight:900;line-height:1.1;letter-spacing:0;
+    color:var(--ink);white-space:nowrap}
+
+  .foot{position:absolute;left:0;bottom:0;width:1920px;height:64px;display:flex;
+    align-items:center;justify-content:space-between;padding:0 72px;
+    background:var(--ink);color:var(--white);font-family:var(--mono);
+    font-size:26px;font-weight:700;letter-spacing:.1em}
+  .foot em{font-style:normal;color:var(--accent)}
+  .divline{position:absolute;left:0;bottom:64px;width:1920px;height:20px;
+    border-top:3px solid var(--ink);border-bottom:3px solid var(--ink);
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="promo">
+    <span class="pc">BRICK / 积木风</span>
+    <span>价格砸换 · 到手价顶掉划线价</span>
+  </div>
+
+  <div class="head" id="head">
+    <span class="eb" id="eyebrow" data-fit-max="30" data-fit-min="16">限时到手</span>
+    <h1 class="ti" id="title" data-fit-max="60" data-fit-min="28">同一件外套，这个价格只到今天</h1>
+  </div>
+
+  <div class="was" id="wasbox">
+    <span class="lb">原价</span>
+    <span class="tx" id="was" data-fit-max="56" data-fit-min="26">¥399</span>
+  </div>
+
+  <div class="price" id="pricebox">
+    <span class="tx" id="price" data-fit-max="112" data-fit-min="44">¥199</span>
+    <span class="un" id="unit">件</span>
+  </div>
+
+  <div class="pill" id="pill">到手 ¥199</div>
+
+  <div class="specs" id="specs">
+    <div class="sp" id="sp1">
+      <svg class="st" width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden="true">
+        <circle class="sc" id="c1" cx="30" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+      </svg>
+      <span class="tx" id="spec1" data-fit-max="32" data-fit-min="16">藏青色</span>
+    </div>
+    <div class="sp" id="sp2">
+      <svg class="st" width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden="true">
+        <circle class="sc" id="c2" cx="30" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+      </svg>
+      <span class="tx" id="spec2" data-fit-max="32" data-fit-min="16">M 码</span>
+    </div>
+    <div class="sp" id="sp3">
+      <svg class="st" width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden="true">
+        <circle class="sc" id="c3" cx="30" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+      </svg>
+      <span class="tx" id="spec3" data-fit-max="32" data-fit-min="16">三天发货</span>
+    </div>
+  </div>
+
+  <div class="divline"></div>
+  <div class="foot">
+    <span>EC / 电商带货</span>
+    <span id="meta">省 0 · 规格 3 · 凸点 3</span>
+  </div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+  ['eyebrow', 'title', 'was', 'price', 'spec1', 'spec2', 'spec3', 'unit']
+    .forEach(function (k) { set(k, v[k]); });
+
+  var rs = document.documentElement.style;
+  if (v.accent) rs.setProperty('--accent', v.accent);
+  var ACC = v.accent || '#FFD429';
+
+  /* 配色包只管到手价块的面色；与强调色（胶囊）撞色时自动退回薄荷绿，
+     保证同屏不出现两个同色块——这条是现算的，不靠用户自己配。 */
+  var PACK = {
+    yellow: '#FFD429', pink: '#FF5FA2', green: '#2FD07A',
+    blue: '#3D7BFF', mixed: '#2FD07A'
+  };
+  var face = PACK[v.brickColor] || PACK.mixed;
+  if (face === ACC) face = '#2FD07A';
+  function inkOn(hex) {
+    var h = String(hex || '').replace('#', '');
+    if (h.length !== 6) return '#0F0F0F';
+    var f = function (c) { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    var L = 0.2126 * f(parseInt(h.slice(0, 2), 16)) +
+            0.7152 * f(parseInt(h.slice(2, 4), 16)) +
+            0.0722 * f(parseInt(h.slice(4, 6), 16));
+    return L > 0.42 ? '#0F0F0F' : '#FFFFFF';
+  }
+  var priceBox = document.getElementById('pricebox');
+  if (priceBox) {
+    priceBox.style.background = face;
+    ['tx', 'un'].forEach(function (c) {
+      var t = priceBox.querySelector('.' + c);
+      if (t) t.style.color = inkOn(face);
+    });
+  }
+
+  /* 派生值：省了多少、胶囊上的到手价，全部按两个 string 现算。
+     金额不做数字跳、不改写用户填的小数位与千分位，只做差值。 */
+  function money(s) {
+    var m = String(s == null ? '' : s).replace(/,/g, '').match(/-?[\d.]+/);
+    var n = m ? parseFloat(m[0]) : 0;
+    return isFinite(n) ? n : 0;
+  }
+  var wasN = money(v.was), priceN = money(v.price);
+  var saved = wasN - priceN;
+  var pill = document.getElementById('pill');
+  if (pill) {
+    pill.textContent = '到手 ' + String(v.price == null ? '' : v.price) +
+      (v.unit ? String(v.unit) : '');
+  }
+  var studs = [].slice.call(document.querySelectorAll('#specs .sc'));
+  var meta = document.getElementById('meta');
+  if (meta) {
+    meta.innerHTML = '省 <em>' + (saved > 0 ? saved : 0) + '</em> · 规格 <em>3</em> · 凸点 <em>' +
+      studs.length + '</em>';
+  }
+
+  var studMode = v.studMode || 'scan';
+  var specsWrap = document.getElementById('specs');
+  if (studMode === 'none' && specsWrap) specsWrap.style.display = 'none';
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：砸换与退场是典型的 reduced-motion 场景，整段撤掉；
+       终态直接给「原价已退场、到手价在位」的成品画面。 */
+    gsap.set('#head', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#pricebox', { x: 0, y: 0, opacity: 1, boxShadow: '10px 10px 0 #0F0F0F' });
+    gsap.set('#pill', { x: 0, y: 0, opacity: 1, boxShadow: '4px 4px 0 #0F0F0F' });
+    gsap.set('#specs', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#wasbox', { visibility: 'hidden' });
+    if (studs.length) gsap.set(studs, { attr: { fill: ACC } });
+    tl.fromTo('#head',   { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .55, ease: 'power3.out' }, 0);
+    tl.fromTo('#specs',  { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .60, ease: 'power3.out' }, .16);
+    tl.fromTo('#pill',   { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .45, ease: 'power3.out' }, .30);
+    B.hold(tl, 1.15, 1.05);
+    return;
+  }
+
+  var stageRect = document.getElementById('stage').getBoundingClientRect();
+  var promoEl = document.querySelector('.promo');
+  var CEIL = promoEl ? Math.round(promoEl.getBoundingClientRect().bottom - stageRect.top) : 0;
+  function topOf(sel) {
+    var el = document.querySelector(sel);
+    return el ? Math.round(el.getBoundingClientRect().top - stageRect.top) : 0;
+  }
+
+  tl.fromTo('#head', { y: CEIL - topOf('#head') },
+    { y: 0, duration: 0.26, ease: 'power4.out' }, 0.00);
+
+  /* 划线原价块砸进卡位 */
+  tl.fromTo('#wasbox', { y: CEIL - topOf('#wasbox') },
+    { y: 0, duration: 0.26, ease: 'power4.out' }, 0.40);
+  tl.set('#wasbox', { boxShadow: '8px 11px 0 #0F0F0F', immediateRender: false }, 0.66);
+  tl.to('#wasbox', { boxShadow: '8px 8px 0 #0F0F0F', duration: 0.04, ease: 'steps(2)' }, 0.70);
+
+  /* 到手价块从画外正上方砸下（z-index 压在标题牌背后，从它下沿钻出来），
+     砸到同一卡位把原价块顶掉 */
+  tl.fromTo('#pricebox', { y: CEIL - topOf('#pricebox') },
+    { y: 0, duration: 0.24, ease: 'power4.out' }, 1.05);
+  tl.set('#pricebox', { boxShadow: '10px 13px 0 #0F0F0F', immediateRender: false }, 1.29);
+  tl.to('#pricebox', { boxShadow: '10px 10px 0 #0F0F0F', duration: 0.04, ease: 'steps(2)' }, 1.33);
+
+  /* 原价块向下退场：加速离画，退到画布下沿之外后整块撤出画面，
+     不让一块停在框外的东西留在定格帧里（motion-qc 出框扫描口径）。 */
+  var out = Math.round(stageRect.height - topOf('#wasbox')) + 24;
+  tl.to('#wasbox', { y: out, duration: 0.30, ease: 'power3.in' }, 1.10);
+  tl.set('#wasbox', { visibility: 'hidden', immediateRender: false }, 1.46);
+
+  /* 落定压 2 帧后，底座顶出一枚胶囊写到手价 */
+  tl.fromTo('#pill', { y: 120 }, { y: 0, duration: 0.24, ease: 'power4.out' }, 1.66);
+  tl.set('#pill', { boxShadow: '4px 7px 0 #0F0F0F', immediateRender: false }, 1.90);
+  tl.to('#pill', { boxShadow: '4px 4px 0 #0F0F0F', duration: 0.04, ease: 'steps(2)' }, 1.94);
+
+  /* 规格三块依次落位，各自带一枚凸点硬切点亮（式 8） */
+  ['#sp1', '#sp2', '#sp3'].forEach(function (sel, i) {
+    var at = 2.14 + i * 0.16;
+    tl.fromTo(sel, { y: 120 }, { y: 0, duration: 0.24, ease: 'power4.out' }, at);
+    tl.set(sel, { boxShadow: '8px 11px 0 #0F0F0F', immediateRender: false }, at + 0.24);
+    tl.to(sel, { boxShadow: '8px 8px 0 #0F0F0F', duration: 0.04, ease: 'steps(2)' }, at + 0.28);
+    if (studMode !== 'none') {
+      tl.set(sel + ' .sc', { attr: { fill: ACC }, immediateRender: false },
+        studMode === 'top' ? at + 0.32 : at + 0.34 + i * 0.02);
+    }
+  });
+
+  var introEnd = tl.duration();
+  var TOTAL = Math.min(6, Math.max(5, Number(v.duration) || 5.5));
+  var holdAt = Math.min(introEnd, TOTAL - 0.8);
+  B.hold(tl, holdAt, Math.max(0.8, TOTAL - holdAt));
+})();
+</script>
+</body></html>

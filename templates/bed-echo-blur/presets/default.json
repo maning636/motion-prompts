@@ -1,0 +1,13 @@
+{
+  "eyebrow": "DEPTH · 03",
+  "title": "纵深不是特效，是信息层级",
+  "subtitle": "把同一个画面推到背景里做残影，前景反而更沉",
+  "keyNumber": "6.5x",
+  "unit": "视觉深度倍增",
+  "ghostCount": 3,
+  "ghostBlur": 28,
+  "ghostDrift": 48,
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

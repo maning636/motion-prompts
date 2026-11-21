@@ -1,0 +1,7 @@
+{
+  "title": "AI Agent 工具集成",
+  "subtitle": "中心 Hub 调度多个外围 Spoke",
+  "hub": "AI Agent",
+  "spokes": "GitHub,Slack,Notion,Calendar,Email,Docs",
+  "hotSpokes": "0,2"
+}

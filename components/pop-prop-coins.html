@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"coin","name":"币面字","type":"string","label":"金币上的符号","default":"¥"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.2}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>手绘金币弹出</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  /* 收银槽：只留描边 + 一条暗槽口，**不做实心白填充**。
+     组件是透明挂件，底下是用户自己的画面——铺一块大白板等于凭空
+     多出一张纸。旧版 180x74 的实心 #FFFDF5 卡片占了画面近三分之一，
+     金币反而看不见，定格帧看上去就是一张空白卡。 */
+  .p-slot { position: absolute; left: 158px; top: 176px; width: 164px; height: 58px;
+    border: 3px solid var(--ink); border-radius: 12px; background: transparent; }
+  /* 槽口：一条深色横缝，斜切进去像投币口 */
+  .p-mouth { position: absolute; left: 178px; top: 186px; width: 124px; height: 13px;
+    background: var(--ink); border-radius: 7px; }
+  /* 托架底沿：纯线条，勾出「这是一台机器的投币口」的形 */
+  .p-tray { position: absolute; left: 146px; top: 234px; width: 188px; height: 5px;
+    background: var(--ink); border-radius: 3px; }
+  .p-coins { position: absolute; left: 0; top: 0; width: 480px; height: 270px; z-index: 2; }
+  /* 金币：直径 38px，明金 #FFC93C 打底 + 深墨硬描边 + 一道白色高光弧。
+     尺寸必须一眼看出是硬币——旧版 34px 压在暗金/棕色上完全读不出来。 */
+  .p-coin { position: absolute; left: 223px; top: 170px; width: 38px; height: 38px;
+    margin: -19px 0 0 -19px; }
+  .p-coin-s { position: absolute; left: 0; top: 0; width: 38px; height: 38px; }
+  .p-coin-t { position: absolute; left: 0; right: 0; top: 0;
+    font-size: 19px; font-weight: 800; color: #241C18; text-align: center;
+    line-height: 38px; }
+  .p-spark { position: absolute; left: 234px; top: 168px; width: 18px; height: 18px;
+    border-radius: 50%; border: 2.5px solid var(--ac); opacity: 0; }
+  /* 币堆：3 枚落回后在槽口上方叠成一小摞，保证**落回之后仍然看得见** */
+  /* 126 = 3×38 + 2×6 间隙。92 装不下，会把右边的币挤出槽口。 */
+  .p-stack { position: absolute; left: 177px; top: 166px; width: 126px; height: 44px; z-index: 3; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"accent":"#FF6B35","coin":"¥","duration":3.2};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || FALLBACK.duration;
+
+  /* 时间轴先建先注册：排在任何可能抛异常的代码之前。
+     注册之后再抛错，预览至少还能拿到一条已注册的时间轴（症状可读），
+     注册之前抛错则整条组件没有时间轴，画面全黑且毫无线索。 */
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  // 槽口机：只描边，没有大白板
+  put('div', 'p-slot', '', null, stage);
+  put('div', 'p-mouth', '', null, stage);
+  put('div', 'p-tray', '', null, stage);
+
+  /* ── 3 枚金币 ───────────────────────────────────────────── */
+  const coins = put('div', 'p-coins');
+  const face = String(v.coin || FALLBACK.coin);
+  const list = [];
+  for (let i = 0; i < 3; i++) {
+    /* 间距必须是 44：币直径 38，原来的 5px 让三枚几乎完全叠在一起，
+       落定帧里三个 ¥ 糊成一团，读不出「三枚金币」。
+       槽在 left:158 / width:164，179~305 三枚加间隙正好落在槽内。 */
+    const c = put('div', 'p-coin', 'left:' + (223 + (i - 1) * 44) + 'px;', null, coins);
+    const inner = put('div', 'p-coin-s', '', null, c);
+    /* 明金 + 深墨硬描边 + 一道白色高光弧。
+       旧版是暗金/棕的小椭圆，缩在白卡片里，静帧完全看不出是金币。 */
+    inner.innerHTML =
+      '<svg width="38" height="38" viewBox="0 0 38 38">' +
+      '<circle cx="19" cy="19" r="16.5" fill="#FFC93C" stroke="#241C18" stroke-width="3"/>' +
+      '<circle cx="19" cy="19" r="11.5" fill="none" stroke="#241C18" stroke-width="1.7" opacity=".45"/>' +
+      '<path d="M 10 13 A 11 11 0 0 1 20 8" fill="none" stroke="#FFFFFF" ' +
+      'stroke-width="3.2" stroke-linecap="round" opacity=".92"/>' +
+      '</svg>';
+    const t = put('div', 'p-coin-t', '', face, inner);
+    t.style.whiteSpace = 'nowrap';
+    t.style.left = '2px'; t.style.right = '2px';
+    if (t.scrollWidth > 34) t.style.fontSize = '15px';
+    list.push(c);
+  }
+
+  const sparks = [];
+  for (let i = 0; i < 3; i++) sparks.push(put('div', 'p-spark', ''));
+
+  /* 落回后的静止币摞：叠在槽口上方，不透明、不出画。
+     旧版落回时 opacity → 0 且被前挡板吃掉，最后一秒画面上什么都没有。 */
+  const stack = put('div', 'p-stack');
+  const pile = [];
+  for (let i = 0; i < 3; i++) {
+    /* 44px 间距 = 币直径 38 + 6px 间隙，三枚不重叠。
+       原来 24px 间距在 38px 的币上必然叠 14px，落定帧三个 ¥ 糊成一团。 */
+    const p = put('div', 'p-coin-s',
+      'position:absolute;left:' + (0 + i * 44) + 'px;top:' + (2 + (i % 2) * 3) +
+      'px;transform:rotate(' + (-6 + i * 5) + 'deg);', null, stack);
+    p.innerHTML =
+      '<svg width="38" height="38" viewBox="0 0 38 38">' +
+      '<circle cx="19" cy="19" r="16.5" fill="#FFC93C" stroke="#241C18" stroke-width="3"/>' +
+      '<circle cx="19" cy="19" r="11.5" fill="none" stroke="#241C18" stroke-width="1.7" opacity=".45"/>' +
+      '<path d="M 10 13 A 11 11 0 0 1 20 8" fill="none" stroke="#FFFFFF" ' +
+      'stroke-width="3.2" stroke-linecap="round" opacity=".92"/>' +
+      '</svg>';
+    const t = put('div', 'p-coin-t', '', face, p);
+    t.style.whiteSpace = 'nowrap';
+    t.style.left = '2px'; t.style.right = '2px';
+    if (t.scrollWidth > 34) t.style.fontSize = '15px';
+    pile.push(p);
+  }
+
+  /* ── 槽口落位 ─────────────────────────────────────────────── */
+  tl.fromTo(stack, { y: 22, scale: .92, opacity: 0 },
+    { y: 0, scale: 1, opacity: 1, duration: .38, ease: 'back.out(1.9)' }, 0);
+
+  /* ── 3 枚依次弹出：升 → 翻面 → 抛物线落回槽口 ───────────────── */
+  list.forEach(function (c, i) {
+    const t0 = 0.4 + i * 0.32;
+    const up = -104 - i * 26;
+    /* 出币：先被顶出来（压扁），再拉长 */
+    tl.fromTo(c, { y: 26, scaleY: .5, scaleX: 1 },
+      { y: up, scaleY: 1.12, scaleX: 1, duration: .36, ease: 'power3.out' }, t0);
+    tl.to(c, { scaleY: 1, duration: .12, ease: 'power2.out' }, t0 + .36);
+    /* 旋转：scaleX 走 1 → 0.08 → -1 → -0.08 → 1 正好两圈 */
+    tl.to(c, { scaleX: .08, duration: .14, ease: 'power1.inOut' }, t0);
+    tl.to(c, { scaleX: -1, duration: .14, ease: 'power1.inOut' }, t0 + .14);
+    tl.to(c, { scaleX: -.08, duration: .14, ease: 'power1.inOut' }, t0 + .28);
+    tl.to(c, { scaleX: 1, duration: .14, ease: 'power1.inOut' }, t0 + .42);
+    /* 落回：抛物线往下走，停在槽口上方（**不再淡出**）——
+       淡出 + 被挡板吃掉是旧版「最后一秒空画面」的根因。 */
+    tl.to(c, { y: -18, scaleY: .86, duration: .34, ease: 'power2.in' }, t0 + .58);
+    tl.to(c, { y: 2, scaleY: 1, duration: .14, ease: 'back.out(2.6)' }, t0 + .92);
+    /* 出币瞬间投币口的小波纹 */
+    tl.fromTo(sparks[i], { opacity: .85, scale: .4 },
+      { opacity: 0, scale: 1.7, duration: .34, ease: 'power2.out' }, t0);
+  });
+
+  /* 收尾：币摞轻轻弹一下，保证定格帧上金币清清楚楚在画面里 */
+  tl.fromTo(stack, { y: 0 }, { y: -7, duration: .16, ease: 'power2.out' }, 1.92);
+  tl.to(stack, { y: 0, duration: .34, ease: 'elastic.out(1, .42)' }, 2.08);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

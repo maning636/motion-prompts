@@ -1,0 +1,11 @@
+{
+  "name": "cream-scene-analytics",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx --yes hyperframes@0.8.55 preview",
+    "check": "npx --yes hyperframes@0.8.55 lint && npx --yes hyperframes@0.8.55 validate && npx --yes hyperframes@0.8.55 inspect",
+    "render": "npx --yes hyperframes@0.8.55 render",
+    "publish": "npx --yes hyperframes@0.8.55 publish"
+  }
+}

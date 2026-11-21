@@ -1,0 +1,7 @@
+{
+  "title": "第一版出来后，只调这四个参数",
+  "params": "海报角度|ROTATE Y|±55°|0.8;海报间距|X GAP|160PX|0.55;减速节奏|POWER4.OUT|4.9S|0.7;光晕强度|FOCUS|0.95|0.92",
+  "img1": "./assets/_gf0.png",
+  "accent": "#00FF00",
+  "duration": 6
+}

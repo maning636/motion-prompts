@@ -1,0 +1,11 @@
+{
+  "eyebrow": "BEFORE · AFTER",
+  "leftLines": "流程靠人盯\n跨部门拉群对齐\n出错再回炉返工\n汇报全靠截图与口头",
+  "rightLines": "结构化卡片沉淀\n上下游语义互通\n实时校验与回放\n看板一键取数",
+  "leftLabel": "BEFORE",
+  "rightLabel": "AFTER",
+  "staggerGap": 0.1,
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

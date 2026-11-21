@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "word", "type": "string", "label": "遮罩大字", "default": "增长"}, {"id": "prodTitle", "type": "string", "label": "产品层标题", "default": "实时数据面板"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#stage{ position:absolute; inset:0; }
+#prodfull{ position:absolute; inset:0; opacity:0; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+<div id="stage">
+<svg id="zoomer" width="1920" height="1080" viewBox="0 0 1920 1080" style="position:absolute;inset:0">
+  <defs><mask id="tm">
+    <rect x="0" y="0" width="1920" height="1080" fill="#000"/>
+    <text id="mw" x="960" y="700" text-anchor="middle" font-size="560" font-weight="900" fill="#fff">增长</text>
+  </mask></defs>
+  <rect x="0" y="0" width="1920" height="1080" fill="#0A0A0F"/>
+  <g mask="url(#tm)"><g id="drift">
+  <rect x="0" y="0" width="2400" height="1080" fill="#101019"/>
+  <rect x="120" y="120" width="560" height="360" rx="20" fill="#1B1B2A"/>
+  <rect x="160" y="160" width="200" height="28" rx="14" fill="#00FF00" opacity=".9"/>
+  <rect x="160" y="210" width="440" height="16" rx="8" fill="#3A3A4E"/>
+  <rect x="160" y="240" width="360" height="16" rx="8" fill="#3A3A4E"/>
+  <rect x="760" y="120" width="560" height="360" rx="20" fill="#1B1B2A"/>
+  <polyline points="800,430 880,380 960,400 1040,330 1120,350 1200,280 1280,300" fill="none" stroke="#00FF00" stroke-width="8"/>
+  <rect x="1400" y="120" width="560" height="360" rx="20" fill="#1B1B2A"/>
+  <circle cx="1560" cy="300" r="90" fill="none" stroke="#00FF00" stroke-width="20" opacity=".85"/>
+  <circle cx="1780" cy="300" r="90" fill="none" stroke="#3A3A4E" stroke-width="20"/>
+  <rect x="120" y="560" width="1840" height="400" rx="20" fill="#161624"/>
+  <rect x="180" y="620" width="300" height="40" rx="10" fill="#2E2E42"/>
+  <rect x="180" y="700" width="1720" height="18" rx="9" fill="#2E2E42"/>
+  <rect x="180" y="740" width="1500" height="18" rx="9" fill="#2E2E42"/>
+  <rect x="180" y="800" width="700" height="90" rx="14" fill="#00FF00" opacity=".22"/>
+  <rect x="920" y="800" width="700" height="90" rx="14" fill="#2E2E42"/></g></g>
+</svg>
+<svg id="prodfull" width="1920" height="1080" viewBox="0 0 1920 1080" style="position:absolute;inset:0"><g id="drift2">
+  <rect x="0" y="0" width="2400" height="1080" fill="#101019"/>
+  <rect x="120" y="120" width="560" height="360" rx="20" fill="#1B1B2A"/>
+  <rect x="160" y="160" width="200" height="28" rx="14" fill="#00FF00" opacity=".9"/>
+  <rect x="160" y="210" width="440" height="16" rx="8" fill="#3A3A4E"/>
+  <rect x="160" y="240" width="360" height="16" rx="8" fill="#3A3A4E"/>
+  <rect x="760" y="120" width="560" height="360" rx="20" fill="#1B1B2A"/>
+  <polyline points="800,430 880,380 960,400 1040,330 1120,350 1200,280 1280,300" fill="none" stroke="#00FF00" stroke-width="8"/>
+  <rect x="1400" y="120" width="560" height="360" rx="20" fill="#1B1B2A"/>
+  <circle cx="1560" cy="300" r="90" fill="none" stroke="#00FF00" stroke-width="20" opacity=".85"/>
+  <circle cx="1780" cy="300" r="90" fill="none" stroke="#3A3A4E" stroke-width="20"/>
+  <rect x="120" y="560" width="1840" height="400" rx="20" fill="#161624"/>
+  <rect x="180" y="620" width="300" height="40" rx="10" fill="#2E2E42"/>
+  <rect x="180" y="700" width="1720" height="18" rx="9" fill="#2E2E42"/>
+  <rect x="180" y="740" width="1500" height="18" rx="9" fill="#2E2E42"/>
+  <rect x="180" y="800" width="700" height="90" rx="14" fill="#00FF00" opacity=".22"/>
+  <rect x="920" y="800" width="700" height="90" rx="14" fill="#2E2E42"/></g></svg>
+</div>
+    </div>
+    <script>
+      const FB = {"word": "增长", "prodTitle": "实时数据面板", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#mw').textContent=v.word||'增长';
+// 字内漂移：产品层匀速平移，字形静止
+tl.fromTo('#drift',{x:0},{x:-220,duration:F(80),ease:'none'},F(20));
+tl.fromTo('#drift2',{x:0},{x:-220,duration:F(80),ease:'none'},F(20));
+// 放大接管 30f：origin 钉在"增"字实心笔画内（左侧 30% 偏上）
+tl.to('#zoomer',{scale:26,transformOrigin:'620px 480px',duration:F(30),ease:'power2.inOut'},F(100));
+// 接管保险：无遮罩全屏层在放大后段淡入，盖住字缝深底残余
+tl.to('#prodfull',{opacity:1,duration:F(22),ease:'power1.inOut'},F(112));
+tl.to({},{duration:F(24)},F(134)); // 真静止
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

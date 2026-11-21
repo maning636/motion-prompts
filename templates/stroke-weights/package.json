@@ -1,0 +1,7 @@
+{
+  "name": "stroke-weights",
+  "private": true,
+  "scripts": {
+    "render": "cd ../.. && npm run render -- stroke-weights"
+  }
+}

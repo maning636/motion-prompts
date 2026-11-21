@@ -1,0 +1,11 @@
+{
+  "title": "LLM 的可见与不可见",
+  "subtitle": "水面之上 10%，水面之下 90%",
+  "visible": "Chat 界面 · 生成结果",
+  "visibleDesc": "用户能直接感知的交互",
+  "hidden": "参数 · 数据 · 推理 · 价值观",
+  "hiddenDesc": "决定质量的隐性基础",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

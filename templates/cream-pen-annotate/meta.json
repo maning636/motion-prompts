@@ -1,0 +1,12 @@
+{
+  "id": "cream-pen-annotate",
+  "name": "绿笔批注卡（奶油贴纸）",
+  "createdAt": "2026-08-29T00:00:00.000Z",
+  "energy": "中",
+  "suggestedDuration": "4–7s",
+  "knownPitfalls": [
+    "关键词超过 10 字会被强制 nowrap 挤出卡片，长词请改用 afterText 承接",
+    "批注 note 超过 14 字会超出胶囊卡宽度，批注保持短句",
+    "圈画位置按排版实测计算，首帧字体未加载完成时圈位可能有数像素偏差，已通过加大圈体余量兜底"
+  ]
+}

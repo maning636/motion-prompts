@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"label","type":"string","label":"小标签","default":"核心概念"},{"id":"keyword","type":"string","label":"关键词","default":"Agent"},{"id":"position","type":"enum","label":"位置","default":"top-right","options":[{"value":"top-left","label":"左上"},{"value":"top-right","label":"右上"},{"value":"bottom-left","label":"左下"},{"value":"bottom-right","label":"右下"}]},{"id":"accent","type":"color","label":"强调色","default":"#00FF00"},{"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},{"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"}]}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+html[data-export-mode="mp4"] body, html[data-export-mode="mp4"] #root{ background: #12100E !important;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      *{ box-sizing: border-box;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      html, body{ margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: var(--background, transparent);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      body{ font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--background, #12100E); color: var(--foreground);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .scene{ position: absolute; inset: 0; padding: 96px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .sticker{ position: absolute; display: flex; align-items: center; gap: 18px; padding: 18px 28px; background: rgba(18,16,14,0.85); border: 2px solid var(--accent); border-radius: 12px; backdrop-filter: blur(14px);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .sticker::before{ content: ""; width: 6px; height: 100%; position: absolute; left: 0; top: 0; background: var(--accent); border-radius: 12px 0 0 12px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .label{ font-size: 14px; font-weight: 700; opacity: 0.6; letter-spacing: 0.1em;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .keyword{ font-size: 36px; font-weight: 800; color: var(--accent);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .top-left{ top: 96px; left: 96px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .top-right{ top: 96px; right: 96px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .bottom-left{ bottom: 96px; left: 96px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .bottom-right{ bottom: 96px; right: 96px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4" data-width="1920" data-height="1080">
+      <section id="scene" class="scene clip" data-start="0" data-duration="4" data-track-index="1">
+        <div class="sticker top-right" id="sticker">
+          <div>
+            <div class="label" id="label"></div>
+            <div class="keyword" id="keyword"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <script>
+      const fallback = { label: "核心概念", keyword: "Agent", position: "top-right", accent: "#00FF00", foreground: "#F4EFE7" };
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.documentElement.dataset.exportMode = v.exportMode || "transparent";
+      document.documentElement.style.setProperty("--accent", v.accent);
+      document.documentElement.style.setProperty("--foreground", v.foreground);
+      document.getElementById("label").textContent = v.label;
+      document.getElementById("keyword").textContent = v.keyword;
+      const sticker = document.getElementById("sticker");
+      sticker.classList.remove("top-right");
+      sticker.classList.add(v.position || "top-right");
+      const from = { top: "y:-80", bottom: "y:80", left: "x:-80", right: "x:80" };
+      const axis = v.position.includes("left") ? "x" : "x";
+      const dir = v.position.includes("left") ? -80 : 80;
+      const ydir = v.position.includes("top") ? -80 : 80;
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(sticker, { opacity: 0, x: dir, y: ydir, scale: 0.9 }, { opacity: 1, x: 0, y: 0, scale: 1, duration: 0.55, ease: "back.out(1.8)" }, 0.1);
+      tl.to(".scene", { opacity: 0, scale: 0.95, duration: 0.35, ease: "power2.in" }, 3.4);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

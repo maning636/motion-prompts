@@ -1,0 +1,17 @@
+{
+  "kicker": "数据 · DATA",
+  "title": "这组数据，说明了一切",
+  "imgBg": "./assets/bg.png",
+  "bigValue": "73%",
+  "bigLabel": "的人都选错了重点",
+  "label1": "刷题",
+  "val1": 38,
+  "label2": "考证",
+  "val2": 55,
+  "label3": "实习",
+  "val3": 72,
+  "label4": "提问",
+  "val4": 91,
+  "strokeColor": "#E53935",
+  "duration": 6
+}

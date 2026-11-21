@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"pack","name":"规格包","type":"enum","label":"规格包（配色 / 字体 / 曲线）","options":[{"label":"暗色科技","value":"dark"},{"label":"奶油贴纸","value":"cream"},{"label":"单色克制","value":"mono"},{"label":"夜航","value":"night"}],"default":"night"},{"id":"eyebrow","name":"眉标","type":"string","label":"顶部眉标","default":"THE ANCHORING"},{"id":"title","name":"标题","type":"string","label":"标题","default":"第一个数字定了，后面全围着它转"},{"id":"leftLabel","name":"左栏标","type":"string","label":"左栏标签","default":"先开口的人"},{"id":"leftText","name":"左栏文","type":"string","label":"左栏内容","default":"说了个数"},{"id":"anchorLabel","name":"锚标签","type":"string","label":"中间那个标签","default":"锚"},{"id":"anchor","name":"锚值","type":"string","label":"中间那个数","default":"100 万"},{"id":"rightLabel","name":"右栏标","type":"string","label":"右栏标签","default":"后面所有人"},{"id":"rightText","name":"右栏文","type":"string","label":"右栏内容","default":"围着这个数谈"},{"id":"note","name":"收口","type":"string","label":"底部判据","default":"后一轮的估值不是从零算的。"},{"id":"foot","name":"落款","type":"string","label":"底部一句话","default":"先说数字的人拿走定价权。"}]'>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="左边是「说了个数的人」，中间是那个数，右边是「后面所有人」。后一轮的估值不是从零算的，是从锚往下挪一点算的——先说数字的人拿走定价权。">
+<title>锚定效应 · 第一个数字定了基准</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<link rel="stylesheet" href="../_lib/packs.css">
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script>
+<!-- packs.js 必须排在 blocks.js **之后**：blocks.js 结尾是 global.BBlocks = BB，
+     会把它整个替换掉。谁先加载谁的东西就没了，表现是 B.pack is not a function。 -->
+<script src="../_lib/packs.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<style>
+  /* 底色和字色**必须来自规格包**，不能写死。
+     写死 #000 + #F4F1EA 的时候，四个包里只有 dark / night 正常：
+     cream 的 --pk-fg 是 #2A2118、mono 是 #14140F，两个都是**深字**，
+     压在这个写死的黑底上 → 标题、标签、说明全糊掉。
+     而写死字面量色的元素（比如 rgba(244,241,234,.82)）反而还看得见，
+     画面上就成了一半能看一半不能看——比全黑更难认。
+     一共 33 条模板中招（混剪 5 + 认知 22 + 节拍 6）。
+
+     注意区分两层契约（packs.css 顶部注释里写过）：
+       --pk-bg / --pk-fg      = 包自带底板，舞台自己用它
+       --pk-*-media           = 压在用户素材上的那一层
+     这里改的是前者。 */
+  html,body{margin:0;padding:0;background:var(--pk-bg,#000)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--pk-bg,#000);
+        color:var(--pk-fg,#F4F1EA);font-family:"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+        -webkit-font-smoothing:antialiased}
+  /* 统一安全区：混剪里所有贴边元素都从 72/88 起，不贴 0 */
+  
+  /* ── 通用 ── */
+  .eyebrow{position:absolute;left:120px;top:104px;opacity:0;
+      font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:700;
+      letter-spacing:.34em;color:var(--pk-accent);text-indent:.34em}
+  .h1{position:absolute;left:120px;top:148px;width:1680px;opacity:0;
+      font-size:76px;font-weight:900;line-height:1.16;color:var(--pk-fg);letter-spacing:.01em}
+  .foot{position:absolute;left:120px;top:922px;width:1680px;opacity:0;
+      font-size:34px;line-height:1.5;color:var(--pk-muted)}
+  .foot b{color:var(--pk-accent);font-weight:700}
+  /* 底部一条极细的分隔，给满屏一个「结束感」 */
+  .footline{position:absolute;left:120px;top:884px;width:0;height:2px;background:var(--pk-accent)}
+
+  /* ── 因果链 ── */
+  .spine{position:absolute;left:120px;top:0;width:4px;height:0;background:var(--pk-accent);opacity:.9}
+  .node{position:absolute;left:120px;width:64px;height:64px;margin:-32px 0 0 -32px;
+      border-radius:50%;border:3px solid var(--pk-accent);background:var(--pk-bg);opacity:0;
+      display:flex;align-items:center;justify-content:center;
+      font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:800;color:var(--pk-accent)}
+  .clabel{position:absolute;opacity:0;font-family:ui-monospace,Consolas,monospace;
+      font-size:30px;font-weight:800;letter-spacing:.20em;color:var(--pk-accent)}
+  .ctext{position:absolute;opacity:0;font-size:52px;font-weight:700;line-height:1.30;color:var(--pk-fg)}
+  .cnote{position:absolute;opacity:0;font-size:27px;line-height:1.5;
+      color:var(--pk-muted)}
+
+  /* ── 公式页 ── */
+  .eqbox{position:absolute;left:120px;top:352px;width:1680px;height:210px;opacity:0;
+      display:flex;align-items:center;justify-content:center;gap:0;
+      border-top:2px solid rgba(244,241,234,.14);border-bottom:2px solid rgba(244,241,234,.14)}
+  .eqbox .t{font-size:150px;font-weight:900;color:var(--pk-fg);font-variant-numeric:tabular-nums}
+  .eqbox .o{font-size:110px;font-weight:300;color:var(--pk-muted);padding:0 26px}
+  .eqbox .r{font-size:150px;font-weight:900;color:var(--pk-accent);font-variant-numeric:tabular-nums}
+  .vcard{position:absolute;top:650px;width:520px;opacity:0;
+      border-left:4px solid rgba(244,241,234,.18);padding-left:28px}
+  .vcard .vn{font-size:40px;font-weight:900;color:var(--pk-fg)}
+  .vcard .vd{font-size:26px;line-height:1.5;color:var(--pk-muted);margin-top:14px}
+  .vcard .vv{font-size:30px;font-weight:800;color:var(--pk-accent);margin-top:14px;
+      font-family:ui-monospace,Consolas,monospace}
+
+  /* ── 引述页 ── */
+  .qm{position:absolute;left:120px;top:236px;opacity:0;
+      font-family:Georgia,'Times New Roman',serif;font-size:220px;line-height:.7;
+      color:var(--pk-accent);opacity:0}
+  .qtext{position:absolute;left:120px;top:376px;width:1560px;opacity:0;
+      font-size:96px;font-weight:800;line-height:1.42;color:var(--pk-fg);letter-spacing:.01em}
+  .qwho{position:absolute;left:120px;opacity:0;
+      font-family:ui-monospace,Consolas,monospace;font-size:28px;font-weight:700;
+      letter-spacing:.16em;color:var(--pk-muted)}
+  .qrule{position:absolute;left:120px;width:0;height:2px;background:rgba(244,241,234,.28)}
+  .qlab{position:absolute;opacity:0;font-family:ui-monospace,Consolas,monospace;
+      font-size:26px;font-weight:800;letter-spacing:.22em;color:var(--pk-accent)}
+  .qtake{position:absolute;opacity:0;font-size:36px;line-height:1.52;
+      color:var(--pk-fg)}
+
+  /* ── 曲线页 ── */
+  .chart{position:absolute;left:120px;top:400px;width:1680px;height:400px}
+  .svgbox{position:absolute;left:0;top:0;width:100%;height:100%}
+  .grid{position:absolute;left:0;right:0;height:1px;background:rgba(244,241,234,.10)}
+  .pivot{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;
+      background:var(--pk-accent);opacity:0;box-shadow:0 0 0 8px rgba(232,160,72,.18)}
+  .pvline{position:absolute;width:2px;background:rgba(232,160,72,.55);opacity:0}
+  .pvlab{position:absolute;opacity:0;font-size:30px;font-weight:800;color:var(--pk-accent)}
+  .phase{position:absolute;top:0;opacity:0}
+  .phase .pn{font-family:ui-monospace,Consolas,monospace;font-size:24px;font-weight:800;
+      letter-spacing:.18em;color:var(--pk-accent)}
+  .phase .pt{font-size:32px;font-weight:700;color:var(--pk-fg);margin-top:12px}
+  .phase .pd{font-size:25px;color:var(--pk-muted);margin-top:10px;line-height:1.45}
+
+  /* ═══ 共用：左右两张卡。left 全写在各自的类里，不混行内 style ═══ */
+  .pp{position:absolute;top:344px;width:800px;height:284px;opacity:0;
+      border:2px solid var(--pk-line);background:var(--pk-panel);padding:36px 42px}
+  .pp-l{left:120px}
+  .pp-r{left:1000px}
+  .pp .ph{font-family:ui-monospace,Consolas,monospace;font-size:28px;font-weight:800;
+      letter-spacing:.20em;color:var(--pk-muted)}
+  .pp .pt{font-size:42px;font-weight:900;line-height:1.22;color:var(--pk-fg);margin-top:22px}
+  .pp .pd{font-size:24px;line-height:1.55;color:var(--pk-muted);margin-top:20px}
+  .pp.key{border-color:var(--pk-accent)}
+  .pp.key .ph{color:var(--pk-accent)}
+  .pp-note{position:absolute;left:120px;top:684px;width:1680px;opacity:0;
+      border-left:4px solid var(--pk-accent);padding-left:34px}
+  .pp-note .nl{font-size:30px;line-height:1.6;color:var(--pk-fg)}
+  .pp-note .nl b{color:var(--pk-accent);font-weight:800}
+
+  /* ═══ 复利：一条直线和一条曲线 ═══ */
+  .cp{position:absolute;left:200px;top:320px;width:1500px;height:420px;opacity:0;z-index:2}
+  .cp-bd{position:absolute;left:0;top:0;width:0;height:0;z-index:1}
+  .cp-ax{position:absolute;left:200px;top:740px;width:0;height:3px;
+      background:var(--pk-line)}
+  .cp-x{position:absolute;top:780px;height:0;opacity:0;border-top:2px dashed var(--pk-line)}
+  .cp-lb{position:absolute;opacity:0;font-size:26px;font-weight:800}
+  .cp-lb.d{color:var(--pk-muted)}
+  .cp-lb.a{color:var(--pk-accent)}
+  .cp-tick{position:absolute;top:0;width:0;height:0;opacity:0}
+  .cp-tick .tv{position:absolute;left:-46px;top:-46px;width:92px;height:92px;
+      border-radius:50%;border:2px solid var(--pk-accent);
+      display:flex;align-items:center;justify-content:center;
+      font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:800;
+      color:var(--pk-accent);background:var(--pk-bg)}
+  .cp-tick .tn{position:absolute;left:-70px;top:56px;width:140px;text-align:center;
+      font-size:22px;line-height:1.4;color:var(--pk-muted)}
+
+  /* ═══ 锚定：中间一个锚，两边被拖走 ═══ */
+  .an-mid{position:absolute;left:640px;top:330px;width:640px;height:280px;opacity:0;
+      border:3px solid var(--pk-accent);background:var(--pk-panel);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+  .an-mid .mk{font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:800;
+      letter-spacing:.22em;color:var(--pk-accent)}
+  .an-mid .mv{font-family:ui-monospace,Consolas,monospace;font-size:104px;font-weight:900;
+      color:var(--pk-fg);font-variant-numeric:tabular-nums;line-height:1}
+  .an-sid{position:absolute;top:352px;width:460px;height:236px;opacity:0;
+      border:2px solid var(--pk-line);background:var(--pk-panel);padding:30px 34px}
+  .an-sl{left:120px}
+  .an-sr{left:1340px}
+  .an-sid .sh{font-family:ui-monospace,Consolas,monospace;font-size:25px;font-weight:800;
+      letter-spacing:.18em;color:var(--pk-muted)}
+  .an-sid .sv{font-size:34px;font-weight:800;line-height:1.32;color:var(--pk-fg);
+      margin-top:18px}
+  .an-arw{position:absolute;top:456px;width:0;height:2px;opacity:0;
+      background:var(--pk-accent)}
+  .an-arw .ad{position:absolute;left:-9px;top:-6px;width:0;height:0;
+      border-top:7px solid transparent;border-bottom:7px solid transparent;
+      border-left:12px solid var(--pk-accent)}
+
+  /* ═══ 确认偏误：两边都是证据，只有一边被留下 ═══ */
+  .cf{position:absolute;top:344px;width:800px;height:300px;opacity:0;
+      border:2px solid var(--pk-line);background:var(--pk-panel);padding:36px 42px}
+  .cf-l{left:120px}
+  .cf-r{left:1000px}
+  .cf.key{border-color:var(--pk-accent)}
+  .cf .fh{font-family:ui-monospace,Consolas,monospace;font-size:27px;font-weight:800;
+      letter-spacing:.20em;color:var(--pk-muted)}
+  .cf.key .fh{color:var(--pk-accent)}
+  .cf .fi{font-size:31px;font-weight:700;line-height:1.36;color:var(--pk-fg);
+      margin-top:22px}
+  .cf .fn{font-size:22px;line-height:1.5;color:var(--pk-muted);margin-top:6px}
+
+  /* ═══ 规划谬误：计划 vs 实际，成对 ═══ */
+  .pf{position:absolute;top:344px;width:520px;height:300px;opacity:0;
+      border:2px solid var(--pk-line);background:var(--pk-panel);padding:32px 36px}
+  .pf .ph{font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:800;
+      letter-spacing:.18em;color:var(--pk-muted)}
+  .pf .pn{font-size:32px;font-weight:800;color:var(--pk-fg);margin-top:16px}
+  .pf .pr{display:flex;align-items:baseline;gap:18px;margin-top:20px}
+  .pf .pr .k{font-size:22px;color:var(--pk-muted);flex:0 0 74px}
+  .pf .pr .bar{position:relative;flex:1;height:16px;border-radius:8px;
+      background:var(--pk-line)}
+  .pf .pr .bar i{position:absolute;left:0;top:0;bottom:0;border-radius:8px;
+      background:var(--pk-muted);width:0}
+  .pf .pr.real .bar i{background:var(--pk-accent)}
+  .pf .pr .v{font-family:ui-monospace,Consolas,monospace;font-size:24px;font-weight:800;
+      color:var(--pk-muted);flex:0 0 76px;text-align:right;
+      font-variant-numeric:tabular-nums}
+  .pf .pr.real .v{color:var(--pk-accent)}
+
+  /* ═══ 范围蔓延：阶梯 ═══ */
+  /* .sc-step 是个零尺寸锚，必须落在基线上，不能写 top:0。
+     子元素 .sc-box 用 bottom:0，是相对这个锚定位的——锚在 y=0 的话，
+     柱子就长到 y=-204，整根跑到画布外去了。F7 第一次在生产代码上抓到东西，
+     抓的就是这个。
+     而「基线在 y=700」对应的不是 bottom:700px：零高度盒子写 bottom:700px
+     落在 y=1080-700=380，差了 320，标签就飘到画布外了。基线 700 → bottom:380。 */
+  .sc{position:absolute;top:330px;width:0;height:0;opacity:0;z-index:1}
+  .sc-step{position:absolute;bottom:380px;width:0;height:0}
+  .sc-box{position:absolute;bottom:0;left:0;background:var(--pk-accent);opacity:.24;
+      border-top:3px solid var(--pk-accent)}
+  .sc-lb{position:absolute;opacity:0;width:250px}
+  .sc-lb .t{font-size:27px;font-weight:800;color:var(--pk-fg)}
+  .sc-lb .d{font-size:22px;color:var(--pk-muted);margin-top:6px}
+  .sc-base{position:absolute;left:120px;top:700px;width:0;height:3px;
+      background:var(--pk-line)}
+
+  /* ═══ 返工成本：两条同起点的路径 ═══ */
+  .rw{position:absolute;top:352px;width:760px;height:300px;opacity:0;
+      border:2px solid var(--pk-line);background:var(--pk-panel);padding:36px 42px}
+  .rw-l{left:120px}
+  .rw.key{border-color:var(--pk-accent)}
+  .rw .rh{font-family:ui-monospace,Consolas,monospace;font-size:27px;font-weight:800;
+      letter-spacing:.20em;color:var(--pk-muted)}
+  .rw.key .rh{color:var(--pk-accent)}
+  .rw .rt{font-size:40px;font-weight:900;color:var(--pk-fg);margin-top:20px}
+  .rw .rb{position:relative;height:20px;border-radius:10px;background:var(--pk-line);
+      margin-top:24px;overflow:hidden}
+  .rw .rb i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:10px;
+      background:var(--pk-muted)}
+  .rw.key .rb i{background:var(--pk-accent)}
+  .rw .rn{font-size:23px;line-height:1.5;color:var(--pk-muted);margin-top:18px}
+
+  /* ═══ 排队论：等待时间随利用率非线性上升 ═══ */
+  .qu{position:absolute;left:240px;top:330px;width:1440px;height:400px;opacity:0;z-index:2}
+  .qu-bd{position:absolute;left:0;top:0;width:0;height:0;z-index:1}
+  .qu-ax{position:absolute;left:240px;top:730px;width:0;height:3px;
+      background:var(--pk-line)}
+  .qu-grid{position:absolute;top:330px;height:0;width:0;opacity:0}
+  /* 标注点的坐标是**从曲线上读出来**的，不是估的：
+     SVG 在版面上是 left:240 top:330，所以内部 (x,y) 对应版面 (240+x, 330+y)。
+     50% 那点内部约 (60,355)，80% 那点内部约 (890,262)——
+     放歪了就成了「指着空白说这里」，比没有标注更糟。 */
+  .qu-pt{position:absolute;top:0;width:0;height:0;opacity:0}
+  .qu-pt .dot{position:absolute;left:-11px;top:-11px;width:22px;height:22px;
+      border-radius:50%;background:var(--pk-accent);border:3px solid var(--pk-bg)}
+  /* 标签放点的**右侧**而不是下方：下方就是横轴，50% 那点正好落在轴上。 */
+  .qu-pt .lv{position:absolute;left:24px;top:-14px;width:200px;
+      font-size:23px;line-height:1.45;color:var(--pk-fg)}
+  .qu-lb{position:absolute;opacity:0;font-size:25px;font-weight:800;color:var(--pk-muted)}
+  .qu-lb.a{color:var(--pk-accent)}
+
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <div class="eyebrow" id="eyebrow">THE ANCHORING</div>
+  <div class="h1" id="h1" data-fit-max="76" data-fit-min="44">第一个数字定了，后面全围着它转</div>
+
+  <div class="an-sid an-sl" id="ansL">
+    <div class="sh" id="anslh">先开口的人</div>
+    <div class="sv" id="anslv" data-fit-max="34" data-fit-min="21">说了个数</div>
+  </div>
+
+  <div class="an-arw" id="anar1" style="left:580px"></div>
+
+  <div class="an-mid" id="anmid">
+    <div class="mk" id="anmk">锚</div>
+    <div class="mv" id="anmv">100 万</div>
+  </div>
+
+  <div class="an-arw" id="anar2" style="left:1280px"></div>
+
+  <div class="an-sid an-sr" id="ansR">
+    <div class="sh" id="ansrh">后面所有人</div>
+    <div class="sv" id="ansrv" data-fit-max="34" data-fit-min="21">围着这个数谈</div>
+  </div>
+
+  <div class="pp-note" id="annote" style="top:686px">
+    <div class="nl"><span id="annl">后一轮的估值不是从零算的，是从那个锚往下挪一点算的。</span><b>先说数字的人拿走定价权。</b></div>
+  </div>
+  <div class="footline" id="footline"></div>
+  <div class="foot" id="footbox"><span id="foot">对锚定最有效的不是不被打断，是</span><b>自己先说一个更高的数</b>。</div>
+
+</div>
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+  var tl = B.tl();
+  /* 规格包：先定风格，再建任何元素。
+     画面素材的配色**不跟着包走**——那是"底片"，用户自己的东西不能被模板改色；
+     跟着包走的只有 UI 层（字色、强调色、描边、圆角、曲线）。这个边界必须守住。 */
+  B.pack(v.pack);
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  function q(s) { return document.querySelector(s); }
+  /* 素材位接真视频：留空就继续用 CSS 画面 */
+  function live(n, src) {
+    if (!src) return;
+    var s = document.getElementById('s' + n), e = document.getElementById('v' + n);
+    if (!s || !e) return;
+    s.classList.add('live'); e.src = src;
+    e.play().catch(function () {});
+  }
+  /* 景别缓推：v1/v3 里画面始终在极慢地动，这是「像镜头」的关键 */
+  function push(n, at, dur, from, to, ease) {
+    var s = q('#s' + n + ' .sky'), g = q('#s' + n + ' .glow'), r = q('#s' + n + ' .r2');
+    if (s) tl.fromTo(s, { scale: from, y: '0%' },
+      { scale: to, y: '-2%', duration: dur, ease: ease || 'none' }, at);
+    if (g) tl.fromTo(g, { xPercent: -4, opacity: .8 },
+      { xPercent: 5, opacity: 1, duration: dur, ease: 'none' }, at);
+    if (r) tl.fromTo(r, { xPercent: 0 },
+      { xPercent: -2.5, duration: dur, ease: 'none' }, at);
+  }
+  /* clip-path 形状插值。
+     两个坑都在这里踩过：
+       1. GSAP 各版本对 clipPath 字符串补间的处理不一致，所以不直接补间它，
+          改成补间一个 {t:0→1} 的代理对象，onUpdate 里自己算 8 个点；
+       2. **from 必须是编译期常量，不能从元素当前状态读。**
+          settle 会把时间轴来回扫；一旦回退越过一个已完成的补间，
+          GSAP 会把它按 ratio 0 重渲——onUpdate 拿到的就是起点，
+          形状会「弹回矩形」。写成常量后，形状是 t 的纯函数，
+          停在任何一帧算出来都一样。
+     相邻两段的 from 必须等于上一段的 to，这条由 Python 侧保证。 */
+  function polyStr(pts) {
+    return 'polygon(' + pts.map(function (p) {
+      return p[0].toFixed(2) + '% ' + p[1].toFixed(2) + '%'; }).join(',') + ')';
+  }
+  function morph(el, from, to, at, dur, ease) {
+    if (!el || !to || !from || from.length !== to.length) return;
+    var st = { t: 0 };
+    tl.to(st, { t: 1, duration: dur == null ? .7 : dur, ease: ease || 'power2.inOut',
+      onUpdate: function () {
+        el.style.clipPath = polyStr(from.map(function (p, i) {
+          return [p[0] + (to[i][0] - p[0]) * st.t,
+                  p[1] + (to[i][1] - p[1]) * st.t];
+        }));
+      } }, at);
+  }
+  set('eyebrow', v.eyebrow); set('h1', v.title); set('foot', v.foot);
+  set('anslh', v.leftLabel); set('anslv', v.leftText);
+  set('ansrh', v.rightLabel); set('ansrv', v.rightText);
+  set('anmk', v.anchorLabel); set('anmv', v.anchor); set('annl', v.note);
+
+  tl.fromTo('#eyebrow', { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: .4 }, 0);
+  tl.fromTo('#h1', { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: .6,
+    ease: 'power3.out' }, .08);
+  tl.fromTo('#ansL', { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: .48,
+    ease: 'power2.out' }, .3);
+  tl.fromTo('#anar1', { opacity: 0, width: 0 },
+    { opacity: 1, width: 60, duration: .3 }, .68);
+  /* 锚最后才落：先让人听见「有人说了个数」，再让那个数占住中间 */
+  tl.fromTo('#anmid', { opacity: 0, scale: .86 },
+    { opacity: 1, scale: 1, duration: .55, ease: 'back.out(1.5)' }, .9);
+  tl.fromTo('#anar2', { opacity: 0, width: 0 },
+    { opacity: 1, width: 60, duration: .3 }, 1.5);
+  tl.fromTo('#ansR', { opacity: 0, x: 24 }, { opacity: 1, x: 0, duration: .48,
+    ease: 'power2.out' }, 1.66);
+  tl.fromTo('#annote', { opacity: 0, x: -18 },
+    { opacity: 1, x: 0, duration: .5, ease: 'power3.out' }, 2.24);
+  tl.fromTo('#footline', { width: 0 }, { width: 420, duration: .5, ease: 'power2.out' }, 2.64);
+  tl.fromTo('#footbox', { opacity: 0 }, { opacity: 1, duration: .5 }, 2.78);
+
+  B.hold(tl, 3.5, .5);
+  B.fitAll();
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"bpm","type":"number","label":"每分钟拍数","default":100},{"id":"beatsPerBar","type":"number","label":"每小节拍数","default":4},{"id":"pattern","type":"string","label":"落点组合（每拍落几个点，逗号分隔）","default":"5-3-2"},{"id":"lyrics","type":"string","label":"歌词（用 | 分行）","default":"夜风吹过街口|心事折成纸飞机"},{"id":"seed","type":"number","label":"随机种子（换个数换一片地形）","default":20261019},{"id":"accent","type":"color","label":"强调色","default":"#5CE1E6"},{"id":"title","type":"string","label":"标题文字","default":"心事折成纸飞机"}]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <meta name="description" content="五线谱从右往左流，每个字在音符上等拍，到点时往前跳两三格落到下一个音。" />
+    <title>音乐混剪·五线谱右滚</title>
+    <script src="../_lib/gsap.min.js"></script>
+    <script src="../_lib/music.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #04070E; }
+body { font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+#root { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #04070E; }
+.scene { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+
+
+#clip { position: absolute; inset: 0; overflow: hidden; }
+#tilt { position: absolute; left: -45%; top: -45%; width: 190%; height: 190%; transform-origin: 50% 50%; }
+#plate { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px;
+  margin-left: -960px; margin-top: -540px; }
+#river { position: absolute; left: 0; top: 0; height: 1080px; will-change: transform; }
+.sline { position: absolute; left: 0; height: 2px; background: rgba(226,238,255,.46); }
+.bline { position: absolute; width: 2px; background: rgba(226,238,255,.26); }
+.note { position: absolute; width: 19px; height: 13px; margin-left: -9.5px; margin-top: -6.5px;
+  border-radius: 50%; background: rgba(226,238,255,.52); transform: rotate(-15deg); }
+/* 主音符是字要落上去的那个点。直径必须小于谱行间距(27px)，
+   否则相邻两列的主音符会连成一条链，看着像串珠不像音符。 */
+.note.lead { width: 28px; height: 28px; margin-left: -14px; margin-top: -14px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(92,225,230,.40), rgba(92,225,230,.06) 58%, rgba(92,225,230,0) 72%);
+  border: 2px solid rgba(92,225,230,.72); transform: none; }
+.ring { position: absolute; width: 52px; height: 52px; margin-left: -26px; margin-top: -26px;
+  border-radius: 50%; border: 3px solid var(--ac); opacity: 0; }
+.cwrap { position: absolute; width: 92px; height: 92px; margin-left: -46px; margin-top: -46px; }
+.ly { position: absolute; left: 0; top: 0; width: 92px; height: 92px; display: flex;
+  align-items: center; justify-content: center; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  font-size: 62px; font-weight: 900; color: #FFFFFF; opacity: .25;
+  text-shadow: 0 0 26px rgba(92,225,230,.85), 0 5px 16px rgba(0,0,0,.75);
+  will-change: transform, opacity; }
+#play { position: absolute; left: 960px; top: 214px; width: 2px; height: 652px; margin-left: -1px;
+  background: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,.30) 14%, rgba(255,255,255,.30) 86%, rgba(255,255,255,0)); }
+#playdot { position: absolute; left: 960px; top: 540px; width: 13px; height: 13px; margin-left: -6.5px; margin-top: -6.5px;
+  border-radius: 50%; background: var(--ac); box-shadow: 0 0 20px var(--ac), 0 0 46px rgba(92,225,230,.55); }
+.riverlab { position: absolute; left: 104px; top: 96px; }
+.riverlab .k { font-size: 25px; letter-spacing: .36em; color: var(--ac); font-weight: 700; text-indent: .36em; }
+.riverlab .t { font-size: 62px; font-weight: 900; color: #EAF2FF; margin-top: 18px; line-height: 1.06; }
+.riverlab .m { font-size: 28px; color: rgba(234,242,255,.48); margin-top: 16px; }
+.pat { position: absolute; right: 104px; bottom: 92px; display: flex; gap: 12px; align-items: flex-end;
+  background: rgba(4,7,14,.66); padding: 13px 15px; border-radius: 15px;
+  border: 1px solid rgba(122,158,206,.14); }
+.pat .g { min-width: 58px; height: 58px; padding: 0 12px; border: 2px solid rgba(92,225,230,.32);
+  border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  font-size: 28px; font-weight: 900; color: rgba(92,225,230,.70); font-variant-numeric: tabular-nums;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+.patlab { position: absolute; right: 104px; bottom: 166px; font-size: 23px; letter-spacing: .26em;
+  color: rgba(234,242,255,.58); background: rgba(4,7,14,.72); padding: 7px 14px; border-radius: 9px;
+  border: 1px solid rgba(122,158,206,.14); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="10.90" data-width="1920" data-height="1080">
+      <section id="scene" class="scene clip" data-start="0" data-duration="10.90" data-track-index="1">
+      <div id="clip">
+        <div id="tilt">
+          <div id="plate">
+            <div id="river"><div id="staff"></div><div id="notes"></div><div id="rings"></div><div id="chars"></div></div>
+            <div id="play"></div>
+            <div id="playdot"></div>
+          </div>
+        </div>
+      </div>
+      <div class="riverlab">
+        <div class="k">SCORE FLOW</div>
+        <div class="t" id="hudt"></div>
+        <div class="m" id="hudm"></div>
+      </div>
+      <div class="patlab">每拍落几个点</div>
+      <div class="pat" id="pat"></div>
+      </section>
+    </div>
+    <script>
+
+window.__MDEFAULTS = {"bpm": 100, "beatsPerBar": 4, "pattern": "5-3-2", "lyrics": "夜风吹过街口|心事折成纸飞机", "seed": 20261019, "accent": "#5CE1E6", "title": "心事折成纸飞机", "bg": "#04070E"};
+(function () {
+  'use strict';
+  var DF = window.__MDEFAULTS || {};
+  var raw = (window.__hyperframes && window.__hyperframes.getVariables)
+            ? window.__hyperframes.getVariables() : null;
+  var v = {};
+  for (var kk in DF) { if (Object.prototype.hasOwnProperty.call(DF, kk)) v[kk] = DF[kk]; }
+  if (raw) { for (var k2 in raw) { if (Object.prototype.hasOwnProperty.call(raw, k2) && raw[k2] !== '' && raw[k2] != null) v[k2] = raw[k2]; } }
+  function val(k, d) { return (v[k] === undefined || v[k] === null || v[k] === '') ? d : v[k]; }
+
+  var score = MMusic.build({
+    bpm: val('bpm', 100),
+    beatsPerBar: val('beatsPerBar', 4),
+    pattern: val('pattern', '5-3-2'),
+    lyrics: val('lyrics', ''),
+    seed: val('seed', 20261019)
+  });
+
+  function hex2rgb(h) {
+    h = String(h || '#5CE1E6').replace('#', '');
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    var n = parseInt(h, 16);
+    if (!isFinite(n)) n = 0x5CE1E6;
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function mix(a, b, t) {
+    t = t < 0 ? 0 : (t > 1 ? 1 : t);
+    return 'rgb(' + Math.round(a[0] + (b[0] - a[0]) * t) + ',' +
+                    Math.round(a[1] + (b[1] - a[1]) * t) + ',' +
+                    Math.round(a[2] + (b[2] - a[2]) * t) + ')';
+  }
+  function clamp(x, a, b) { return x < a ? a : (x > b ? b : x); }
+  function easeIO(p) { return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; }
+
+  var ACC = val('accent', '#5CE1E6');
+  var accRGB = hex2rgb(ACC);
+  var ACCS = 'rgb(' + accRGB[0] + ',' + accRGB[1] + ',' + accRGB[2] + ')';
+  var MUTED = [138, 164, 200];
+  var ROOT = document.getElementById('root');
+  ROOT.style.setProperty('--ac', ACCS);
+  ROOT.style.backgroundColor = val('bg', '#04070E');
+  document.documentElement.style.setProperty('--ac', ACCS);
+
+
+  /* 落点组合的节拍条：每格 = 一拍落几个点。当前拍放大高亮。
+     这条把「5个键、3个键、2个键」的按法摆在明面上，不是玄学。 */
+  var chipEls = [];
+  (function () {
+    var box = document.getElementById('pat');
+    if (!box) return;
+    /* 节拍格子的数量要跟画幅走：竖屏只有 1080 宽，按横屏的 16 个排会切掉。
+       算式里减掉 300 是给「起始边距 + 面板内边距」留的余量。 */
+    var n = Math.min(score.totalBeats, 16, Math.floor((1920 - 300) / 70));
+    for (var i = 0; i < n; i++) {
+      var sz = score.pattern[i % score.pattern.length];
+      var c = document.createElement('div');
+      c.className = 'g';
+      c.textContent = String(sz);
+      box.appendChild(c);
+      chipEls.push(c);
+    }
+  })();
+  function updateChips(t) {
+    var beat = Math.floor(t / score.spb);
+    for (var i = 0; i < chipEls.length; i++) {
+      var d = beat - i;
+      var on = (d === 0);
+      chipEls[i].style.opacity = on ? 1 : (d > 0 ? 0.20 : 0.40);
+      chipEls[i].style.transform = on ? 'scale(1.16)' : 'scale(1)';
+      chipEls[i].style.borderColor = on ? ACCS : 'rgba(' + accRGB.join(',') + ',.32)';
+      chipEls[i].style.color = on ? '#04070E' : 'rgba(' + accRGB.join(',') + ',.70)';
+      chipEls[i].style.background = on ? ACCS : 'transparent';
+    }
+  }
+
+
+  /* ── 曲谱层 ───────────────────────────────────────────────
+     五线谱从右往左流。每个字在自己的音符上待着，到点时用「跳点」
+     往前跳 2~3 格落到下一个音符上 —— 一下一下往前跳，不是滑过去。
+
+     关键：跳点用抛物线弧（sin），不是线性位移。一条直线的移动
+     看起来像滚动条，只有「先抬起来再落下」才像跳。 */
+  var COLW = 152, PLAY = 960, STAFF_TOP = 378, ROWH = 27;
+  function rowY(r) { return STAFF_TOP + r * ROWH; }
+
+  var river = document.getElementById('river');
+  var RIVER_W = score.cols * COLW;
+  river.style.width = RIVER_W + 'px';
+
+  (function () {
+    var st = document.getElementById('staff');
+    for (var s = 2; s <= 10; s += 2) {
+      var ln = document.createElement('div');
+      ln.className = 'sline';
+      ln.style.top = rowY(s) + 'px';
+      ln.style.width = RIVER_W + 'px';
+      st.appendChild(ln);
+    }
+    var step = score.subdiv * score.bpb;
+    for (var bc = 0; bc <= score.cols; bc += step) {
+      var bl = document.createElement('div');
+      bl.className = 'bline';
+      bl.style.left = (bc * COLW) + 'px';
+      bl.style.top = rowY(2) + 'px';
+      bl.style.height = (rowY(10) - rowY(2)) + 'px';
+      st.appendChild(bl);
+    }
+  })();
+
+  var noteEls = [];
+  (function () {
+    var wrap = document.getElementById('notes');
+    for (var i = 0; i < score.notes.length; i++) {
+      var col = score.notes[i];
+      for (var j = 0; j < col.notes.length; j++) {
+        var n = col.notes[j];
+        var el = document.createElement('div');
+        el.className = 'note' + (n.lead ? ' lead' : '');
+        el.style.left = (col.col * COLW) + 'px';
+        el.style.top = rowY(n.row) + 'px';
+        wrap.appendChild(el);
+        noteEls.push({ el: el, col: col, row: n.row, lead: n.lead, t: col.t });
+      }
+    }
+  })();
+
+  var charEls = [];
+  (function () {
+    var wrap = document.getElementById('chars');
+    var ringWrap = document.getElementById('rings');
+    for (var i = 0; i < score.chars.length; i++) {
+      var c = score.chars[i];
+      var cw = document.createElement('div');
+      cw.className = 'cwrap';
+      cw.style.left = (c.col * COLW) + 'px';
+      cw.style.top = rowY(c.row) + 'px';
+      var el = document.createElement('span');
+      el.className = 'ly';
+      el.textContent = c.ch;
+      cw.appendChild(el);
+      wrap.appendChild(cw);
+      /* 落点环必须挂在 #rings（也就是 #river 的定位祖先）上：
+         挂进 .cwrap 会把 left/top 当成 cwrap 的相对偏移，位置整个跑掉。 */
+      var ring = document.createElement('div');
+      ring.className = 'ring';
+      ring.style.left = (c.col * COLW) + 'px';
+      ring.style.top = rowY(c.row) + 'px';
+      ringWrap.appendChild(ring);
+      charEls.push({ c: c, el: el, ring: ring,
+                     hopDur: Math.min(0.44, Math.max(0.16, c.gap * 0.42)),
+                     arc: 74 + c.hop * 18, x0: -c.hop * COLW });
+    }
+  })();
+
+  function updateScore(t) {
+    /* 整条谱往左流：col 0 出发时正好在播放线上 */
+    var x = PLAY - (t / score.colDur) * COLW;
+    river.style.transform = 'translate3d(' + x.toFixed(1) + 'px,0,0)';
+
+    /* 跳点 */
+    for (var i = 0; i < charEls.length; i++) {
+      var C = charEls[i];
+      var at = C.c.t - C.hopDur, en = at + C.hopDur;
+      var p = t <= at ? 0 : (t >= en ? 1 : (t - at) / C.hopDur);
+      var pe = easeIO(p);
+      var px = C.x0 * (1 - pe);
+      var py = -C.arc * Math.sin(Math.PI * pe);
+      /* 落点有一个「砸下去」的鼓包：中途最大，落地回到 1.0 */
+      var sc = 0.88 + 0.12 * pe + 0.20 * Math.sin(Math.PI * pe);
+      var op = 0.40 + 0.60 * Math.min(1, pe * 2.6);
+      C.el.style.transform = 'translate(' + px.toFixed(1) + 'px,' + py.toFixed(1) + 'px) scale(' + sc.toFixed(3) + ')';
+      C.el.style.opacity = op.toFixed(3);
+
+      /* 落点环：字砸到音符上的那一下 */
+      var rp = (t - C.c.t) / 0.66;
+      if (rp < 0 || rp > 1) { C.ring.style.opacity = '0'; }
+      else {
+        var rv = rp < 0.22 ? rp / 0.22 : 1 - (rp - 0.22) / 0.78;
+        C.ring.style.opacity = Math.max(0, rv).toFixed(3);
+        C.ring.style.transform = 'scale(' + (0.30 + rp * 1.35).toFixed(3) + ')';
+      }
+    }
+
+    /* 音符被弹到时高亮 */
+    for (var j = 0; j < noteEls.length; j++) {
+      var N = noteEls[j];
+      var age = t - N.t;
+      var e = 0;
+      if (age >= 0 && age < 0.9) e = age < 0.06 ? age / 0.06 : Math.exp(-(age - 0.06) * 4.2);
+      N.el.style.opacity = (0.42 + 0.58 * e).toFixed(3);
+      N.el.style.borderColor = e > 0.25 ? ACCS : '';
+    }
+  }
+
+  function render(t) {
+    if (t > DUR) t = DUR;
+    updateScore(t);
+    updateChips(t);
+  }
+
+  (function () {
+    var t = document.getElementById('hudt');
+    var m = document.getElementById('hudm');
+    var b = document.getElementById('bpmn');
+    if (t) t.textContent = val('title', '');
+    if (m) m.textContent = score.bars + ' 小节 · ' + score.chars.length + ' 字 · 2/3/5 复节奏';
+    if (b) b.textContent = String(Math.round(score.bpm));
+  })();
+
+
+  /* ── 时间轴 ───────────────────────────────────────────────
+     全片只有这一条补间：一个 {t:0} 代理对象线性推进，onUpdate 调 render。
+     画面是时间的纯函数，往回 seek 也一定还原得对。 */
+  var DUR = score.duration;
+  var st = { t: 0 };
+  var tl = gsap.timeline({ paused: true });
+  tl.fromTo(st, { t: 0 }, {
+    t: DUR, duration: DUR, ease: 'none',
+    onUpdate: function () { render(st.t); }
+  }, 0);
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+  render(0);
+})();
+
+    </script>
+  </body>
+</html>

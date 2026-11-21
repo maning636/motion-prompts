@@ -1,0 +1,13 @@
+{
+  "eyebrow": "SCENE SWEEP · 转场",
+  "oldTitle": "旧场景 · 上一拍",
+  "oldSubtitle": "信息 A · 已成过去",
+  "oldPoints": "语境已搭建\n情绪已铺好\n主角已登场",
+  "newTitle": "新场景 · 下一拍",
+  "newSubtitle": "信息 B · 即将揭晓",
+  "newPoints": "视角切换\n焦点转移\n结论高亮",
+  "linePosition": 50,
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

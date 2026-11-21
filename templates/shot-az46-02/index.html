@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "段落标题", "default": "系统就绪"}, {"id": "label1", "type": "string", "label": "表一标签", "default": "渲染"}, {"id": "value1", "type": "string", "label": "表一数值", "default": "86"}, {"id": "label2", "type": "string", "label": "表二标签", "default": "配音"}, {"id": "value2", "type": "string", "label": "表二数值", "default": "92"}, {"id": "label3", "type": "string", "label": "表三标签", "default": "合成"}, {"id": "value3", "type": "string", "label": "表三数值", "default": "78"}, {"id": "unit", "type": "string", "label": "单位", "default": "%"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+.gtitle{ position:absolute; left:0; right:0; top:150px; text-align:center; font-size:60px; color:var(--fg); }
+.grow{ position:absolute; left:0; right:0; top:290px; display:flex; justify-content:center; gap:120px; }
+.gauge{ position:relative; width:420px; height:460px; }
+.glabel{ position:absolute; left:0; right:0; top:330px; text-align:center; font-size:34px; color:rgba(255,255,255,.75); letter-spacing:.2em; }
+.gval{ position:absolute; left:0; right:0; top:240px; text-align:center; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  font-weight:700; font-size:76px; color:var(--accent); opacity:0; }
+.gval small{ font-size:40px; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+<div class="gtitle" id="t"></div>
+<div class="grow" id="row"></div>
+    </div>
+    <script>
+      const FB = {"title": "系统就绪", "label1": "渲染", "value1": "86", "label2": "配音", "value2": "92", "label3": "合成", "value3": "78", "unit": "%", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#t').textContent=v.title||'';
+const A=v.accent||'#00FF00';
+const row=$('#row');
+const R=180,CX=210,CY=230,A0=-225,A1=45;
+const rad=d=>d*Math.PI/180;
+const pt=(a,r)=>[CX+r*Math.cos(rad(a)),CY+r*Math.sin(rad(a))];
+const gauges=[];
+for(let i=1;i<=3;i++){
+  const g=document.createElement('div');g.className='gauge';
+  let ticks='';
+  for(let k=0;k<=10;k++){
+    const a=A0+(A1-A0)*k/10;
+    const [x1,y1]=pt(a,R-16),[x2,y2]=pt(a,R-2);
+    const major=k%5===0;
+    ticks+='<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="rgba(255,255,255,'+(major?'.7':'.28')+')" stroke-width="'+(major?5:3)+'"/>';
+  }
+  const [sx,sy]=pt(A0,R),[ex,ey]=pt(A1,R);
+  g.innerHTML='<svg width="420" height="460" viewBox="0 0 420 460">'
+    +'<path d="M'+sx+' '+sy+' A '+R+' '+R+' 0 1 1 '+ex+' '+ey+'" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="14" stroke-linecap="round"/>'
+    +ticks
+    +'<g class="needle" style="transform-origin:'+CX+'px '+CY+'px"><line x1="'+CX+'" y1="'+CY+'" x2="'+CX+'" y2="'+(CY-R+34)+'" stroke="'+A+'" stroke-width="8" stroke-linecap="round"/>'
+    +'<circle cx="'+CX+'" cy="'+CY+'" r="16" fill="'+A+'"/></g>'
+    +'</svg>'
+    +'<div class="gval num">0<small>'+(v.unit||'')+'</small></div>'
+    +'<div class="glabel">'+(v['label'+i]||'')+'</div>';
+  row.appendChild(g);
+  gauges.push({g,val:+(v['value'+i]||0),needle:g.querySelector('.needle'),num:g.querySelector('.gval')});
+}
+tl.fromTo('.gtitle',{opacity:0,y:20},{opacity:1,y:0,duration:F(10)},0);
+gauges.forEach(({needle,num,val},i)=>{
+  const at=F(10)+i*F(4);
+  const aTrue=A0+(A1-A0)*Math.min(val,100)/100;
+  // 指针静止时朝上(-90°)，刻度角 a 对应的旋转量 = a + 90；svgOrigin 锁定表盘中心为旋转原点
+  tl.set(needle,{rotation:A0+90,svgOrigin:CX+" "+CY},0);
+  // 点火自检：12f 甩满弧 → 20f 回落带 7° 过冲 → 落定
+  tl.to(needle,{rotation:A1+90,duration:F(12),ease:'power2.out'},at);
+  tl.to(needle,{rotation:aTrue+90-7,duration:F(16),ease:'power2.inOut'},at+F(12));
+  tl.to(needle,{rotation:aTrue+90,duration:F(6),ease:'power2.out'},at+F(28));
+  // 落定同帧数值弹出
+  const tSet=at+F(34);
+  tl.fromTo(num,{opacity:0,scale:.7},{opacity:1,scale:1,duration:F(6),ease:'back.out(2)'},tSet);
+  const obj={n:0};
+  tl.to(obj,{n:val,duration:F(8),ease:'power2.out',onUpdate:()=>{
+    num.innerHTML=Math.round(obj.n)+'<small>'+(v.unit||'')+'</small>';}},tSet);
+});
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

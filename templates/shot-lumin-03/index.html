@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}, {"id": "img1", "type": "image", "label": "页面图（可选，填了就把图贴进霓虹框）", "default": ""}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+.tube{ position:absolute; border:3px solid var(--accent); border-radius:14px;
+  box-shadow:0 0 22px var(--accent); opacity:.45; }
+#tube1{ left:100px; top:140px; width:400px; height:220px; }
+#tube2{ left:1420px; top:560px; width:360px; height:340px; }
+#view{ position:absolute; inset:0; perspective:1200px; perspective-origin:30% 50%; }
+#orbit{ position:absolute; left:230px; top:130px; width:1460px; height:820px; transform-style:preserve-3d;
+  will-change:transform; }
+#frameSvg{ position:absolute; left:0; top:0; width:1460px; height:820px; overflow:visible; }
+.fpath{ fill:none; stroke:var(--accent); stroke-width:5;
+  filter:drop-shadow(0 0 14px var(--accent)); }
+.fhead{ fill:#fff; filter:drop-shadow(0 0 10px var(--accent)); }
+#panel{ position:absolute; inset:0; border-radius:18px; background:#101219; overflow:hidden; }
+#sideCol{ position:absolute; left:0; top:0; width:320px; height:100%; padding:44px 34px;
+  border-right:1px solid color-mix(in srgb, var(--fg) 12%, transparent); }
+.blk{ position:relative; will-change:transform; }
+.sh{ position:absolute; left:8%; right:8%; bottom:-14px; height:18px; border-radius:50%;
+  background:#000; filter:blur(14px); opacity:0; }
+.row{ height:52px; border-radius:10px; background:color-mix(in srgb, var(--fg) 10%, transparent); margin-bottom:26px; }
+#main{ position:absolute; left:360px; top:0; right:0; padding:56px 54px; }
+.hero{ height:200px; border-radius:14px; background:color-mix(in srgb, var(--accent) 16%, transparent);
+  border:1px solid color-mix(in srgb, var(--accent) 45%, transparent); margin-bottom:34px; }
+.cardRow{ display:flex; gap:30px; }
+.mcard{ flex:1; height:300px; border-radius:14px; background:color-mix(in srgb, var(--fg) 8%, transparent);
+  border:1px solid color-mix(in srgb, var(--fg) 16%, transparent); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4.5" data-width="1920" data-height="1080">
+
+<div class="tube" id="tube1"></div><div class="tube" id="tube2"></div>
+<div id="view">
+  <div id="orbit">
+    <div id="panel">
+      <div id="sideCol">
+        <div class="blk"><div class="row"></div><div class="sh"></div></div>
+        <div class="blk"><div class="row"></div><div class="sh"></div></div>
+        <div class="blk"><div class="row"></div><div class="sh"></div></div>
+      </div>
+      <div id="main">
+        <div class="blk"><div class="hero"></div><div class="sh"></div></div>
+        <div class="cardRow">
+          <div class="blk" style="flex:1"><div class="mcard"></div><div class="sh"></div></div>
+          <div class="blk" style="flex:1"><div class="mcard"></div><div class="sh"></div></div>
+          <div class="blk" style="flex:1"><div class="mcard"></div><div class="sh"></div></div>
+        </div>
+      </div>
+      <img id="pageImg" alt="" style="position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#101219; display:none; z-index:4;" />
+    </div>
+    <svg id="frameSvg" viewBox="0 0 1460 820">
+      <path class="fpath" id="fpA" d="M 0 410 L 0 0 L 1460 0 L 1460 410"/>
+      <path class="fpath" id="fpB" d="M 0 410 L 0 820 L 1460 820 L 1460 410"/>
+      <circle class="fhead" id="fhA" r="8"/><circle class="fhead" id="fhB" r="8"/>
+    </svg>
+  </div>
+</div>
+
+    </div>
+    <script>
+      const FB = {"accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+// 可选页面图：填了 img1 就把图贴进霓虹框面板（contain 完整显示，盖住线框 UI）
+if (v.img1) { const im=$('#pageImg'); im.src=v.img1; im.style.display='block'; }
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+const fpA=$('#fpA'), fpB=$('#fpB'), fhA=$('#fhA'), fhB=$('#fhB');
+const LA=fpA.getTotalLength(), LB=fpB.getTotalLength();
+fpA.style.strokeDasharray=LA; fpA.style.strokeDashoffset=LA;
+fpB.style.strokeDasharray=LB; fpB.style.strokeDashoffset=LB;
+const fw={a:0,b:0};
+function paintF(){
+  fpA.style.strokeDashoffset=LA-fw.a; fpB.style.strokeDashoffset=LB-fw.b;
+  let p=fpA.getPointAtLength(Math.min(fw.a,LA-0.01)); fhA.setAttribute('cx',p.x); fhA.setAttribute('cy',p.y);
+  p=fpB.getPointAtLength(Math.min(fw.b,LB-0.01)); fhB.setAttribute('cx',p.x); fhB.setAttribute('cy',p.y);
+}
+paintF();
+// 描框 ~14f
+tl.to(fw,{a:LA,b:LB,duration:F(14),ease:'power1.inOut',onUpdate:paintF},F(2));
+tl.to([fhA,fhB],{opacity:0,duration:F(4)},F(16));
+// 视角弧线 rotateY +38° → -26°，透视原点 30%→64% 随动，贯穿全片
+gsap.set('#orbit',{rotationY:38});
+tl.to('#orbit',{rotationY:-26,duration:F(96),ease:'power1.inOut'},F(14));
+tl.to('#view',{perspectiveOrigin:'64% 50%',duration:F(96),ease:'power1.inOut'},F(14));
+// 全体组件同帧贴落（零错峰——整体登场语法）：悬浮 150px，f44-72 齐落
+const blks=document.querySelectorAll('.blk');
+blks.forEach((b)=>{
+  const sh=b.querySelector('.sh');
+  gsap.set(b,{y:-150});
+  tl.to(b,{y:0,duration:F(28),ease:'power2.in'},F(44));
+  tl.fromTo(sh,{opacity:0,scaleX:1.5},{opacity:.55,scaleX:1,duration:F(28),ease:'power2.in'},F(44));
+});
+// 落定后框光并入、背景管让位
+tl.to('#panel',{boxShadow:'0 0 60px color-mix(in srgb, var(--accent) 35%, transparent)',duration:F(16)},F(76));
+tl.to(['#tube1','#tube2'],{opacity:.06,duration:F(14)},F(92));
+// 收尾真静止
+tl.to({},{duration:F(29)},F(106));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,16 @@
+{
+ "name": "折扣标签贴",
+ "description": "ink 小条压在强调色胶囊上沿，胶囊内 900 大折扣数字 + 单位字，右侧白底说明块分格擦出；三层错峰做匀速往返位移",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "discount",
+  "pill",
+  "pink"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "电商直播挂折扣角标、需要一句「仅剩最后 N 天」施压时"
+}

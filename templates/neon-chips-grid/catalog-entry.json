@@ -1,0 +1,28 @@
+{
+  "id": "neon-chips-grid",
+  "name": "霓虹功能chips网格",
+  "description": "荧光绿暗底口播包装：标题组+图标功能chips两行逐个弹入，绿框收拢圈住全部chips后淡入说明字，适合产品功能盘点。",
+  "category": "信息卡片",
+  "tags": [
+    "chips网格",
+    "霓虹",
+    "功能盘点",
+    "收拢框",
+    "口播"
+  ],
+  "duration": 6,
+  "slot": "concept",
+  "when": "口播列举一组产品功能或能力项，需要逐个亮相再整体框选收尾时",
+  "assets": [],
+  "path": "templates/neon-chips-grid",
+  "size": "1920×1080",
+  "formats": [
+    "mp4"
+  ],
+  "defaultFormat": "mp4",
+  "preview": "https://maning789link.top/hub/renders/neon-chips-grid/sample.webm",
+  "status": "ready",
+  "tier": "free",
+  "no": null,
+  "series": "shot"
+}

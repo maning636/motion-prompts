@@ -1,0 +1,13 @@
+{
+  "id": "paged-review-skeleton",
+  "name": "分页项目测评骨架（杂志测评页）",
+  "series": "page",
+  "createdAt": "2026-08-15T08:20:00.000Z",
+  "energy": "中",
+  "suggestedDuration": 7,
+  "knownPitfalls": [
+    "条目格式是 标题|说明，多条用分号分隔，说明别超 40 字否则换行顶到下行",
+    "titleHl 必须是 title 里真实存在的子串，否则不高亮",
+    "结论条是盖章砸入，条目超过 4 条会挤压结论条入场时间，建议 3 条"
+  ]
+}

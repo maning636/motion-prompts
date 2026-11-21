@@ -1,0 +1,36 @@
+{
+  "id": "transition-wipe-down",
+  "name": "纵向擦拭·上→下",
+  "description": "纵向擦拭·上→下 · 6s 过渡模板（bg→fg 两图切换）",
+  "duration": 6,
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "category": "过渡/转场",
+  "tags": [
+    "transition-wipe-down",
+    "transition",
+    "bg-fg"
+  ],
+  "variables": [
+    {
+      "id": "bg",
+      "type": "image",
+      "label": "起始画面",
+      "default": "./placeholder-1.png"
+    },
+    {
+      "id": "fg",
+      "type": "image",
+      "label": "结束画面",
+      "default": "./placeholder-2.png"
+    },
+    {
+      "id": "duration",
+      "type": "number",
+      "label": "总时长",
+      "default": 6
+    }
+  ],
+  "presetId": "default"
+}

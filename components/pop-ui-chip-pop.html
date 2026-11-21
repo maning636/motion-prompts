@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"label","name":"控件文案","type":"string","label":"控件说明文案","default":"风格标签"},{"id":"chips","name":"标签","type":"string","label":"四个标签（逗号分隔）","default":"运镜,转场,配乐,字幕"},{"id":"picked","name":"选中项","type":"number","label":"第几个被选中（从 1 起）","default":3},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.2}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>标签依次弹入</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-halo { position: absolute; inset: 0;
+    background: radial-gradient(60% 72% at 50% 50%,
+      rgba(0,0,0,.56) 0%, rgba(0,0,0,.30) 54%, rgba(0,0,0,0) 84%); }
+  .p-label { position: absolute; font-size: 11px; font-weight: 700; letter-spacing: .18em;
+    color: rgba(255,248,238,.6); white-space: nowrap; }
+  .p-chip { position: absolute; top: 124px; width: 68px; height: 30px; border-radius: 15px;
+    background: rgba(255,248,238,.08); border: 2px solid rgba(255,248,238,.28);
+    display: flex; align-items: center; justify-content: center; }
+  /* 选中态单独一层：颜色走 --ac，换强调色时整组跟着换 */
+  .p-chip-on { position: absolute; left: -2px; top: -2px; width: 68px; height: 30px;
+    border-radius: 15px; opacity: 0; background: rgba(255,107,53,.22);
+    border: 2px solid var(--ac); }
+  .p-chip-tx { font-size: 12px; font-weight: 800; color: rgba(255,248,238,.8);
+    white-space: nowrap; }
+  .p-ring { position: absolute; top: 124px; width: 68px; height: 30px; border-radius: 15px;
+    opacity: 0; border: 2px solid var(--ac); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"label":"风格标签","chips":"运镜,转场,配乐,字幕","picked":3,"accent":"#FF6B35","duration":3.2};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || 3.2;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  const fits = [];
+  function fit(list) { fits.push.apply(fits, list); }
+  function runFit() {
+    fits.forEach((f) => {
+      const el = f.el;
+      el.style.fontSize = f.max + 'px';
+      const avail = f.box || el.clientWidth;
+      const ws = el.style.whiteSpace;
+      el.style.whiteSpace = 'nowrap';
+      const natural = el.scrollWidth;
+      el.style.whiteSpace = ws;
+      if (natural > avail) {
+        el.style.fontSize = Math.max(f.min, Math.floor(f.max * avail / natural)) + 'px';
+      }
+    });
+  }
+  function list4(s, fb) {
+    const a = String(s == null ? '' : s).split(/[,，|]/);
+    const out = [];
+    for (let i = 0; i < 4; i++) {
+      const t = (a[i] || '').trim();
+      out.push(t || fb[i]);
+    }
+    return out;
+  }
+
+  put('div', 'p-halo');
+  const label = put('div', 'p-label', 'left:92px; top:82px;', v.label || FALLBACK.label);
+  const names = list4(v.chips, list4(FALLBACK.chips, ['运镜', '转场', '配乐', '字幕']));
+  const pick = Math.min(4, Math.max(1, Math.round(parseFloat(v.picked) || 3))) - 1;
+
+  const chips = [], rings = [];
+  names.forEach(function (s, i) {
+    const ring = put('div', 'p-ring', 'left:' + (92 + i * 76) + 'px;', null);
+    const chip = put('div', 'p-chip', 'left:' + (92 + i * 76) + 'px;');
+    put('div', 'p-chip-on', '', null, chip);
+    put('div', 'p-chip-tx', '', s, chip);
+    chips.push(chip); rings.push(ring);
+  });
+
+  fit([{ el: label, max: 11, min: 9, box: 296 }]);
+  /* chip 文字是 chip 的子节点，量它自己才有意义（量块级 chip 量到的是 68px 容器宽） */
+  chips.forEach(function (c) {
+    fits.push({ el: c.lastChild, max: 12, min: 9, box: 56 });
+  });
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  tl.fromTo(label, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .3 }, .04);
+  /* 逐个弹入：stagger 就是「依次」的全部含义 */
+  tl.fromTo(chips, { scale: 0, opacity: 0, rotate: -10 },
+    { scale: 1, opacity: 1, rotate: 0, duration: .42, ease: 'back.out(2.4)', stagger: .13 }, .22);
+
+  /* 选中动作必须等这颗 chip 的入场补间跑完再开始，
+     否则两条补间同时改 scale、互相抢帧。 */
+  const T = .22 + pick * 0.13 + 0.42;
+  /* 选中态：描边跳一下 + 一圈扩散环 */
+  tl.to(chips[pick].firstChild, { opacity: 1, duration: .18, ease: 'power2.out' }, T);
+  tl.to(chips[pick].lastChild, { color: '#FFF8EE', duration: .18 }, T);
+  tl.to(chips[pick], { scale: 1.14, duration: .13, ease: 'power2.out' }, T);
+  tl.to(chips[pick], { scale: 1, duration: .34, ease: 'elastic.out(1,.5)' }, T + 0.13);
+  tl.fromTo(rings[pick], { opacity: .9, scale: 1 },
+    { opacity: 0, scale: 1.5, duration: .46, ease: 'power2.out' }, T + 0.05);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  runFit();
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

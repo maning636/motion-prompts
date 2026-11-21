@@ -1,0 +1,7 @@
+{
+  "name": "api-call-mock",
+  "private": true,
+  "scripts": {
+    "render": "cd ../.. && npm run render -- api-call-mock"
+  }
+}

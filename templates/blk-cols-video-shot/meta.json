@@ -1,0 +1,16 @@
+{
+ "name": "分栏数字条 · 一条片子到底烧多少",
+ "description": "五根等宽色条并排顶天立地，每根一个主指标，色条端头压一条墨色横杠",
+ "category": "数据可视化",
+ "tags": [
+  "积木社",
+  "chart",
+  "sun",
+  "snappy"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "card",
+ "when": "数据卡片 / 分栏数字条"
+}

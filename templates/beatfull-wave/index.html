@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"pack","name":"规格包","type":"enum","label":"规格包（配色 / 字体 / 曲线）","options":[{"label":"暗色科技","value":"dark"},{"label":"奶油贴纸","value":"cream"},{"label":"单色克制","value":"mono"},{"label":"夜航","value":"night"}],"default":"night"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":4.8},{"id":"bpm","type":"number","name":"BPM","label":"每分钟拍数","default":126},{"id":"beatsPerBar","type":"number","name":"拍号","label":"每小节拍数","default":4}]'>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="64 根柱按小节内位置推高度，强拍最高并换成强调色，柱顶下方标出小节号。柱高是合成的，不是音频分析的结果。">
+<title>波形 · 强弱拍形状不同</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<link rel="stylesheet" href="../_lib/packs.css">
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script>
+<!-- packs.js 必须排在 blocks.js **之后**：blocks.js 结尾是 global.BBlocks = BB，
+     会把它整个替换掉。谁先加载谁的东西就没了，表现是 B.pack is not a function。 -->
+<script src="../_lib/packs.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<style>
+  /* 底色和字色**必须来自规格包**，不能写死。
+     写死 #000 + #F4F1EA 的时候，四个包里只有 dark / night 正常：
+     cream 的 --pk-fg 是 #2A2118、mono 是 #14140F，两个都是**深字**，
+     压在这个写死的黑底上 → 标题、标签、说明全糊掉。
+     而写死字面量色的元素（比如 rgba(244,241,234,.82)）反而还看得见，
+     画面上就成了一半能看一半不能看——比全黑更难认。
+     一共 33 条模板中招（混剪 5 + 认知 22 + 节拍 6）。
+
+     注意区分两层契约（packs.css 顶部注释里写过）：
+       --pk-bg / --pk-fg      = 包自带底板，舞台自己用它
+       --pk-*-media           = 压在用户素材上的那一层
+     这里改的是前者。 */
+  html,body{margin:0;padding:0;background:var(--pk-bg,#000)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--pk-bg,#000);
+        color:var(--pk-fg,#F4F1EA);font-family:"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+        -webkit-font-smoothing:antialiased}
+  /* 统一安全区：混剪里所有贴边元素都从 72/88 起，不贴 0 */
+  
+  /* ── 通用 ── */
+  .eyebrow{position:absolute;left:120px;top:104px;opacity:0;
+      font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:700;
+      letter-spacing:.34em;color:var(--pk-accent);text-indent:.34em}
+  .h1{position:absolute;left:120px;top:148px;width:1680px;opacity:0;
+      font-size:76px;font-weight:900;line-height:1.16;color:var(--pk-fg);letter-spacing:.01em}
+  .foot{position:absolute;left:120px;top:922px;width:1680px;opacity:0;
+      font-size:34px;line-height:1.5;color:var(--pk-muted)}
+  .foot b{color:var(--pk-accent);font-weight:700}
+  /* 底部一条极细的分隔，给满屏一个「结束感」 */
+  .footline{position:absolute;left:120px;top:884px;width:0;height:2px;background:var(--pk-accent)}
+
+  /* ── 因果链 ── */
+  .spine{position:absolute;left:120px;top:0;width:4px;height:0;background:var(--pk-accent);opacity:.9}
+  .node{position:absolute;left:120px;width:64px;height:64px;margin:-32px 0 0 -32px;
+      border-radius:50%;border:3px solid var(--pk-accent);background:var(--pk-bg);opacity:0;
+      display:flex;align-items:center;justify-content:center;
+      font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:800;color:var(--pk-accent)}
+  .clabel{position:absolute;opacity:0;font-family:ui-monospace,Consolas,monospace;
+      font-size:30px;font-weight:800;letter-spacing:.20em;color:var(--pk-accent)}
+  .ctext{position:absolute;opacity:0;font-size:52px;font-weight:700;line-height:1.30;color:var(--pk-fg)}
+  .cnote{position:absolute;opacity:0;font-size:27px;line-height:1.5;
+      color:var(--pk-muted)}
+
+  /* ── 公式页 ── */
+  .eqbox{position:absolute;left:120px;top:352px;width:1680px;height:210px;opacity:0;
+      display:flex;align-items:center;justify-content:center;gap:0;
+      border-top:2px solid rgba(244,241,234,.14);border-bottom:2px solid rgba(244,241,234,.14)}
+  .eqbox .t{font-size:150px;font-weight:900;color:var(--pk-fg);font-variant-numeric:tabular-nums}
+  .eqbox .o{font-size:110px;font-weight:300;color:var(--pk-muted);padding:0 26px}
+  .eqbox .r{font-size:150px;font-weight:900;color:var(--pk-accent);font-variant-numeric:tabular-nums}
+  .vcard{position:absolute;top:650px;width:520px;opacity:0;
+      border-left:4px solid rgba(244,241,234,.18);padding-left:28px}
+  .vcard .vn{font-size:40px;font-weight:900;color:var(--pk-fg)}
+  .vcard .vd{font-size:26px;line-height:1.5;color:var(--pk-muted);margin-top:14px}
+  .vcard .vv{font-size:30px;font-weight:800;color:var(--pk-accent);margin-top:14px;
+      font-family:ui-monospace,Consolas,monospace}
+
+  /* ── 引述页 ── */
+  .qm{position:absolute;left:120px;top:236px;opacity:0;
+      font-family:Georgia,'Times New Roman',serif;font-size:220px;line-height:.7;
+      color:var(--pk-accent);opacity:0}
+  .qtext{position:absolute;left:120px;top:376px;width:1560px;opacity:0;
+      font-size:96px;font-weight:800;line-height:1.42;color:var(--pk-fg);letter-spacing:.01em}
+  .qwho{position:absolute;left:120px;opacity:0;
+      font-family:ui-monospace,Consolas,monospace;font-size:28px;font-weight:700;
+      letter-spacing:.16em;color:var(--pk-muted)}
+  .qrule{position:absolute;left:120px;width:0;height:2px;background:rgba(244,241,234,.28)}
+  .qlab{position:absolute;opacity:0;font-family:ui-monospace,Consolas,monospace;
+      font-size:26px;font-weight:800;letter-spacing:.22em;color:var(--pk-accent)}
+  .qtake{position:absolute;opacity:0;font-size:36px;line-height:1.52;
+      color:var(--pk-fg)}
+
+  /* ── 曲线页 ── */
+  .chart{position:absolute;left:120px;top:400px;width:1680px;height:400px}
+  .svgbox{position:absolute;left:0;top:0;width:100%;height:100%}
+  .grid{position:absolute;left:0;right:0;height:1px;background:rgba(244,241,234,.10)}
+  .pivot{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;
+      background:var(--pk-accent);opacity:0;box-shadow:0 0 0 8px rgba(232,160,72,.18)}
+  .pvline{position:absolute;width:2px;background:rgba(232,160,72,.55);opacity:0}
+  .pvlab{position:absolute;opacity:0;font-size:30px;font-weight:800;color:var(--pk-accent)}
+  .phase{position:absolute;top:0;opacity:0}
+  .phase .pn{font-family:ui-monospace,Consolas,monospace;font-size:24px;font-weight:800;
+      letter-spacing:.18em;color:var(--pk-accent)}
+  .phase .pt{font-size:32px;font-weight:700;color:var(--pk-fg);margin-top:12px}
+  .phase .pd{font-size:25px;color:var(--pk-muted);margin-top:10px;line-height:1.45}
+
+  /* ── 节拍地图 ── */
+  .taxis{position:absolute;left:120px;top:560px;width:1680px;height:3px;
+      background:rgba(244,241,234,.18)}
+  /* 刻度用 top 定位，不用 bottom。
+     容器 #ticks 是静态块，.tick 里的 bottom:0 是相对 **#stage** 的下边——
+     整排刻度会掉到画面最底边，而不是贴在轴上。 */
+  .tick{position:absolute;width:2px;background:rgba(244,241,234,.34);opacity:0}
+  .tick.down{width:3px;background:var(--pk-accent);height:44px;top:543px}
+  .tick.up{height:24px;top:563px}
+  .barlab{position:absolute;opacity:0;font-family:ui-monospace,Consolas,monospace;
+      font-size:24px;font-weight:800;color:var(--pk-muted)}
+  .barlab.down{color:var(--pk-accent);font-size:30px}
+  .bpmbox{position:absolute;right:120px;top:104px;opacity:0;text-align:right}
+  .bpmbox .bv{font-family:ui-monospace,Consolas,monospace;font-size:64px;font-weight:800;
+      color:var(--pk-accent);line-height:1}
+  .bpmbox .bs{font-size:22px;color:var(--pk-muted);margin-top:10px;
+      font-family:ui-monospace,Consolas,monospace;letter-spacing:.10em}
+  .evrow{position:absolute;left:120px;width:1680px;height:66px;opacity:0;
+      border-top:1px solid rgba(244,241,234,.10)}
+  .evrow .et{position:absolute;left:0;top:16px;font-size:30px;font-weight:700;
+      color:var(--pk-fg)}
+  .evrow .ed{position:absolute;left:0;top:0;font-family:ui-monospace,Consolas,monospace;
+      font-size:20px;color:var(--pk-accent);transform:translateY(-34px)}
+
+  /* ── 卡点标题 ── */
+  .cdwrap{position:absolute;left:120px;top:300px;width:1680px;height:340px;
+      display:flex;align-items:center;justify-content:center}
+  .cdword{position:absolute;font-size:150px;font-weight:900;line-height:1;
+      color:var(--pk-fg);opacity:0;white-space:nowrap;letter-spacing:.04em}
+  .cdbar{position:absolute;left:120px;bottom:150px;width:0;height:6px;
+      background:var(--pk-accent);border-radius:3px}
+  .cdmeta{position:absolute;right:120px;top:110px;opacity:0;text-align:right;
+      font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:800;
+      color:var(--pk-muted);letter-spacing:.14em}
+
+  /* ── 节拍环 ── */
+  .ringwrap{position:absolute;left:400px;top:540px;width:0;height:0}
+  .ringdot{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;
+      background:rgba(244,241,234,.22);opacity:0}
+  .ringdot.on{background:var(--pk-accent);box-shadow:0 0 0 10px rgba(232,160,72,.20)}
+  .ringhand{position:absolute;left:-2px;top:-230px;width:4px;height:230px;
+      background:linear-gradient(to top,rgba(232,160,72,0),var(--pk-accent));opacity:0;
+      transform-origin:50% 100%}
+  .ringmid{position:absolute;left:400px;top:540px;width:0;height:0;opacity:0;text-align:center}
+  .ringmid .rn{font-family:ui-monospace,Consolas,monospace;font-size:96px;font-weight:900;
+      color:var(--pk-fg);line-height:1}
+  .ringmid .rs{font-size:24px;color:var(--pk-muted);margin-top:14px;
+      font-family:ui-monospace,Consolas,monospace;letter-spacing:.16em}
+  .ringside{position:absolute;left:900px;top:430px;width:900px;opacity:0}
+  .ringside .st{font-size:30px;color:var(--pk-muted);
+      font-family:ui-monospace,Consolas,monospace;letter-spacing:.16em}
+  .ringside .sx{margin-top:24px;font-size:52px;font-weight:800;line-height:1.4;
+      color:var(--pk-fg)}
+  .ringside .sy{margin-top:22px;font-size:28px;line-height:1.5;
+      color:var(--pk-muted)}
+
+  /* ── 波形 ── */
+  .wave{position:absolute;left:120px;top:360px;width:1680px;height:340px;
+      display:flex;align-items:center;gap:0}
+  .wbar{flex:1 1 0;background:rgba(244,241,234,.26);height:20%;opacity:0;
+      border-radius:2px 2px 0 0}
+  .wbar.down{background:var(--pk-accent)}
+  .wlab{position:absolute;opacity:0;font-family:ui-monospace,Consolas,monospace;
+      font-size:22px;font-weight:800;color:var(--pk-muted);text-align:center}
+  .wlab.down{color:var(--pk-accent);font-size:26px}
+
+  /* ── 倒数起拍 ── */
+  .count{position:absolute;left:120px;top:300px;width:1680px;height:300px;
+      display:flex;align-items:center;justify-content:center}
+  .count .cn{font-size:280px;font-weight:900;line-height:1;color:var(--pk-fg);opacity:0;
+      font-variant-numeric:tabular-nums}
+  .count .cn.hit{color:var(--pk-accent)}
+  .ctitle{position:absolute;left:0;right:0;top:700px;opacity:0;text-align:center;
+      font-size:88px;font-weight:900;line-height:1.25;color:var(--pk-fg);padding:0 120px}
+
+  /* ── 段落标记 ── */
+  .segbar{position:absolute;left:120px;top:400px;width:0;height:120px;opacity:0;
+      display:flex;border-radius:10px;overflow:hidden}
+  .seg{position:relative;height:100%;display:flex;align-items:center;
+      justify-content:center;font-family:ui-monospace,Consolas,monospace;
+      font-size:22px;font-weight:800;letter-spacing:.14em;overflow:hidden}
+  .segcard{position:absolute;top:560px;opacity:0}
+  .segcard .sn{font-size:32px;font-weight:800;color:var(--pk-fg)}
+  .segcard .sd{font-size:24px;color:var(--pk-muted);margin-top:12px}
+  .segtick{position:absolute;top:520px;width:2px;height:20px;
+      background:rgba(244,241,234,.35);opacity:0}
+
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <div class="eyebrow" id="eb">THE WAVE</div>
+  <div class="h1" id="h1" data-fit-max="76" data-fit-min="44">强弱拍，形状本来就不同</div>
+  <div class="cdmeta" id="cdmeta" style="top:220px"></div>
+  <div class="wave" id="wave"></div>
+  <div id="wlab"></div>
+  <div class="footline" id="fline"></div>
+  <div class="foot" id="foot" data-fit-max="34" data-fit-min="22">柱高是合成的，不是音频分析的结果——真波形要等管线支持音频。</div>
+
+</div>
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+  var tl = B.tl();
+  /* 规格包：先定风格，再建任何元素。
+     画面素材的配色**不跟着包走**——那是"底片"，用户自己的东西不能被模板改色；
+     跟着包走的只有 UI 层（字色、强调色、描边、圆角、曲线）。这个边界必须守住。 */
+  B.pack(v.pack);
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  function q(s) { return document.querySelector(s); }
+  /* 素材位接真视频：留空就继续用 CSS 画面 */
+  function live(n, src) {
+    if (!src) return;
+    var s = document.getElementById('s' + n), e = document.getElementById('v' + n);
+    if (!s || !e) return;
+    s.classList.add('live'); e.src = src;
+    e.play().catch(function () {});
+  }
+  /* 景别缓推：v1/v3 里画面始终在极慢地动，这是「像镜头」的关键 */
+  function push(n, at, dur, from, to, ease) {
+    var s = q('#s' + n + ' .sky'), g = q('#s' + n + ' .glow'), r = q('#s' + n + ' .r2');
+    if (s) tl.fromTo(s, { scale: from, y: '0%' },
+      { scale: to, y: '-2%', duration: dur, ease: ease || 'none' }, at);
+    if (g) tl.fromTo(g, { xPercent: -4, opacity: .8 },
+      { xPercent: 5, opacity: 1, duration: dur, ease: 'none' }, at);
+    if (r) tl.fromTo(r, { xPercent: 0 },
+      { xPercent: -2.5, duration: dur, ease: 'none' }, at);
+  }
+  /* clip-path 形状插值。
+     两个坑都在这里踩过：
+       1. GSAP 各版本对 clipPath 字符串补间的处理不一致，所以不直接补间它，
+          改成补间一个 {t:0→1} 的代理对象，onUpdate 里自己算 8 个点；
+       2. **from 必须是编译期常量，不能从元素当前状态读。**
+          settle 会把时间轴来回扫；一旦回退越过一个已完成的补间，
+          GSAP 会把它按 ratio 0 重渲——onUpdate 拿到的就是起点，
+          形状会「弹回矩形」。写成常量后，形状是 t 的纯函数，
+          停在任何一帧算出来都一样。
+     相邻两段的 from 必须等于上一段的 to，这条由 Python 侧保证。 */
+  function polyStr(pts) {
+    return 'polygon(' + pts.map(function (p) {
+      return p[0].toFixed(2) + '% ' + p[1].toFixed(2) + '%'; }).join(',') + ')';
+  }
+  function morph(el, from, to, at, dur, ease) {
+    if (!el || !to || !from || from.length !== to.length) return;
+    var st = { t: 0 };
+    tl.to(st, { t: 1, duration: dur == null ? .7 : dur, ease: ease || 'power2.inOut',
+      onUpdate: function () {
+        el.style.clipPath = polyStr(from.map(function (p, i) {
+          return [p[0] + (to[i][0] - p[0]) * st.t,
+                  p[1] + (to[i][1] - p[1]) * st.t];
+        }));
+      } }, at);
+  }
+  /* 版式常量也要在 JS 侧给一份。上一版 px() 里直接写了 L / W——
+     那是 Python 的变量名，浏览器里根本没有，一执行就 ReferenceError，
+     整段脚本挂掉、时间轴是空的（DUR=0.00）。
+     而 ERRS 当时报的是 none——因为 probe_full 的探针挂在组件脚本**之后**，
+     连错误监听器都还没注册。和 §25 修的 D7 是同一个毛病。 */
+  var L = 120, W = 1680;
+  var bpm = Math.max(40, Math.min(220, parseFloat(v.bpm) || 124));
+  var spb = 60 / bpm;
+  var bpb = Math.max(2, Math.min(7, parseInt(v.beatsPerBar, 10) || 4));
+  var BD = parseFloat(v.duration) || 4.8;  var BEATS = [];
+  for (var i = 0; i * spb < BD - 0.001; i++) {
+    BEATS.push({ i: i, t: +(i * spb).toFixed(4),
+                 bar: Math.floor(i / bpb) + 1, down: (i % bpb) === 0 });
+  }
+  var BARS = BEATS.filter(function (b) { return b.down; });
+  var ACCENT = BARS.filter(function (b) { return (b.bar - 1) % 4 === 0; });
+  var BPMTXT = Math.round(bpm) + ' BPM';
+  var BPMNOTE = bpb + '/4 · 一拍 ' + spb.toFixed(2) + 's · 共 ' + BARS.length + ' 小节';
+  /* 拍在时间轴上的横向位置：一切版式都从这里来，不写死 */
+  function px(t) { return (L + (t / BD) * W).toFixed(1) + 'px'; }
+  set('eb', v.eyebrow); set('h1', v.title); set('foot', v.foot);
+  set('cdmeta', BPMTXT + ' · ' + BPMNOTE);
+  var N = 64, host = document.getElementById('wave'), lab = document.getElementById('wlab');
+  var bars = [], labs = [];
+  for (var k = 0; k < N; k++) {
+    var d = document.createElement('div');
+    d.className = 'wbar';
+    d.style.opacity = '0';
+    host.appendChild(d);
+    bars.push(d);
+  }
+  BARS.forEach(function (b) {
+    var e = document.createElement('div');
+    e.className = 'wlab down';
+    e.style.opacity = '0';
+    e.style.left = (L + (b.t / BD) * W - 30) + 'px';
+    e.style.top = '716px';
+    e.style.width = '60px';
+    e.textContent = 'BAR ' + b.bar;
+    lab.appendChild(e);
+    labs.push(e);
+  });
+  /* 柱高按「小节内位置」推：强拍最高，弱拍依次收下来。
+     改 BPM 时小节数变，每根柱对应的拍也变，整排形状跟着变。 */
+  bars.forEach(function (el, k) {
+    var bi = Math.floor((k / N) * BARS.length);
+    var within = (k / N) * BARS.length - bi;
+    var h = 30 + 70 * Math.abs(Math.sin(within * Math.PI * 2 + bi * 0.7));
+    if (within < 0.06) h = 100;
+    el.style.height = h.toFixed(0) + '%';
+    el.className = 'wbar' + (within < 0.06 ? ' down' : '');
+    var at = 0.4 + (k / N) * (BD - 1.0);
+    tl.fromTo(el, { scaleY: 0, transformOrigin: '50% 100%' },
+        { scaleY: 1, opacity: 1, duration: .3, ease: 'power2.out' }, at);
+  });
+  labs.forEach(function (e, k) {
+    tl.fromTo(e, { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .3, ease: 'power2.out' }, 0.5 + k * .2);
+  });
+  tl.fromTo('#eb', { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: .4 }, 0);
+  tl.fromTo('#h1', { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .06);
+  tl.fromTo('#cdmeta', { opacity: 0 }, { opacity: 1, duration: .4 }, .2);
+  tl.fromTo('#fline', { width: 0 }, { width: 200, duration: .5, ease: 'power3.out' }, BD - .3);
+  tl.fromTo('#foot', { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: .5 }, BD - .18);
+  B.hold(tl, BD + .4, .4);
+  B.fitAll();
+
+})();
+</script>
+</body>
+</html>

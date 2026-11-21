@@ -1,0 +1,13 @@
+{
+  "id": "lead-word-zoom-assemble",
+  "name": "领头词放大定格 · 句式组装",
+  "description": "文字 kinetic 模板：领头词从屏幕中心炸开放大至定格尺寸，配 halo 圆环与准星短暂闪示，随后其余词以小号错峰飞入就位排成完整句式，最后领头词字号收敛到与余词协调的尺寸，整体收归常速停留可读。",
+  "category": "文字动效",
+  "tags": ["文字动效", "词组", "kinetic", "headline", "zoom"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-10T00:00:00.000Z"
+}

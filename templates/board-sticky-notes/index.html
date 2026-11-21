@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "本周发布计划"}, {"id": "notes", "type": "string", "label": "便签内容（逗号分隔）", "default": "定稿脚本,录制旁白,剪辑粗剪,封面设计,定时发布,复盘数据"}, {"id": "underline", "type": "color", "label": "下划线颜色", "default": "#1E7A46"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      #root{ background: #FCFBF6; font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; color: #1D1D20;
+        background-image: linear-gradient(rgba(29,29,32,.045) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(29,29,32,.045) 1px, transparent 1px); background-size: 64px 64px; }
+      .b-head{ position: absolute; left: 140px; top: 110px; }
+      .b-head h1{ font-size: 68px; font-weight: 900; letter-spacing: .02em; }
+      .b-under{ width: 480px; height: 22px; margin-top: 14px; background: var(--under, #1E7A46);
+        border-radius: 11px; transform-origin: left center; }
+      .b-grid{ position: absolute; left: 140px; right: 140px; top: 320px; bottom: 130px;
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 52px 56px; }
+      .note{ position: relative; background: #FFE98A; border-radius: 6px; padding: 40px 34px;
+        font-size: 34px; font-weight: 800; line-height: 1.3; display: flex; align-items: center;
+        box-shadow: 6px 7px 0 rgba(29,29,32,.14); word-break: break-all; }
+      .note:last-child{ background: #DFF2C0; }
+      .note::before{ content: ""; position: absolute; left: 50%; top: -16px; width: 96px; height: 30px;
+        margin-left: -48px; background: rgba(255,255,255,.6); transform: rotate(-2deg);
+        border-left: 1px solid rgba(29,29,32,.08); border-right: 1px solid rgba(29,29,32,.08); }
+      .note .idx{ position: absolute; left: 22px; top: 14px; font-size: 20px; color: rgba(29,29,32,.45); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="b-head">
+        <h1 id="title"></h1>
+        <div class="b-under" id="under"></div>
+      </div>
+      <div class="b-grid" id="grid"></div>
+
+    </div>
+    <script>
+      const fallback = {"title": "本周发布计划", "notes": "定稿脚本,录制旁白,剪辑粗剪,封面设计,定时发布,复盘数据", "underline": "#1E7A46", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      document.documentElement.style.setProperty("--under", V.underline ?? "#1E7A46");
+      $("title").textContent = V.title;
+      const notes = split(V.notes).slice(0, 6);
+      const rots = [-3.5, 2.5, -2, 3, -1.5, 2];
+      const grid = $("grid");
+      notes.forEach((txt, i) => {
+        const d = document.createElement("div");
+        d.className = "note";
+        d.innerHTML = `<span class="idx mono">${String(i + 1).padStart(2, "0")}</span><span class="txt"></span>`;
+        d.querySelector(".txt").textContent = txt;
+        grid.appendChild(d);
+      });
+      tl.fromTo("#title", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 0.1);
+      tl.fromTo("#under", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power3.out" }, 0.35);
+      document.querySelectorAll(".note").forEach((el, i) => {
+        tl.fromTo(el, { scale: 0.55, opacity: 0, rotation: rots[i % rots.length] + 10 },
+          { scale: 1, opacity: 1, rotation: rots[i % rots.length], duration: 0.48, ease: "back.out(2.4)" },
+          0.75 + i * 0.16);
+      });
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

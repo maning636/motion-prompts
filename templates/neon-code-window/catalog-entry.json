@@ -1,0 +1,28 @@
+{
+  "id": "neon-code-window",
+  "name": "霓虹代码窗口卡",
+  "description": "深黑底荧光绿左文右窗：标题关键词绿色高亮，右侧 macOS 代码窗口内 5 行伪代码逐行 cascade 淡入，适合口播讲生成流程/构建进度。",
+  "category": "信息卡片",
+  "tags": [
+    "代码窗口",
+    "霓虹",
+    "荧光绿",
+    "生成流程",
+    "口播"
+  ],
+  "duration": 6,
+  "slot": "concept",
+  "when": "口播讲解生成器/构建流程的逐步推进，需要代码窗口逐行出现的科技感画面时",
+  "assets": [],
+  "path": "templates/neon-code-window",
+  "size": "1920×1080",
+  "formats": [
+    "mp4"
+  ],
+  "defaultFormat": "mp4",
+  "preview": "https://maning789link.top/hub/renders/neon-code-window/sample.webm",
+  "status": "ready",
+  "tier": "free",
+  "no": null,
+  "series": "shot"
+}

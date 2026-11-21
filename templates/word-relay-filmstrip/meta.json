@@ -1,0 +1,13 @@
+{
+  "id": "word-relay-filmstrip",
+  "name": "词语接力·胶片条",
+  "description": "横向胶片条横贯画面，槽位里的旧词向左飞出胶片外、新词从右飞入接替，循环 2-3 次表达词义演化或迭代叙事。",
+  "category": "文字动效",
+  "tags": ["文字动效", "词语接力", "胶片条", "迭代叙事"],
+  "duration": 7,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-05T00:00:00.000Z"
+}

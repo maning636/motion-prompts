@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"text","name":"文案","type":"string","label":"渐变文案","default":"流光溢彩"},{"id":"c1","name":"渐变色1","type":"color","label":"渐变色 1","default":"#FF6B35"},{"id":"c2","name":"渐变色2","type":"color","label":"渐变色 2","default":"#FFC93C"},{"id":"c3","name":"渐变色3","type":"color","label":"渐变色 3","default":"#2EC4B6"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.2}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>渐变流动字</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+
+  .p-gf-halo {
+    position: absolute; left: 60px; top: 70px; width: 360px; height: 130px;
+    background: radial-gradient(60% 70% at 50% 50%,
+      rgba(0, 0, 0, .50) 0%, rgba(0, 0, 0, .24) 54%, rgba(0, 0, 0, 0) 84%);
+  }
+  .p-gf-wrap {
+    position: absolute; left: 0; right: 0; top: 98px; height: 74px;
+    display: flex; align-items: center; justify-content: center;
+    will-change: transform;
+  }
+  .p-gf-word {
+    display: inline-block; white-space: nowrap;
+    font-size: 44px; line-height: 1.1; font-weight: 900; letter-spacing: .04em;
+    color: var(--fg, #FFF8EE);
+    background-image: linear-gradient(100deg,
+      var(--c1, #FF6B35) 0%, var(--c2, #FFC93C) 24%,
+      var(--c3, #2EC4B6) 50%, var(--c2, #FFC93C) 76%, var(--c1, #FF6B35) 100%);
+    background-size: 260% 100%;
+    background-position: 0% 50%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    will-change: background-position, transform;
+  }
+  .p-gf-bar {
+    position: absolute; left: 132px; right: 132px; top: 196px; height: 5px;
+    background: var(--c2, #FFC93C); border-radius: 3px; opacity: .8;
+    transform: scaleX(0); transform-origin: 50% 50%;
+    will-change: transform, opacity;
+  }
+  .p-gf-sub {
+    position: absolute; left: 0; right: 0; top: 212px; text-align: center;
+    font-size: 10px; line-height: 1; font-weight: 700; letter-spacing: .3em;
+    color: rgba(255, 248, 238, .55);
+    will-change: transform, opacity;
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"流光溢彩","c1":"#FF6B35","c2":"#FFC93C","c3":"#2EC4B6","duration":3.2};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--c1', v.c1 || FALLBACK.c1);
+  root.style.setProperty('--c2', v.c2 || FALLBACK.c2);
+  root.style.setProperty('--c3', v.c3 || FALLBACK.c3);
+  const dur = parseFloat(v.duration) || 3.2;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  const text = (v.text == null || v.text === '' ? FALLBACK.text : v.text)
+    .toString().replace(/\s+/g, ' ').trim().slice(0, 8);
+
+  put('div', 'p-gf-halo');
+  const wrap = put('div', 'p-gf-wrap');
+  const word = put('div', 'p-gf-word', null, text, wrap);
+  const bar = put('div', 'p-gf-bar');
+  const sub = put('div', 'p-gf-sub', null, 'GRADIENT FLOW', stage);
+
+  /* §3.2 中文溢出防护：白底/描边层不参与布局量宽，直接量 word 本身 */
+  const MAXFS = 44, MINFS = 18, AVAIL = 340;
+  word.style.whiteSpace = 'nowrap';
+  const natural = word.scrollWidth;
+  if (natural > AVAIL && natural > 0) {
+    word.style.fontSize = String(Math.max(MINFS, Math.floor(MAXFS * AVAIL / natural))) + 'px';
+  }
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  const FLOW_END = Math.max(1.8, dur - .35);
+
+  /* ① 弹入 */
+  tl.fromTo(wrap, { y: 22, scale: .90, opacity: 0 },
+    { y: 0, scale: 1, opacity: 1, duration: .50, ease: 'back.out(2.4)' }, 0);
+  tl.fromTo(sub, { y: 8, opacity: 0 },
+    { y: 0, opacity: 1, duration: .34, ease: 'power2.out' }, .30);
+
+  /* ② 渐变位移动画：background-position 0% → 100% → 0%，
+        两端对齐且用 ease:'none'，循环接缝无跳变 */
+  tl.fromTo(word,
+    { backgroundPosition: '0% 50%' },
+    { backgroundPosition: '100% 50%', duration: (FLOW_END - .35) / 2, ease: 'none',
+      yoyo: true, repeat: 1 }, .35);
+
+  /* ③ 字轻微浮动：四拍正弦，首尾都回 y:0，循环接缝不跳 */
+  const Q = (dur - .35) / 4;
+  tl.fromTo(wrap, { y: 0 }, { y: -5, duration: Q, ease: 'sine.inOut' }, .35);
+  tl.to(wrap, { y: 0, duration: Q, ease: 'sine.inOut' }, .35 + Q);
+  tl.to(wrap, { y: -5, duration: Q, ease: 'sine.inOut' }, .35 + Q * 2);
+  tl.to(wrap, { y: 0, duration: Q, ease: 'sine.inOut' }, .35 + Q * 3);
+
+  /* ④ 底部细条拉开 */
+  tl.fromTo(bar, { scaleX: 0, opacity: 0 },
+    { scaleX: 1, opacity: .8, duration: .52, ease: 'back.out(2.2)' }, .34);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

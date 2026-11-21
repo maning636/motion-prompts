@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "word", "type": "string", "label": "大字文本", "default": "THE OCEAN"}, {"id": "video1", "type": "string", "label": "视频路径", "default": "视频 placeholder.mp4（未随仓分发）"}, {"id": "anchorIndex", "type": "number", "label": "锚点字母序号（0 起，空格不计）", "default": 3}, {"id": "splitAmount", "type": "number", "label": "裂开幅度(px，上下各半)", "default": 560}, {"id": "pushScale", "type": "number", "label": "推近倍率", "default": 1.055}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}, {"id": "noteKicker", "type": "string", "label": "解说角标（留空不显示）", "default": ""}, {"id": "noteText", "type": "string", "label": "解说正文（留空不显示）", "default": ""}, {"id": "notePosition", "type": "string", "label": "解说卡位置 tl/tr/bl/br", "default": "tl"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #040604; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+      .vm-stage{ position: absolute; inset: 0; overflow: hidden; }
+      #vid1{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform-origin: center; }
+      .vm-mask{ position: absolute; inset: 0; width: 1920px; height: 1080px; }
+      .vm-mask text{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 380px; font-weight: 700; fill: #000; }
+      #maskTop{ clip-path: inset(0 0 49.8% 0); }
+      #maskBottom{ clip-path: inset(49.8% 0 0 0); }
+      .vm-tag{ position: absolute; left: 64px; bottom: 54px; font-size: 22px; letter-spacing: .4em;
+        color: rgba(255,255,255,.6); z-index: 5; }
+      /* 可选解说浮层：半透明毛玻璃卡 + 品牌绿竖条，浮在字母蒙版层之上 */
+      .vm-note{ position: absolute; z-index: 10; max-width: 560px; padding: 18px 24px 18px 21px;
+        background: rgba(10,14,12,.55); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+        border-radius: 14px; border-left: 3px solid #22c55e; opacity: 0;
+        box-shadow: 0 8px 32px rgba(0,0,0,.35); }
+      .vm-note.tl{ left: 64px; top: 56px; }
+      .vm-note.tr{ right: 64px; top: 56px; }
+      .vm-note.bl{ left: 64px; bottom: 56px; }
+      .vm-note.br{ right: 64px; bottom: 56px; }
+      .vm-note .nk{ font-size: clamp(18px, 1.15vw, 24px); color: #22c55e; letter-spacing: .18em;
+        margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .vm-note .nt{ font-size: clamp(22px, 1.45vw, 30px); line-height: 1.45; color: rgba(255,255,255,.95);
+        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+    </style>
+  <style>
+/* [公开版] 原实拍视频未随仓分发，此处为占位块 */
+.pub-media-placeholder{
+  background:
+    repeating-linear-gradient(135deg, rgba(255,255,255,.05) 0 12px, rgba(255,255,255,.11) 12px 24px),
+    rgba(120,120,130,.22);
+  border:1px dashed rgba(255,255,255,.22);
+  border-radius:10px;
+  position:relative;
+}
+.pub-media-placeholder::after{
+  content:"公开版未包含实拍素材";
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  font:400 20px/1.4 'PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,sans-serif;
+  color:rgba(255,255,255,.62);
+  letter-spacing:.04em;
+}
+</style>
+</head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="vm-stage">
+        <!-- [公开版] 原视频 视频 placeholder.mp4（未随仓分发） 未随仓分发（实拍素材，体积原因）。此位置改为占位块。 -->
+<div id="vid1"></div>
+        <svg class="vm-mask" id="maskTop" viewBox="0 0 1920 1080">
+          <defs><mask id="mTop" maskUnits="userSpaceOnUse" x="0" y="0" width="1920" height="1080">
+            <rect x="0" y="0" width="1920" height="1080" fill="#fff"/><g class="letters"></g>
+          </mask></defs>
+          <rect x="0" y="0" width="1920" height="1080" fill="#040604" mask="url(#mTop)"/>
+        </svg>
+        <svg class="vm-mask" id="maskBottom" viewBox="0 0 1920 1080">
+          <defs><mask id="mBottom" maskUnits="userSpaceOnUse" x="0" y="0" width="1920" height="1080">
+            <rect x="0" y="0" width="1920" height="1080" fill="#fff"/><g class="letters"></g>
+          </mask></defs>
+          <rect x="0" y="0" width="1920" height="1080" fill="#040604" mask="url(#mBottom)"/>
+        </svg>
+      </div>
+      <div class="vm-tag">VIDEO × MASK · APERTURE</div>
+      <div class="vm-note tl" id="note" style="display:none">
+        <div class="nk" id="noteKicker"></div>
+        <div class="nt" id="noteText"></div>
+      </div>
+
+    </div>
+    <script>
+      const fallback = {"word": "THE OCEAN", "video1": "视频 placeholder.mp4（未随仓分发）", "anchorIndex": 3, "splitAmount": 560, "pushScale": 1.055, "duration": 6, "noteKicker": "", "noteText": "", "notePosition": "tl"};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      if (V.video1) $("vid1").src = V.video1;
+      const word = String(V.word ?? "THE OCEAN");
+      const chars = [];
+      for (const ch of word) { if (ch !== " ") chars.push(ch); }
+      const anchorVi = Math.max(0, Math.min(chars.length - 1, Number(V.anchorIndex) || 0));
+      const adv = 245, cy = 600, cx = 960;
+      const letterHtml = chars.map((ch, vi) =>
+        `<text class="L" data-vi="${vi}" x="${cx + (vi - anchorVi) * adv}" y="${cy}" text-anchor="middle">${ch}</text>`).join("");
+      document.querySelectorAll(".vm-mask .letters").forEach((g) => { g.innerHTML = letterHtml; });
+      // 首帧只留锚点字母，其余从两侧归位（先快后慢 ease-out）
+      document.querySelectorAll(".vm-mask text.L").forEach((el) => {
+        const vi = Number(el.dataset.vi);
+        if (vi !== anchorVi) gsap.set(el, { x: (vi < anchorVi ? -1 : 1) * 1500 });
+      });
+      tl.fromTo(".vm-tag", { opacity: 0 }, { opacity: 1, duration: 0.5 }, 0);
+      tl.to(".vm-mask text.L", { x: 0, duration: 1.15, ease: "power3.out",
+        stagger: { each: 0.05, from: "center" } }, 0.35);
+      // 中央 aperture 横向裂开：字形复用为上下两个实例同步退场，黑边里仍见移动字形
+      const splitAmt = Math.abs(Number(V.splitAmount) || 420);
+      tl.to("#maskTop", { y: -splitAmt, duration: 1.05, ease: "power2.inOut" }, 1.8);
+      tl.to("#maskBottom", { y: splitAmt, duration: 1.05, ease: "power2.inOut" }, 1.8);
+      // 缓慢推近（1.055 足够，大了变 Zoom 特效片）
+      tl.to("#vid1", { scale: Number(V.pushScale) || 1.055, duration: 1.6, ease: "power1.inOut" }, 2.2);
+      // 可选解说浮层：开始后 0.4s 淡入上浮，结尾前 0.4s 淡出
+      const nk = String(V.noteKicker ?? "").trim();
+      const nt = String(V.noteText ?? "").trim();
+      if (nk || nt) {
+        const note = $("note");
+        note.style.display = "block";
+        const pos = String(V.notePosition ?? "tl").toLowerCase();
+        note.classList.remove("tl", "tr", "bl", "br");
+        note.classList.add(["tl", "tr", "bl", "br"].includes(pos) ? pos : "tl");
+        $("noteKicker").textContent = nk;
+        $("noteText").textContent = nt;
+        $("noteKicker").style.display = nk ? "block" : "none";
+        $("noteText").style.display = nt ? "block" : "none";
+        const noteIn = Math.min(0.4, Math.max(0.2, (Number(V.duration) || 6) * 0.06));
+        const noteOut = Math.max(0.4, (Number(V.duration) || 6) - 0.4);
+        const slideY = (pos === "bl" || pos === "br") ? 24 : -24;
+        tl.fromTo(note, { opacity: 0, y: slideY }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, noteIn);
+        tl.to(note, { opacity: 0, y: -slideY * 0.5, duration: 0.4, ease: "power2.in" }, noteOut);
+      }
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

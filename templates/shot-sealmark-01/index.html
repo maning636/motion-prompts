@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "labelA", "type": "string", "label": "模式A角标", "default": "DESIGN"}, {"id": "labelB", "type": "string", "label": "模式B角标", "default": "DEV MODE"}, {"id": "titleA", "type": "string", "label": "窗内标题A", "default": "画板 · 首页落地页"}, {"id": "titleB", "type": "string", "label": "窗内标题B", "default": "代码 · HeroSection.tsx"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+.fb{ position:absolute; background:#3E7BFA; }
+#fT{ left:0; right:0; top:0; height:0; } #fB{ left:0; right:0; bottom:0; height:0; }
+#fL{ left:0; top:0; bottom:0; width:0; } #fR{ right:0; top:0; bottom:0; width:0; }
+#corner{ position:absolute; right:64px; top:64px; font-size:24px; letter-spacing:6px; color:rgba(255,255,255,.9); z-index:5; }
+#cornerA,#cornerB{ position:absolute; right:0; top:0; white-space:nowrap; }
+#cornerB{ opacity:0; color:var(--accent); }
+#winB{ position:absolute; left:410px; top:250px; width:1100px; height:660px; border-radius:16px; overflow:hidden;
+  background:#14141B; border:1px solid rgba(255,255,255,.14); box-shadow:0 40px 120px rgba(0,0,0,.6); opacity:0; }
+.lay{ position:absolute; inset:0; display:none; padding:44px; }
+#layA{ display:block; }
+.lt{ font-size:32px; color:var(--fg); margin-bottom:30px; }
+.ablock{ border-radius:12px; background:#22222E; border:1px solid rgba(255,255,255,.1); margin-bottom:20px; }
+.cl{ font-size:24px; line-height:2.1; color:rgba(255,255,255,.75); white-space:pre; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+.cl b{ color:var(--accent); font-weight:normal; }
+#wflash{ position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:9; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4.5" data-width="1920" data-height="1080">
+<div class="fb" id="fT"></div><div class="fb" id="fB"></div><div class="fb" id="fL"></div><div class="fb" id="fR"></div><div id="corner"><span id="cornerA"></span><span id="cornerB"></span></div><div id="winB"><div class="lay" id="layA"><div class="lt" id="ta"></div><div class="ablock" style="height:150px"></div><div style="display:flex;gap:20px"><div class="ablock" style="height:180px;flex:1"></div><div class="ablock" style="height:180px;flex:1"></div><div class="ablock" style="height:180px;flex:1"></div></div><div class="ablock" style="height:90px"></div></div><div class="lay" id="layB"><div class="lt" id="tb"></div><div class="cl">export function <b>HeroSection</b>() {
+  return (
+    &lt;section className=<b>"hero dark"</b>&gt;
+      &lt;h1&gt;{title}&lt;/h1&gt;
+      &lt;CTA color=<b>"green"</b> /&gt;
+    &lt;/section&gt;
+  );
+}</div></div></div><div id="wflash"></div>
+    </div>
+    <script>
+      const FB = {"labelA": "DESIGN", "labelB": "DEV MODE", "titleA": "画板 · 首页落地页", "titleB": "代码 · HeroSection.tsx", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#cornerA').textContent=v.labelA||'';$('#cornerB').textContent=v.labelB||'';
+$('#ta').textContent=v.titleA||'';$('#tb').textContent=v.titleB||'';
+// 画框 4 色带 0→44px ease-out 18f 长出（先于窗口）
+const th={t:0};
+const lay=()=>{ $('#fT').style.height=th.t+'px'; $('#fB').style.height=th.t+'px';
+  $('#fL').style.width=th.t+'px'; $('#fR').style.width=th.t+'px'; };
+lay();
+tl.to(th,{t:44,duration:F(18),ease:'power2.out',onUpdate:lay},0);
+// 窗口 spring 落进框内（f14 起）
+tl.fromTo('#winB',{opacity:0,y:560,scale:.82},{opacity:1,y:0,scale:1,duration:F(26),ease:'back.out(1.25)'},F(14));
+// 翻色帧 f78：画框/窗内布局/角标 三者同帧硬翻（全部用 set 零时长补间，可回放）
+const FLIP=78;
+tl.set('.fb',{backgroundColor:'#00FF00'},F(FLIP));
+tl.set('#cornerA',{opacity:0},F(FLIP));
+tl.set('#cornerB',{opacity:1},F(FLIP));
+tl.set('#layA',{display:'none'},F(FLIP));
+tl.set('#layB',{display:'block'},F(FLIP));
+// 白闪脉冲 0.55→0.19 阶梯 3f + 画框厚度阻尼弹跳
+tl.set('#wflash',{opacity:.55},F(FLIP));
+tl.set('#wflash',{opacity:.19},F(FLIP+1));
+tl.set('#wflash',{opacity:0},F(FLIP+3));
+tl.to(th,{t:54,duration:F(3),ease:'power2.out',onUpdate:lay},F(FLIP));
+tl.to(th,{t:44,duration:F(9),ease:'elastic.out(1,0.4)',onUpdate:lay},F(FLIP+3));
+tl.to({},{duration:F(40)},F(95)); // 真静止
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

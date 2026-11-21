@@ -1,0 +1,16 @@
+{
+ "name": "人名字幕条",
+ "description": "左下角四块积木叠成一条姓名贴片：黑条 mono 眉标、强调色姓名块、白底头衔、绿斜纹带；整摞从左上斜向拍入后静止，只有斜纹带匀速滚动",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "lower-third",
+  "pink",
+  "heavy"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "直播、播客、访谈开场，需要用姓名加头衔压住讲者身份时"
+}

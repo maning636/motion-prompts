@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"photoCount","type":"enum","label":"照片数量","options":[{"label":"3张","value":"3"},{"label":"4张","value":"4"},{"label":"5张","value":"5"}],"default":"4"},{"id":"ringColor","type":"color","label":"强调色（爱心/箭头点缀）","default":"#E78AA2"},{"id":"ringBgColor","type":"color","label":"焦糖装饰色（星星/太阳）","default":"#E0A458"},{"id":"textColor","type":"color","label":"文字与手绘线色","default":"#3B2F2A"},{"id":"rotationDuration","type":"number","label":"旋转一圈时长（秒，2-4）","default":"3"},{"id":"orbitFlatness","type":"number","label":"轨道扁平度（0.15-0.45）","default":"0.28"},{"id":"centerText","type":"string","label":"中心贴纸文字","default":"本周回忆"}]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=480, height=270" />
+    <style>
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { width: 480px; height: 270px; overflow: hidden; background: transparent; }
+      body {
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+        position: relative;
+      }
+
+      #stage {
+        position: relative;
+        width: 480px;
+        height: 270px;
+      }
+
+      /* ===== 手绘虚线轨道（虚线穿帮修正：手绘感 + 箭头指向）===== */
+      #track-svg {
+        position: absolute;
+        inset: 0;
+        width: 480px;
+        height: 270px;
+        opacity: 0;
+        z-index: 1;
+        pointer-events: none;
+      }
+      #track-path {
+        fill: none;
+        stroke: var(--tc, #3B2F2A);
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-dasharray: 2 8;
+        opacity: 0.4;
+      }
+      #track-arrow {
+        opacity: 0;
+      }
+
+      /* ===== 中心标题贴纸 ===== */
+      #center {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 100;
+        opacity: 0;
+      }
+      .cs-main {
+        position: relative;
+        background: #FFFDF6;
+        border: 2px solid var(--tc, #3B2F2A);
+        border-radius: 14px;
+        padding: 8px 18px 7px;
+        transform: rotate(-3deg);
+        box-shadow: 4px 4px 0 rgba(59, 47, 42, 0.85);
+        text-align: center;
+      }
+      .cs-text {
+        font-size: 17px;
+        color: var(--tc, #3B2F2A);
+        letter-spacing: 0.1em;
+        line-height: 1.1;
+      }
+      .cs-sub {
+        font-size: 6.5px;
+        letter-spacing: 0.34em;
+        color: rgba(59, 47, 42, 0.55);
+        margin-top: 2px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+      }
+      .cs-tape {
+        position: absolute;
+        left: 14px;
+        top: -8px;
+        width: 34px;
+        height: 13px;
+        background: rgba(156, 205, 180, 0.85);
+        transform: rotate(-9deg);
+        clip-path: polygon(3% 12%, 97% 0, 100% 72%, 96% 100%, 4% 92%, 0 28%);
+        z-index: 2;
+      }
+      /* 中心贴纸上的小爱心（独立弹出） */
+      #center-heart {
+        position: absolute;
+        right: -13px;
+        top: -14px;
+        width: 24px;
+        height: 22px;
+        transform: rotate(12deg);
+        filter: drop-shadow(2px 2px 0 rgba(59, 47, 42, 0.85));
+      }
+
+      /* ===== 照片贴纸卡 ===== */
+      .card {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 76px;
+        height: 60px;
+        will-change: transform;
+      }
+      .card-pop {
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        will-change: transform;
+      }
+      .card-bump {
+        width: 100%;
+        height: 100%;
+        will-change: transform;
+      }
+      .card-rot {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background: #FFFDF6;
+        border: 2px solid var(--tc, #3B2F2A);
+        border-radius: 10px;
+        padding: 5px;
+        box-shadow: 4px 4px 0 rgba(59, 47, 42, 0.85);
+        overflow: visible;
+      }
+      .photo {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .photo svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      /* 纸纹噪点 */
+      .photo::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='5'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+        mix-blend-mode: multiply;
+        opacity: 0.55;
+        pointer-events: none;
+      }
+      /* 手帐胶带贴角 */
+      .tape {
+        position: absolute;
+        width: 28px;
+        height: 11px;
+        clip-path: polygon(3% 15%, 97% 0, 100% 70%, 95% 100%, 4% 88%, 0 30%);
+        z-index: 3;
+      }
+      .tape.tl { left: -9px; top: -6px; transform: rotate(-38deg); background: rgba(156, 205, 180, 0.85); }
+      .tape.br { right: -9px; bottom: -6px; transform: rotate(-38deg); background: rgba(224, 164, 88, 0.85); }
+
+      /* ===== 贴纸小装饰（爱心/星星/手绘箭头/猫爪）===== */
+      .deco {
+        position: absolute;
+        opacity: 0;
+        z-index: 110;
+        pointer-events: none;
+        filter: drop-shadow(2px 2px 0 rgba(59, 47, 42, 0.8));
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <svg id="track-svg" viewBox="0 0 480 270">
+        <path id="track-path" d="" />
+        <g id="track-arrow"></g>
+      </svg>
+      <div id="center">
+        <div class="cs-main">
+          <div class="cs-tape"></div>
+          <div class="cs-text" id="cs-text">本周回忆</div>
+          <div class="cs-sub">THIS WEEK</div>
+        </div>
+        <svg id="center-heart" viewBox="0 0 20 18">
+          <path d="M10 17 C4 12 1 9 1 5.5 C1 2.5 3.5 1 5.8 1 C7.6 1 9.2 2 10 3.4 C10.8 2 12.4 1 14.2 1 C16.5 1 19 2.5 19 5.5 C19 9 16 12 10 17 Z" fill="var(--rc, #E78AA2)" stroke="var(--tc, #3B2F2A)" stroke-width="1.4"/>
+          <circle cx="5.4" cy="5.2" r="1.3" fill="#FFFDF6" opacity="0.9"/>
+        </svg>
+      </div>
+    </div>
+
+  <script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+  <script>
+    (() => {
+      const fallback = {
+        photoCount: "4",
+        ringColor: "#E78AA2",
+        ringBgColor: "#E0A458",
+        textColor: "#3B2F2A",
+        rotationDuration: "3",
+        orbitFlatness: "0.28",
+        centerText: "本周回忆"
+      };
+      const v = (window.__hyperframes && window.__hyperframes.getVariables)
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const count = Math.min(5, Math.max(3, parseInt(v.photoCount) || 4));
+      const rc = v.ringColor || "#E78AA2";            // 强调色：爱心/箭头点缀
+      const rb = v.ringBgColor || "#E0A458";          // 焦糖：星星/太阳/胶带
+      const tc = v.textColor || "#3B2F2A";            // 文字与手绘线
+      const dur = Math.min(4, Math.max(2, parseFloat(v.rotationDuration) || 3));
+      const flat = Math.min(0.45, Math.max(0.15, parseFloat(v.orbitFlatness) || 0.28));
+      const centerText = (v.centerText || "本周回忆").toString().slice(0, 6);
+
+      document.documentElement.style.setProperty('--rc', rc);
+      document.documentElement.style.setProperty('--rb', rb);
+      document.documentElement.style.setProperty('--tc', tc);
+      document.getElementById('cs-text').textContent = centerText;
+
+      const stage = document.getElementById('stage');
+      const cx = 240, cy = 138;
+      const rx = 166;
+      const ry = Math.round(rx * flat);
+
+      /* ---------- 占位小插画（奶油色系渐变 + 纸纹 + 山/云/猫爪/爱心） ---------- */
+      function photoSVG(variant, uid) {
+        const g = 'g' + uid;
+        if (variant === 0) {
+          // 焦糖落日山丘
+          return `<svg viewBox="0 0 66 50" preserveAspectRatio="xMidYMid slice">
+            <defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#FBEED3"/><stop offset="1" stop-color="#F4C98C"/>
+            </linearGradient></defs>
+            <rect width="66" height="50" fill="url(#${g})"/>
+            <circle cx="23" cy="17" r="11" fill="${rb}" opacity="0.28"/>
+            <circle cx="23" cy="17" r="7.5" fill="#E8813F"/>
+            <path d="M0,33 Q12,25 24,31 T47,29 Q58,27 66,33 L66,50 L0,50 Z" fill="#C98A4B"/>
+            <path d="M0,40 Q16,33 33,38 T66,41 L66,50 L0,50 Z" fill="#A96F38"/>
+            <path d="M42,12 q2.4,-3.2 4.8,0 M48.5,15 q2.4,-3.2 4.8,0" stroke="${tc}" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+          </svg>`;
+        }
+        if (variant === 1) {
+          // 薄荷云与猫爪印
+          return `<svg viewBox="0 0 66 50" preserveAspectRatio="xMidYMid slice">
+            <defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#EDF6E6"/><stop offset="1" stop-color="#C2E4CE"/>
+            </linearGradient></defs>
+            <rect width="66" height="50" fill="url(#${g})"/>
+            <g fill="#FFFDF6">
+              <ellipse cx="18" cy="13" rx="10" ry="5.5"/><ellipse cx="24" cy="10" rx="7" ry="4.5"/>
+              <ellipse cx="50" cy="24" rx="8" ry="4"/><ellipse cx="55" cy="21" rx="5.5" ry="3.5"/>
+            </g>
+            <g fill="${tc}" opacity="0.85">
+              <ellipse cx="44" cy="37" rx="4.6" ry="3.6"/>
+              <circle cx="39.4" cy="31.6" r="1.9"/><circle cx="44" cy="30.2" r="1.9"/><circle cx="48.6" cy="31.6" r="1.9"/>
+            </g>
+            <g fill="${tc}" opacity="0.35">
+              <ellipse cx="18" cy="42" rx="3.4" ry="2.6"/>
+              <circle cx="14.6" cy="38.2" r="1.4"/><circle cx="18" cy="37.2" r="1.4"/><circle cx="21.4" cy="38.2" r="1.4"/>
+            </g>
+            <path d="M0,47 Q10,44 20,46 T40,45 T66,46" stroke="${tc}" stroke-width="1" fill="none" opacity="0.3" stroke-linecap="round"/>
+          </svg>`;
+        }
+        if (variant === 2) {
+          // 草莓爱心
+          return `<svg viewBox="0 0 66 50" preserveAspectRatio="xMidYMid slice">
+            <defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#FBEEEA"/><stop offset="1" stop-color="#F4C3CB"/>
+            </linearGradient></defs>
+            <rect width="66" height="50" fill="url(#${g})"/>
+            <path d="M33 42 C24 34 19 29 19 22.5 C19 17.5 23 14.5 27.5 14.5 C30.5 14.5 32.3 16 33 17.6 C33.7 16 35.5 14.5 38.5 14.5 C43 14.5 47 17.5 47 22.5 C47 29 42 34 33 42 Z" fill="${rc}" stroke="${tc}" stroke-width="1.4"/>
+            <circle cx="25.5" cy="21" r="1.6" fill="#FFFDF6" opacity="0.9"/>
+            <path d="M12 12 l0 -5 M9.5 9.5 l5 0" stroke="${rb}" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M55 34 l0 -6 M52 31 l6 0" stroke="${tc}" stroke-width="1.6" stroke-linecap="round" opacity="0.6"/>
+            <circle cx="55" cy="14" r="2.2" fill="${rb}" opacity="0.85"/>
+          </svg>`;
+        }
+        if (variant === 3) {
+          // 奶油月亮星星
+          return `<svg viewBox="0 0 66 50" preserveAspectRatio="xMidYMid slice">
+            <defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#F8F0DC"/><stop offset="1" stop-color="#EAD9A8"/>
+            </linearGradient></defs>
+            <rect width="66" height="50" fill="url(#${g})"/>
+            <circle cx="22" cy="18" r="9" fill="${rb}"/>
+            <circle cx="26" cy="15" r="8" fill="#F1E3BC"/>
+            <g stroke-linecap="round">
+              <path d="M46 10 l0 7 M42.5 13.5 l7 0" stroke="#FFFDF6" stroke-width="2.2"/>
+              <path d="M55 26 l0 5 M52.5 28.5 l5 0" stroke="${rc}" stroke-width="2"/>
+              <path d="M38 32 l0 4 M36 34 l4 0" stroke="${tc}" stroke-width="1.6" opacity="0.55"/>
+            </g>
+            <circle cx="12" cy="38" r="1.6" fill="${tc}" opacity="0.4"/>
+            <circle cx="52" cy="40" r="1.8" fill="#FFFDF6" opacity="0.9"/>
+          </svg>`;
+        }
+        // 薄荷小盆栽
+        return `<svg viewBox="0 0 66 50" preserveAspectRatio="xMidYMid slice">
+          <defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#F0F7E9"/><stop offset="1" stop-color="#CBE7D3"/>
+          </linearGradient></defs>
+          <rect width="66" height="50" fill="url(#${g})"/>
+          <path d="M26 32 L40 32 L37.5 46 L28.5 46 Z" fill="#C98A4B" stroke="${tc}" stroke-width="1.2" stroke-linejoin="round"/>
+          <rect x="24" y="29" width="18" height="4.5" rx="2" fill="#A96F38" stroke="${tc}" stroke-width="1.2"/>
+          <path d="M33 29 L33 20" stroke="${tc}" stroke-width="1.4" stroke-linecap="round"/>
+          <ellipse cx="28.5" cy="17" rx="5" ry="3.4" fill="#8FC7A3" stroke="${tc}" stroke-width="1.1" transform="rotate(-24 28.5 17)"/>
+          <ellipse cx="37.5" cy="15.5" rx="5" ry="3.4" fill="#8FC7A3" stroke="${tc}" stroke-width="1.1" transform="rotate(22 37.5 15.5)"/>
+          <circle cx="12" cy="12" r="2.4" fill="${rb}" opacity="0.8"/>
+          <path d="M52 36 l0 5 M49.5 38.5 l5 0" stroke="${rc}" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>`;
+      }
+
+      /* ---------- 创建照片贴纸卡 ---------- */
+      const crooked = [-4, 3, -2.5, 4.5, -3.5];
+      const cards = [];
+      for (let i = 0; i < count; i++) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        const pop = document.createElement('div');
+        pop.className = 'card-pop';
+        const bump = document.createElement('div');
+        bump.className = 'card-bump';
+        const rot = document.createElement('div');
+        rot.className = 'card-rot';
+        rot.style.transform = 'rotate(' + crooked[i % crooked.length] + 'deg)';
+        const photo = document.createElement('div');
+        photo.className = 'photo';
+        photo.innerHTML = photoSVG(i % 5, i);
+        rot.appendChild(photo);
+        const tape = document.createElement('div');
+        tape.className = 'tape ' + (i % 2 === 0 ? 'tl' : 'br');
+        rot.appendChild(tape);
+        bump.appendChild(rot);
+        pop.appendChild(bump);
+        card.appendChild(pop);
+        stage.appendChild(card);
+        cards.push({ el: card, pop: pop, bump: bump, popped: false });
+      }
+
+      /* ---------- 贴纸小装饰 ---------- */
+      function svgDeco(inner, w, h, x, y, restRot) {
+        const el = document.createElement('div');
+        el.className = 'deco';
+        el.style.cssText = 'left:' + x + 'px;top:' + y + 'px;width:' + w + 'px;height:' + h + 'px;';
+        el.innerHTML = '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '">' + inner + '</svg>';
+        stage.appendChild(el);
+        return { el: el, restRot: restRot };
+      }
+      const plus = (color, s, sw) => '<path d="M' + (s/2) + ' ' + (s*0.15) + ' V' + (s*0.85) + ' M' + (s*0.15) + ' ' + (s/2) + ' H' + (s*0.85) + '" stroke="' + color + '" stroke-width="' + sw + '" stroke-linecap="round" fill="none"/>';
+      const heartPath = 'M10 17 C4 12 1 9 1 5.5 C1 2.5 3.5 1 5.8 1 C7.6 1 9.2 2 10 3.4 C10.8 2 12.4 1 14.2 1 C16.5 1 19 2.5 19 5.5 C19 9 16 12 10 17 Z';
+      const decos = [
+        svgDeco(plus(rc, 18, 4) + plus(rb, 12, 3.4), 22, 24, 60, 28, -8),
+        svgDeco('<path d="' + heartPath + '" fill="' + rc + '" stroke="' + tc + '" stroke-width="1.4"/><circle cx="5.4" cy="5.2" r="1.3" fill="#FFFDF6" opacity="0.9"/>', 20, 18, 408, 30, 10),
+        svgDeco('<polygon points="12,1.5 14.7,8.6 22.3,8.9 16.4,13.7 18.5,21 12,16.5 5.5,21 7.6,13.7 1.7,8.9 9.3,8.6" fill="' + rb + '" stroke="' + tc + '" stroke-width="1.3" stroke-linejoin="round"/>', 24, 22, 22, 128, -12),
+        svgDeco('<path d="M6 3 Q22 10 20 25 M20 25 L13.5 20 M20 25 L26 20.5" stroke="' + tc + '" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>', 30, 30, 396, 100, 8),
+        svgDeco('<g fill="' + tc + '" opacity="0.9"><ellipse cx="12" cy="14.5" rx="5.4" ry="4.1"/><circle cx="7.2" cy="8.6" r="2.2"/><circle cx="12" cy="6.6" r="2.2"/><circle cx="16.8" cy="8.6" r="2.2"/></g>', 24, 21, 48, 222, 6)
+      ];
+
+      /* ---------- 手绘虚线轨道（带微抖） ---------- */
+      const trackPath = document.getElementById('track-path');
+      (function buildTrack() {
+        const SEG = 40;
+        let d = '';
+        for (let i = 0; i <= SEG; i++) {
+          const a = (i / SEG) * Math.PI * 2;
+          const wob = 1 + 0.014 * Math.sin(a * 3 + 1.7) + 0.009 * Math.sin(a * 5 + 0.6);
+          const x = cx + rx * wob * Math.cos(a);
+          const y = cy + ry * wob * Math.sin(a);
+          d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
+        }
+        d += 'Z';
+        trackPath.setAttribute('d', d);
+        const len = trackPath.getTotalLength();
+        trackPath.style.strokeDasharray = '2 8';
+        trackPath.dataset.len = len;
+        trackPath.style.strokeDashoffset = len;
+        // 手绘箭头：指向运动方向（右侧向下）
+        document.getElementById('track-arrow').innerHTML =
+          '<g transform="translate(402,108) rotate(14)">' +
+          '<path d="M6 3 Q22 10 20 25 M20 25 L13.5 20 M20 25 L26 20.5" stroke="' + tc + '" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>' +
+          '</g>';
+      })();
+
+      /* ---------- 轨道运动：黏滞相位（近处慢、远处快）+ 到正面回弹 ---------- */
+      const N = count;
+      const ampDeg = 8;                              // 黏滞调制幅度（度）
+      const phi = Math.PI * (1 - N / 2);             // 相位对齐：每张照片过正面时减速
+      const orbit = { p: 0 };
+      const master = gsap.timeline({ repeat: -1, delay: 0.1 });
+          // 注册到 window.__timelines：云渲染的 settle/逐帧定位靠它驱动时间轴。
+          // 组件此前全部没注册，导致渲染停在第 0 帧（主体初始 opacity:0 → 整层空）。
+          // gsap 时间轴就地 mutate，先存引用即可，后续 tl.to() 作用在同一对象上。
+          window.__timelines = window.__timelines || {};
+          window.__timelines.main = master;
+
+      function updateCards() {
+        const t = orbit.p;
+        const thetaBase = 360 * t + ampDeg * Math.sin(2 * Math.PI * N * t + phi);
+        for (let i = 0; i < N; i++) {
+          const c = cards[i];
+          const th = (thetaBase + i * (360 / N)) * Math.PI / 180;
+          const x = cx + rx * Math.cos(th);
+          const y = cy + ry * Math.sin(th);
+          const depth = (Math.sin(th) + 1) / 2;    // 1=正面(下) 0=背面(上)
+          const s = 0.56 + 0.5 * depth;
+          c.el.style.transform = 'translate(-50%,-50%) translate(' + (x - cx).toFixed(2) + 'px,' + (y - cy).toFixed(2) + 'px) scale(' + s.toFixed(3) + ')';
+          c.el.style.zIndex = 10 + Math.round(depth * 80);
+          // 转到正面：轻微回弹停一下
+          if (master.isActive() && !c.popped && depth > 0.985) {
+            c.popped = true;
+            gsap.fromTo(c.bump, { scale: 1.1 }, { scale: 1, duration: 0.5, ease: 'back.out(3)' });
+          }
+          if (depth < 0.8) c.popped = false;
+        }
+      }
+
+      master.to(orbit, { p: 1, duration: dur, ease: 'none', onUpdate: updateCards }, 0);
+
+      /* ---------- 编排：轨道画出 → 中心贴纸 → 照片逐个"啪"贴上 → 装饰点缀 → 收尾让循环 ---------- */
+      const trackLen = parseFloat(trackPath.dataset.len);
+      master.fromTo('#track-svg', { opacity: 0 }, { opacity: 1, duration: 0.25, ease: 'power1.out' }, 0);
+      master.fromTo(trackPath, { strokeDashoffset: trackLen }, { strokeDashoffset: 0, duration: 0.6, ease: 'power2.inOut' }, 0.02);
+      master.fromTo('#track-arrow', { opacity: 0, scale: 0.3, rotation: -25, svgOrigin: '417 123' },
+        { opacity: 1, scale: 1, rotation: 0, duration: 0.4, ease: 'back.out(2.2)' }, 0.42);
+
+      master.fromTo('#center', { opacity: 0, scale: 0, rotation: -14 },
+        { opacity: 1, scale: 1, rotation: 0, duration: 0.55, ease: 'back.out(1.9)', transformOrigin: '50% 50%' }, 0.12);
+      master.fromTo('#center-heart', { scale: 0, rotation: 40 },
+        { scale: 1, rotation: 12, duration: 0.45, ease: 'back.out(2.6)', transformOrigin: '50% 50%' }, 0.42);
+
+      cards.forEach((c, i) => {
+        const rr = ((i * 47) % 26) - 13;
+        master.fromTo(c.pop, { opacity: 0, scale: 0, rotation: rr },
+          { opacity: 1, scale: 1, rotation: 0, duration: 0.5, ease: 'back.out(2.1)', transformOrigin: '50% 50%' },
+          0.3 + i * 0.13);
+      });
+
+      decos.forEach((d, i) => {
+        master.fromTo(d.el, { opacity: 0, scale: 0, rotation: -d.restRot * 2.5 },
+          { opacity: 1, scale: 1, rotation: d.restRot, duration: 0.4, ease: 'back.out(2.4)', transformOrigin: '50% 50%' },
+          0.72 + i * 0.11);
+      });
+
+      // 收尾：装饰与轨道淡出，下一循环重新"贴"（照片与中心贴纸持续在环上）
+      master.to(decos.map(d => d.el), { opacity: 0, scale: 0.55, duration: 0.22, ease: 'power2.in', stagger: 0.03 }, dur - 0.34);
+      master.to('#track-arrow', { opacity: 0, duration: 0.2, ease: 'power1.in' }, dur - 0.28);
+      master.to('#track-svg', { opacity: 0, duration: 0.22, ease: 'power1.in' }, dur - 0.22);
+    })();
+  </script>
+  </body>
+</html>

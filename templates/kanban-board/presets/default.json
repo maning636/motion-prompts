@@ -1,0 +1,10 @@
+{
+  "title": "Sprint 看板",
+  "subtitle": "四列任务状态可视化",
+  "columns": "BACKLOG,IN PROGRESS,REVIEW,DONE",
+  "cards": "需求梳理,接口定义|API 开发,前端联调|Code Review,文档补齐|已上线,已验收",
+  "focusColumn": 1,
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

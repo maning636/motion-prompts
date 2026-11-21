@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "titleEn", "type": "string", "label": "顶部英文小标签（全大写）", "default": "JUST SAY ONE LINE"}, {"id": "titleCn", "type": "string", "label": "中文标题（含高亮词）", "default": "新建一个对话，说一句"}, {"id": "titleAccent", "type": "string", "label": "标题高亮词（绿色，须为标题子串）", "default": "新建"}, {"id": "promptText", "type": "string", "label": "输入框逐字打出的提示语", "default": "初始化 个人工作台生成器"}, {"id": "statusText", "type": "string", "label": "发送后状态行（绿色）", "default": "自动完成初始化，开始引导"}, {"id": "duration", "type": "number", "label": "总时长（秒，演完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12);
+  color: var(--foreground, #F5F5F3); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+/* 顶部英文小标签 */
+.clabel{ position:absolute; left:0; right:0; top:150px; text-align:center;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:26px; letter-spacing:9px;
+  color:#10B981; text-transform:uppercase; text-shadow:0 0 14px rgba(16,185,129,.45);
+  white-space:nowrap; }
+.clabel::before{ content:''; display:inline-block; width:34px; height:3px; border-radius:2px;
+  background:#10B981; box-shadow:0 0 10px rgba(16,185,129,.7);
+  margin-right:18px; vertical-align:middle; }
+
+/* 顶部中文标题 */
+.ctitle{ position:absolute; left:0; right:0; top:206px; text-align:center;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:66px; letter-spacing:2px;
+  color:#FFFFFF; white-space:nowrap; }
+.ctitle .acc{ color:#34D399; text-shadow:0 0 20px rgba(52,211,153,.6); position:relative; padding:0 4px; }
+.ctitle .acc::after{ content:''; position:absolute; left:6px; right:6px; bottom:-12px; height:5px;
+  border-radius:3px; background:#10B981; box-shadow:0 0 14px rgba(16,185,129,.8); }
+
+/* 中央输入框（胶囊形） */
+.inputbox{ position:absolute; left:360px; top:440px; width:1200px; height:132px;
+  background:#12161C; border:1px solid rgba(16,185,129,.85); border-radius:66px;
+  box-shadow:0 0 26px rgba(16,185,129,.35), 0 0 60px rgba(16,185,129,.12), inset 0 0 30px rgba(16,185,129,.05);
+  display:flex; align-items:center; padding:0 140px 0 60px; will-change:transform; }
+.txtwrap{ position:relative; max-width:990px; overflow-wrap:break-word;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:44px; color:#F5F5F3;
+  line-height:1.35; transform-origin:0% 50%; }
+.ch{ opacity:0; }
+.cursor{ display:inline-block; width:26px; height:54px; border-radius:4px;
+  background:#34D399; box-shadow:0 0 14px rgba(52,211,153,.85);
+  margin:0 4px; vertical-align:-9px; opacity:0; }
+
+/* 发送按钮（绿色圆钮 + 白色↑） */
+.sendbtn{ position:absolute; right:22px; top:22px; width:88px; height:88px; border-radius:50%;
+  background:#10B981; box-shadow:0 0 18px rgba(16,185,129,.5);
+  display:flex; align-items:center; justify-content:center; will-change:transform; }
+.sendbtn svg{ width:42px; height:42px; overflow:visible; }
+.sendbtn .ar{ stroke:#FFFFFF; stroke-width:6; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+
+/* 状态行 */
+.statusline{ position:absolute; left:420px; right:360px; top:646px;
+  font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-size:30px; letter-spacing:1px; color:#34D399;
+  text-shadow:0 0 12px rgba(52,211,153,.4); overflow-wrap:break-word; }
+.statusline::before{ content:'\25E6'; margin-right:16px; color:#10B981; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="clabel" id="labelTxt"></div>
+      <div class="ctitle" id="titleWrap"><span id="tPre"></span><span class="acc" id="tAcc"></span><span id="tPost"></span></div>
+
+      <div class="inputbox" id="inputBox">
+        <div class="txtwrap" id="txtWrap"></div>
+        <div class="sendbtn" id="sendBtn">
+          <svg viewBox="0 0 42 42"><line class="ar" x1="21" y1="34" x2="21" y2="9"/><path class="ar" d="M10 19 L21 8 L32 19"/></svg>
+        </div>
+      </div>
+
+      <div class="statusline" id="statusTxt"></div>
+    </div>
+    <script>
+      const FB = {"titleEn": "JUST SAY ONE LINE", "titleCn": "新建一个对话，说一句", "titleAccent": "新建", "promptText": "初始化 个人工作台生成器", "statusText": "自动完成初始化，开始引导", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $=(s)=>document.querySelector(s);
+      const DUR=+v.duration>0?+v.duration:6;
+      $('[data-composition-id]').setAttribute('data-duration',String(DUR));
+
+      $('#labelTxt').textContent=v.titleEn||'';
+
+      /* 标题：高亮词作为子串拆分，找不到则整体前置、高亮词附加在后 */
+      const title=String(v.titleCn??''), acc=String(v.titleAccent??'');
+      const idx=acc?title.indexOf(acc):-1;
+      if(idx>=0){
+        $('#tPre').textContent=title.slice(0,idx);
+        $('#tAcc').textContent=acc;
+        $('#tPost').textContent=title.slice(idx+acc.length);
+      }else{
+        $('#tPre').textContent=title;
+        $('#tAcc').textContent=acc;
+        $('#tPost').textContent='';
+      }
+
+      /* 逐字打字：拆字 span（空格用 NBSP）+ 方块光标在文档流中跟随，免测量、不受字体加载时机影响 */
+      const txtWrap=$('#txtWrap');
+      const cursor=document.createElement('span'); cursor.className='cursor';
+      txtWrap.appendChild(cursor);
+      const chars=[];
+      const prompt=String(v.promptText??'');
+      for(const ch of prompt){
+        const s=document.createElement('span');
+        s.className='ch';
+        s.textContent=(ch===' ')?' ':ch;
+        txtWrap.appendChild(s);
+        chars.push(s);
+      }
+
+      $('#statusTxt').textContent=v.statusText||'';
+
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+
+      /* 1. 标题组：英文标签 + 中文标题依次淡入上移 */
+      tl.fromTo('#labelTxt',{opacity:0,y:24},{opacity:1,y:0,duration:0.5,ease:'power3.out'},0.2);
+      tl.fromTo('#titleWrap',{opacity:0,y:36},{opacity:1,y:0,duration:0.6,ease:'power3.out'},0.35);
+      /* 2. 输入框升入 */
+      tl.fromTo('#inputBox',{opacity:0,y:70},{opacity:1,y:0,duration:0.7,ease:'power3.out'},0.8);
+
+      /* 3. 逐字打字（约 0.06s/字），方块光标跟随 */
+      const T0=1.55, STEP=0.06;
+      const typeEnd=T0+chars.length*STEP;
+      if(chars.length){
+        tl.set(cursor,{opacity:1},T0);
+        chars.forEach((s,i)=>{
+          const t=T0+i*STEP;
+          tl.set(s,{opacity:1},t);
+          tl.call(()=>{ txtWrap.insertBefore(cursor,s.nextSibling); },null,t+STEP*0.5);
+        });
+        /* 打完光标闪烁两轮后隐藏 */
+        tl.to(cursor,{opacity:0,duration:0.22,repeat:3,yoyo:true,ease:'none'},typeEnd+0.15);
+        tl.set(cursor,{opacity:0},typeEnd+1.05);
+      }
+
+      /* 4. 发送：按钮 0.3s 发光脉冲，输入文字微缩归位 */
+      const sendT=chars.length?typeEnd+1.15:T0+0.2;
+      tl.to('#sendBtn',{scale:1.14,boxShadow:'0 0 36px rgba(16,185,129,.9), 0 0 70px rgba(16,185,129,.4)',
+        duration:0.15,repeat:1,yoyo:true,ease:'power2.inOut'},sendT);
+      tl.to('#txtWrap',{scale:0.94,duration:0.15,repeat:1,yoyo:true,ease:'power2.inOut'},sendT);
+
+      /* 5. 状态行淡入 */
+      tl.fromTo('#statusTxt',{opacity:0,y:18},{opacity:1,y:0,duration:0.5,ease:'power2.out'},sendT+0.35);
+
+      /* 6. 定格：补 set 占满 data-duration 防黑帧 */
+      tl.set('#root',{opacity:1},Math.max(DUR-0.02,sendT+0.9));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

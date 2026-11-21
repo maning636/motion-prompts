@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"oldTitle","type":"string","label":"原大标题","default":"重新设计首页"},
+  {"id":"newTitle","type":"string","label":"新主标题","default":"新方案：分层交付"},
+  {"id":"items","type":"string","label":"要点（换行分隔）","default":"信息层级清晰\n首屏 3 秒读懂\n转化率提升 22%"},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(254,254,254,.05) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity: .55;
+      }
+
+      /* ---------- 顶部小眉标 ---------- */
+      .eyebrow{
+        position:absolute; top: 56px; right: 96px;
+        display:flex; align-items:center; gap: 10px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.22em; text-transform:uppercase;
+        color: #8A8A85;
+        opacity: 0;
+      }
+      .eyebrow .dot{
+        width:8px; height:8px; border-radius:50%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+      }
+
+      /* ---------- 大标题（中心舞台） ---------- */
+      #heroTitle{
+        position:absolute; left: 0; top: 0;
+        width: 1920px;
+        transform-origin: center center;
+        display:flex; justify-content:center; align-items:center;
+        padding: 0 160px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight: 700; letter-spacing: -.02em;
+        font-size: 108px; line-height: 1.08;
+        color: var(--foreground, #F4EFE7);
+        text-align: center;
+        white-space: nowrap;
+        opacity: 0;
+        will-change: transform, opacity, font-size;
+      }
+
+      /* ---------- 降级后的角落标签（左上角） ---------- */
+      #demotedLabel{
+        position:absolute; top: 60px; left: 96px;
+        display:inline-flex; align-items:center; gap: 10px;
+        padding: 8px 16px;
+        border:1px solid #2A2A2E; border-radius: 999px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.14em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 72%, transparent);
+        white-space: nowrap;
+        opacity: 0;
+        will-change: transform, opacity;
+        background: color-mix(in srgb, var(--foreground, #F4EFE7) 4%, transparent);
+      }
+      #demotedLabel::before{
+        content:""; width:6px; height:6px; border-radius:50%;
+        background: color-mix(in srgb, var(--accent, #00FF00) 80%, transparent);
+      }
+
+      /* ---------- 新主内容 ---------- */
+      #newContent{
+        position:absolute; left: 0; right: 0; top: 0; bottom: 0;
+        display:flex; flex-direction:column; justify-content:center;
+        padding: 0 200px 0 200px;
+        opacity: 0;
+      }
+      .nc-chip{
+        display:inline-flex; align-items:center; gap: 10px;
+        align-self: flex-start;
+        padding: 8px 16px; border-radius: 999px;
+        border: 1px solid color-mix(in srgb, var(--accent, #00FF00) 55%, transparent);
+        background: color-mix(in srgb, var(--accent, #00FF00) 12%, transparent);
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.22em; text-transform:uppercase;
+        color: var(--accent, #00FF00);
+        font-weight: 700;
+        margin-bottom: 24px;
+      }
+      .nc-title{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight: 700; letter-spacing: -.02em;
+        font-size: 88px; line-height: 1.08;
+        color: var(--foreground, #F4EFE7);
+        margin: 0 0 40px 0;
+        max-width: 1520px;
+      }
+      .nc-items{
+        list-style:none; padding:0; margin:0;
+        display:flex; flex-direction:column; gap: 18px;
+        max-width: 1300px;
+      }
+      .nc-items li{
+        display:flex; align-items:center; gap: 22px;
+        font-size: 32px; line-height: 1.4;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 88%, transparent);
+        opacity: 0;
+      }
+      .nc-items li .num{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 22px; letter-spacing:.06em;
+        color: var(--accent, #00FF00);
+        font-weight: 700;
+        min-width: 44px;
+      }
+      .nc-items li .bar{
+        width: 60px; height: 2px;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 10px color-mix(in srgb, var(--accent, #00FF00) 55%, transparent);
+        flex: none;
+      }
+
+      /* ---------- 脚注 ---------- */
+      .footnote{
+        position:absolute; bottom: 56px; left: 96px; right: 96px;
+        display:flex; align-items:center; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.2em; text-transform:uppercase;
+        color: #6B6B66;
+        opacity: 0;
+      }
+      .footnote .acc{ color: var(--accent, #00FF00); font-weight: 700; }
+
+      /* 分隔线（大标题→角标过渡时短暂出现） */
+      .rail-h{
+        position:absolute; left: 96px; right: 96px; top: 50%;
+        height: 1px; background: rgba(255,255,255,.06);
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="stage" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+
+        <div class="rail-h" id="railH"></div>
+
+        <div class="eyebrow" id="eyebrow">
+          <span class="dot"></span>
+          <span>TITLE → LABEL</span>
+        </div>
+
+        <!-- 原大标题（阶段 1 主体） -->
+        <div id="heroTitle">重新设计首页</div>
+
+        <!-- 降级后的角标 -->
+        <div id="demotedLabel"><span id="demotedLabelText">重新设计首页</span></div>
+
+        <!-- 新主内容 -->
+        <div id="newContent">
+          <span class="nc-chip" id="ncChip">NEW · 01</span>
+          <h2 class="nc-title" id="ncTitle">新方案：分层交付</h2>
+          <ul class="nc-items" id="ncItems">
+            <li><span class="num">01</span><span class="bar"></span><span>信息层级清晰</span></li>
+            <li><span class="num">02</span><span class="bar"></span><span>首屏 3 秒读懂</span></li>
+            <li><span class="num">03</span><span class="bar"></span><span>转化率提升 22%</span></li>
+          </ul>
+        </div>
+
+        <div class="footnote" id="footnote">
+          <span>hierarchy handoff</span>
+          <span class="acc">6s · title demote to label</span>
+        </div>
+
+      </section>
+    </div>
+    <script>
+      /* ----- 变量接线 ----- */
+      const fallback = {
+        oldTitle: "重新设计首页",
+        newTitle: "新方案：分层交付",
+        items: "信息层级清晰\n首屏 3 秒读懂\n转化率提升 22%",
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const $ = (id) => document.getElementById(id);
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      /* ----- 内容回填 ----- */
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      $("heroTitle").textContent = v.oldTitle || fallback.oldTitle;
+      $("demotedLabelText").textContent = v.oldTitle || fallback.oldTitle;
+      $("ncTitle").textContent = v.newTitle || fallback.newTitle;
+
+      const items = String(v.items ?? "").split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      const padded = items.slice(0, 3);
+      while (padded.length < 3) padded.push("");
+      $("ncItems").innerHTML = padded.map((t, i) =>
+        `<li><span class="num">${String(i+1).padStart(2,"0")}</span><span class="bar"></span><span>${escapeHtml(t)}</span></li>`
+      ).join("");
+
+      /* ----- 时间线 ----- */
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      // 阶段 1：大标题居中放大呈现（0 – 1.5s）
+      tl.fromTo("#heroTitle",
+        { opacity: 0, scale: 0.88, y: 40 },
+        { opacity: 1, scale: 1, y: 0, duration: 1.1, ease: "power3.out" }, 0.1);
+      // 大标题微光呼吸
+      tl.fromTo("#heroTitle",
+        { textShadow: "0 0 0 rgba(0,0,0,0)" },
+        { textShadow: "0 0 32px color-mix(in srgb, var(--accent, #00FF00) 35%, transparent)",
+          duration: 0.6, ease: "power2.out" }, 0.9);
+
+      // 眉标淡入
+      tl.fromTo("#eyebrow",
+        { opacity: 0, x: 12 },
+        { opacity: 1, x: 0, duration: 0.5, ease: "power2.out" }, 0.4);
+
+      // 阶段 2：大标题缩小 + 位移到左上角，降级为 chip（1.5 – 3s）
+      // 先把大标题的可视文字复制到角标位置（用 CSS transform 让 heroTitle 从中心飞到左上角）
+      // 目标位置：center → (152, 78)，缩放 0.143（108px → 约 15.4px 视觉重量）
+      tl.to("#heroTitle", {
+        xPercent: 0,
+        scale: 0.15,
+        left: 96,
+        top: 46,
+        width: "auto",
+        padding: "0 16px",
+        border: "1px solid #2A2A2E",
+        borderRadius: "999px",
+        fontSize: "16px",
+        letterSpacing: ".14em",
+        lineHeight: 1,
+        textAlign: "left",
+        duration: 1.35,
+        ease: "power3.inOut"
+      }, 1.55);
+      tl.to("#heroTitle", {
+        opacity: 0,
+        duration: 0.25,
+        ease: "power2.out"
+      }, 2.75);
+
+      // 与此同时，隐藏 heroTitle 后由 #demotedLabel 承接（保持视觉连续性）
+      tl.fromTo("#demotedLabel",
+        { opacity: 0, scale: 0.9, x: -8 },
+        { opacity: 1, scale: 1, x: 0, duration: 0.4, ease: "back.out(1.6)" }, 2.7);
+
+      // 新主内容从下方进入（fade + y）
+      tl.fromTo("#newContent",
+        { opacity: 0, y: 60 },
+        { opacity: 1, y: 0, duration: 0.9, ease: "power3.out" }, 2.0);
+      tl.fromTo("#ncChip",
+        { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 2.2);
+      tl.fromTo("#ncTitle",
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }, 2.4);
+
+      // 阶段 3：主内容条目错峰入场（3 – 4.5s）
+      tl.fromTo("#ncItems li",
+        { opacity: 0, x: 24 },
+        { opacity: 1, x: 0, duration: 0.5, ease: "power2.out", stagger: 0.22 }, 3.1);
+
+      // 角标轻微呼吸（贯穿后半段）
+      tl.fromTo("#demotedLabel",
+        { scale: 1 },
+        { scale: 1.03, duration: 1.2, ease: "sine.inOut", yoyo: true, repeat: 1 }, 3.6);
+
+      // 脚注淡入
+      tl.fromTo("#footnote",
+        { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 4.2);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

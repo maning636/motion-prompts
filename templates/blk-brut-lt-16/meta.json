@@ -1,0 +1,16 @@
+{
+ "name": "章节角标",
+ "description": "强调色序号方块自上砸落，右侧 ink 章节条分六格擦出，底部斜纹导轨随后匀速滚动；方块与章节条反向微位移",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "chapter",
+  "marker",
+  "yellow"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "长视频、课程、专栏，需要在切换章节时打一个明确的定场帧时"
+}

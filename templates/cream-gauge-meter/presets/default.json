@@ -1,0 +1,11 @@
+{
+  "title": "系统健康度",
+  "subtitle": "实时可用性评分",
+  "value": 87,
+  "min": 0,
+  "max": 100,
+  "unit": "%",
+  "labelLow": "低",
+  "labelMid": "中",
+  "labelHigh": "高"
+}

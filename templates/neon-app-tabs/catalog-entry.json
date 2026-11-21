@@ -1,0 +1,28 @@
+{
+  "id": "neon-app-tabs",
+  "name": "霓虹应用双Tab",
+  "description": "深黑底荧光绿双Tab切换：标题关键词绿色高亮，两个并排圆角按钮（彩点+主副标签）初始激活Tab1，2.2s激活态切到Tab2并横扫闪光，说明字同步淡入，适合口播讲同一产品的不同入口/叫法。",
+  "category": "信息卡片",
+  "tags": [
+    "Tab切换",
+    "霓虹",
+    "荧光绿",
+    "入口对比",
+    "口播"
+  ],
+  "duration": 6,
+  "slot": "concept",
+  "when": "口播讲同一个东西在手机端/桌面端的不同入口或叫法，需要两个Tab切换激活态呈现时",
+  "assets": [],
+  "path": "templates/neon-app-tabs",
+  "size": "1920×1080",
+  "formats": [
+    "mp4"
+  ],
+  "defaultFormat": "mp4",
+  "preview": "https://maning789link.top/hub/renders/neon-app-tabs/sample.webm",
+  "status": "ready",
+  "tier": "free",
+  "no": null,
+  "series": "shot"
+}

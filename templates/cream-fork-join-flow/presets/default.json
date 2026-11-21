@@ -1,0 +1,7 @@
+{
+  "title": "并行检索",
+  "subtitle": "Coordinator 同时下发多个 Worker，完成后汇合结果",
+  "coordinator": "Coordinator",
+  "workers": "Web,Doc,Code",
+  "mergeLabel": "Merge Results"
+}

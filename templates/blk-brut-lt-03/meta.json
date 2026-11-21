@@ -1,0 +1,16 @@
+{
+ "name": "角标徽章",
+ "description": "贴角三层小徽章：品牌方块 + 胶囊状态牌 + mono 副行；整摞斜向拍入落定后，两层做匀速位移往返做机械呼吸，全程不缩放",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "badge",
+  "pink",
+  "tick"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "需要常驻显示「直播中 / NEW / 订阅提醒」这类状态角标时"
+}

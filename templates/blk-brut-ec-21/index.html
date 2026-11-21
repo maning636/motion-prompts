@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（顶部纸底行上的 mono 字）","default":"INGREDIENT / 成分对比"},{"id":"title","name":"主标题","type":"string","label":"主标题（中文大字，一行）","default":"同一张成分表，我们多写了三行"},{"id":"m1","name":"成分 1","type":"string","label":"第一项名称","default":"纯棉含量"},{"id":"o1","name":"我方值 1","type":"number","label":"第一项我方数值","default":96},{"id":"b1","name":"基准值 1","type":"number","label":"第一项行业基准","default":60},{"id":"m2","name":"成分 2","type":"string","label":"第二项名称","default":"莱赛尔混纺"},{"id":"o2","name":"我方值 2","type":"number","label":"第二项我方数值","default":20},{"id":"b2","name":"基准值 2","type":"number","label":"第二项行业基准","default":15},{"id":"m3","name":"成分 3","type":"string","label":"第三项名称","default":"氨纶弹性纤维"},{"id":"o3","name":"我方值 3","type":"number","label":"第三项我方数值","default":5},{"id":"b3","name":"基准值 3","type":"number","label":"第三项行业基准","default":8},{"id":"unit","name":"单位","type":"string","label":"数值单位（% / mg）","default":"%"},{"id":"note","name":"口径说明","type":"string","label":"底部口径说明（一行 mono）","default":"口径：基准取同价位段同类目中位数 · 检测批次 2026-10"},{"id":"accent","name":"强调色","type":"color","label":"强调色（我方条 / 斜纹带）","default":"#2FD07A"},{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–6）","default":6},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="成分表格构图：三行成分各配两条横向对比条，我方实色条在上、行业斜纹条在下，行尾一枚倍数片，倍数由两个数值算出">
+<title>成分对比表 · 同一张成分表，我们多写了三行</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --accent:#2FD07A;
+  }
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--paper);color:var(--ink);font-family:var(--sans);
+    display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+  .hd{flex:0 0 auto;display:flex;align-items:center;gap:26px;
+    padding:38px 72px 30px;border-bottom:var(--bw) solid var(--ink)}
+  .hd .eb{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-family:var(--mono);font-weight:700;font-size:26px;
+    letter-spacing:.14em;color:var(--mute)}
+  .hd .tt{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-weight:900;font-size:64px;letter-spacing:0}
+  .hd .side{flex:0 0 auto;display:flex;gap:14px}
+  .hd .lg{display:inline-flex;align-items:center;gap:12px;padding:8px 20px;
+    border:var(--bw) solid var(--ink);border-radius:9999px;background:var(--white);
+    font-size:22px;font-weight:700;white-space:nowrap}
+  .hd .lg i{display:block;width:22px;height:22px;border-radius:4px;
+    border:var(--bw) solid var(--ink);background:var(--accent)}
+  .hd .lg.b i{background:repeating-linear-gradient(45deg,
+      var(--ink) 0 6px, var(--white) 6px 12px)}
+
+  /* 表格区：行间 3px 实线，表头与行共享边框 */
+  .tbl{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+  .tr{flex:1 1 0;min-height:0;display:flex;align-items:center;gap:34px;
+    padding:0 72px;background:var(--white);border-bottom:var(--bw) solid var(--ink)}
+  .tr:last-child{border-bottom:0}
+  .tr .nm{flex:0 0 300px;white-space:nowrap;font-size:34px;font-weight:900;
+    letter-spacing:0;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .tr .bars{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:10px}
+  /* 底槽：纸色 + 45° 疏纹；填充：实色。语义靠纹理密度区分，不靠深浅 */
+  .b{flex:0 0 auto;display:flex;align-items:center;gap:16px;min-width:0}
+  .b .trk{position:relative;flex:1 1 auto;min-width:0;height:34px;
+    border:var(--bw) solid var(--ink);border-radius:4px;overflow:hidden;
+    background-color:var(--paper);
+    background-image:repeating-linear-gradient(45deg,
+      rgba(15,15,15,.13) 0 2px, transparent 2px 16px)}
+  .b .trk i{position:absolute;left:0;top:0;bottom:0;width:0}
+  .b.a .trk i{background:var(--accent)}
+  .b.b .trk i{background:repeating-linear-gradient(45deg,
+      var(--ink) 0 8px, var(--white) 8px 16px)}
+  .b .t{flex:0 0 210px;white-space:nowrap;font-family:var(--mono);font-weight:900;
+    font-size:38px;letter-spacing:0;text-align:right;
+    font-variant-numeric:tabular-nums}
+  .b.b .t{color:var(--mute)}
+  .tr .gain{flex:0 0 200px;white-space:nowrap;display:flex;align-items:center;
+    justify-content:center;padding:12px 0;background:var(--ink);color:var(--accent);
+    border:var(--bw) solid var(--ink);border-radius:4px;box-shadow:6px 6px 0 var(--ink);
+    font-family:var(--mono);font-weight:900;font-size:32px;letter-spacing:0}
+
+  .foot{flex:0 0 auto;display:flex;align-items:center;gap:24px;padding:22px 72px 28px;
+    border-top:var(--bw) solid var(--ink)}
+  .foot .sq{flex:0 0 auto;width:22px;height:22px;background:var(--accent);
+    border:var(--bw) solid var(--ink);border-radius:4px}
+  .foot .tx{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-family:var(--mono);font-weight:700;font-size:24px;
+    letter-spacing:.06em;color:var(--mute)}
+
+  .stripe{flex:0 0 auto;height:20px;border-top:var(--bw) solid var(--ink);
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+
+  @media (prefers-reduced-motion: reduce){
+    .anim{transition-duration:.01ms !important;animation-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="hd anim" id="hd">
+    <span class="eb anim" id="eyebrow" data-fit-max="26" data-fit-min="16">INGREDIENT / 成分对比</span>
+    <span class="tt anim" id="title" data-fit-max="64" data-fit-min="32">同一张成分表，我们多写了三行</span>
+    <span class="side">
+      <span class="lg anim" id="lgA"><i></i>这一件</span>
+      <span class="lg b anim" id="lgB"><i></i>行业基准</span>
+    </span>
+  </div>
+
+  <div class="tbl anim" id="tbl">
+    <div class="tr anim" id="tr1">
+      <span class="nm anim" id="m1" data-fit-max="34" data-fit-min="19">纯棉含量</span>
+      <span class="bars">
+        <span class="b a"><span class="trk"><i id="fa1"></i></span><span class="t" id="ta1">96%</span></span>
+        <span class="b b"><span class="trk"><i id="fb1"></i></span><span class="t" id="tb1">60%</span></span>
+      </span>
+      <span class="gain anim" id="g1">×1.6</span>
+    </div>
+    <div class="tr anim" id="tr2">
+      <span class="nm anim" id="m2" data-fit-max="34" data-fit-min="19">莱赛尔混纺</span>
+      <span class="bars">
+        <span class="b a"><span class="trk"><i id="fa2"></i></span><span class="t" id="ta2">20%</span></span>
+        <span class="b b"><span class="trk"><i id="fb2"></i></span><span class="t" id="tb2">15%</span></span>
+      </span>
+      <span class="gain anim" id="g2">×1.3</span>
+    </div>
+    <div class="tr anim" id="tr3">
+      <span class="nm anim" id="m3" data-fit-max="34" data-fit-min="19">氨纶弹性纤维</span>
+      <span class="bars">
+        <span class="b a"><span class="trk"><i id="fa3"></i></span><span class="t" id="ta3">5%</span></span>
+        <span class="b b"><span class="trk"><i id="fb3"></i></span><span class="t" id="tb3">8%</span></span>
+      </span>
+      <span class="gain anim" id="g3">−38%</span>
+    </div>
+  </div>
+
+  <div class="foot anim" id="foot">
+    <span class="sq"></span>
+    <span class="tx anim" id="note" data-fit-max="24" data-fit-min="15">口径：基准取同价位段同类目中位数 · 检测批次 2026-10</span>
+  </div>
+
+  <div class="stripe anim" id="stripe"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  ['eyebrow', 'title', 'm1', 'm2', 'm3', 'note']
+    .forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+
+  var U = v.unit == null || v.unit === '' ? '%' : v.unit;
+  /* 条宽、百分比与倍数全部由我方值 / 基准值算出，不手抄结论 */
+  var ours = [Number(v.o1), Number(v.o2), Number(v.o3)];
+  var base = [Number(v.b1), Number(v.b2), Number(v.b3)];
+  var WA = ['', '', ''];   // 我方条宽
+  var WB = ['', '', ''];   // 基准条宽
+  for (var i = 0; i < 3; i++) {
+    var o = isFinite(ours[i]) ? ours[i] : 0;
+    var b = isFinite(base[i]) ? base[i] : 0;
+    o = Math.max(0, o); b = Math.max(0, b);
+    /* 同一行的两条共用一把尺：以两者的较大值为满格，读出来就是「谁长谁赢」 */
+    var top = Math.max(o, b, 1);
+    WA[i] = (o / top * 100).toFixed(1) + '%';
+    WB[i] = (b / top * 100).toFixed(1) + '%';
+    set('ta' + (i + 1), Math.round(o * 10) / 10 + U);
+    set('tb' + (i + 1), Math.round(b * 10) / 10 + U);
+    if (b > 0) {
+      var r = o / b;
+      set('g' + (i + 1), r >= 1
+        ? '×' + (Math.round(r * 10) / 10)
+        : '−' + Math.round((1 - r) * 100) + '%');
+    } else {
+      set('g' + (i + 1), '—');
+    }
+  }
+
+  B.fitAll();
+  var tl = B.tl();
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (reduce) {
+    gsap.set('.anim', { x: 0, y: 0, scale: 1, scaleX: 1, rotate: 0 });
+    for (var k = 0; k < 3; k++) {
+      gsap.set('#fa' + (k + 1), { width: WA[k] });
+      gsap.set('#fb' + (k + 1), { width: WB[k] });
+    }
+    tl.fromTo('#hd',  { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, 0);
+    tl.fromTo('#tbl', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .15);
+    tl.fromTo('#foot', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .35);
+    tl.fromTo('#stripe',{ opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, .5);
+    B.hold(tl, 1.2, 1.1);
+    return;
+  }
+
+  function slam(sel, at, dx, dy, d) {
+    tl.fromTo(sel, { x: dx, y: dy },
+      { x: 0, y: 0, duration: d, ease: 'power4.out' }, at);
+  }
+
+  slam('#hd',     0.00,   0, -34, 0.24);
+  slam('#eyebrow',0.12, -24, -20, 0.22);
+  slam('#title',  0.20, -28, -24, 0.26);
+  slam('#lgA',    0.30,  24, -20, 0.22);
+  slam('#lgB',    0.36,  24, -20, 0.22);
+  /* 三行自左画外依次切入，行内六条对比条用 grow 从 0% 长出 */
+  tl.from('#tbl .tr', { x: -110, duration: .28, ease: 'power4.out', stagger: .16 }, 0.46);
+  for (var r = 0; r < 3; r++) {
+    var baseAt = 0.66 + r * 0.16;
+    B.in.grow(tl, '#fa' + (r + 1), WA[r], baseAt + 0.06, { d: .5, ease: 'power3.out' });
+    B.in.grow(tl, '#fb' + (r + 1), WB[r], baseAt + 0.18, { d: .5, ease: 'power3.out' });
+    slam('#g' + (r + 1), baseAt + 0.26, 24, -20, 0.22);
+  }
+  slam('#foot',    1.72,   0,  28, 0.26);
+  slam('#note',    1.84, -24, -20, 0.22);
+  slam('#stripe',  1.94,   0,  24, 0.24);
+  tl.fromTo('#stripe', { backgroundPositionX: '0px' },
+    { backgroundPositionX: '60px', duration: 1.2, ease: 'none' }, 2.18);
+
+  var introEnd = 3.38;
+  var total = Math.min(6, Math.max(5, Number(v.duration) || 6));
+  B.hold(tl, introEnd, Math.max(0.6, total - introEnd));
+})();
+</script>
+</body></html>

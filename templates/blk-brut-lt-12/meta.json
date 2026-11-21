@@ -1,0 +1,16 @@
+{
+ "name": "进度角标",
+ "description": "白底卡内 mono 当前进度 + 匀速填充条 + 十格刻度，填充条用 grow 长宽、刻度按百分比逐格硬切点亮，底部读数整数跳到百分比",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "progress",
+  "steps",
+  "yellow"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "课程、答题、分步教程类内容，需要把「进行到第几步」常驻挂在画面上时"
+}

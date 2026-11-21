@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "target", "type": "string", "label": "目标卡标题", "default": "异常订单 #4471"}, {"id": "label", "type": "string", "label": "锁定标签", "default": "已锁定"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#tgt{ position:absolute; left:660px; top:350px; width:600px; height:380px; border-radius:20px;
+  background:#17171F; border:1px solid rgba(255,255,255,.16); padding:38px; }
+#tgt h3{ font-size:40px; color:var(--fg); margin-bottom:24px; }
+#tgt i{ display:block; height:13px; border-radius:7px; background:rgba(255,255,255,.15); margin-bottom:13px; }
+#tflash{ position:absolute; inset:0; background:#fff; opacity:0; border-radius:20px; pointer-events:none; }
+.lc{ position:absolute; width:56px; height:56px; border:5px solid var(--accent); will-change:transform; }
+#lc1{ border-right:none; border-bottom:none; }
+#lc2{ border-left:none; border-bottom:none; }
+#lc3{ border-right:none; border-top:none; }
+#lc4{ border-left:none; border-top:none; }
+#lk{ position:absolute; left:660px; top:290px; padding:12px 30px; border-radius:999px; background:var(--accent);
+  color:#0A0A0F; font-size:28px; opacity:0; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="2.5" data-width="1920" data-height="1080">
+<div id="tgt"><h3 id="tt"></h3><i></i><i style="width:72%"></i><i style="width:55%"></i><div id="tflash"></div></div><div class="lc" id="lc1"></div><div class="lc" id="lc2"></div><div class="lc" id="lc3"></div><div class="lc" id="lc4"></div><div id="lk"></div>
+    </div>
+    <script>
+      const FB = {"target": "异常订单 #4471", "label": "已锁定", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#tt').textContent=v.target||'';$('#lk').textContent=v.label||'';
+// 目标四角坐标（L 角标的咬合位）
+const TX=660,TY=350,TW=600,TH=380,GAP=26;
+const corners=[['#lc1',TX-GAP-56,TY-GAP-56,-1,-1],['#lc2',TX+TW+GAP,TY-GAP-56,1,-1],
+  ['#lc3',TX-GAP-56,TY+TH+GAP,-1,1],['#lc4',TX+TW+GAP,TY+TH+GAP,1,1]];
+// 飞入（10f out-cubic，画外≥1000px）与收缩超调（2.2×→0.94×→1）解耦
+corners.forEach(([sel,cx,cy,dx,dy],i)=>{
+  gsap.set(sel,{x:cx+dx*1200,y:cy+dy*1200});
+  tl.to(sel,{x:cx,y:cy,duration:F(10),ease:'power3.out'},F(6+i));
+});
+// 超调回弹：f16 收过头（向中心多压 14px）f20 回位
+corners.forEach(([sel,cx,cy,dx,dy])=>{
+  tl.to(sel,{x:cx-dx*14,y:cy-dy*14,duration:F(4),ease:'power2.inOut'},F(16));
+  tl.to(sel,{x:cx,y:cy,duration:F(4),ease:'back.out(2)'},F(20));
+});
+// 咬合帧 f24：目标白闪 0.55→停 0.28 + 标签同帧 back 弹出
+tl.set('#tflash',{opacity:.55},F(24));
+tl.set('#tflash',{opacity:.28},F(25));
+tl.to('#tflash',{opacity:0,duration:F(8)},F(26));
+tl.fromTo('#lk',{opacity:0,scale:.6},{opacity:1,scale:1,duration:F(8),ease:'back.out(1.8)'},F(24));
+tl.to({},{duration:F(41)},F(34)); // 真静止
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

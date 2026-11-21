@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="zh-CN" data-audit-offcanvas="翻页动效：上一页按设计滑出画布左侧（x=-436），否则两页会重叠" data-composition-variables='[{"id":"p1t","name":"页1标题","type":"string","label":"第一页标题","default":"素材"},{"id":"p2t","name":"页2标题","type":"string","label":"第二页标题","default":"成片"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"accent2","name":"次强调","type":"color","label":"次强调色","default":"#2EC4B6"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.4}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>页面横向滑动</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+
+  .p-sw-halo {
+    position: absolute; left: 60px; top: 22px; width: 360px; height: 226px;
+    background: radial-gradient(58% 62% at 50% 50%,
+      rgba(0, 0, 0, .50) 0%, rgba(0, 0, 0, .25) 56%, rgba(0, 0, 0, 0) 86%);
+  }
+  /* 屏幕窗：两页都在这一格里，overflow 裁掉溢出部分 */
+  .p-sw-view {
+    position: absolute; left: 84px; top: 26px; width: 312px; height: 218px;
+    border-radius: 18px; overflow: hidden;
+    background: #1B1B24;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, .5);
+    will-change: transform, opacity;
+  }
+  /* 每一页：position:absolute 同一位置，靠 x 位移切换 */
+  .p-sw-page {
+    position: absolute; left: 0; top: 0; width: 312px; height: 218px;
+    will-change: transform;
+  }
+  /* 页内两层：back 走得慢、front 走得快 → 视差 */
+  .p-sw-back {
+    position: absolute; left: 0; top: 0; width: 312px; height: 218px;
+    will-change: transform;
+  }
+  .p-sw-front {
+    position: absolute; left: 0; top: 0; width: 312px; height: 218px;
+    will-change: transform;
+  }
+  .p-sw-cap {
+    position: absolute; left: 0; right: 0; top: 16px; text-align: center;
+    font-size: 14px; line-height: 1.2; font-weight: 800; letter-spacing: .06em;
+    color: #FFF8EE; white-space: nowrap;
+  }
+  .p-sw-blob { position: absolute; border-radius: 12px; }
+  .p-sw-lb {
+    position: absolute; height: 7px; border-radius: 4px;
+    background: rgba(255, 248, 238, .28);
+  }
+  /* 指示点 */
+  .p-sw-dots {
+    position: absolute; left: 0; right: 0; top: 252px;
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+    will-change: opacity;
+  }
+  .p-sw-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: rgba(255, 248, 238, .30);
+    transform-origin: 50% 50%; will-change: transform, background-color;
+  }
+  .p-sw-dot.on { background: var(--ac, #FF6B35); }
+  /* 手指提示：跟着滑动方向推一下 */
+  .p-sw-hand {
+    position: absolute; left: 50%; top: 135px; width: 26px; height: 26px;
+    margin-left: -13px; border-radius: 50%;
+    border: 3px solid rgba(255, 248, 238, .85);
+    color: rgba(255, 248, 238, .85);
+    opacity: 0; will-change: transform, opacity;
+  }
+  .p-sw-hand::after {
+    content: ""; position: absolute; left: 50%; top: 50%;
+    width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px;
+    border-radius: 50%; background: rgba(255, 248, 238, .85);
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"p1t":"素材","p2t":"成片","accent":"#FF6B35","accent2":"#2EC4B6","duration":3.4};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--ac2', v.accent2 || FALLBACK.accent2);
+  const dur = parseFloat(v.duration) || 3.4;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  function label(raw, fb) {
+    const s = (raw == null || raw === '' ? fb : raw).toString()
+      .replace(/\s+/g, ' ').trim().slice(0, 6);
+    return s;
+  }
+  const t1 = label(v.p1t, FALLBACK.p1t);
+  const t2 = label(v.p2t, FALLBACK.p2t);
+
+  put('div', 'p-sw-halo');
+  const view = put('div', 'p-sw-view');
+
+  const W = 312;           /* 页宽 = 窗宽，滑一整格 */
+  const SLIDE = .52;
+
+  /* 两页内容全是自己画的简化色块 + 文字占位，不模仿任何真实 App。
+     offsetX 决定这一页初始停在哪一格：第 1 页 0，第 2 页 W（藏在右边待命）。 */
+  function buildPage(title, tint, offsetX) {
+    const page = put('div', 'p-sw-page',
+      offsetX ? 'transform:translateX(' + offsetX + 'px);' : null, null, view);
+    const back = put('div', 'p-sw-back', null, null, page);
+    const front = put('div', 'p-sw-front', null, null, page);
+
+    put('div', 'p-sw-blob',
+      'left:34px;top:56px;width:96px;height:96px;background:' + tint + ';opacity:.92;', null, back);
+    put('div', 'p-sw-blob',
+      'left:150px;top:76px;width:44px;height:44px;background:rgba(255,248,238,.16);', null, back);
+
+    put('div', 'p-sw-cap', null, title, front);
+    for (let i = 0; i < ROWS; i++) {
+      put('div', 'p-sw-lb',
+        'left:40px;right:40px;top:' + (168 + i * 15) + 'px;', null, front);
+    }
+    return { page: page, back: back, front: front };
+  }
+
+  const ROWS = 3;
+  const A = buildPage(t1, 'var(--ac)', 0);
+  const B = buildPage(t2, 'var(--ac2)', W);
+
+  const dots = put('div', 'p-sw-dots');
+  const d1 = put('div', 'p-sw-dot on', null, null, dots);
+  const d2 = put('div', 'p-sw-dot', null, null, dots);
+  const hand = put('div', 'p-sw-hand');
+
+  /* §3.2 中文溢出防护 */
+  const caps = view.querySelectorAll('.p-sw-cap');
+  caps.forEach(function (c) {
+    c.style.whiteSpace = 'nowrap';
+    const n = c.scrollWidth;
+    if (n > 260 && n > 0) {
+      c.style.fontSize = String(Math.max(9, Math.floor(14 * 260 / n))) + 'px';
+    }
+  });
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* ① 屏幕窗弹入 */
+  tl.fromTo(view, { y: 30, scale: .90, opacity: 0 },
+    { y: 0, scale: 1, opacity: 1, duration: .50, ease: 'back.out(2.2)' }, 0);
+  tl.fromTo(dots, { y: 10, opacity: 0 },
+    { y: 0, opacity: 1, duration: .32, ease: 'power2.out' }, .34);
+
+  /* ② 第 1 页内容落位（视差：back 慢、front 快） */
+  tl.fromTo(A.back, { x: 26, opacity: 0 },
+    { x: 0, opacity: 1, duration: .40, ease: 'power3.out' }, .40);
+  tl.fromTo(A.front, { x: 52, opacity: 0 },
+    { x: 0, opacity: 1, duration: .40, ease: 'power3.out' }, .48);
+
+  const T = 1.18;
+
+  /* ④ 手指推一下 */
+  tl.fromTo(hand, { x: -46, opacity: 0 },
+    { x: -46, opacity: 1, duration: .16, ease: 'power2.out' }, T - .22);
+  tl.to(hand, { x: 40, opacity: 1, duration: .40, ease: 'power2.inOut' }, T - .06);
+  tl.to(hand, { opacity: 0, duration: .14, ease: 'power2.in' }, T + .34);
+
+  /* ⑤ 两页左右滑入滑出 + 视差（back 走 0.78 格、front 走 1 格） */
+  tl.to(A.page, { x: -W, duration: SLIDE, ease: 'power2.inOut' }, T);
+  tl.to(B.page, { x: 0, duration: SLIDE, ease: 'power2.inOut' }, T);
+  tl.to(A.back, { x: -W * .78, duration: SLIDE, ease: 'power2.inOut' }, T);
+  tl.to(A.front, { x: -W, duration: SLIDE, ease: 'power2.inOut' }, T);
+  tl.to(B.back, { x: 0, duration: SLIDE, ease: 'power2.inOut' }, T);
+  tl.to(B.front, { x: 0, duration: SLIDE, ease: 'power2.inOut' }, T);
+
+  /* ⑥ 指示点切换：小圆点拉长 + 变色 */
+  tl.to(d1, { scaleX: 1, backgroundColor: 'rgba(255, 248, 238, .30)', duration: .18, ease: 'power2.out' }, T + .10);
+  tl.fromTo(d2, { scaleX: 1 },
+    { scaleX: 2.2, backgroundColor: v.accent || FALLBACK.accent, duration: .22, ease: 'back.out(2.6)' }, T + .10);
+
+  /* ⑦ 落定后轻微呼吸 */
+  const tail = Math.max(T + SLIDE + .35, dur - .8);
+  tl.to(view, { y: -2.5, duration: .34, ease: 'sine.inOut' }, tail);
+  tl.to(view, { y: 0, duration: .36, ease: 'sine.inOut' }, tail + .34);
+
+  /* ⑧ 收尾淡出 */
+  tl.to(dots, { opacity: 0, duration: .22, ease: 'power2.in' }, Math.max(.1, dur - .5));
+  tl.to(view, { opacity: 0, scale: .95, duration: .28, ease: 'power2.in' }, Math.max(.1, dur - .45));
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

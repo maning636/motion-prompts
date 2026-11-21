@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "hub", "type": "string", "label": "中枢页标题", "default": "集成中心"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#bg{ position:absolute; inset:0; background:#12101C; }
+.nr{ position:absolute; border:1px solid rgba(150,120,255,.14); border-radius:14px; }
+#flip{ position:absolute; left:510px; top:230px; width:900px; height:620px; transform-style:preserve-3d; }
+.face{ position:absolute; inset:0; border-radius:22px; backface-visibility:hidden; overflow:hidden;
+  border:1px solid rgba(255,255,255,.14); }
+#fOld{ background:#191924; padding:46px; }
+#fOld i{ display:block; height:15px; border-radius:8px; background:rgba(255,255,255,.13); margin-bottom:16px; }
+#fNew{ background:#16121F; transform:rotateY(180deg); display:flex; align-items:center; justify-content:center; }
+#fNew h2{ font-size:58px; color:var(--fg); }
+#edge{ position:absolute; left:50%; top:180px; width:14px; height:720px; transform:translateX(-50%);
+  background:linear-gradient(180deg,transparent,#C9A8FF,transparent); opacity:0; filter:blur(6px); }
+.app{ position:absolute; width:96px; height:96px; border-radius:26px; display:flex; align-items:center;
+  justify-content:center; font-size:44px; color:#0A0A0F; opacity:0; }
+#pipes{ position:absolute; inset:0; pointer-events:none; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+<div id="bg"><div class="nr" style="left:120px;top:120px;width:280px;height:180px"></div><div class="nr" style="left:1520px;top:760px;width:300px;height:200px"></div></div><svg id="pipes" width="1920" height="1080"></svg><div id="flip"><div class="face" id="fOld"><i style="width:60%"></i><i></i><i style="width:82%"></i><i style="width:70%"></i><i style="width:88%"></i><i style="width:64%"></i></div><div class="face" id="fNew"><h2 id="ht"></h2></div></div><div id="edge"></div><div class="app" id="ap0" style="left:260px;top:300px;background:#FF6B6B">邮</div><div class="app" id="ap1" style="left:200px;top:540px;background:#FFD43B">历</div><div class="app" id="ap2" style="left:260px;top:780px;background:#63E6BE">云</div><div class="app" id="ap3" style="left:1560px;top:360px;background:#74C0FC">聊</div><div class="app" id="ap4" style="left:1560px;top:700px;background:#B197FC">档</div>
+    </div>
+    <script>
+      const FB = {"hub": "集成中心", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#ht').textContent=v.hub||'';
+// 翻面 35f out-cubic（前 41% 完成 80% 角度，尾段长减速）
+gsap.set('#flip',{transformPerspective:1600});
+tl.to('#flip',{rotationY:180,duration:F(35),ease:'power3.out'},F(10));
+// 侧棱瞬闪 ~90° 时刻 2f 脉冲 4f 归零
+tl.set('#edge',{opacity:1},F(26));
+tl.set('#edge',{opacity:.25},F(28));
+tl.set('#edge',{opacity:0},F(30));
+// 两拍制：五图标同帧弹现（落定+3f）→ +10f 五管同帧起画 9f 齐长
+const AP=[[308,348,'#FF6B6B'],[248,588,'#FFD43B'],[308,828,'#63E6BE'],[1608,408,'#74C0FC'],[1608,748,'#B197FC']];
+const HUB=[960,540];
+const svg=$('#pipes'), NS='http://www.w3.org/2000/svg';
+const grads=[];
+AP.forEach((a,i)=>{
+  tl.fromTo('#ap'+i,{opacity:0,scale:.4},{opacity:1,scale:1,duration:F(8),ease:'back.out(1.7)'},F(48));
+});
+AP.forEach((a,i)=>{
+  const [x,y,c]=a;
+  const sx=x+48, sy=y+48;
+  const mx=(sx+HUB[0])/2, my=(sy+HUB[1])/2-80;
+  const gid='pg'+i;
+  const defs=document.createElementNS(NS,'defs');
+  defs.innerHTML='<linearGradient id="'+gid+'" gradientUnits="userSpaceOnUse" x1="'+sx+'" y1="'+sy+'" x2="'+HUB[0]+'" y2="'+HUB[1]+'">'
+    +'<stop offset="0" stop-color="'+c+'"/><stop offset="1" stop-color="#00FF00"/></linearGradient>';
+  svg.appendChild(defs);
+  const p=document.createElementNS(NS,'path');
+  p.setAttribute('d','M'+sx+','+sy+' Q'+mx+','+my+' '+HUB[0]+','+HUB[1]);
+  p.setAttribute('fill','none'); p.setAttribute('stroke','url(#'+gid+')'); p.setAttribute('stroke-width',6);
+  p.setAttribute('stroke-linecap','round');
+  svg.appendChild(p);
+  const len=p.getTotalLength();
+  p.style.strokeDasharray=len; p.style.strokeDashoffset=len;
+  tl.to(p,{strokeDashoffset:0,duration:F(9),ease:'power2.inOut'},F(58));
+  // 输送脉冲：亮斑沿图标→中枢循环流动（有限时长、相位错开）
+  const pl=document.createElementNS(NS,'path');
+  pl.setAttribute('d',p.getAttribute('d')); pl.setAttribute('fill','none');
+  pl.setAttribute('stroke','rgba(255,255,255,.85)'); pl.setAttribute('stroke-width',3);
+  pl.setAttribute('stroke-linecap','round');
+  svg.appendChild(pl);
+  pl.style.strokeDasharray='14 '+(len-14);
+  tl.fromTo(pl,{strokeDashoffset:len},{strokeDashoffset:0,duration:F(Math.round(len/4.6)),ease:'none'},F(67+i*6));
+});
+// 中枢页轻呼吸（有限）
+tl.to('#flip',{scale:1.015,duration:F(16),yoyo:true,repeat:3,ease:'sine.inOut'},F(70));
+tl.to({},{duration:F(26)},F(124)); // 真静止
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

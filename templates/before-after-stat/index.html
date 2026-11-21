@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"label","type":"string","label":"主题","default":"做一条知识视频"},{"id":"beforeLabel","type":"string","label":"之前标签","default":"过去"},{"id":"beforeValue","type":"number","label":"之前数值","default":12},{"id":"afterLabel","type":"string","label":"之后标签","default":"现在"},{"id":"afterValue","type":"number","label":"之后数值","default":3},{"id":"unit","type":"string","label":"单位","default":"小时"},{"id":"conclusion","type":"string","label":"结论","default":"流程被压缩到原来的 1/4"},{"id":"accent","type":"color","label":"强调色","default":"#00FF00"},{"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},{"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"}]}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+*{ box-sizing: border-box; }
+html, body{ margin:0; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0A0B); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0A0B); color: var(--foreground, #F5F5F4);
+  font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.scene{ position:absolute; inset:0; padding:72px 88px; }
+.gridbg{ position:absolute; inset:0; pointer-events:none;
+  background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px); background-size:48px 48px; }
+.chip{ display:inline-flex; align-items:center; gap:10px; padding:8px 16px; border:1px solid #2A2A2E; border-radius:999px;
+  font-size:18px; letter-spacing:.16em; color:#9CA3AF; text-transform:uppercase; white-space:nowrap; }
+.chip b{ color:var(--accent,#00FF00); font-weight:700; letter-spacing:.05em; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; }
+.wipe{ clip-path: inset(0 100% 0 0); }
+</style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5.5" data-width="1920" data-height="1080">
+      <section id="scene" class="scene" data-start="0" data-duration="5.5" data-track-index="1">
+
+        <div class="gridbg"></div>
+        <div style="position:relative;z-index:2;text-align:center;"><span class="chip"><b>VS</b><span id="label"></span></span></div>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:120px;">
+          <div id="panelL" style="text-align:center;">
+            <span class="chip" id="beforeLabel" style="color:#9CA3AF;"></span>
+            <div class="num" style="font-size:200px;line-height:1;color:#6B7280;"><span id="beforeValue">0</span><span id="unitL" style="font-size:48px;"></span></div>
+          </div>
+          <div id="arrow" style="width:96px;height:96px;border:2px solid var(--accent,#00FF00);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:44px;color:var(--accent,#00FF00);transform:scale(0);">→</div>
+          <div id="panelR" style="text-align:center;">
+            <span class="chip" id="afterLabel"><b></b></span>
+            <div class="num" style="font-size:200px;line-height:1;color:var(--accent,#00FF00);"><span id="afterValue">0</span><span id="unitR" style="font-size:48px;"></span></div>
+          </div>
+        </div>
+        <div id="concl" style="position:absolute;left:50%;bottom:90px;transform:translateX(-50%);padding:14px 34px;border:1px solid #2A2A2E;border-radius:12px;font-size:26px;color:#D4D4D8;background:rgba(10,10,11,.8);"></div>
+
+      </section>
+    </div>
+    <script>
+      const fallback = {"label": "做一条知识视频", "beforeLabel": "过去", "beforeValue": 12, "afterLabel": "现在", "afterValue": 3, "unit": "小时", "conclusion": "流程被压缩到原来的 1/4", "accent": "#00FF00", "foreground": "#F4EFE7", "exportMode": "transparent"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4EFE7");
+      document.documentElement.style.setProperty("--accent", v.accent ?? "#00FF00");
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const DUR = 5.5;
+      const countTo = (el, target, at, dur = 1.1, dec = 0) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(target) || 0, duration: dur, ease: "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+
+      $("label").textContent = v.label;
+      $("beforeLabel").textContent = v.beforeLabel;
+      $("afterLabel").innerHTML = "<b>" + v.afterLabel + "</b>";
+      $("unitL").textContent = v.unit; $("unitR").textContent = v.unit;
+      $("concl").textContent = v.conclusion;
+      tl.fromTo("#panelL", { x: -220, opacity: 0 }, { x: 0, opacity: 1, duration: 0.7, ease: "power3.out" }, 0.2);
+      tl.fromTo("#panelR", { x: 220, opacity: 0 }, { x: 0, opacity: 1, duration: 0.7, ease: "power3.out" }, 0.2);
+      countTo($("beforeValue"), v.beforeValue, 0.6, 1.0);
+      countTo($("afterValue"), v.afterValue, 0.9, 1.2);
+      tl.to("#arrow", { scale: 1, duration: 0.5, ease: "back.out(2.5)" }, 1.1);
+      tl.fromTo("#concl", { clipPath: "inset(0 50% 0 50%)", opacity: 0 }, { clipPath: "inset(0 0% 0 0%)", opacity: 1, duration: 0.6, ease: "power3.out" }, 1.8);
+      tl.to(".scene", { opacity: 0, y: -30, duration: 0.5, ease: "power2.in" }, DUR - 0.6);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

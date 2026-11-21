@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "c1", "type": "string", "label": "功能点1", "default": "模板 202 个"}, {"id": "c2", "type": "string", "label": "功能点2", "default": "一键渲染"}, {"id": "c3", "type": "string", "label": "功能点3", "default": "提示词直接抄"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+.hc{ position:absolute; left:610px; top:0; width:700px; height:150px; border-radius:18px;
+  background:#17171F; border:1px solid rgba(255,255,255,.16); display:flex; align-items:center;
+  padding:0 46px; font-size:44px; color:var(--fg); opacity:0; will-change:transform; }
+.dmg{ position:absolute; font-size:52px; color:var(--accent); opacity:0; font-weight:900; }
+#combo{ position:absolute; right:120px; top:90px; font-size:110px; color:var(--accent);
+  font-weight:900; transform-origin:center; }
+.cbn{ position:absolute; right:0; top:0; opacity:0; }
+#title{ position:absolute; left:120px; top:100px; font-size:40px; color:rgba(255,255,255,.45); letter-spacing:6px; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4" data-width="1920" data-height="1080">
+<div id="title">FEATURE COMBO</div><div class="hc" id="hc0" style="top:300px"><span id="h1"></span></div><div class="hc" id="hc1" style="top:490px"><span id="h2"></span></div><div class="hc" id="hc2" style="top:680px"><span id="h3"></span></div><div class="dmg" id="d0" style="left:1180px;top:250px">HIT</div><div class="dmg" id="d1" style="left:1180px;top:440px">HIT</div><div class="dmg" id="d2" style="left:1180px;top:630px">HIT</div><div id="combo"><div class="cbn" id="cb0">×1</div><div class="cbn" id="cb1">×2</div><div class="cbn" id="cb2">×3</div></div>
+    </div>
+    <script>
+      const FB = {"c1": "模板 202 个", "c2": "一键渲染", "c3": "提示词直接抄", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#h1').textContent=v.c1||'';$('#h2').textContent=v.c2||'';$('#h3').textContent=v.c3||'';
+const PKS=[1.3,1.45,1.6], ROT=[-2,-4,-6];
+for(let i=0;i<3;i++){
+  const hit=10+i*30;
+  // 命中前 10f ease-in 砸落
+  tl.fromTo('#hc'+i,{opacity:1,y:-520},{y:0,duration:F(10),ease:'power2.in'},F(hit-10));
+  tl.set('#hc'+i,{opacity:1},F(hit-10));
+  // 伤害数字上浮 12f 渐隐
+  const d=$('#d'+i);
+  tl.set(d,{opacity:1,scale:1.4,y:0},F(hit));
+  tl.to(d,{scale:1,y:-52,duration:F(6),ease:'power2.out'},F(hit));
+  tl.to(d,{opacity:0,duration:F(6),ease:'none'},F(hit+6));
+  // 计数跳字逐次加码：三层叠放 opacity 硬切（可回放）+ 脉冲/旋转递增
+  tl.set('#cb'+i,{opacity:1},F(hit));
+  if(i>0) tl.set('#cb'+(i-1),{opacity:0},F(hit));
+  tl.fromTo('#cb'+i,{scale:PKS[i],rotation:ROT[i]},{scale:1,rotation:0,duration:F(10),ease:'power2.out'},F(hit));
+}
+tl.to({},{duration:F(40)},F(80)); // 真静止（补齐到 120f=data-duration）
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

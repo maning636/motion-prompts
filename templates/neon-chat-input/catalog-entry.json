@@ -1,0 +1,28 @@
+{
+  "id": "neon-chat-input",
+  "name": "对话输入框打字卡",
+  "description": "深黑底荧光绿对话输入框：标题关键词绿色高亮，胶囊输入框内提示语逐字打出、方块光标跟随，发送按钮发光脉冲后绿色状态行淡入，适合口播演示AI对话操作。",
+  "category": "信息卡片",
+  "tags": [
+    "对话输入",
+    "打字机",
+    "霓虹",
+    "荧光绿",
+    "口播"
+  ],
+  "duration": 6,
+  "slot": "concept",
+  "when": "口播演示在AI对话框输入一句话并发送的操作过程，需要逐字打字与发送反馈时",
+  "assets": [],
+  "path": "templates/neon-chat-input",
+  "size": "1920×1080",
+  "formats": [
+    "mp4"
+  ],
+  "defaultFormat": "mp4",
+  "preview": "https://maning789link.top/hub/renders/neon-chat-input/sample.webm",
+  "status": "ready",
+  "tier": "free",
+  "no": null,
+  "series": "shot"
+}

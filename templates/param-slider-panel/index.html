@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "第一版出来后，只调这四个参数"}, {"id": "params", "type": "string", "label": "参数行（名称|代号|数值|0-1，分号分隔）", "default": "海报角度|ROTATE Y|±55°|0.8;海报间距|X GAP|160PX|0.55;减速节奏|POWER4.OUT|4.9S|0.7;光晕强度|FOCUS|0.95|0.92"}, {"id": "img1", "type": "image", "label": "预览图", "default": "./placeholder-1.png"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #0E100F; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #EDF2EE; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      .corner{ position: absolute; width: 34px; height: 34px; border: 3px solid var(--ac, #00FF00); }
+      .c-tl{ left: -3px; top: -3px; border-right: none; border-bottom: none; }
+      .c-tr{ right: -3px; top: -3px; border-left: none; border-bottom: none; }
+      .c-bl{ left: -3px; bottom: -3px; border-right: none; border-top: none; }
+      .c-br{ right: -3px; bottom: -3px; border-left: none; border-top: none; }
+      .tc{ position: absolute; right: 90px; top: 84px; text-align: right; font-family: 'IBM Plex Mono', monospace;
+        font-size: 20px; letter-spacing: .22em; color: rgba(237,242,238,.5); line-height: 1.9; z-index: 6; }
+      .psp-head{ position: absolute; left: 90px; top: 76px; z-index: 6; }
+      .psp-kicker{ font-size: 20px; letter-spacing: .3em; color: var(--ac); }
+      .psp-title{ margin-top: 14px; font-size: 62px; font-weight: 900; }
+      .psp-prev{ position: absolute; left: 90px; top: 290px; width: 860px; height: 620px; z-index: 4;
+        background: #131614; border: 1px solid rgba(237,242,238,.12); }
+      .psp-prev img{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      .psp-cap{ position: absolute; left: 90px; top: 246px; font-size: 20px; letter-spacing: .26em;
+        color: rgba(237,242,238,.6); z-index: 5; }
+      .psp-cap b{ color: var(--ac); font-weight: 400; }
+      .psp-panel{ position: absolute; left: 1020px; top: 290px; width: 810px; height: 620px; z-index: 4;
+        background: #121513; border: 1px solid rgba(237,242,238,.1); border-radius: 16px; padding: 40px 44px; }
+      .psp-ph{ font-size: 20px; letter-spacing: .3em; color: rgba(237,242,238,.5); margin-bottom: 16px; }
+      .psp-row{ padding: 26px 0; border-top: 1px solid rgba(237,242,238,.09); }
+      .psp-r1{ display: flex; align-items: baseline; gap: 22px; margin-bottom: 20px; }
+      .psp-nm{ font-size: 30px; font-weight: 700; flex: 1; }
+      .psp-cd{ font-size: 20px; letter-spacing: .12em; color: var(--ac); }
+      .psp-vl{ font-size: 26px; color: #EDF2EE; }
+      .psp-track{ position: relative; height: 6px; background: rgba(237,242,238,.12); border-radius: 4px; }
+      .psp-fill{ position: absolute; left: 0; top: 0; bottom: 0; width: 100%; background: var(--ac);
+        border-radius: 4px; transform: scaleX(0); transform-origin: 0 50%; }
+      .psp-handle{ position: absolute; top: 50%; left: 0; width: 20px; height: 20px; margin: -10px 0 0 -10px;
+        border-radius: 50%; background: #EDF2EE; border: 4px solid var(--ac); box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 50%, transparent); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="psp-head"><div class="psp-kicker mono">STEP 03 · REVIEW AND TUNE</div><div class="psp-title" id="title"></div></div>
+      <div class="tc mono">01:24 → 01:36<br>V1 → FINAL</div>
+      <div class="psp-cap mono" id="cap"><b>●</b> PREVIEW · FINAL</div>
+      <div class="psp-prev" id="prev">
+        <img id="prevImg" alt="">
+        <span class="corner c-tl"></span><span class="corner c-tr"></span>
+        <span class="corner c-bl"></span><span class="corner c-br"></span>
+      </div>
+      <div class="psp-panel"><div class="psp-ph mono">参数 · PARAMETERS</div><div id="prows"></div></div>
+
+    </div>
+    <script>
+      const fallback = {"title": "第一版出来后，只调这四个参数", "params": "海报角度|ROTATE Y|±55°|0.8;海报间距|X GAP|160PX|0.55;减速节奏|POWER4.OUT|4.9S|0.7;光晕强度|FOCUS|0.95|0.92", "img1": "./placeholder-1.png", "accent": "#00FF00", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      document.documentElement.style.setProperty("--ac", V.accent ?? "#00FF00");
+      $("title").textContent = V.title;
+      if (V.img1) $("prevImg").src = V.img1;
+      const rows = String(V.params ?? "").split(";").map((r) => r.split("|").map((s) => s.trim())).filter((r) => r[0]);
+      const wrap = $("prows");
+      rows.forEach((r) => {
+        const d = document.createElement("div");
+        d.className = "psp-row";
+        d.innerHTML = '<div class="psp-r1"><span class="psp-nm"></span><span class="psp-cd mono"></span><span class="psp-vl mono"></span></div>' +
+          '<div class="psp-track"><div class="psp-fill"></div><div class="psp-handle"></div></div>';
+        d.querySelector(".psp-nm").textContent = r[0];
+        d.querySelector(".psp-cd").textContent = r[1] || "";
+        d.querySelector(".psp-vl").textContent = r[2] || "";
+        d._pct = Math.min(Math.max(Number(r[3]) || 0.5, 0), 1);
+        wrap.appendChild(d);
+      });
+      const rowEls = Array.from(wrap.children);
+      tl.fromTo([".psp-head", ".tc"], { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.1 }, 0.1);
+      tl.fromTo("#prev", { opacity: 0, scale: 0.97, y: 18 }, { opacity: 1, scale: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.3);
+      tl.fromTo("#prev .corner", { opacity: 0, scale: 0.4 }, { opacity: 1, scale: 1, duration: 0.3, stagger: 0.06, ease: "back.out(2)" }, 0.7);
+      tl.fromTo("#cap", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 0.8);
+      tl.fromTo([".psp-ph", ...rowEls], { opacity: 0, x: 36 }, { opacity: 1, x: 0, duration: 0.45, stagger: 0.09, ease: "power3.out" }, 0.5);
+      rowEls.forEach((d, i) => {
+        const t = 1.1 + i * 0.16;
+        tl.to(d.querySelector(".psp-fill"), { scaleX: d._pct, duration: 0.6, ease: "power2.out" }, t);
+        tl.to(d.querySelector(".psp-handle"), { left: (d._pct * 100) + "%", duration: 0.6, ease: "power2.out" }, t);
+      });
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

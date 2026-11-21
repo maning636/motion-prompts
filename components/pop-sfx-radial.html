@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"text","name":"拟声词","type":"string","label":"主文案（2–4 字最像原片）","default":"空心入网！"},{"id":"accent","name":"强调色","type":"color","label":"字色 / 强调","default":"#FF6B35"},{"id":"color","name":"硬阴影色","type":"color","label":"描边硬阴影 / 冲击线深色","default":"#241C18"},{"id":"fontSize","name":"字号","type":"number","label":"字号 px（超出画面自动缩）","default":80},{"id":"rayCount","name":"射线数","type":"number","label":"射线数量 0–12","default":8},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":2.8}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>拟声词放射爆开</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    /* 透明底：这层是挂件，底下是用户自己的实拍 */
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+
+  /* 射线组整体带一点自转，爆开感更足 */
+  .p-spin { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+  .p-ray {
+    position: absolute; left: 0; top: 0;
+    width: 10px; height: 52px; margin-left: -5px; margin-top: -52px;
+    border-radius: 5px; background: var(--ac2); opacity: 0;
+    transform-origin: 50% 100%;
+    filter: drop-shadow(1.5px 1.5px 0 var(--ink));
+  }
+  /* 环：宽度可配，扩散时 scale 越大环越"甩" */
+  .p-ring {
+    position: absolute; left: 50%; top: 50%;
+    margin: -70px 0 0 -70px; width: 140px; height: 140px;
+    border-radius: 50%; opacity: 0;
+    filter: drop-shadow(2px 2px 0 var(--ink));
+  }
+  .p-ring.r1 { border: 6px solid var(--ac2); }
+  .p-ring.r2 { border: 4px solid var(--ink); }
+
+  .p-core { position: absolute; inset: 0; display: flex;
+            align-items: center; justify-content: center; }
+  .p-word {
+    display: inline-block; white-space: nowrap;
+    font-size: var(--fs, 80px); font-weight: 900; line-height: 1;
+    letter-spacing: -.01em; color: var(--ac);
+    transform-origin: 50% 50%;
+    -webkit-font-smoothing: antialiased;
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"空心入网！","accent":"#FF6B35","color":"#241C18","fontSize":80,"rayCount":8,"duration":2.8};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--ink', v.color || FALLBACK.color);
+  root.style.setProperty('--ac2', '#FFC93C');
+  const dur = parseFloat(v.duration) || 2.8;
+  const fs = parseFloat(v.fontSize) || 80;
+  root.style.setProperty('--fs', fs + 'px');
+  const text = String(v.text == null ? FALLBACK.text : v.text);
+  const rcRaw = parseFloat(v.rayCount);
+  const rayN = Math.max(0, Math.min(12, isNaN(rcRaw) ? 8 : Math.round(rcRaw)));
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text_, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text_ != null) el.textContent = text_;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  /* 8 方向白描边 + 硬阴影：paint-order 在部分浏览器不可靠，这是最稳的跨浏览器做法。
+     硬阴影放第一位 = 画在最底下。全程字符串拼接，不用 % 格式化。 */
+  function outlineShadow(r, d, off, ink) {
+    const W = 'rgba(255,255,255,1)';
+    return [
+      off + 'px ' + off + 'px 0 ' + ink,
+      r + 'px 0 0 ' + W, (0 - r) + 'px 0 0 ' + W,
+      '0 ' + r + 'px 0 ' + W, '0 ' + (0 - r) + 'px 0 ' + W,
+      d + 'px ' + d + 'px 0 ' + W, (0 - d) + 'px ' + d + 'px 0 ' + W,
+      d + 'px ' + (0 - d) + 'px 0 ' + W, (0 - d) + 'px ' + (0 - d) + 'px 0 ' + W
+    ].join(',');
+  }
+
+  const r1 = put('div', 'p-ring r1', '', null, stage);
+  const r2 = put('div', 'p-ring r2', '', null, stage);
+  const spin = put('div', 'p-spin', 'opacity:1;');
+  const rays = [];
+  for (let i = 0; i < rayN; i++) rays.push(put('div', 'p-ray', '', null, spin));
+  const core = put('div', 'p-core', '', null, stage);
+  const word = put('span', 'p-word', '', text, core);
+  word.style.textShadow = outlineShadow(3, 2.2, 4.5, v.color || FALLBACK.color);
+
+  const tl = gsap.timeline({ paused: true });
+  /* 注册：云渲染的 settle / 逐帧定位靠 window.__timelines 驱动时间轴 */
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 收口：先量文字自然宽，超宽就缩字号（inline-block + nowrap，量到的就是真宽度） */
+  (function fit() {
+    word.style.fontSize = fs + 'px';
+    const natural = word.scrollWidth;
+    const avail = 420;
+    if (natural > avail) {
+      word.style.fontSize = Math.max(26, Math.floor(fs * avail / natural)) + 'px';
+    }
+  })();
+
+  // 0.00 字先"长"出来，射线在它身上爆开（与 slam 的先砸后炸相反）
+  tl.fromTo(word, { scale: .5, rotation: 6, opacity: 0 },
+    { scale: 1.1, rotation: -3, opacity: 1, duration: .3, ease: 'power3.out',
+      immediateRender: false }, 0);
+  tl.to(word, { scale: 1, duration: .3, ease: 'back.out(2.4)' }, .3);
+  tl.to(word, { scaleX: 1.06, scaleY: .9, duration: .08, yoyo: true, repeat: 1,
+    ease: 'power2.inOut' }, .3);
+
+  // 射线：0 起爆开，0.03 逐条，末端整体带一点自转
+  if (rays.length) {
+    const step = 360 / rays.length;
+    rays.forEach((r, i) => {
+      const a = i * step + 22.5;
+      tl.fromTo(r, { scaleY: .15, scaleX: .5, rotation: a - 26, opacity: 0 },
+        { scaleY: 1.7, scaleX: 1, rotation: a, opacity: 1, duration: .34,
+          ease: 'back.out(2.2)', immediateRender: false }, i * .03);
+    });
+    tl.fromTo(spin, { rotation: -7 },
+      { rotation: 3, duration: .5, ease: 'power2.out', immediateRender: false }, 0);
+    tl.to(rays, { opacity: .32, duration: .55, ease: 'sine.inOut' }, .82);
+  }
+
+  // 两道环先后扩散
+  tl.fromTo(r1, { scale: .2, opacity: .85 },
+    { scale: 2.7, opacity: 0, duration: .56, ease: 'power2.out', immediateRender: false }, .1);
+  tl.fromTo(r2, { scale: .2, opacity: .55 },
+    { scale: 2, opacity: 0, duration: .5, ease: 'power2.out', immediateRender: false }, .2);
+
+  // 稳定后一次轻微呼吸，尾巴活着
+  tl.to(word, { scale: 1.035, duration: .42, yoyo: true, repeat: 1,
+    ease: 'sine.inOut' }, 1.0);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

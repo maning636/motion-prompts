@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"label","name":"倒计时标签","type":"string","label":"倒计时标签（4–8 字）","default":"距本场结束"},{"id":"start","name":"起始秒数","type":"number","label":"起始秒数（1–60，只决定显示值）","default":5},{"id":"unit","name":"单位","type":"string","label":"单位（1 字）","default":"秒"},{"id":"note","name":"底部说明","type":"string","label":"底部 mono 说明（6–14 字）","default":"结束整点自动抽奖"},{"id":"accent","name":"强调色","type":"color","label":"强调色（倒计时块底 / 剩余条）","default":"#FF5FA2"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","hidden":true,"default":"transparent","options":[{"value":"transparent","label":"透明底"},{"value":"mp4","label":"MP4 纯底"},{"value":"webm","label":"WebM 纯底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="倒计时贴：强调色块内 900 大数字按整数硬跳倒数到 0，展示窗口写死 1.8s，下方剩余条匀速排空，数字块与剩余条做反向微位移">
+<title>倒计时贴 · 距本场结束</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 透明底贴片：--paper 不出现，底色与阴影色收进变量（风格规范 §7.1 / §7.2 规则 A） */
+  :root{ --shadow:#FFFFFF; --background:transparent; }
+
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--background);color:var(--ink);font-family:var(--sans)}
+
+  /* 数字块定高 280px，下方剩余条靠常量坐标摆位 */
+  #cd{position:absolute;left:96px;bottom:288px;width:900px;height:280px;
+    display:flex;flex-direction:column;justify-content:center;padding:0 40px;
+    background:var(--accent);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  #label{display:block;font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:.14em;
+    line-height:1;color:var(--ink);white-space:nowrap;overflow:hidden}
+  .amt{display:flex;align-items:baseline;gap:16px;margin-top:16px}
+  /* 倒数数字：mono + tabular-nums，字号比标签 5 倍以上（基因 8 极限字号跳跃） */
+  #nu{display:block;font-family:var(--mono);font-weight:900;font-size:168px;line-height:.9;
+    letter-spacing:0;color:var(--ink);font-variant-numeric:tabular-nums;
+    font-feature-settings:"tnum" 1;white-space:nowrap;overflow:hidden}
+  #unit{display:block;font-size:56px;font-weight:900;line-height:1;letter-spacing:0;color:var(--ink);
+    white-space:nowrap}
+
+  /* 剩余条：白底槽 + 实色填充，填充长度就是剩余量（blocks.css 进度语义件） */
+  #dr{position:absolute;left:96px;bottom:88px;width:900px;height:168px;
+    display:flex;flex-direction:column;justify-content:center;padding:0 40px;
+    background:var(--white);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  #dr .row{display:flex;align-items:baseline;justify-content:space-between;gap:20px}
+  #note{display:block;font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:.06em;
+    line-height:1;color:var(--ink);white-space:nowrap;overflow:hidden}
+  #dr .pct{display:block;font-family:var(--mono);font-weight:900;font-size:40px;line-height:1;
+    letter-spacing:0;color:var(--ink);font-variant-numeric:tabular-nums;
+    font-feature-settings:"tnum" 1;white-space:nowrap}
+  #tr{position:relative;margin-top:16px;height:34px;background:var(--white);
+    border:var(--bw) solid var(--ink);border-radius:4px;overflow:hidden}
+  #fl{position:absolute;left:0;top:0;bottom:0;width:100%;background:var(--accent)}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="cd">
+    <span id="label" data-fit-max="26" data-fit-min="16">距本场结束</span>
+    <div class="amt"><span id="nu" data-fit-max="168" data-fit-min="84">5</span><span id="unit" data-fit-max="56" data-fit-min="28">秒</span></div>
+  </div>
+  <div id="dr">
+    <div class="row"><span id="note" data-fit-max="26" data-fit-min="16">结束整点自动抽奖</span><span class="pct" id="pc">100%</span></div>
+    <div id="tr"><div id="fl"></div></div>
+  </div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  var isT = (v.exportMode || 'transparent') === 'transparent';
+  var r = document.documentElement.style;
+  r.setProperty('--background', isT ? 'transparent' : '#0F0F0F');
+  r.setProperty('--shadow', isT ? '#FFFFFF' : '#0F0F0F');
+  if (v.accent) r.setProperty('--accent', v.accent);
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+  ['label', 'unit', 'note'].forEach(function (k) { set(k, v[k]); });
+
+  /* 起始秒数只决定画面上第一个数字；展示窗口 RUN 写死 1.8s，
+     绝不用 start 值推算时间轴长度（数值填大就把时间轴撑爆撞 SMOKE_TOO_LONG）。 */
+  var START = Math.max(1, Math.min(60, Number(v.start) || 5));
+  var RUN = 1.8;
+  var eNu = document.getElementById('nu');
+  var ePc = document.getElementById('pc');
+  if (eNu) eNu.textContent = String(START);
+  if (ePc) ePc.textContent = '100%';
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：倒数直接给终值，只留终态 + ≤8px 微位移淡入（规范 §13.5） */
+    gsap.set('#cd', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#dr', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#fl', { width: '0%' });
+    gsap.set('#nu', { textContent: '0' });
+    gsap.set('#pc', { textContent: '0%' });
+
+    tl.fromTo('#cd', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, 0);
+    tl.fromTo('#dr', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, .45);
+
+    B.hold(tl, 1.6, 1.2);
+    return;
+  }
+
+  var TOTAL = parseFloat(v.duration) > 0 ? parseFloat(v.duration) : 5;
+  var HOLD = 0.5;
+  var WIN = Math.max(1.6, TOTAL - HOLD);
+  var SH = isT ? '#FFFFFF' : '#0F0F0F';
+
+  /* 模 1 · 拍进来：数字块自左上斜向硬着陆，落定瞬间阴影压 2 帧再弹回原档 */
+  tl.fromTo('#cd', { x: -70, y: -36 },
+      { x: 0, y: 0, duration: .26, ease: 'power4.out' }, 0)
+    .fromTo('#cd', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#cd', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+  tl.fromTo('#label', { x: -22 }, { x: 0, duration: .2, ease: 'power4.out' }, .18);
+  tl.fromTo('#unit', { x: -18 }, { x: 0, duration: .2, ease: 'power4.out' }, .34);
+
+  /* 剩余条自左分六格擦出（模 7） */
+  tl.fromTo('#dr', { clipPath: 'inset(0 100% 0 0)' },
+      { clipPath: 'inset(0 0% 0 0)', duration: .32, ease: 'steps(6)' }, .24);
+  tl.fromTo('#note', { x: -22 }, { x: 0, duration: .2, ease: 'power4.out' }, .44);
+  tl.fromTo('#pc', { x: 22 }, { x: 0, duration: .2, ease: 'power4.out' }, .5);
+
+  /* 倒数：START × (1 − 进度)，steps 按整数跳，展示窗口写死 1.8s。
+     onUpdate 只写 textContent，绝不做 DOM 测量（规范 §15 回调专项）。 */
+  tl.fromTo('#nu', { y: 26 }, { y: 0, duration: .24, ease: 'power4.out' }, .32);
+  var n = { v: START };
+  tl.to(n, { v: 0, duration: RUN, ease: 'steps(12)',
+      onUpdate: function () {
+        var left = Math.max(0, Math.round(n.v));
+        if (eNu) eNu.textContent = String(left);
+        if (ePc) ePc.textContent = Math.round(left / START * 100) + '%';
+      } }, .5);
+
+  /* 剩余条匀速排空：倒数是进度语义，缓动恒 none（规范 §4.1） */
+  tl.fromTo('#fl', { width: '100%' },
+      { width: '0%', duration: RUN, ease: 'none' }, .5);
+
+  /* 模 8 · 硬切闪烁：倒数走到 0 时标签左右各跳一格，收尾停在可见帧 */
+  tl.to('#label', { x: 12, duration: .06, ease: 'steps(2)' }, 2.3)
+    .to('#label', { x: 0, duration: .06, ease: 'steps(2)' })
+    .to('#label', { x: 12, duration: .06, ease: 'steps(2)' })
+    .to('#label', { x: 0, duration: .06, ease: 'steps(2)' });
+
+  /* 两块反向微位移：数字块下压、剩余条上抬，匀速往返 */
+  var T0 = 2.7;
+  var REP = Math.max(1, Math.round((WIN - T0) / .8));
+  var half = (WIN - T0) / (REP * 2);
+  tl.to('#cd', { y: 6, duration: half, ease: 'none', repeat: REP * 2 - 1, yoyo: true }, T0);
+  tl.to('#dr', { y: -6, duration: half, ease: 'none', repeat: REP * 2 - 2, yoyo: true }, T0 + half);
+
+  var end = tl.duration();
+  B.hold(tl, end, Math.max(HOLD, TOTAL - end));
+})();
+</script>
+</body></html>

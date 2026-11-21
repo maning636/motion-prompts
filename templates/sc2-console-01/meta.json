@@ -1,0 +1,13 @@
+{
+  "id": "sc2-console-01",
+  "name": "仪表盘荧光扫描高亮",
+  "series": "sc2",
+  "createdAt": "2026-08-16T08:00:00.000Z",
+  "energy": "中",
+  "suggestedDuration": 6,
+  "knownPitfalls": [
+    "rows 用分号分隔，最多取前 8 行；行数变化时扫描带终点按行数自动换算，别写死像素",
+    "target 从 1 开始数；超出行数会被钳制到最后一行",
+    "深色场下扫描带用半透明绿渐变+上下 2px 绿线，别开 mix-blend-mode，会发灰"
+  ]
+}

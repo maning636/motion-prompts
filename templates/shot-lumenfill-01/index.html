@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "titleBefore", "type": "string", "label": "前文", "default": "让创作"}, {"id": "keyword", "type": "string", "label": "充能关键词", "default": "更快"}, {"id": "titleAfter", "type": "string", "label": "后文", "default": "十倍"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+.gttl{ position:absolute; left:0; right:0; top:440px; text-align:center; font-size:108px; color:var(--fg); }
+.gw{ position:relative; display:inline-block; padding:0 6px; }
+.gw .base{ color:var(--fg); }
+.gw .grad{ position:absolute; inset:0; padding:0 6px;
+  background:linear-gradient(100deg, var(--accent) 10%, #D83CBE 90%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  clip-path:inset(-20% 105% -20% -5%); }
+.gw .boost{ position:absolute; inset:0; padding:0 6px; color:#fff; opacity:0;
+  background:linear-gradient(100deg, #fff 0%, var(--accent) 100%);
+  -webkit-background-clip:text; background-clip:text;
+  clip-path:inset(-20% 70% -20% 0); filter:blur(1px); }
+.glow1{ text-shadow:0 0 46px color-mix(in srgb, var(--accent) 28%, transparent); }
+.gbolt{ position:absolute; left:0; right:0; top:560px; display:flex; justify-content:center; pointer-events:none; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4" data-width="1920" data-height="1080">
+<h1 class="gttl"><span id="tb"></span><span class="gw"><span class="base" id="kw"></span><span class="grad glow1" id="kg"></span><span class="boost" id="kb"></span></span><span id="ta"></span></h1>
+<div class="gbolt"><svg id="bolt" width="700" height="90" viewBox="0 0 700 90" style="overflow:visible">
+  <path id="bp" d="M60,50 L180,30 L320,58 L470,28 L640,52" fill="none"/>
+</svg></div>
+    </div>
+    <script>
+      const FB = {"titleBefore": "让创作", "keyword": "更快", "titleAfter": "十倍", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#tb').textContent=v.titleBefore||'';$('#kw').textContent=v.keyword||'';$('#ta').textContent=v.titleAfter||'';
+$('#kg').textContent=v.keyword||'';$('#kb').textContent=v.keyword||''; // 渐变层/增亮层必须同文字，background-clip:text 才有字形可裁
+const A=v.accent||'#00FF00';
+$('#kg').style.textShadow='0 0 46px '+A+'47, 0 0 18px '+A+'59, 0 0 6px #ffffff80';
+$('#bp').setAttribute('stroke',A);
+tl.fromTo('.gttl',{opacity:0},{opacity:1,duration:F(8)},0);
+// 扫充 18f：渐变层 mask 从左到右揭开，波前增亮带跟随
+const t0=F(14);
+tl.fromTo('#kg',{clipPath:'inset(-20% 105% -20% -5%)'},{clipPath:'inset(-20% -5% -20% -5%)',duration:F(18),ease:'power1.inOut'},t0);
+tl.fromTo('#kb',{opacity:0},{opacity:.85,duration:F(3)},t0);
+tl.fromTo('#kb',{clipPath:'inset(-20% 100% -20% 0)'},{clipPath:'inset(-20% 0% -20% 66%)',duration:F(18),ease:'power1.inOut'},t0);
+tl.to('#kb',{opacity:0,duration:F(10)},t0+F(18));
+// 稳态泛光呼吸
+tl.fromTo('#kg',{opacity:.55},{opacity:.72,duration:F(30),ease:'sine.inOut',yoyo:true,repeat:5},t0+F(18));
+// 稀疏闪电：紫红三层描边，种子随机零星闪烁
+const bolt=document.createElementNS('http://www.w3.org/2000/svg','g');
+const mk=(w,op,col)=>{const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+  p.setAttribute('d','M60,50 L180,30 L320,58 L470,28 L640,52');p.setAttribute('fill','none');
+  p.setAttribute('stroke',col);p.setAttribute('stroke-width',w);p.setAttribute('opacity',op);bolt.appendChild(p);};
+mk(6,.18,'#D83CBE');mk(2.4,.5,'#D83CBE');mk(1.4,.9,'#F2C9FF');
+$('#bolt').appendChild(bolt);
+let seed=7;const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+tl.set(bolt,{opacity:0},0);
+let bt=t0+F(20);
+for(let i=0;i<7;i++){
+  bt+=F(9+Math.floor(rnd()*10));
+  tl.set(bolt,{opacity:.9,x:(rnd()*30-15)},bt);
+  tl.set(bolt,{opacity:0},bt+F(2+Math.floor(rnd()*2)));
+}
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

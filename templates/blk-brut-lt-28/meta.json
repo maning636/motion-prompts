@@ -1,0 +1,16 @@
+{
+ "name": "热线电话条",
+ "description": "绿色方块内 3px 描边话筒 SVG，中段白底卡给出 mono 大号码，右侧粉色服务时间块；三块自左依次拍入后错峰微位移",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "hotline",
+  "contact",
+  "pink"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "门店、客服、售后类内容的固定档，需要把联系电话与服务时间挂在画面上时"
+}

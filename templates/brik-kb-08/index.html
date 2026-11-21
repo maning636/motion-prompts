@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（本期讲法标签）","default":"同一件事，三种说法"},
+{"id":"stage1Label","name":"第一段标签","type":"string","label":"第一段标签（mono 小标签，≤8 字）","default":"第一段"},
+{"id":"stage1Text","name":"第一段正文","type":"string","label":"第一段正文（8–16 字）","default":"先做出来，再想怎么讲"},
+{"id":"stage2Label","name":"第二段标签","type":"string","label":"第二段标签（mono 小标签，≤8 字）","default":"第二段"},
+{"id":"stage2Text","name":"第二段正文","type":"string","label":"第二段正文（8–16 字）","default":"先讲清楚，再做出来"},
+{"id":"stage3Label","name":"第三段标签","type":"string","label":"第三段标签（mono 小标签，≤8 字）","default":"第三段"},
+{"id":"stage3Text","name":"第三段正文","type":"string","label":"第三段正文（8–16 字）","default":"先对齐口径，再动手做"},
+{"id":"accent","name":"强调色","type":"color","label":"强调色（凸点亮起色 / 斜纹带 / 页脚计数）","default":"#FFD429"},
+{"id":"brickColor","name":"配色包","type":"enum","label":"配色包（块面轮转顺序）","default":"mixed","options":[{"value":"yellow","label":"暖黄主调"},{"value":"pink","label":"桃粉主调"},{"value":"green","label":"薄荷主调"},{"value":"blue","label":"靛蓝主调"},{"value":"mixed","label":"四色轮转"}]},
+{"id":"studMode","name":"凸点","type":"enum","label":"凸点（不显示 / 整排同时亮 / 逐枚硬切）","default":"scan","options":[{"value":"none","label":"不显示"},{"value":"top","label":"整排同时亮"},{"value":"scan","label":"逐枚硬切"}]},
+{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–6）","default":5.5},
+{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}],"hidden":true}
+]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>三段卡位抽换</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 积木风 · 知识口播 · 三段卡位抽换
+     一个 720×360 的卡位里塞三段内容，式 3 抽换：旧段自上抽走、新段自下塞进同一卡位，每换完点亮一枚凸点。抽走/塞进位移都写死 160px，不越框。
+     块宽只用 120/240/480/720，块高只用 120/240/360/480；普通块恒 8px 硬影，
+     承重件 10px；相邻块用 margin -3px 合流成单线缝；凸点是内联 SVG circle。 */
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --mod:240px; --mod-h:120px; --shadow:#0F0F0F; --background:var(--paper); --accent:#FFD429;
+  }
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--background);color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased}
+  /* 纸面网点：全族唯一允许的 rgba 例外，必须铺满 #stage */
+  .blk-noise{background-image:radial-gradient(rgba(15,15,15,.12) 1px,transparent 1px);
+    background-size:10px 10px}
+  .sh-s{box-shadow:4px 4px 0 var(--shadow)}
+  .sh-l{box-shadow:8px 8px 0 var(--shadow)}
+  .sh-xl{box-shadow:10px 10px 0 var(--shadow)}
+
+  /* 桌沿铭牌：贴在桌面之外，不许浮在块上面 */
+  .promo{position:absolute;left:0;top:0;width:1920px;height:56px;display:flex;
+    align-items:center;justify-content:space-between;padding:0 72px;
+    background:var(--ink);color:var(--white);font-family:var(--mono);
+    font-size:24px;font-weight:700;letter-spacing:.14em}
+  .promo .pc{color:var(--accent)}
+  .foot{position:absolute;left:0;bottom:0;width:1920px;height:64px;display:flex;
+    align-items:center;justify-content:space-between;padding:0 72px;
+    background:var(--ink);color:var(--white);font-family:var(--mono);
+    font-size:26px;font-weight:700;letter-spacing:.1em}
+  .foot em{font-style:normal;color:var(--accent)}
+  /* 斜纹带：全族唯一合法渐变，周期 10+10=20px */
+  .divline{position:absolute;left:0;bottom:64px;width:1920px;height:20px;
+    border-top:3px solid var(--ink);border-bottom:3px solid var(--ink);
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+
+  .head{position:absolute;left:600px;top:88px;width:720px}
+  .head .eb{font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:.14em;
+    color:var(--ink);white-space:nowrap}
+
+  /* 卡位：720×360，三段内容绝对定位在同一卡位上，靠位移互相顶替。
+     抽走上移 120px（落点 160..520，不压眉标）、塞进下移 160px（落点 440..800，
+     不压凸点条 840..900）——两个位移量都写死，任何一帧都不越框也不互撞。 */
+  .slot{position:absolute;left:600px;top:280px;width:720px;height:360px}
+  .pane{position:absolute;left:0;top:0;width:720px;min-width:0;height:360px;
+    display:flex;flex-direction:column;justify-content:center;gap:24px;
+    padding:0 48px;box-sizing:border-box;border:var(--bw) solid var(--ink);
+    border-radius:4px;box-shadow:8px 8px 0 var(--shadow)}
+  .pane#p1{z-index:3}
+  .pane#p2{z-index:2}
+  .pane#p3{z-index:1}
+  .pane .pl{font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:.14em;
+    color:inherit;white-space:nowrap}
+  .pane .px{font-size:48px;font-weight:900;line-height:1.35;letter-spacing:0;color:inherit}
+
+  .studs{position:absolute;left:840px;top:840px;width:240px;height:60px}
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="promo">
+    <span class="pc">BRICK / 积木风</span>
+    <span>误区抽换 · 三段卡位换位</span>
+  </div>
+
+  <div class="head" id="head">
+    <span class="eb" id="eyebrow" data-fit-max="30" data-fit-min="16">同一件事，三种说法</span>
+  </div>
+
+  <div class="slot" id="slot">
+    <div class="pane" id="p1">
+      <span class="pl" id="stage1Label" data-fit-max="30" data-fit-min="16">第一段</span>
+      <span class="px" id="stage1Text" data-fit-max="48" data-fit-min="24">先做出来，再想怎么讲</span>
+    </div>
+    <div class="pane" id="p2">
+      <span class="pl" id="stage2Label" data-fit-max="30" data-fit-min="16">第二段</span>
+      <span class="px" id="stage2Text" data-fit-max="48" data-fit-min="24">先讲清楚，再做出来</span>
+    </div>
+    <div class="pane" id="p3">
+      <span class="pl" id="stage3Label" data-fit-max="30" data-fit-min="16">第三段</span>
+      <span class="px" id="stage3Text" data-fit-max="48" data-fit-min="24">先对齐口径，再动手做</span>
+    </div>
+  </div>
+
+  <div class="studs" id="studs">
+    <svg width="300" height="60" viewBox="0 0 300 60" fill="none" aria-hidden="true"><circle class="sc" id="c1" cx="60" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/><circle class="sc" id="c2" cx="180" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/><circle class="sc" id="c3" cx="300" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/></svg>
+  </div>
+
+  <div class="divline"></div>
+  <div class="foot">
+    <span>KB / 知识口播</span>
+    <span id="meta">卡位 1 · 段落 3 · 凸点 3</span>
+  </div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+['eyebrow', 'stage1Label', 'stage1Text', 'stage2Label', 'stage2Text', 'stage3Label', 'stage3Text'].forEach(function (k) { set(k, v[k]); });
+
+  var rs = document.documentElement.style;
+  if (v.accent) rs.setProperty('--accent', v.accent);
+  var ACC = v.accent || '#FFD429';
+
+  /* 配色包：yellow → pink → blue → green 是全族轮转序，同屏不重色 */
+  var PACK = {
+    yellow: ['#FFD429', '#FF5FA2', '#3D7BFF', '#2FD07A'],
+    pink:   ['#FF5FA2', '#FFD429', '#2FD07A', '#3D7BFF'],
+    green:  ['#2FD07A', '#3D7BFF', '#FFD429', '#FF5FA2'],
+    blue:   ['#3D7BFF', '#2FD07A', '#FF5FA2', '#FFD429'],
+    mixed:  ['#FFD429', '#FF5FA2', '#3D7BFF', '#2FD07A']
+  };
+  /* 明度判定：亮底压墨字、暗底压白字，不造灰色阶 */
+  function inkOn(hex) {
+    var h = String(hex || '').replace('#', '');
+    if (h.length !== 6) return '#0F0F0F';
+    var f = function (c) { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    var L = 0.2126 * f(parseInt(h.slice(0, 2), 16)) +
+            0.7152 * f(parseInt(h.slice(2, 4), 16)) +
+            0.0722 * f(parseInt(h.slice(4, 6), 16));
+    return L > 0.42 ? '#0F0F0F' : '#FFFFFF';
+  }
+  var pack = PACK[v.brickColor] || PACK.mixed;
+  /* 三段依次占住同一卡位：只有当前段不透明，尚未出场的段先落到位外 160px */
+  var PANES = ['#p1', '#p2', '#p3'];
+  var PACK2 = [pack[0], '#FFFFFF', pack[1]];
+  PANES.forEach(function (sel, i) {
+    var el = document.querySelector(sel);
+    if (!el) return;
+    el.style.background = PACK2[i];
+    var fg = inkOn(PACK2[i]);
+    ['pl', 'px'].forEach(function (c) {
+      var t = el.querySelector('.' + c);
+      if (t) t.style.color = fg;
+    });
+  });
+
+  var studs = [].slice.call(document.querySelectorAll('#studs .sc'));
+  var studMode = v.studMode || 'scan';
+  var studWrap = document.getElementById('studs');
+  if (studMode === 'none' && studWrap) studWrap.style.display = 'none';
+  var words = [v.stage1Text, v.stage2Text, v.stage3Text].reduce(function (a, x) {
+    return a + String(x == null ? '' : x).replace(/\s+/g, '').length;
+  }, 0);
+  var meta = document.getElementById('meta');
+  if (meta) {
+    meta.innerHTML = '卡位 <em>1</em> · 段落 <em>' + PANES.length + '</em> · 凸点 <em>' +
+      studs.length + '</em> · 正文字数 <em>' + words + '</em>';
+  }
+
+  /* reduce 短路：这一行必须逐字节保持不变，QC 工具靠字符串匹配把它替换成常量 true */
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：搬移与压影全撤掉，只给终态 + 一段 8px 微位移淡入 */
+    gsap.set('#head', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#slot', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#p1', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#p2', { x: 0, y: 0, opacity: 0 });
+    gsap.set('#p3', { x: 0, y: 0, opacity: 0 });
+    gsap.set('#studs', { x: 0, y: 0, opacity: 1 });
+    if (studMode !== 'none' && studs.length) gsap.set(studs, { attr: { fill: ACC } });
+    tl.fromTo('#head',  { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .55, ease: 'power3.out' }, 0);
+    tl.fromTo('#slot',  { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .60, ease: 'power3.out' }, .16);
+    tl.fromTo('#studs', { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .45, ease: 'power3.out' }, .30);
+    B.hold(tl, 1.15, 1.05);
+    return;
+  }
+
+  var SHADOW = '8px 8px 0 #0F0F0F';
+  var stageRect = document.getElementById('stage').getBoundingClientRect();
+  var promoEl = document.querySelector('.promo');
+  var CEIL = promoEl ? Math.round(promoEl.getBoundingClientRect().bottom - stageRect.top) : 0;
+
+  /* 起跳点一律现算，保证任何一帧都不越框；onUpdate 里绝不做 DOM 测量 */
+  function topOf(sel) {
+    var e = document.querySelector(sel);
+    return e ? Math.round(e.getBoundingClientRect().top - stageRect.top) : 0;
+  }
+  function bottomOf(sel) {
+    var e = document.querySelector(sel);
+    return e ? Math.round(stageRect.bottom - e.getBoundingClientRect().bottom) : 0;
+  }
+  function leftOf(sel) {
+    var e = document.querySelector(sel);
+    return e ? Math.round(stageRect.left - e.getBoundingClientRect().left) : 0;
+  }
+  function rightOf(sel) {
+    var e = document.querySelector(sel);
+    return e ? Math.round(stageRect.right - e.getBoundingClientRect().right) : 0;
+  }
+  function fromCeil(sel) { return CEIL - topOf(sel); }
+
+  /* 式 1/2/4/6 通用落位：单轴直落或顶出，零 overshoot，落定沿 Y 多压 3px 打 2 帧再回原档 */
+  function slam(sel, at, from, dur, shadow) {
+    var S = shadow || SHADOW;
+    var d = dur || 0.24;
+    var p = String(S).split(' ');
+    var press = p[0] + ' ' + (parseFloat(p[1]) + 3) + 'px 0 ' + p.slice(3).join(' ');
+    tl.fromTo(sel, { x: from.x || 0, y: from.y || 0 },
+      { x: 0, y: 0, duration: d, ease: 'power4.out' }, at);
+    tl.set(sel, { boxShadow: press, immediateRender: false }, at + d);
+    tl.to(sel, { boxShadow: S, duration: 0.04, ease: 'steps(2)' }, at + d + 0.04);
+    return at + d + 0.04;
+  }
+  /* 式 8 凸点扫描：单枚间隔 ≥0.12s，fill 硬切，不补间 */
+  function scanStuds(list, at, mode) {
+    if (mode === 'none' || !list.length) return;
+    list.forEach(function (c, i) {
+      tl.set(c, { attr: { fill: ACC }, immediateRender: false },
+        mode === 'top' ? at : at + i * 0.12);
+    });
+  }
+
+  slam('#head', 0.00, { x: 0, y: fromCeil('#head') }, 0.26);
+
+  /* 凸点条先落进卡位下方，等着被逐枚点亮 */
+  var sAt = 0.34;
+  slam('#studs', sAt, { x: 0, y: fromCeil('#studs') }, 0.24);
+
+  /* 三段都停在卡位下方 160px；只有当前段可见，未出场段逐帧硬切显现（不用淡入） */
+  var IN = 160, OUT = 120;
+  PANES.forEach(function (sel, i) {
+    gsap.set(sel, { x: 0, y: IN, opacity: i === 0 ? 1 : 0 });
+  });
+
+  /* 式 3 抽换：旧段自上抽走（power3.in 加速离画），新段自下塞进同一卡位 */
+  var AT = [0.62, 1.55, 2.35];
+  PANES.forEach(function (sel, i) {
+    if (i > 0) {
+      tl.set(sel, { opacity: 1, immediateRender: false }, AT[i] - 0.14);
+      var prev = PANES[i - 1];
+      tl.to(prev, { y: -OUT, duration: 0.20, ease: 'power3.in' }, AT[i] - 0.12);
+      tl.set(prev, { opacity: 0, immediateRender: false }, AT[i] + 0.08);
+    }
+    slam(sel, AT[i], { x: 0, y: IN }, 0.24);
+    if (studMode !== 'none' && studs[i]) {
+      tl.set(studs[i], { attr: { fill: ACC }, immediateRender: false },
+        studMode === 'top' ? AT[AT.length - 1] + 0.34 : AT[i] + 0.34);
+    }
+  });
+
+  var introEnd = tl.duration();
+  var TOTAL = Math.min(6, Math.max(5, Number(v.duration) || 5.5));
+  var holdAt = Math.min(introEnd, TOTAL - 0.8);
+  B.hold(tl, holdAt, Math.max(0.8, TOTAL - holdAt));
+})();
+</script>
+</body></html>

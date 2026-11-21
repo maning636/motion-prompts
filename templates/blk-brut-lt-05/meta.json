@@ -1,0 +1,16 @@
+{
+ "name": "口播字幕条",
+ "description": "白底大字幕卡左压一道强调色竖条、右下角挂一枚 ink 字幕标记；整条自下方硬落位，竖条与标记各走一段匀速往返",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "subtitle",
+  "lower-third",
+  "yellow"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "知识口播与资讯短视频，需要在画面下方压一条可读字幕时"
+}

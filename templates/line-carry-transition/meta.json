@@ -1,0 +1,13 @@
+{
+  "id": "line-carry-transition",
+  "name": "线条横扫转场",
+  "description": "一条发光细线从左侧切入横贯画面，线到之处旧内容淡出并被切除，新内容随线切入后呈到另一场景；线最终停下成为新场景的装饰分隔线，承载叙事切换。",
+  "category": "转场镜头",
+  "tags": ["转场", "横扫线", "场景切换", "线到之处"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-05T00:00:00.000Z"
+}

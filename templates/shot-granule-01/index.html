@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#ground{ position:absolute; left:0; top:880px; width:1920px; height:4px;
+  background:color-mix(in srgb, var(--fg) 30%, transparent); }
+.bar{ position:absolute; bottom:200px; width:160px; border-radius:10px 10px 0 0; transform-origin:50% 100%;
+  transform:scaleY(0); background:color-mix(in srgb, var(--fg) 16%, transparent);
+  border:1px solid color-mix(in srgb, var(--fg) 25%, transparent); }
+.bar.hot{ background:color-mix(in srgb, var(--accent) 75%, transparent); border-color:var(--accent); }
+.blabel{ position:absolute; bottom:0; width:160px; text-align:center; font-size:44px; font-weight:900;
+  opacity:0; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+.sq{ position:absolute; width:14px; height:14px; border-radius:2px; will-change:transform,opacity; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4.5" data-width="1920" data-height="1080">
+<div id="ground"></div><div class="bar" id="bar0" style="left:420px;height:560px"></div><div class="blabel" id="bl0" style="left:420px;bottom:770px">2.4k</div><div class="bar" id="bar1" style="left:720px;height:380px"></div><div class="blabel" id="bl1" style="left:720px;bottom:590px">1.6k</div><div class="bar hot" id="bar2" style="left:1020px;height:680px"></div><div class="blabel" id="bl2" style="left:1020px;bottom:890px">3.1k</div><div class="bar" id="bar3" style="left:1320px;height:260px"></div><div class="blabel" id="bl3" style="left:1320px;bottom:470px">980</div><div class="sq" id="sq0_0"></div><div class="sq" id="sq0_1"></div><div class="sq" id="sq0_2"></div><div class="sq" id="sq0_3"></div><div class="sq" id="sq0_4"></div><div class="sq" id="sq0_5"></div><div class="sq" id="sq0_6"></div><div class="sq" id="sq0_7"></div><div class="sq" id="sq0_8"></div><div class="sq" id="sq0_9"></div><div class="sq" id="sq0_10"></div><div class="sq" id="sq0_11"></div><div class="sq" id="sq0_12"></div><div class="sq" id="sq0_13"></div><div class="sq" id="sq0_14"></div><div class="sq" id="sq0_15"></div><div class="sq" id="sq0_16"></div><div class="sq" id="sq0_17"></div><div class="sq" id="sq0_18"></div><div class="sq" id="sq0_19"></div><div class="sq" id="sq0_20"></div><div class="sq" id="sq0_21"></div><div class="sq" id="sq0_22"></div><div class="sq" id="sq0_23"></div><div class="sq" id="sq0_24"></div><div class="sq" id="sq0_25"></div><div class="sq" id="sq0_26"></div><div class="sq" id="sq0_27"></div><div class="sq" id="sq0_28"></div><div class="sq" id="sq0_29"></div><div class="sq" id="sq0_30"></div><div class="sq" id="sq0_31"></div><div class="sq" id="sq0_32"></div><div class="sq" id="sq0_33"></div><div class="sq" id="sq0_34"></div><div class="sq" id="sq0_35"></div><div class="sq" id="sq0_36"></div><div class="sq" id="sq0_37"></div><div class="sq" id="sq0_38"></div><div class="sq" id="sq0_39"></div><div class="sq" id="sq1_0"></div><div class="sq" id="sq1_1"></div><div class="sq" id="sq1_2"></div><div class="sq" id="sq1_3"></div><div class="sq" id="sq1_4"></div><div class="sq" id="sq1_5"></div><div class="sq" id="sq1_6"></div><div class="sq" id="sq1_7"></div><div class="sq" id="sq1_8"></div><div class="sq" id="sq1_9"></div><div class="sq" id="sq1_10"></div><div class="sq" id="sq1_11"></div><div class="sq" id="sq1_12"></div><div class="sq" id="sq1_13"></div><div class="sq" id="sq1_14"></div><div class="sq" id="sq1_15"></div><div class="sq" id="sq1_16"></div><div class="sq" id="sq1_17"></div><div class="sq" id="sq1_18"></div><div class="sq" id="sq1_19"></div><div class="sq" id="sq1_20"></div><div class="sq" id="sq1_21"></div><div class="sq" id="sq1_22"></div><div class="sq" id="sq1_23"></div><div class="sq" id="sq1_24"></div><div class="sq" id="sq1_25"></div><div class="sq" id="sq1_26"></div><div class="sq" id="sq2_0"></div><div class="sq" id="sq2_1"></div><div class="sq" id="sq2_2"></div><div class="sq" id="sq2_3"></div><div class="sq" id="sq2_4"></div><div class="sq" id="sq2_5"></div><div class="sq" id="sq2_6"></div><div class="sq" id="sq2_7"></div><div class="sq" id="sq2_8"></div><div class="sq" id="sq2_9"></div><div class="sq" id="sq2_10"></div><div class="sq" id="sq2_11"></div><div class="sq" id="sq2_12"></div><div class="sq" id="sq2_13"></div><div class="sq" id="sq2_14"></div><div class="sq" id="sq2_15"></div><div class="sq" id="sq2_16"></div><div class="sq" id="sq2_17"></div><div class="sq" id="sq2_18"></div><div class="sq" id="sq2_19"></div><div class="sq" id="sq2_20"></div><div class="sq" id="sq2_21"></div><div class="sq" id="sq2_22"></div><div class="sq" id="sq2_23"></div><div class="sq" id="sq2_24"></div><div class="sq" id="sq2_25"></div><div class="sq" id="sq2_26"></div><div class="sq" id="sq2_27"></div><div class="sq" id="sq2_28"></div><div class="sq" id="sq2_29"></div><div class="sq" id="sq2_30"></div><div class="sq" id="sq2_31"></div><div class="sq" id="sq2_32"></div><div class="sq" id="sq2_33"></div><div class="sq" id="sq2_34"></div><div class="sq" id="sq2_35"></div><div class="sq" id="sq2_36"></div><div class="sq" id="sq2_37"></div><div class="sq" id="sq2_38"></div><div class="sq" id="sq2_39"></div><div class="sq" id="sq2_40"></div><div class="sq" id="sq2_41"></div><div class="sq" id="sq2_42"></div><div class="sq" id="sq2_43"></div><div class="sq" id="sq2_44"></div><div class="sq" id="sq2_45"></div><div class="sq" id="sq2_46"></div><div class="sq" id="sq2_47"></div><div class="sq" id="sq3_0"></div><div class="sq" id="sq3_1"></div><div class="sq" id="sq3_2"></div><div class="sq" id="sq3_3"></div><div class="sq" id="sq3_4"></div><div class="sq" id="sq3_5"></div><div class="sq" id="sq3_6"></div><div class="sq" id="sq3_7"></div><div class="sq" id="sq3_8"></div><div class="sq" id="sq3_9"></div><div class="sq" id="sq3_10"></div><div class="sq" id="sq3_11"></div><div class="sq" id="sq3_12"></div><div class="sq" id="sq3_13"></div><div class="sq" id="sq3_14"></div><div class="sq" id="sq3_15"></div><div class="sq" id="sq3_16"></div><div class="sq" id="sq3_17"></div>
+    </div>
+    <script>
+      const FB = {"accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+const G=880, H=[560,380,680,260], X=[420,720,1020,1320];
+const hot=[false,false,true,false];
+// 粒子：闭式坠落（重力加速），落地 15% 单次回弹，柱间错峰 6f
+const sqs=[];
+for(let b=0;b<4;b++){
+  const cnt=Math.floor(H[b]/14);
+  for(let k=0;k<cnt;k++){
+    const el=$('#sq'+b+'_'+k);
+    el.style.background=hot[b]?'var(--accent)':'color-mix(in srgb, var(--fg) 45%, transparent)';
+    const start=b*6+k*1.2;
+    const landY=G-14-k*14;             // 堆在已落粒子上
+    const dist=landY-(-30);
+    const g=1.6;                        // px/f²
+    const tFall=Math.sqrt(2*dist/g);
+    sqs.push({el,x:X[b]+((k%3)-1)*3,start,landY,dist,g,tFall});
+  }
+}
+const sim={n:0};
+function paintSq(){
+  for(const p of sqs){
+    const n=sim.n-p.start;
+    if(n<=0){ p.el.style.opacity=0; continue; }
+    let y,op=1;
+    if(n<p.tFall){
+      y=-30+0.5*p.g*n*n;
+    }else{
+      const bn=n-p.tFall;
+      const bh=14*0.15*Math.sin(Math.PI*Math.min(1,bn/6));
+      y=p.landY-bh;
+    }
+    p.el.style.opacity=op;
+    p.el.style.transform='translate('+p.x+'px,'+y+'px)';
+  }
+}
+paintSq();
+tl.to(sim,{n:110,duration:F(110),ease:'none',onUpdate:paintSq},0);
+// 堆满→粒子面淡出→实体柱+标签 back-out 弹出
+tl.to('.sq',{opacity:0,duration:F(8)},F(100));
+for(let b=0;b<4;b++){
+  tl.to('#bar'+b,{scaleY:1,duration:F(8),ease:'back.out(1.4)'},F(104+b*2));
+  tl.to('#bl'+b,{opacity:1,duration:F(6),ease:'back.out(2)'},F(110+b*2));
+}
+// 收尾真静止（补齐到 135f）
+tl.to({},{duration:F(19)},F(116));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

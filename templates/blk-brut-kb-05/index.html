@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（mono + 大字距）","default":"TITLE / 逐字大标题"},
+{"id":"idx","name":"期号","type":"string","label":"右上角期号（mono）","default":"EP.012"},
+{"id":"title","name":"主标题","type":"string","label":"逐字弹入的大标题（一行，建议 8–12 字）","default":"写得慢，多半是想得少"},
+{"id":"note","name":"注脚","type":"string","label":"底部 mono 注脚（出处 / 口径）","default":"口播 · 第 12 期 · 讲稿第 3 段"},
+{"id":"accent","name":"强调色","type":"color","label":"强调色（左侧竖条 + 斜纹带）","default":"#FF5FA2"},
+{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–8）","default":5.5},
+{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>逐字弹入大标题 · 写得慢，多半是想得少</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 字号阶梯 = 风格规范基因 8 的 76/48/24/17/13/11 在 1920×1080 画布上等比放大 2.0，即 152/96/48/34/26/22。 */
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --accent:#FF5FA2;
+  }
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--paper);color:var(--ink);font-family:var(--sans);
+    display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+  .sh-s{box-shadow:4px 4px 0 var(--ink)}
+  .sh-m{box-shadow:6px 6px 0 var(--ink)}
+
+  /* 左侧竖色条：满高 3px 黑边 + 强调色块，承担「分期」的重音位 */
+  .rail{flex:0 0 auto;height:20px;background:var(--accent);
+    border-top:var(--bw) solid var(--ink);border-bottom:var(--bw) solid var(--ink)}
+
+  .top{flex:0 0 auto;display:flex;align-items:center;gap:24px;
+    padding:46px 88px 0}
+  .eyebrow{font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:.14em;
+    white-space:nowrap;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .idx{margin-left:auto;font-family:var(--mono);font-weight:700;font-size:22px;
+    letter-spacing:.10em;padding:7px 18px;border-radius:9999px;white-space:nowrap;
+    background:var(--white);color:var(--ink);border:var(--bw) solid var(--ink);
+    box-shadow:4px 4px 0 var(--ink);flex:0 1 auto;min-width:0;
+    overflow:hidden;text-overflow:ellipsis}
+
+  /* 标题区：整块居中，逐字弹入的落点 */
+  .band{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;
+    justify-content:center;padding:0 88px}
+  /* 中文大字：块级 + nowrap，交给 B.fit() 按容器实测缩放，绝不写死 font-size。
+     字距取 0——中文收紧会粘连。 */
+  .big{display:block;white-space:nowrap;font-weight:900;font-size:152px;
+    line-height:1.08;letter-spacing:0}
+  .ch{display:inline-block}
+  /* 光标块：打字机感的机械标记，不是渐变，是实心方块 */
+  .cursor{display:inline-block;width:22px;height:120px;margin-left:14px;
+    vertical-align:-14px;background:var(--accent);border:var(--bw) solid var(--ink)}
+
+  .footrow{flex:0 0 auto;padding:0 88px 46px}
+  .rule{width:100%;border-top:var(--bw) solid var(--ink)}
+  .note{display:block;margin-top:22px;font-family:var(--mono);font-weight:700;
+    font-size:22px;letter-spacing:.12em;color:var(--mute);white-space:nowrap;
+    min-width:0;overflow:hidden;text-overflow:ellipsis}
+
+  .stripe{flex:0 0 auto;height:20px;border-top:var(--bw) solid var(--ink);
+    border-bottom:var(--bw) solid var(--ink);
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+
+  @media (prefers-reduced-motion: reduce){
+    .anim{transition-duration:.01ms !important;animation-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="rail anim" id="rail"></div>
+
+  <div class="top anim" id="top">
+    <span class="eyebrow anim" id="eyebrow" data-fit-max="26" data-fit-min="16">TITLE / 逐字大标题</span>
+    <span class="idx anim" id="idx" data-fit-max="22" data-fit-min="14">EP.012</span>
+  </div>
+
+  <div class="band anim" id="band">
+    <div class="big anim" id="title" data-fit-max="152" data-fit-min="72">写得慢，多半是想得少</div>
+  </div>
+
+  <div class="footrow anim" id="footrow">
+    <div class="rule anim" id="rule"></div>
+    <span class="note anim" id="note" data-fit-max="22" data-fit-min="14">口播 · 第 12 期 · 讲稿第 3 段</span>
+  </div>
+
+  <div class="stripe anim" id="stripe"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  ['eyebrow', 'idx', 'title', 'note'].forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+
+  /* 逐字切分：JS 切 span，不引额外库。切完再 fitAll，量到的才是最终 DOM。 */
+  function splitChars(el) {
+    var txt = el.textContent;
+    el.textContent = '';
+    for (var i = 0; i < txt.length; i++) {
+      var s = document.createElement('span');
+      s.className = 'ch';
+      s.textContent = txt.charAt(i);
+      el.appendChild(s);
+    }
+    return el.querySelectorAll('.ch');
+  }
+  var titleEl = document.getElementById('title');
+  var chars = titleEl ? splitChars(titleEl) : [];
+  var cursor = document.createElement('span');
+  cursor.className = 'cursor anim';
+  cursor.id = 'cursor';
+  if (titleEl) titleEl.appendChild(cursor);
+
+  B.fitAll();
+  var tl = B.tl();
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (reduce) {
+    gsap.set('.anim', { x: 0, y: 0, scaleX: 1, scale: 1, rotate: 0 });
+    /* 降级：逐字效果整体落终态，只留透明度 + ≤8px 微位移 */
+    gsap.set(chars, { y: 0, opacity: 1 });
+    gsap.set('#cursor', { opacity: 1 });
+    tl.fromTo('#rail',    { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0);
+    tl.fromTo('#top',     { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.55, ease: 'power3.out' }, 0.12);
+    tl.fromTo('#band',    { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' }, 0.28);
+    tl.fromTo('#footrow', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.55, ease: 'power3.out' }, 0.44);
+    tl.fromTo('#stripe',  { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.58);
+    B.hold(tl, 1.2, 1.1);
+    return;
+  }
+
+  var INK = '#0F0F0F';
+  function slam(sel, at, dx, dy, d) {
+    tl.fromTo(sel, { x: dx, y: dy },
+      { x: 0, y: 0, duration: d, ease: 'power4.out' }, at);
+  }
+
+  /* 模 7 分格揭示：顶栏斜纹带从左逐格推出 */
+  tl.fromTo('#rail', { clipPath: 'inset(0 100% 0 0)' },
+    { clipPath: 'inset(0 0% 0 0%)', duration: 0.34, ease: 'steps(8)' }, 0);
+
+  slam('#top',     0.10, -28, -20, 0.24);
+  slam('#band',    0.24,   0, -20, 0.26);
+
+  /* 逐字弹入：只走位移，opacity 保持 1（模 2 硬着陆的干净版本），
+     错峰 0.045s，整串 11 个字约 0.5s 落定，零回弹。 */
+  tl.fromTo(chars, { y: 30 },
+    { y: 0, duration: 0.22, ease: 'power4.out', stagger: 0.045 }, 0.46);
+
+  /* 模 1 拍进来：落定瞬间阴影压 2 帧再弹回原档，总阴影回弹 ≤0.12s */
+  tl.set('#cursor', { boxShadow: '3px 6px 0 ' + INK, immediateRender: false }, 1.28);
+  tl.to('#cursor', { boxShadow: '4px 4px 0 ' + INK, duration: 0.04, ease: 'steps(2)' }, 1.32);
+
+  slam('#footrow', 1.20,   0,  24, 0.26);
+  tl.fromTo('#rule', { scaleX: 0, transformOrigin: 'left center' },
+    { scaleX: 1, duration: 0.26, ease: 'power4.out' }, 1.34);
+  slam('#note',    1.46,   0, -16, 0.22);
+
+  /* 模 6：斜纹带匀速滚动，位移取 20px 整周期，ease:none（不做无限循环） */
+  tl.fromTo('#stripe', { backgroundPositionX: '0px' },
+    { backgroundPositionX: '60px', duration: 1.2, ease: 'none' }, 1.62);
+
+  var introEnd = 2.82;
+  var total = Math.min(8, Math.max(5, Number(v.duration) || 5.5));
+  B.hold(tl, introEnd, Math.max(0.6, total - introEnd));
+})();
+</script>
+</body></html>

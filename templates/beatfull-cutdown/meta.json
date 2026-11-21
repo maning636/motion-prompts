@@ -1,0 +1,19 @@
+{
+ "id": "beatfull-cutdown",
+ "name": "卡点标题 · 砸在重拍上",
+ "description": "四句大字，逐个重拍砸下去再弹回，底部一条进度条跟着 BPM 走。节奏感来自重复，不来自花哨。",
+ "category": "字幕与标题",
+ "tags": [
+  "节拍",
+  "卡点",
+  "大字",
+  "开场"
+ ],
+ "duration": 4.0,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "",
+ "when": "需要一句有节奏的字 / 章节开场",
+ "series": "night",
+ "createdAt": "2026-10-03T10:20:00.000Z"
+}

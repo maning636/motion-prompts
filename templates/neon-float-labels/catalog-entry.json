@@ -1,0 +1,34 @@
+{
+  "id": "neon-float-labels",
+  "name": "霓虹浮动标签卡",
+  "description": "压实拍 overlay 浮动标签卡，深黑底荧光绿描边圆角卡四角 stagger 滑入，英文小标签+中文两行大字，可叠背景图，适合口播要点标注。",
+  "category": "字幕与重点标注",
+  "tags": [
+    "浮动标签",
+    "overlay",
+    "霓虹",
+    "要点标注",
+    "口播"
+  ],
+  "duration": 6,
+  "slot": "concept",
+  "when": "压实拍画面上需要在四角浮动标注要点、强调关键词时",
+  "assets": [
+    {
+      "id": "imgBg",
+      "type": "image",
+      "label": "背景图（留空为深黑底+暗角）"
+    }
+  ],
+  "path": "templates/neon-float-labels",
+  "size": "1920×1080",
+  "formats": [
+    "mp4"
+  ],
+  "defaultFormat": "mp4",
+  "preview": "https://maning789link.top/hub/renders/neon-float-labels/sample.webm",
+  "status": "ready",
+  "tier": "free",
+  "no": null,
+  "series": "shot"
+}

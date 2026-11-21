@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"product","type":"string","label":"商品名","default":"冷萃冻干柠檬片"},{"id":"price","type":"number","label":"到手价","default":89},{"id":"originPrice","type":"number","label":"划线价","default":168},{"id":"selling","type":"string","label":"卖点","default":"0 糖 · 3 秒化开 · 冷热皆宜"},{"id":"cta","type":"string","label":"行动文案","default":"评论区扣 1 拿券"},{"id":"accent","type":"color","label":"强调色","default":"#FFD429"},{"id":"background","type":"color","label":"背景色","default":"#12100E"},{"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+*{ box-sizing: border-box;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      html, body{ margin: 0; width: 1920px; height: 1080px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .scene{ position: absolute; inset: 0; width: 100%; height: 100%; padding: 88px 96px; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+
+      /* 拍二：核心利益大字 —— 172~180px / 900 / 强调色，取自小红书实测参数 */
+      .product{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 172px; font-weight: 900;
+        line-height: 1.06; letter-spacing: -.03em; color: var(--accent); text-align: center;
+        margin: 0 0 18px; max-width: 1728px; text-wrap: balance;font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+
+      /* 拍一：利益呈现（价格），先于大字落定 */
+      .price-row{ display: flex; align-items: baseline; gap: 20px; margin: 0 0 34px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .price-cur{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 64px; color: var(--accent);font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+      .price-now{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 168px; font-weight: 900; line-height: .9; color: var(--accent); font-variant-numeric: tabular-nums;font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+      .price-was{ font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-size: 44px; color: rgba(244,239,231,.42); text-decoration: line-through; margin-left: 10px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .price-flag{ display: inline-flex; align-items: center; background: var(--accent); color: #12100E;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 40px; font-weight: 900;
+        border-radius: 10px; padding: 8px 22px; margin: 0 0 14px 22px; letter-spacing: .02em;font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+
+      .selling{ display: flex; gap: 16px; margin: 0 0 44px; padding: 0; list-style: none;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .selling li{ font-size: 34px; color: var(--fg); background: rgba(244,239,231,.08);
+        border: 3px solid var(--accent); border-radius: 9999px; padding: 12px 32px; white-space: nowrap;
+        font-weight: 700;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+
+      /* 拍二：动作指引 —— 高饱和块 + 箭头，手指感要强 */
+      .cta{ display: inline-flex; align-items: center; gap: 24px; background: var(--accent);
+        color: #12100E; border-radius: 20px; padding: 34px 76px;
+        box-shadow: 0 0 0 6px var(--accent), 0 0 0 10px #12100E, 18px 18px 0 rgba(0,0,0,.6);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .cta-txt{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 64px; font-weight: 900; color: #12100E;letter-spacing: -.01em;font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+      .cta-arrow{ width: 52px; height: 52px; color: #12100E;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .cta-arrow path{ stroke: currentColor; stroke-width: 2.6; fill: none; stroke-linecap: round; stroke-linejoin: round;}
+
+      /* 拍三：安全区定格标记（横屏版的四角框） */
+      .frame{ position: absolute; width: 96px; height: 96px; border: 8px solid var(--accent); opacity: .9;
+        transition: opacity .2s;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .frame.tl{ left: 56px; top: 56px; border-right: none; border-bottom: none;}
+      .frame.br{ right: 56px; bottom: 56px; border-left: none; border-top: none;}
+      .safe-txt{ position: absolute; left: 0; right: 0; bottom: 30px; text-align: center;
+        font-size: 26px; letter-spacing: .3em; color: rgba(244,239,231,.34);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene clip" data-start="0" data-duration="6" data-track-index="1">
+        <div class="frame tl"></div><div class="frame br"></div>
+        <div class="price-row">
+          <span class="price-cur">¥</span><span class="price-now" id="priceNow">0</span>
+          <span class="price-was" id="priceWas">¥168</span>
+          <span class="price-flag">立省 47%</span>
+        </div>
+        <h1 class="product" id="product">冷萃冻干柠檬片</h1>
+        <ul class="selling" id="selling"></ul>
+        <div class="cta" id="cta">
+          <span class="cta-txt" id="ctaTxt">评论区扣 1 拿券</span>
+          <svg class="cta-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
+        </div>
+        <p class="safe-txt" id="safeTxt">安全区 · 单指令收尾</p>
+      </section>
+    </div>
+    <script>
+      const fallback = { product: "冷萃冻干柠檬片", price: 89, originPrice: 168, selling: "0 糖 · 3 秒化开 · 冷热皆宜", cta: "评论区扣 1 拿券", accent: "#FFD429", background: "#12100E", foreground: "#F4EFE7" };
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      const root = document.getElementById("root");
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4EFE7");
+      document.documentElement.style.setProperty("--background", v.background ?? "#12100E");
+      root.style.backgroundColor = v.background;
+      root.style.setProperty("--accent", v.accent ?? "#FFD429");
+      root.style.setProperty("--fg", v.foreground ?? "#F4EFE7");
+      document.getElementById("product").textContent = v.product;
+      document.getElementById("ctaTxt").textContent = v.cta;
+
+      const price = Math.max(0, Number(v.price) || 0);
+      const was = Math.max(0, Number(v.originPrice) || 0);
+      document.getElementById("priceWas").textContent = "¥" + was;
+      const flag = document.querySelector(".price-flag");
+      if (was > price) flag.textContent = "立省 " + Math.round((1 - price / was) * 100) + "%";
+      else flag.style.display = "none";
+
+      const list = document.getElementById("selling");
+      String(v.selling || "").split(/[·|]/).map(s => s.trim()).filter(Boolean)
+        .forEach(t => { const li = document.createElement("li"); li.textContent = t; list.appendChild(li); });
+
+      // 价格滚动：onUpdate 驱动，渲染必须 seek(t,false)
+      const priceEl = document.getElementById("priceNow");
+      const counter = { n: 0 };
+      function paintPrice() { priceEl.textContent = Math.round(counter.n); }
+
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      /* 三拍结构（取自 300 组 A/B 数据：动效收尾 CTR 是静态的 3 倍）
+         拍一 0.0~2.0  利益呈现：价格滚动 + 大字砸落
+         拍二 2.0~3.6  动作指引：CTA 落定 + 箭头推
+         拍三 3.6~5.6  安全区定格：整体静止 2 秒（实测停留 2.5~3s 最优） */
+      tl.fromTo(".price-row", { opacity: 0, y: -40 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.05);
+      tl.to(counter, { n: price, duration: 1.25, ease: "power2.out", onUpdate: paintPrice }, 0.12);
+      tl.fromTo(".product", { opacity: 0, y: 70, scale: 0.9 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.78, ease: "back.out(1.9)" }, 0.42);
+      tl.fromTo(".selling li", { opacity: 0, y: 26, scale: 0.86 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.5, ease: "back.out(2.2)", stagger: 0.1 }, 1.15);
+      tl.fromTo(".cta", { opacity: 0, y: -76, scale: 0.82 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.68, ease: "back.out(2.4)" }, 1.95);
+      tl.fromTo(".cta-arrow", { x: -26, opacity: 0.3 },
+        { x: 0, opacity: 1, duration: 0.34, ease: "sine.inOut" }, 2.35);
+      tl.fromTo(".frame", { opacity: 0, scale: 0.4 },
+        { opacity: 0.9, scale: 1, duration: 0.55, ease: "back.out(2)", stagger: 0.1 }, 2.5);
+      tl.fromTo(".safe-txt", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out" }, 2.7);
+      // 定格期的呼吸，制造"活着"的静止
+      tl.to(".cta", { scale: 1.05, duration: 0.42, ease: "sine.inOut", yoyo: true, repeat: 5 }, 3.0);
+      tl.to(".cta-arrow", { x: 14, duration: 0.42, ease: "sine.inOut", yoyo: true, repeat: 5 }, 3.0);
+      tl.to(".price-now", { scale: 1.04, duration: 0.5, ease: "sine.inOut", yoyo: true, repeat: 4 }, 3.3);
+      tl.to(".scene", { opacity: 0, duration: 0.4, ease: "power2.in" }, 5.6);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

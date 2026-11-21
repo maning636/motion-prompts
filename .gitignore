@@ -2,3 +2,9 @@
 prompts/_staging_*/
 prompts/_backup_*/
 *.tmp
+
+# 真实账号二维码（含 PII）不进版本库
+# 历史里已存在的同名文件已通过 git filter-repo 改写清除；
+# 本地残留文件保留在工作区但不跟踪 —— 需要时手动从备份取回。
+assets/qr-*.png
+assets/qr-*.jpg

@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"label","name":"控件文案","type":"string","label":"控件说明文案","default":"播放量（万）"},{"id":"start","name":"起始值","type":"string","label":"起始数字","default":"07"},{"id":"mid","name":"中间值","type":"string","label":"中间数字","default":"43"},{"id":"end","name":"结束值","type":"string","label":"结束数字","default":"86"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.4}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>数字滚动跳变</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-halo { position: absolute; inset: 0;
+    background: radial-gradient(58% 72% at 50% 46%,
+      rgba(0,0,0,.58) 0%, rgba(0,0,0,.30) 54%, rgba(0,0,0,0) 84%); }
+  .p-label { position: absolute; font-size: 11px; font-weight: 700; letter-spacing: .18em;
+    color: rgba(255,248,238,.6); white-space: nowrap; }
+  /* 卷轴窗口：只露一行，旧数字上滚、新数字下滚都发生在窗口里 */
+  .p-win { position: absolute; left: 90px; top: 84px; width: 300px; height: 82px;
+    overflow: hidden; }
+  .p-num { position: absolute; left: 0; top: 0; width: 300px; height: 82px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 66px; font-weight: 900; letter-spacing: -.01em;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+    transform-origin: 50% 50%; }
+  .p-base { position: absolute; left: 90px; top: 168px; width: 300px; height: 2px;
+    background: rgba(255,248,238,.22); border-radius: 1px; }
+  .p-base-dot { position: absolute; left: 0; top: -3px; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--ac); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"label":"播放量（万）","start":"07","mid":"43","end":"86","accent":"#FF6B35","duration":3.4};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || 3.4;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  const fits = [];
+  function fit(list) { fits.push.apply(fits, list); }
+  function runFit() {
+    fits.forEach((f) => {
+      const el = f.el;
+      el.style.fontSize = f.max + 'px';
+      const avail = f.box || el.clientWidth;
+      const ws = el.style.whiteSpace;
+      el.style.whiteSpace = 'nowrap';
+      const natural = el.scrollWidth;
+      el.style.whiteSpace = ws;
+      if (natural > avail) {
+        el.style.fontSize = Math.max(f.min, Math.floor(f.max * avail / natural)) + 'px';
+      }
+    });
+  }
+
+  put('div', 'p-halo');
+  const label = put('div', 'p-label', 'left:90px; top:184px;', v.label || FALLBACK.label);
+  const base  = put('div', 'p-base');
+  const baseDot = put('div', 'p-base-dot', '', null, base);
+  const win   = put('div', 'p-win');
+
+  const vals = [
+    String(v.start || FALLBACK.start),
+    String(v.mid   || FALLBACK.mid),
+    String(v.end   || FALLBACK.end)
+  ];
+  /* 每个数字行都自带 color：卷轴里三层叠着，谁在上谁亮，
+     不写 color 的层会继承成默认黑。 */
+  const rows = vals.map(function (s, i) {
+    return put('div', 'p-num',
+      'color:' + (i === 0 ? '#FFF8EE' : 'rgba(255,248,238,.3)') + ';', s, win);
+  });
+
+  /* box = 行宽 300：scrollWidth 不会小于 clientWidth，传小数字会误判溢出 */
+  fit([{ el: label, max: 11, min: 9, box: 300 }].concat(rows.map((el) => ({ el: el, max: 66, min: 26, box: 300 }))));
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 卷轴状态完全由时间算出来：每一帧都能重算，
+     不会出现「两层同时可见」或「滚到一半停住」的错帧。 */
+  const H = 82, T1 = 1.08, T2 = 2.04, IN = 0.46, OUT = 0.4;
+  const inT = [-1, T1, T2];
+  const outT = [T1, T2, null];
+  const clamp01 = (x) => x < 0 ? 0 : (x > 1 ? 1 : x);
+  const outBack = (x) => { const c1 = 1.7, c3 = 2.7, u = x - 1; return 1 + c3 * u * u * u + c1 * u * u; };
+  const inCubic = (x) => x * x * x;
+  function paint() {
+    const t = tl.time();
+    for (let i = 0; i < rows.length; i++) {
+      const el = rows[i];
+      const ti = inT[i], to = outT[i];
+      let y, op;
+      if (t < ti) {
+        y = H; op = 0;
+      } else if (to == null || t < to) {
+        y = H * (1 - outBack(clamp01((t - ti) / IN)));
+        op = clamp01((t - ti) / 0.16);
+      } else {
+        y = -H * inCubic(clamp01((t - to) / OUT));
+        op = 1 - clamp01((t - to) / OUT);
+      }
+      /* 落地瞬间顶一下：用高斯包络，任意时间点可重算 */
+      const hit = Math.exp(-Math.pow((t - (ti + 0.2)) / 0.1, 2));
+      const s = 1 + 0.17 * hit;
+      el.style.transform = 'translateY(' + y.toFixed(2) + 'px) scale(' + s.toFixed(3) + ')';
+      el.style.opacity = op.toFixed(3);
+      el.style.color = i === 0 ? '#FFF8EE'
+        : (t >= ti - 0.02 ? '#FFF8EE' : 'rgba(255,248,238,.3)');
+    }
+    baseDot.style.transform = 'scale(' + (1 + 0.5 * Math.exp(-Math.pow((t - (T1 + 0.2)) / 0.11, 2))).toFixed(3) + ')';
+  }
+  tl.to({}, { duration: dur, onUpdate: paint }, 0);
+
+  tl.fromTo(label, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .3 }, .04);
+  tl.fromTo(win, { opacity: 0, scale: .92 },
+    { opacity: 1, scale: 1, duration: .34, ease: 'back.out(2)' }, .0);
+  tl.fromTo(base, { opacity: 0, scaleX: .6 },
+    { opacity: 1, scaleX: 1, duration: .34, ease: 'power3.out' }, .06);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  runFit();
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "z1", "type": "string", "label": "区1", "default": "项目空间"}, {"id": "z2", "type": "string", "label": "区2", "default": "任务看板"}, {"id": "z3", "type": "string", "label": "区3", "default": "文档库"}, {"id": "z4", "type": "string", "label": "区4", "default": "数据面板"}, {"id": "z5", "type": "string", "label": "区5", "default": "自动化"}, {"id": "z6", "type": "string", "label": "区6", "default": "集成中心"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#stg{ position:absolute; inset:0; perspective:1300px; overflow:hidden; }
+#plane{ position:absolute; left:260px; top:-200px; width:1400px; height:1800px;
+  transform-style:preserve-3d; background:#10101A; border-radius:26px; padding:80px 90px; }
+.prow{ height:120px; border-radius:16px; background:#171722; border:1px solid rgba(255,255,255,.1);
+  margin-bottom:56px; display:flex; align-items:center; padding:0 44px; }
+.prow i{ display:block; height:16px; border-radius:8px; background:rgba(255,255,255,.18); width:40%; }
+.zone{ position:absolute; left:90px; width:1220px; transform-style:preserve-3d; }
+.zt{ position:absolute; left:0; top:0; font-size:64px; color:var(--fg); will-change:transform; }
+.zs{ position:absolute; left:10px; top:60px; width:300px; height:44px; border-radius:50%;
+  background:rgba(0,0,0,.55); filter:blur(14px); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+<div id="stg"><div id="plane"><div class="prow"><i></i></div><div class="prow"><i style="width:56%"></i></div><div class="prow"><i style="width:34%"></i></div><div class="prow"><i style="width:62%"></i></div><div class="prow"><i style="width:48%"></i></div><div class="prow"><i style="width:52%"></i></div><div class="zone" id="z0" style="top:150px"><div class="zs" id="zs0"></div><div class="zt" id="zt0"></div></div><div class="zone" id="z1" style="top:410px"><div class="zs" id="zs1"></div><div class="zt" id="zt1"></div></div><div class="zone" id="z2" style="top:670px"><div class="zs" id="zs2"></div><div class="zt" id="zt2"></div></div><div class="zone" id="z3" style="top:930px"><div class="zs" id="zs3"></div><div class="zt" id="zt3"></div></div><div class="zone" id="z4" style="top:1190px"><div class="zs" id="zs4"></div><div class="zt" id="zt4"></div></div><div class="zone" id="z5" style="top:1450px"><div class="zs" id="zs5"></div><div class="zt" id="zt5"></div></div></div></div>
+    </div>
+    <script>
+      const FB = {"z1": "项目空间", "z2": "任务看板", "z3": "文档库", "z4": "数据面板", "z5": "自动化", "z6": "集成中心", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+const ZS=[v.z1,v.z2,v.z3,v.z4,v.z5,v.z6];
+// 大倾角贴面机位：面几乎侧掠，持续推进
+gsap.set('#plane',{rotationX:52,rotationZ:-14});
+tl.fromTo('#plane',{y:120},{y:-300,duration:F(148),ease:'none'},0);
+// 悬浮文字：translateZ 150px 带同形软影，按镜头行进方向错峰加速贴落
+ZS.forEach((z,i)=>{
+  const zt=$('#zt'+i), zs=$('#zs'+i);
+  zt.textContent=z||'';
+  gsap.set(zt,{z:150, filter:'brightness(1.3)'}); // 空中提亮 1.3x 防被吞
+  const H={h:150};
+  const sh=()=>{ const t=H.h/150;
+    gsap.set(zs,{opacity:.5*t, scaleX:.6+.8*t, scaleY:.6+.8*t}); };
+  sh();
+  const cue=20+i*15; // 先经过的先落，错开起点但下落并行
+  tl.to(H,{h:0,duration:F(16),ease:'power2.in',onUpdate:()=>{ // easeFall 加速+软着陆
+    gsap.set(zt,{z:H.h}); sh();
+  }},F(cue));
+  tl.to(zt,{filter:'brightness(1)',duration:F(6)},F(cue+10));
+  tl.to(zs,{opacity:0,duration:F(4)},F(cue+13)); // 落地影归零
+});
+tl.to({},{duration:F(2)},F(148));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "title": "岗位 AI 能力金字塔",
+  "subtitle": "从低风险任务开始，别想一步登天",
+  "layers": "L4 团队能力,L3 工作流,L2 固定模板,L1 单次辅助",
+  "descs": "组织级沉淀,流程化复用,模板化交付,低风险起步",
+  "accent": "#22c55e",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

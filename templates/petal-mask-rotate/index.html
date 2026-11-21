@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "img1", "type": "image", "label": "底图（全屏压暗）", "default": "./placeholder-1.png"}, {"id": "img2", "type": "image", "label": "新图（花瓣窗口推入）", "default": "./placeholder-2.png"}, {"id": "title", "type": "string", "label": "大标题", "default": "林间晨光"}, {"id": "enTitle", "type": "string", "label": "英文小标", "default": "SUMMER · 01"}, {"id": "desc", "type": "string", "label": "文案（逗号分隔逐行）", "default": "光穿过叶隙落在车把上,整座森林都在轻轻呼吸。"}, {"id": "sign", "type": "string", "label": "底部署名", "default": "夏日 · 未至"}, {"id": "petals", "type": "number", "label": "花瓣数", "default": 8}, {"id": "spinDur", "type": "number", "label": "旋转时长(秒)", "default": 2}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #050605; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+      .pt-layer{ position: absolute; inset: 0; overflow: hidden; }
+      .pt-layer img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+      #ptA img{ filter: brightness(.55) saturate(.92); }
+      .pt-shade{ position: absolute; inset: 0; z-index: 2;
+        background: linear-gradient(90deg, rgba(4,6,5,.62) 0%, rgba(4,6,5,.28) 34%, rgba(4,6,5,0) 58%); }
+      svg.pt-win{ position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; z-index: 3; }
+      .pt-title{ position: absolute; left: 130px; top: 190px; z-index: 6; color: #F4F6F0; }
+      .pt-h1{ font-size: 98px; font-weight: 900; letter-spacing: .06em; line-height: 1.1; }
+      .pt-en{ margin-top: 26px; font-size: 30px; letter-spacing: .52em; color: rgba(255,255,255,.72);
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+      .pt-desc{ margin-top: 64px; font-size: 29px; line-height: 1.9; color: rgba(255,255,255,.85);
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+      .pt-div{ margin-top: 58px; width: 74px; height: 3px; background: rgba(255,255,255,.85); }
+      .pt-sign{ margin-top: 30px; font-size: 27px; letter-spacing: .22em; color: rgba(255,255,255,.8);
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="pt-layer" id="ptA"><img id="imgA" src="./placeholder-1.png" alt=""></div>
+      <div class="pt-shade"></div>
+      <svg class="pt-win" id="ptWin" viewBox="0 0 1920 1080">
+        <defs>
+          <filter id="pFeather" x="-60%" y="-60%" width="220%" height="220%">
+            <feMorphology operator="dilate" radius="7.6"/>
+            <feGaussianBlur stdDeviation="19.5"/>
+          </filter>
+          <filter id="rblur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2"/></filter>
+          <mask id="petalM" maskUnits="userSpaceOnUse" x="926" y="182" width="760" height="760">
+            <g id="petalRot"><path id="petalOuter" fill="#fff" filter="url(#pFeather)"/><path id="petalInner" fill="#fff"/></g>
+          </mask>
+          <mask id="rimM" maskUnits="userSpaceOnUse" x="926" y="182" width="760" height="760">
+            <g id="rimRot"><path id="rimPath" fill="none" stroke="#fff" stroke-width="26" filter="url(#rblur)"/></g>
+          </mask>
+        </defs>
+        <circle cx="1306" cy="562" r="335" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="2"/>
+        <g mask="url(#petalM)"><g class="pt-push"><image id="ptImgB" x="0" y="0" width="1920" height="1080" preserveAspectRatio="xMidYMid slice"/></g></g>
+        <g mask="url(#rimM)"><g class="pt-push"><image id="ptRimB" x="0" y="0" width="1920" height="1080" preserveAspectRatio="xMidYMid slice"/></g></g>
+      </svg>
+      <div class="pt-title" id="ptTitle">
+        <div class="pt-h1" id="ptH1"></div>
+        <div class="pt-en" id="enTitle"></div>
+        <div class="pt-desc" id="desc"></div>
+        <div class="pt-div"></div>
+        <div class="pt-sign" id="sign"></div>
+      </div>
+
+    </div>
+    <script>
+      const fallback = {"img1": "./placeholder-1.png", "img2": "./placeholder-2.png", "title": "林间晨光", "enTitle": "SUMMER · 01", "desc": "光穿过叶隙落在车把上,整座森林都在轻轻呼吸。", "sign": "夏日 · 未至", "petals": 8, "spinDur": 2, "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      if (V.img1) $("imgA").src = V.img1;
+      const imgB = V.img2 || "./placeholder-2.png";
+      $("ptImgB").setAttribute("href", imgB);
+      $("ptRimB").setAttribute("href", imgB);
+      $("ptH1").textContent = V.title;
+      $("enTitle").textContent = V.enTitle;
+      const descEl = $("desc");
+      split(V.desc).forEach((ln) => {
+        const d = document.createElement("div");
+        d.textContent = ln;
+        descEl.appendChild(d);
+      });
+      $("sign").textContent = V.sign;
+      const petals = Math.max(3, Math.round(Number(V.petals) || 8));
+      const spin = Math.max(0.6, Number(V.spinDur) || 2);
+      // 花瓣窗口是局部区域：圆形区圆心 68% 宽 / 52% 高、直径 62% 画面高，花形 mask 只在窗口内作用
+      const CX = 1306, CY = 562, R = 300;
+      const petalD = (k) => {
+        let s = "";
+        for (let a = 0; a <= 360; a += 2) {
+          const th = a * Math.PI / 180;
+          const r = R * k * (0.60 + 0.40 * Math.cos(petals * th));
+          s += (a === 0 ? "M" : "L") + (CX + r * Math.cos(th)).toFixed(1) + "," + (CY + r * Math.sin(th)).toFixed(1);
+        }
+        return s + "Z";
+      };
+      $("petalOuter").setAttribute("d", petalD(1));      // 外圈：羽化 19.5 + 发散 7.6
+      $("petalInner").setAttribute("d", petalD(0.62));   // 内圈：smallScale 0.62 清晰实边
+      $("rimPath").setAttribute("d", petalD(1));
+      const rot = { a: 0 };
+      const applyRot = () => {
+        const t = `rotate(${rot.a} ${CX} ${CY})`;
+        $("petalRot").setAttribute("transform", t);
+        $("rimRot").setAttribute("transform", t);
+      };
+      gsap.set(".pt-push", { y: 1080 });
+      tl.fromTo(["#ptH1", "#enTitle", "#desc", "#ptTitle .pt-div", "#sign"],
+        { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.09, ease: "power2.out" }, 0.1);
+      // 底图只做 bgZoom 0.05 轻微视差，不硬推（硬推会拉出一道贯穿全屏的接缝）
+      tl.to("#ptA img", { scale: 1.05, duration: spin + 0.4, ease: "none" }, 0);
+      // 只转 SVG 蒙版，照片钉在原地：360°/spin，内外两圈同角同速
+      tl.to(rot, { a: 360, duration: spin, ease: "none", onUpdate: applyRot }, 0);
+      // 新图晚半拍（pushLag 0.28s）向上推入窗口，与旋转同一个终点
+      tl.to(".pt-push", { y: 0, duration: spin - 0.28, ease: "power2.out" }, 0.28);
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

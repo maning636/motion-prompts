@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "prompt", "type": "string", "label": "生成指令", "default": "帮我画出内容团队的组织架构"}, {"id": "root", "type": "string", "label": "根节点", "default": "内容团队"}, {"id": "kid1", "type": "string", "label": "子节点1", "default": "选题组"}, {"id": "kid2", "type": "string", "label": "子节点2", "default": "制作组"}, {"id": "g1", "type": "string", "label": "孙节点1", "default": "文案"}, {"id": "g2", "type": "string", "label": "孙节点2", "default": "剪辑"}, {"id": "g3", "type": "string", "label": "孙节点3", "default": "封面"}, {"id": "g4", "type": "string", "label": "孙节点4", "default": "发布"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#bar{ position:absolute; left:460px; top:80px; width:1000px; height:88px; border-radius:16px;
+  background:#14141B; border:2px solid rgba(255,255,255,.18); display:flex; align-items:center; padding:0 32px; }
+#bar .pt{ font-size:30px; color:var(--fg); }
+#bar .cur{ display:inline-block; width:16px; height:32px; background:var(--accent); vertical-align:-4px; margin-left:6px; }
+.node{ position:absolute; width:200px; height:84px; border-radius:14px; background:#1A1A24;
+  border:1px solid rgba(255,255,255,.16); display:flex; align-items:center; justify-content:center;
+  font-size:28px; color:var(--fg); opacity:0; }
+#nd-root{ background:var(--accent); color:#061106; border-color:var(--accent); }
+#wires{ position:absolute; inset:0; }
+.wire{ fill:none; stroke:rgba(255,255,255,.45); stroke-width:3; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+<div id="bar"><div class="pt"><span id="ptx"></span><span class="cur" id="cur"></span></div></div><svg id="wires" width="1920" height="1080" viewBox="0 0 1920 1080"></svg><div class="node" id="nd-root"></div><div class="node" id="nd-k1"></div><div class="node" id="nd-k2"></div><div class="node" id="nd-g1"></div><div class="node" id="nd-g2"></div><div class="node" id="nd-g3"></div><div class="node" id="nd-g4"></div>
+    </div>
+    <script>
+      const FB = {"prompt": "帮我画出内容团队的组织架构", "root": "内容团队", "kid1": "选题组", "kid2": "制作组", "g1": "文案", "g2": "剪辑", "g3": "封面", "g4": "发布", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#nd-root').textContent=v.root||'';
+$('#nd-k1').textContent=v.kid1||'';$('#nd-k2').textContent=v.kid2||'';
+['g1','g2','g3','g4'].forEach((g,i)=>$('#nd-'+g).textContent=v['g'+(i+1)]||'');
+// 布局（中心坐标）
+const POS={root:[960,330],k1:[620,560],k2:[1300,560],g1:[400,800],g2:[840,800],g3:[1080,800],g4:[1520,800]};
+Object.keys(POS).forEach(k=>{
+  const [cx,cy]=POS[k], el=$('#nd-'+k);
+  el.style.left=(cx-100)+'px'; el.style.top=(cy-42)+'px';
+});
+// prompt 逐字敲出（1.1 字符/帧），敲完描边变深确认
+const txt=v.prompt||'';
+for(let i=1;i<=txt.length;i++){
+  tl.call(((s)=>()=>{$('#ptx').textContent=s;})(txt.slice(0,i)),[],F(4+i*1.1));
+}
+const typeEnd=4+Math.ceil(txt.length*1.1);
+tl.to('#bar',{borderColor:'rgba(255,255,255,.55)',duration:F(4)},F(typeEnd+2));
+tl.set('#cur',{display:'none'},F(typeEnd+4));
+// 折角连线：父底边→中线→子顶边，描线先行 8f、16f ease-out
+const LINKS=[['root','k1'],['root','k2'],['k1','g1'],['k1','g2'],['k2','g3'],['k2','g4']];
+const wires=$('#wires');
+const NW=200,NH=84;
+const mkWire=(a,b)=>{
+  const [ax,ay]=POS[a],[bx,by]=POS[b], midY=(ay+NH/2+by-NH/2)/2;
+  const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+  p.setAttribute('d','M'+ax+','+(ay+NH/2)+' V'+midY+' H'+bx+' V'+(by-NH/2));
+  p.setAttribute('class','wire'); wires.appendChild(p); return p;
+};
+// 级联时序：根 f40，子层 f60（兄弟错峰 6f），孙层 f80（错峰 6f）
+const pop=(id,f)=>{
+  tl.fromTo('#nd-'+id,{opacity:0,scale:0,transformOrigin:'center center'},
+    {opacity:1,scale:1,duration:F(10),ease:'back.out(1.7)'},F(f));
+};
+pop('root',40);
+[['k1',60],['k2',66]].forEach(([k,f])=>{
+  const w=mkWire('root',k), L=w.getTotalLength();
+  w.style.strokeDasharray=L; w.style.strokeDashoffset=L;
+  tl.to(w,{strokeDashoffset:0,duration:F(16),ease:'power2.out'},F(f-8));
+  pop(k,f);
+});
+[['g1','k1',80],['g2','k1',86],['g3','k2',92],['g4','k2',98]].forEach(([g,par,f])=>{
+  const w=mkWire(par,g), L=w.getTotalLength();
+  w.style.strokeDasharray=L; w.style.strokeDashoffset=L;
+  tl.to(w,{strokeDashoffset:0,duration:F(16),ease:'power2.out'},F(f-8));
+  pop(g,f);
+});
+// 成树呼吸：末节点 +22f 起，以树心为原点 1→1.035→1（28f）
+tl.set('.node, #wires',{transformOrigin:'960px 565px'},F(130));
+tl.to('#wires',{scale:1.035,duration:F(14),ease:'sine.inOut'},F(130));
+tl.to('.node',{scale:1.035,duration:F(14),ease:'sine.inOut'},F(130));
+tl.to('#wires',{scale:1,duration:F(14),ease:'sine.inOut'},F(144));
+tl.to('.node',{scale:1,duration:F(14),ease:'sine.inOut'},F(144));
+tl.to({},{duration:F(22)},F(158)); // 真静止
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（反白画面上的 mono 字）","default":"TRACK RECORD / 数据背书"},{"id":"title","name":"主标题","type":"string","label":"主标题（反白画面上的中文大字）","default":"买的人多，第二次买的人更多"},{"id":"n1","name":"已售件数","type":"number","label":"已售件数（件）","default":86000},{"id":"l1","name":"数据 1 标签","type":"string","label":"第一张卡标签","default":"累计已售"},{"id":"d1","name":"数据 1 说明","type":"string","label":"第一张卡说明","default":"上线 14 个月，同一 SKU 未换版"},{"id":"p1","name":"已售占比","type":"number","label":"本批次售出比例（%）","default":86},{"id":"n2","name":"复购率","type":"number","label":"复购率（%）","default":62},{"id":"l2","name":"数据 2 标签","type":"string","label":"第二张卡标签","default":"90 天复购率"},{"id":"d2","name":"数据 2 说明","type":"string","label":"第二张卡说明","default":"同一账号第二次下单的比例"},{"id":"note","name":"口径说明","type":"string","label":"口径说明（一行 mono）","default":"口径：复购率按账号去重 · 统计窗口为近 90 天"},{"id":"accent","name":"强调色","type":"color","label":"强调色（第一张卡底 / 斜纹带）","default":"#FFD429"},{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–6）","default":6},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="双数据巨卡构图：整屏近黑底，两张并排巨卡各压一个巨型数据与一条占比条，左卡黄底近黑字、右卡蓝底白字，两卡一色一变">
+<title>数据卖点巨卡 · 买的人多，第二次买的人更多</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --accent:#FFD429;
+  }
+  html,body{margin:0;padding:0;background:var(--ink)}
+  /* 整屏反白：底与字整块替换（基因 10） */
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--ink);color:var(--white);font-family:var(--sans);
+    display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+  .stripe{flex:0 0 auto;height:20px;border-top:var(--bw) solid var(--white);
+    background:repeating-linear-gradient(45deg,var(--white) 0 10px,var(--accent) 10px 20px)}
+  .stripe.b{background:repeating-linear-gradient(-45deg,var(--white) 0 10px,var(--accent) 10px 20px)}
+
+  .hd{flex:0 0 auto;display:flex;align-items:center;gap:22px;padding:36px 72px 30px}
+  .hd .tag{flex:0 0 auto;font-family:var(--mono);font-weight:700;font-size:24px;
+    letter-spacing:.12em;padding:4px 18px;background:var(--accent);color:var(--ink);
+    border-radius:9999px;white-space:nowrap}
+  .hd .eb{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-family:var(--mono);font-weight:700;font-size:24px;
+    letter-spacing:.14em;color:var(--white)}
+  .hd .tt{margin-left:auto;flex:1 1 auto;min-width:0;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;font-size:40px;font-weight:900;
+    letter-spacing:0;color:var(--white);text-align:right}
+
+  .stats{flex:1 1 auto;min-height:0;display:flex;gap:34px;padding:6px 72px 34px;
+    overflow:hidden}
+  .card{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:22px;
+    padding:38px 44px 40px;border:var(--bw) solid var(--white);border-radius:4px;
+    box-shadow:10px 10px 0 var(--white)}
+  .card.a{background:var(--accent);color:var(--ink)}
+  /* blue 底必须配白字（§1.2 明度中纪律），阴影换白 */
+  .card.b{background:var(--blue);color:var(--white)}
+  .card .lab{display:block;white-space:nowrap;font-family:var(--mono);font-weight:700;
+    font-size:26px;letter-spacing:.12em;max-width:100%;overflow:hidden;
+    text-overflow:ellipsis}
+  .card.a .lab{color:var(--ink)}
+  .card.b .lab{color:var(--white)}
+  .card .row{display:flex;align-items:baseline;gap:16px}
+  .card .n{display:block;white-space:nowrap;font-family:var(--mono);font-weight:900;
+    font-size:236px;line-height:.9;letter-spacing:0;
+    font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+  .card .u{font-family:var(--mono);font-weight:700;font-size:44px;letter-spacing:.06em}
+  .card .ds{display:block;white-space:nowrap;font-size:28px;font-weight:700;
+    letter-spacing:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  /* 占比条：底槽压本卡底色的纸色斜纹，填充实色 */
+  .card .trk{position:relative;height:34px;margin-top:auto;
+    border:var(--bw) solid currentColor;border-radius:4px;overflow:hidden;
+    background-color:var(--paper);
+    background-image:repeating-linear-gradient(45deg,
+      rgba(15,15,15,.13) 0 2px, transparent 2px 16px)}
+  .card .trk i{position:absolute;left:0;top:0;bottom:0;width:0;
+    border-right:var(--bw) solid currentColor}
+  .card.a .trk i{background:var(--ink)}
+  .card.b .trk i{background:var(--white)}
+
+  .foot{flex:0 0 auto;display:flex;align-items:center;gap:24px;padding:0 72px 26px}
+  .foot .sq{flex:0 0 auto;width:22px;height:22px;background:var(--accent);
+    border:var(--bw) solid var(--white);border-radius:4px}
+  .foot .tx{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-family:var(--mono);font-weight:700;font-size:24px;
+    letter-spacing:.06em;color:var(--white)}
+
+  @media (prefers-reduced-motion: reduce){
+    .anim{transition-duration:.01ms !important;animation-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="stripe anim" id="stripeA"></div>
+
+  <div class="hd anim" id="hd">
+    <span class="tag">PROOF</span>
+    <span class="eb anim" id="eyebrow" data-fit-max="24" data-fit-min="15">TRACK RECORD / 数据背书</span>
+    <span class="tt anim" id="title" data-fit-max="40" data-fit-min="22">买的人多，第二次买的人更多</span>
+  </div>
+
+  <div class="stats anim" id="stats">
+    <div class="card a anim" id="cardA">
+      <span class="lab anim" id="l1" data-fit-max="26" data-fit-min="15">累计已售</span>
+      <span class="row"><span class="n" id="n1">8.6</span><span class="u" id="u1">万件</span></span>
+      <span class="ds anim" id="d1" data-fit-max="28" data-fit-min="17">上线 14 个月，同一 SKU 未换版</span>
+      <span class="trk anim" id="trkA"><i id="fillA"></i></span>
+    </div>
+    <div class="card b anim" id="cardB">
+      <span class="lab anim" id="l2" data-fit-max="26" data-fit-min="15">90 天复购率</span>
+      <span class="row"><span class="n" id="n2">62</span><span class="u">%</span></span>
+      <span class="ds anim" id="d2" data-fit-max="28" data-fit-min="17">同一账号第二次下单的比例</span>
+      <span class="trk anim" id="trkB"><i id="fillB"></i></span>
+    </div>
+  </div>
+
+  <div class="foot anim" id="foot">
+    <span class="sq"></span>
+    <span class="tx anim" id="note" data-fit-max="24" data-fit-min="15">口径：复购率按账号去重 · 统计窗口为近 90 天</span>
+  </div>
+
+  <div class="stripe b anim" id="stripeB"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  ['eyebrow', 'title', 'l1', 'd1', 'l2', 'd2', 'note']
+    .forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+
+  /* 单位换算与条宽都由原始数字推出，不手动再写一遍 */
+  var n1 = Number(v.n1), p1 = Number(v.p1), n2 = Number(v.n2);
+  if (!isFinite(n1)) n1 = 0;
+  if (!isFinite(p1)) p1 = 0;
+  if (!isFinite(n2)) n2 = 0;
+  p1 = Math.max(0, Math.min(100, Math.round(p1)));
+  n2 = Math.max(0, Math.min(100, Math.round(n2)));
+
+  n1 = Math.max(0, Math.round(n1));
+  if (n1 >= 10000) {
+    set('n1', (n1 / 10000).toFixed(1).replace(/\.0$/, ''));
+    set('u1', '万件');
+  } else {
+    set('n1', String(n1));
+    set('u1', '件');
+  }
+  set('n2', String(n2));
+
+  var WA = p1 + '%';
+  var WB = n2 + '%';
+
+  B.fitAll();
+  var tl = B.tl();
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (reduce) {
+    gsap.set('.anim', { x: 0, y: 0, scale: 1, scaleX: 1, rotate: 0 });
+    gsap.set('#fillA', { width: WA });
+    gsap.set('#fillB', { width: WB });
+    tl.fromTo('#stripeA',{ opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, 0);
+    tl.fromTo('#hd',      { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, .1);
+    tl.fromTo('#stats',   { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .24);
+    tl.fromTo('#foot',    { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, .42);
+    tl.fromTo('#stripeB',{ opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, .54);
+    B.hold(tl, 1.3, 1.1);
+    return;
+  }
+
+  var WHT = '#FFFFFF';
+  function slam(sel, at, dx, dy, d) {
+    tl.fromTo(sel, { x: dx, y: dy },
+      { x: 0, y: 0, duration: d, ease: 'power4.out' }, at);
+  }
+  function shadowBounce(sel, off, at) {
+    tl.set(sel, { boxShadow: off + 'px ' + (off + 3) + 'px 0 ' + WHT, immediateRender: false }, at);
+    tl.to(sel, { boxShadow: off + 'px ' + off + 'px 0 ' + WHT, duration: 0.04, ease: 'steps(2)' }, at + 0.04);
+  }
+
+  tl.fromTo('#stripeA', { clipPath: 'inset(0 100% 0 0)' },
+      { clipPath: 'inset(0 0% 0 0%)', duration: .34, ease: 'steps(8)' }, 0);
+  slam('#hd',      0.12,   0, -28, 0.24);
+  slam('#eyebrow', 0.24, -24, -20, 0.22);
+  slam('#title',   0.30,  24, -20, 0.24);
+  /* 两张巨卡自左右画外对向切入 */
+  tl.fromTo('#cardA', { x: -150, y: 40 },
+      { x: 0, y: 0, duration: .3, ease: 'power4.out' }, 0.46);
+  tl.fromTo('#cardB', { x: 150, y: 40 },
+      { x: 0, y: 0, duration: .3, ease: 'power4.out' }, 0.58);
+  shadowBounce('#cardA', 10, 0.86);
+  shadowBounce('#cardB', 10, 0.94);
+  slam('#l1',   0.84,    0, -22, 0.22);
+  slam('#l2',   0.96,    0, -22, 0.22);
+  slam('#n1',   0.96,    0, -28, 0.26);
+  slam('#n2',   1.08,    0, -28, 0.26);
+  slam('#d1',   1.24,    0, -20, 0.22);
+  slam('#d2',   1.34,    0, -20, 0.22);
+  /* width:0 的占比条必须用 grow，不能用 wipe */
+  B.in.grow(tl, '#fillA', WA, 1.34, { d: .5, ease: 'power3.out' });
+  B.in.grow(tl, '#fillB', WB, 1.46, { d: .5, ease: 'power3.out' });
+  slam('#foot',    1.86,   0,  28, 0.26);
+  slam('#note',    1.98, -24, -20, 0.22);
+  tl.fromTo('#stripeB', { clipPath: 'inset(0 0 0 100%)' },
+      { clipPath: 'inset(0 0% 0 0%)', duration: .34, ease: 'steps(8)' }, 2.04);
+  tl.fromTo('.stripe', { backgroundPositionX: '0px' },
+      { backgroundPositionX: '60px', duration: 1.1, ease: 'none' }, 2.38);
+
+  var introEnd = 3.48;
+  var total = Math.min(6, Math.max(5, Number(v.duration) || 6));
+  B.hold(tl, introEnd, Math.max(0.6, total - introEnd));
+})();
+</script>
+</body></html>

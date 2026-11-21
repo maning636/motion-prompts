@@ -1,0 +1,8 @@
+{
+  "title": "模型能力对比",
+  "objects": "Claude,GPT-4,Gemini",
+  "dimensions": "推理,代码,长上下文,多模态,价格",
+  "valuesA": "强,强,中,弱,高",
+  "valuesB": "强,中,强,中,中",
+  "valuesC": "中,中,强,强,低"
+}

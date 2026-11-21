@@ -1,0 +1,7 @@
+{
+  "name": "scene-library",
+  "private": true,
+  "scripts": {
+    "render": "cd ../.. && npm run render -- scene-library"
+  }
+}

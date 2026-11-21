@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "AI 自主程度光谱"}, {"id": "subtitle", "type": "string", "label": "副标题", "default": "从完全规则驱动到完全智能体驱动"}, {"id": "leftPole", "type": "string", "label": "左极端", "default": "规则驱动"}, {"id": "rightPole", "type": "string", "label": "右极端", "default": "智能体驱动"}, {"id": "markerLabel", "type": "string", "label": "Marker 标签", "default": "当前产品"}, {"id": "markerPosition", "type": "number", "label": "Marker 位置（0–1）", "default": 0.62}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      /* ===== 奶油纸面贴纸工作台 · 设计令牌（见 design-systems/sticker-workbench/DESIGN.md） ===== */
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden;
+        font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden;
+        background: var(--background, #F5F0E6); color: var(--foreground, #1D1D20); }
+      .outer-frame{ position: absolute; inset: 0; border: 10px solid #1D1D20; pointer-events: none; z-index: 40; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; font-weight: 700; }
+      .fredoka{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; }
+      .corner-tag{ position: absolute; top: 74px; left: 120px; z-index: 30;
+        background: #FFFDF7; border: 4px solid #1D1D20; border-radius: 8px;
+        box-shadow: 10px 10px 0 #2A292B; padding: 14px 22px; transform: rotate(-2deg); }
+      .corner-tag span{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; font-weight: 700;
+        font-size: 24px; letter-spacing: 0.06em; text-transform: uppercase; }
+      .corner-index{ position: absolute; top: 84px; right: 120px; z-index: 30;
+        font-size: 20px; color: #4D4A48; }
+      .scene{ position: absolute; inset: 0; }
+      .panel{ background: #FFFDF7; border: 4px solid #1D1D20; border-radius: 10px;
+        box-shadow: 10px 10px 0 #2A292B; }
+      .chip{ display: inline-block; padding: 8px 20px; border: 4px solid #1D1D20; border-radius: 8px;
+        box-shadow: 6px 6px 0 #2A292B; font-size: 26px; font-weight: 800; line-height: 1.1; }
+      .chip-blue{ background: #3E7BF2; color: #FFFDF7; }
+      .chip-pink{ background: #F13B88; color: #FFFDF7; }
+      .chip-orange{ background: #FF9F1C; color: #1D1D20; }
+      .chip-lime{ background: #B9E833; color: #1D1D20; }
+      .chip-violet{ background: #B99AF7; color: #1D1D20; }
+      .chip-paper{ background: #FFFDF7; color: #1D1D20; }
+      .ttl{ font-size: 52px; font-weight: 900; line-height: 1.2; }
+      .sub{ font-size: 30px; font-weight: 700; line-height: 1.35; color: #4D4A48; }
+      .num{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; font-weight: 700; }
+      .title-center{ position: absolute; top: 200px; left: 0; width: 100%; text-align: center; z-index: 20; }
+      .sub-center{ position: absolute; top: 286px; left: 0; width: 100%; text-align: center; z-index: 20; }
+
+      .pstage{ position: absolute; left: 200px; right: 200px; top: 46%; height: 200px; }
+      .paxis{ position: absolute; left: 0; right: 0; top: 90px; border-top: 5px solid #1D1D20; }
+      .ppole{ position: absolute; top: 40px; transform: translateX(-50%); }
+      .pmark{ position: absolute; top: 62px; width: 56px; height: 56px; border-radius: 50%;
+        background: #B9E833; border: 4px solid #1D1D20; transform: translateX(-50%); z-index: 4; }
+      .plab{ position: absolute; top: 130px; transform: translateX(-50%); white-space: nowrap; }
+      .pitem{ position: absolute; top: 76px; transform: translateX(-50%); z-index: 4; text-align: center; }
+      .pitem .pd{ width: 26px; height: 26px; margin: 0 auto; border-radius: 50%;
+        background: #3E7BF2; border: 4px solid #1D1D20; }
+      .pitem .pl{ margin-top: 52px; font-size: 24px; font-weight: 800; white-space: nowrap; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="outer-frame" id="frame"></div>
+      <div class="corner-tag" id="cornerTag"><span>SPECTRUM AXIS</span></div>
+      <div class="corner-index mono" id="cornerIndex">01 / AXIS</div>
+      <svg width="0" height="0" style="position:absolute"><defs>
+        <marker id="arrowHead" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto">
+          <path d="M1 1 L11 6 L1 11 Z" fill="#1D1D20" />
+        </marker>
+      </defs></svg>
+      <section class="scene" id="rootScene" data-start="0" data-duration="6" data-track-index="1">
+        <h2 class="ttl title-center" id="pTitle"></h2>
+        <p class="sub sub-center" id="pSub"></p>
+        <div class="pstage" id="pStage"><div class="paxis"></div></div>
+      </section>
+    </div>
+    <script>
+      const FB = {"title": "AI 自主程度光谱", "subtitle": "从完全规则驱动到完全智能体驱动", "leftPole": "规则驱动", "rightPole": "智能体驱动", "markerLabel": "当前产品", "markerPosition": 0.62};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $ = (id) => document.getElementById(id);
+      const T = (id, val) => { const el = $(id); if (el) el.textContent = val; };
+      const SP = (s) => String(s ?? '').split(',').map(x => x.trim()).filter(Boolean);
+      const SPN = (s) => SP(s).map(Number);
+      const scene = () => $('rootScene');
+      function el(tag, cls, parent, text){ const e = document.createElement(tag);
+        if (cls) e.className = cls; if (text != null) e.textContent = text;
+        (parent || scene()).appendChild(e); return e; }
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const SPRING = "back.out(1.4)";
+      function pop(sel, at, dx){ tl.fromTo(sel, { opacity: 0, x: dx || 0, scale: 0.88 },
+        { opacity: 1, x: 0, scale: 1, duration: 0.38, ease: SPRING }, at); }
+      function fade(sel, at){ tl.fromTo(sel, { opacity: 0 }, { opacity: 1, duration: 0.24 }, at); }
+      function drawArrow(line, at){ const len = line.getAttribute('stroke-dasharray');
+        tl.set(line, { attr: { "marker-end": "url(#arrowHead)" } }, at);
+        tl.fromTo(line, { strokeDashoffset: len }, { strokeDashoffset: 0, duration: 0.4, ease: "power2.inOut" }, at); }
+      tl.fromTo("#frame", { opacity: 0 }, { opacity: 1, duration: 0.18 }, 0);
+      tl.fromTo(["#cornerTag", "#cornerIndex"], { opacity: 0 }, { opacity: 1, duration: 0.18 }, 0);
+      T("pTitle", v.title || ""); T("pSub", v.subtitle || ""); if (!v.subtitle) $("pSub").style.display = "none";
+      const stage = $("pStage");
+      const l = el("span", "chip chip-blue ppole", stage, v.leftPole); l.style.left = "0";
+      const r = el("span", "chip chip-pink ppole", stage, v.rightPole); r.style.left = "100%";
+      const pos = Math.min(1, Math.max(0, Number(v.markerPosition) || 0.5));
+      const m = el("div", "pmark", stage); m.style.left = pos * 100 + "%";
+      const lb = el("span", "chip chip-paper plab", stage, v.markerLabel); lb.style.left = pos * 100 + "%";
+      pop(l, 0.3, -40); pop(r, 0.45, 40);
+      tl.fromTo(".paxis", { scaleX: 0 }, { scaleX: 1, duration: 0.6, ease: "power2.inOut" }, 0.6);
+      tl.fromTo(m, { opacity: 0, scale: 0.5 }, { opacity: 1, scale: 1.12, duration: 0.16 }, 1.3);
+      tl.to(m, { scale: 1, duration: 0.12 }, 1.46);
+      tl.fromTo(lb, { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.26 }, 1.6);
+      tl.to("#rootScene", { opacity: 0, duration: 0.28, ease: "power2.in" }, 5.5);
+      tl.to(["#cornerTag", "#cornerIndex"], { opacity: 0, duration: 0.28 }, 5.5);
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

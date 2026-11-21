@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "mythLabel", "type": "string", "label": "误区标签", "default": "常见误区"}, {"id": "myth", "type": "string", "label": "误区", "default": "AI 会直接替你思考"}, {"id": "factLabel", "type": "string", "label": "事实标签", "default": "更准确的说法"}, {"id": "fact", "type": "string", "label": "事实", "default": "AI 会放大你的问题定义能力"}, {"id": "caption", "type": "string", "label": "总结", "default": "重点不是替代，而是协作结构"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+*{ box-sizing: border-box; }
+html, body{ margin:0; width:1920px; height:1080px; overflow:hidden; background: var(--background, #F5F0E6); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #F5F0E6); color: var(--foreground, #1D1D20);
+  font-family:'Noto Sans SC','PingFang SC',sans-serif; }
+.scene{ position:absolute; inset:0; padding:64px 80px; }
+.card{ background:#FFFDF7; border:3px solid #1D1D20; border-radius:16px; box-shadow:6px 6px 0 #2A292B; }
+.tape{ position:absolute; width:120px; height:32px; background:rgba(185,232,51,.6); border:2px solid #1D1D20;
+  border-radius:4px; transform:rotate(-5deg); z-index:5; }
+.tape.pink{ background:rgba(241,59,136,.35); transform:rotate(4deg); }
+.tape.blue{ background:rgba(62,123,242,.3); transform:rotate(-3deg); }
+.chip{ display:inline-flex; align-items:center; gap:8px; padding:6px 14px; background:#FFFDF7; border:3px solid #1D1D20;
+  border-radius:999px; font-family:'Fredoka','Arial Rounded MT Bold',sans-serif; font-weight:700; font-size:18px;
+  letter-spacing:.1em; text-transform:uppercase; white-space:nowrap; box-shadow:4px 4px 0 #2A292B; }
+.chip.lime{ background:#B9E833; } .chip.blue{ background:#3E7BF2; color:#FFFDF7; }
+.chip.pink{ background:#F13B88; color:#FFFDF7; } .chip.orange{ background:#FF9F1C; }
+.num{ font-family:'Fredoka','Arial Rounded MT Bold',sans-serif; font-weight:700; }
+.mono{ font-family:'IBM Plex Mono','JetBrains Mono',monospace; font-weight:700; }
+.dashline{ border:none; border-top:3px dashed #1D1D20; }
+</style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene" data-start="0" data-duration="6" data-track-index="1">
+
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+          <div id="cardMyth" class="card" style="position:absolute;width:1150px;padding:56px 64px;text-align:center;">
+            <span class="tape pink" style="left:-24px;top:-16px;"></span>
+            <span class="chip orange" id="mythLabel"></span>
+            <p id="myth" class="num" style="margin:24px 0 0;font-size:48px;line-height:1.6;color:#4D4A48;text-decoration:line-through;text-decoration-color:#F13B88;text-decoration-thickness:5px;"></p>
+          </div>
+          <div id="cardFact" class="card" style="position:absolute;width:1150px;padding:56px 64px;text-align:center;background:#B9E833;transform:rotate(-3deg) scale(.6);opacity:0;">
+            <span class="tape" style="right:-24px;top:-16px;"></span>
+            <span class="chip" id="factLabel"></span>
+            <p id="fact" class="num" style="margin:24px 0 0;font-size:52px;line-height:1.6;"></p>
+          </div>
+        </div>
+        <span class="chip blue" id="caption" style="position:absolute;left:50%;bottom:60px;transform:translateX(-50%);opacity:0;"></span>
+
+      </section>
+    </div>
+    <script>
+      const fallback = {"mythLabel": "常见误区", "myth": "AI 会直接替你思考", "factLabel": "更准确的说法", "fact": "AI 会放大你的问题定义能力", "caption": "重点不是替代，而是协作结构", "accent": "#00FF00", "foreground": "#F4EFE7", "exportMode": "transparent"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.documentElement.style.setProperty("--accent", v.accent ?? "#00FF00");
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const DUR = 6;
+      const countTo = (el, target, at, dur = 1.1, dec = 0) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(target) || 0, duration: dur, ease: "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+
+      $("mythLabel").textContent = v.mythLabel; $("myth").textContent = v.myth;
+      $("factLabel").textContent = v.factLabel; $("fact").textContent = v.fact; $("caption").textContent = v.caption;
+      tl.fromTo("#cardMyth", { y: 60, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: "power3.out" }, 0.3);
+      tl.to("#cardMyth", { rotate: 4, y: -80, opacity: 0, duration: 0.5, ease: "power2.in" }, 2.6);
+      tl.to("#cardFact", { rotate: -1, scale: 1, opacity: 1, duration: 0.6, ease: "back.out(1.6)" }, 3.0);
+      tl.to("#caption", { opacity: 1, y: -8, duration: 0.4 }, 3.6);
+      tl.to(".scene", { opacity: 0, duration: 0.5 }, DUR - 0.6);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

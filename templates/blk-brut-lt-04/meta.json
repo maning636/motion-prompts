@@ -1,0 +1,16 @@
+{
+ "name": "底部跑马灯",
+ "description": "ink 底黄字通栏跑马灯：左端强调色标签块、右端 mono 落款、中间无缝匀速滚动，上下两条反向斜纹带同步滚；窗口宽度按实测文案长度反推",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "marquee",
+  "ink",
+  "loop"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "直播与短视频需要滚动播报通知、接单状态或版权落款时"
+}

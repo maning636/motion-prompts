@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-composition-variables='[{"id": "chapterNo", "type": "string", "label": "章节序号", "default": "CH.03"}, {"id": "chapterTitle", "type": "string", "label": "章节标题", "default": "转折"}, {"id": "subtitle", "type": "string", "label": "副标题", "default": "The Turning Point"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#b91c1c"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+<head>
+  <meta charset="UTF-8">
+  <title>角落小标题·皮影档案</title>
+  <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+  <style>
+    :root { --accent: #b91c1c; --ink: #0a0a0a; --paper: #faf6ed; --warm: #8b7355; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: var(--paper); color: var(--ink); font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+    .composition { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+    .layer { position: absolute; inset: 0; }
+    .l1-bg { z-index: 1; }
+    .paper-base { position: absolute; inset: 0; background: var(--paper); }
+    .paper-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(61,40,23,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(61,40,23,0.08) 1px, transparent 1px); background-size: 48px 48px; }
+    .grain-layer { position: absolute; inset: 0; background-image: url("./assets/grain.png"); background-size: 320px 320px; opacity: 0.25; mix-blend-mode: multiply; }
+    .paper-age { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 60%, rgba(61,40,23,0.18) 100%); }
+
+    /* 中央留空——主要是角落小标 */
+    .l2-content { z-index: 10; }
+
+    /* 左上小标（章节序号） */
+    .corner-chapter {
+      position: absolute; left: 100px; top: 100px;
+      padding: 12px 24px;
+      background: var(--ink);
+      color: var(--paper);
+      font-family: "Courier New", monospace;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0.4em;
+      padding-left: calc(24px + 0.4em);
+    }
+
+    /* 中央小标题（小号宋体） */
+    .corner-title {
+      position: absolute; left: 100px; top: 220px;
+      font-family: "Source Han Serif", "Songti SC", "STSong", "SimSun", serif;
+      font-size: 96px;
+      font-weight: 800;
+      color: var(--ink);
+      letter-spacing: 0.1em;
+      padding-left: 0.1em;
+      line-height: 1.1;
+    }
+    .corner-subtitle {
+      position: absolute; left: 100px; top: 380px;
+      font-family: "Source Han Serif", "Songti SC", serif;
+      font-size: 22px;
+      font-weight: 400;
+      font-style: italic;
+      color: var(--warm);
+      letter-spacing: 0.15em;
+      padding-left: 0.15em;
+    }
+
+    /* 右下角元数据卡片 */
+    .l4-emphasis { z-index: 30; pointer-events: none; }
+    .meta-card {
+      position: absolute; right: 100px; bottom: 100px;
+      padding: 24px 32px;
+      background: var(--paper);
+      border: 2px solid var(--ink);
+      box-shadow: 8px 8px 0 var(--ink);
+      font-family: "Courier New", monospace;
+      font-size: 14px;
+      line-height: 1.8;
+      color: var(--ink);
+      min-width: 240px;
+    }
+    .meta-card .accent-line {
+      position: absolute; left: -2px; top: -2px;
+      width: 40px; height: 6px;
+      background: var(--accent);
+    }
+
+    .l6-environment { z-index: 50; pointer-events: none; }
+    .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.15) 100%); }
+
+    .progress-bar { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--accent); width: 0%; z-index: 60; }
+
+    /* 初始态 */
+    .corner-chapter { opacity: 0; transform: translateX(-30px); }
+    .corner-title { opacity: 0; transform: translateX(-30px); }
+    .corner-subtitle { opacity: 0; }
+    .meta-card { opacity: 0; transform: translate(20px, 20px); }
+  </style>
+</head>
+<body>
+  <div id="composition" class="composition" data-composition-id="docu-title-corner-2026-08-31" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+    <div class="layer l1-bg">
+      <div class="paper-base"></div>
+      <div class="paper-grid"></div>
+      <div class="grain-layer"></div>
+      <div class="paper-age"></div>
+    </div>
+    <div class="layer l2-content">
+      <div class="corner-chapter" data-composition-variable="chapterNo">CH.03</div>
+      <div class="corner-title" data-composition-variable="chapterTitle">转折</div>
+      <div class="corner-subtitle" data-composition-variable="subtitle">The Turning Point</div>
+    </div>
+    <div class="layer l4-emphasis">
+      <div class="meta-card">
+        <div class="accent-line"></div>
+        DOCU · 003<br/>
+        EPISODE 03<br/>
+        REC 2026.08.31
+      </div>
+    </div>
+    <div class="layer l6-environment">
+      <div class="vignette"></div>
+    </div>
+    <div class="progress-bar"></div>
+  </div>
+  <script>
+    window.addEventListener("load", () => {
+      const vars = window.__hyperframes?.getVariables?.() || {};
+      const duration = Math.max(1, Number(vars.duration) || 6);
+      const tl = gsap.timeline({ paused: true, defaults: { ease: "power3.out" } });
+          // 注册到 window.__timelines：云渲染的 settle/逐帧定位靠它驱动时间轴。
+          // 此前有一批素材没注册，导致渲染停在第 0 帧（主体初始 opacity:0 → 整层空）。
+          // gsap 时间轴就地 mutate，先存引用即可，后续 tl.to() 作用在同一对象上。
+          window.__timelines = window.__timelines || {};
+          window.__timelines.main = tl;
+      window.__timelines = window.__timelines || {};
+      tl.to(".corner-chapter", { opacity: 1, x: 0, duration: 0.5 }, 0);
+      tl.to(".corner-title", { opacity: 1, x: 0, duration: 0.6 }, 0.2);
+      tl.to(".corner-subtitle", { opacity: 1, duration: 0.5 }, 0.5);
+      tl.to(".meta-card", { opacity: 1, x: 0, y: 0, duration: 0.6, ease: "back.out(1.2)" }, 0.8);
+      const exitAt = Math.max(1.5, duration - 0.8);
+      tl.to(".corner-subtitle", { opacity: 0, duration: 0.4 }, exitAt);
+      tl.to(".meta-card", { opacity: 0, duration: 0.4 }, exitAt);
+      tl.to(".progress-bar", { width: "100%", duration: duration, ease: "none" }, 0);
+      window.__timelines["docu-title-corner-2026-08-31"] = tl;
+      window.__hyperframes?.ready?.();
+    });
+  </script>
+</body>
+</html>

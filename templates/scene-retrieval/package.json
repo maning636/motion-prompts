@@ -1,0 +1,7 @@
+{
+  "name": "scene-retrieval",
+  "private": true,
+  "scripts": {
+    "render": "cd ../.. && npm run render -- scene-retrieval"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "scanline-annotate",
+  "name": "扫描线解读",
+  "description": "扫描线自上而下扫过画面，扫到的条目逐条点亮并弹出右侧标注解读，结尾收束为完成态。",
+  "category": "解读叙事",
+  "tags": ["解读叙事", "扫描线", "标注", "报告"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-20T00:00:00.000Z"
+}

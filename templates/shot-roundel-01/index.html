@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "name", "type": "string", "label": "锚点名称", "default": "老马"}, {"id": "role", "type": "string", "label": "锚点身份", "default": "创作者"}, {"id": "pct", "type": "string", "label": "圆环百分比", "default": "72"}, {"id": "chartLabel", "type": "string", "label": "图表说明", "default": "本周完更率"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#scA{ position:absolute; inset:0; }
+.cardA{ position:absolute; left:320px; top:400px; width:640px; height:280px; border-radius:20px;
+  background:#15151C; border:1px solid rgba(255,255,255,.12); display:flex; align-items:center; padding:0 44px; gap:34px; }
+#av{ width:170px; height:170px; border-radius:50%; flex:none;
+  background:radial-gradient(circle at 34% 28%, #3A3A4E, #22222E); border:3px solid var(--accent); }
+#avt{ font-size:30px; color:var(--fg); } #avr{ font-size:22px; color:rgba(255,255,255,.5); margin-top:10px; }
+.halo{ position:absolute; width:170px; height:170px; border-radius:50%; border:3px solid var(--accent); opacity:0; pointer-events:none; }
+#scB{ position:absolute; inset:0; background:#101016; clip-path:circle(0px at 405px 485px); }
+#scB .pnl{ position:absolute; inset:0; padding:120px; }
+#scB h3{ position:absolute; right:260px; top:430px; font-size:44px; color:var(--fg); width:500px; }
+#scB .sub{ position:absolute; right:260px; top:510px; font-size:26px; color:rgba(255,255,255,.55); width:500px; }
+#num{ position:absolute; left:405px; top:485px; transform:translate(-50%,-50%); font-size:74px; color:var(--fg);
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4.7" data-width="1920" data-height="1080">
+<div id="scA"><div class="cardA"><div id="av"></div><div><div id="avt"></div><div id="avr"></div></div></div><div class="halo" id="h1" style="left:364px;top:455px"></div><div class="halo" id="h2" style="left:364px;top:455px"></div></div><div id="scB"><div class="pnl"><svg width="1920" height="1080" viewBox="0 0 1920 1080" style="position:absolute;inset:0"><circle cx="405" cy="485" r="170" fill="none" stroke="#22222E" stroke-width="38"/><circle id="swp" cx="405" cy="485" r="170" fill="none" stroke="#00FF00" stroke-width="38" stroke-linecap="round" transform="rotate(-90 405 485)"/></svg><div id="num">0%</div><h3 id="cl"></h3><div class="sub">头像的圆变成数据的圆 · 这个人 → 这个人的本周</div></div></div>
+    </div>
+    <script>
+      const FB = {"name": "老马", "role": "创作者", "pct": "72", "chartLabel": "本周完更率", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#avt').textContent=v.name||'';$('#avr').textContent=v.role||'';$('#cl').textContent=v.chartLabel||'';
+// 定睛引导：锚点两次放大脉冲 + 两道扩散光环（30f）
+tl.to('#av',{scale:1.15,duration:F(6),yoyo:true,repeat:1,ease:'power2.out'},F(2));
+tl.to('#av',{scale:1.15,duration:F(6),yoyo:true,repeat:1,ease:'power2.out'},F(14));
+['#h1','#h2'].forEach((h,i)=>{
+  tl.fromTo(h,{opacity:.8,scale:1},{opacity:0,scale:2.2,duration:F(14),ease:'power2.out'},F(2+i*10));
+});
+// 光圈扩张 22→2100px（45f inOut）从圆心炸开；圆环同心中途接圆生长
+const ir={r:22};
+tl.to(ir,{r:2100,duration:F(45),ease:'power2.inOut',onUpdate:()=>{
+  $('#scB').style.clipPath='circle('+ir.r+'px at 405px 485px)';
+}},F(30));
+// 圆环 sweep 45-100f 到目标值，数字同步计数
+const C=2*Math.PI*170, pct=parseFloat(v.pct||'72')/100;
+$('#swp').style.strokeDasharray=C; $('#swp').style.strokeDashoffset=C;
+const sw={p:0};
+tl.to(sw,{p:pct,duration:F(55),ease:'power2.inOut',onUpdate:()=>{
+  $('#swp').style.strokeDashoffset=C*(1-sw.p);
+  $('#num').textContent=Math.round(sw.p*100)+'%';
+}},F(45));
+tl.to({},{duration:F(40)},F(100)); // 真静止 ≥40f
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

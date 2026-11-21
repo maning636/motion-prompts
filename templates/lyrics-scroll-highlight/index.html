@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "lyrics", "type": "string", "label": "歌词（逗号分隔逐句）", "default": "把问题写在风里,答案长在路上,别急着一个一个解开,时间会给每行字落款,你只管往前走,回头看时全是注脚"}, {"id": "accent", "type": "color", "label": "高亮色", "default": "#00FF00"}, {"id": "lineHeight", "type": "number", "label": "行高(px)", "default": 64}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #0B0C0B; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #F2EFE7; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      .lsh-head{ position: absolute; left: 90px; top: 76px; font-size: 20px; letter-spacing: .34em;
+        color: rgba(242,239,231,.45); z-index: 6; }
+      .lsh-wrap{ position: absolute; left: 50%; top: 54%; transform: translate(-50%,-50%); width: 1240px; height: 430px;
+        overflow: hidden;
+        -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 78%, transparent 100%);
+        mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 78%, transparent 100%); }
+      .lsh-lines{ position: absolute; left: 0; top: 0; width: 100%; will-change: transform; }
+      .lsh-line{ height: var(--lh, 64px); line-height: var(--lh, 64px); text-align: center; font-size: 38px;
+        color: rgba(242,239,231,.42); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .lsh-line.near{ color: rgba(242,239,231,.68); }
+      .lsh-line.cur{ color: var(--ac); font-weight: 800; transform: scale(1.12);
+        text-shadow: 0 0 34px var(--acGlow); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="lsh-head mono">LYRICS · SCROLL HIGHLIGHT</div>
+      <div class="lsh-wrap" id="wrap"><div class="lsh-lines" id="lines"></div></div>
+
+    </div>
+    <script>
+      const fallback = {"lyrics": "把问题写在风里,答案长在路上,别急着一个一个解开,时间会给每行字落款,你只管往前走,回头看时全是注脚", "accent": "#00FF00", "lineHeight": 64, "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      const hexRgb = (h) => { const m = String(h || "#00FF00").replace("#", "");
+        const v = (m.length === 3 ? m.split("").map((c) => c + c).join("") : m).padEnd(6, "0").slice(0, 6);
+        const n = parseInt(v, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+      const [ar, ag, ab] = hexRgb(V.accent);
+      document.documentElement.style.setProperty("--ac", V.accent ?? "#00FF00");
+      document.documentElement.style.setProperty("--acGlow", "rgba(" + ar + "," + ag + "," + ab + ",.35)");
+      const lh = Math.max(40, Number(V.lineHeight) || 64);
+      document.documentElement.style.setProperty("--lh", lh + "px");
+      const lines = split(V.lyrics);
+      const linesEl = $("lines");
+      lines.forEach((t) => {
+        const d = document.createElement("div");
+        d.className = "lsh-line";
+        d.textContent = t;
+        linesEl.appendChild(d);
+      });
+      const lineEls = Array.from(linesEl.children);
+      const N = Math.max(lines.length, 1), SCENE = 5.2, LINE_T = 1.8, WIN = 430;
+      let curL = -1;
+      const master = { p: 0 };
+      const applyFrame = () => {
+        const t = master.p * SCENE;
+        const posL = Math.min(t / LINE_T, N - 1);
+        linesEl.style.transform = "translateY(" + (WIN / 2 - lh / 2 - posL * lh) + "px)";
+        const c = Math.round(posL);
+        if (c !== curL) {
+          lineEls.forEach((el, i) => {
+            el.classList.toggle("cur", i === c);
+            el.classList.toggle("near", Math.abs(i - c) === 1);
+          });
+          curL = c;
+        }
+      };
+      tl.fromTo([".lsh-head", "#wrap"], { opacity: 0 }, { opacity: 1, duration: 0.6 }, 0);
+      tl.to(master, { p: 1, duration: SCENE, ease: "none", onUpdate: applyFrame }, 0.4);
+      applyFrame();
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

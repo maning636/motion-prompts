@@ -1,0 +1,12 @@
+{
+  "title": "转场、轮播、产品展示",
+  "subtitle": "都是一句话",
+  "mediaTL": "./assets/bar-chart-grow.webm",
+  "mediaTR": "./assets/number-counter.webm",
+  "mediaBL": "./assets/simple-flow-chart.webm",
+  "mediaBR": "./assets/pull-quote-hero.webm",
+  "scaleTL": 0.5,
+  "scaleTR": 0.5,
+  "scaleBL": 0.5,
+  "scaleBR": 0.5
+}

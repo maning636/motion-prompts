@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"eyebrow","name":"眉标","type":"string","label":"顶部眉标","default":"RANKING / 本季"},
+  {"id":"title","name":"主标题","type":"string","label":"主标题","default":"卖得最狠的五件"},
+  {"id":"note","name":"注释","type":"string","label":"右上角注释","default":"单位：件"},
+  {"id":"r1Name","name":"第一名","type":"string","label":"第一名 · 名称","default":"手冲咖啡壶"},
+  {"id":"r1Val","name":"第一名数值","type":"number","label":"第一名 · 数值","default":"4820"},
+  {"id":"r2Name","name":"第二名","type":"string","label":"第二名 · 名称","default":"折叠晾衣架"},
+  {"id":"r2Val","name":"第二名数值","type":"number","label":"第二名 · 数值","default":"3610"},
+  {"id":"r3Name","name":"第三名","type":"string","label":"第三名 · 名称","default":"桌面绿植"},
+  {"id":"r3Val","name":"第三名数值","type":"number","label":"第三名 · 数值","default":"2740"},
+  {"id":"r4Name","name":"第四名","type":"string","label":"第四名 · 名称","default":"手工皂礼盒"},
+  {"id":"r4Val","name":"第四名数值","type":"number","label":"第四名 · 数值","default":"1980"},
+  {"id":"r5Name","name":"第五名","type":"string","label":"第五名 · 名称","default":"棉麻围裙"},
+  {"id":"r5Val","name":"第五名数值","type":"number","label":"第五名 · 数值","default":"1130"}
+]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>积木排行 · TOP5</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  html,body{background:var(--ink)}
+  #stage{width:1920px;height:1080px;background:var(--paper);color:var(--ink);
+        font-family:var(--sans);padding:64px 72px 0;display:flex;flex-direction:column;overflow:hidden;position:relative}
+  .top{display:flex;align-items:flex-end;justify-content:space-between;gap:40px;flex:0 0 auto}
+  .top h1{font-size:60px;font-weight:900;line-height:1.05;margin-top:8px;letter-spacing:-.01em}
+  .note{font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:.1em;
+        border:3px solid var(--ink);border-radius:9999px;padding:9px 20px;
+        background:var(--white);box-shadow:4px 4px 0 var(--ink);white-space:nowrap}
+
+  .board{flex:1 1 auto;display:flex;flex-direction:column;gap:16px;margin-top:34px;min-height:0}
+  .row{flex:1 1 0;display:flex;align-items:stretch;gap:20px;min-height:0}
+
+  /* 名次牌：方块 + 硬阴影，尺寸恒定，靠底色区分名次 */
+  .rk{width:96px;display:flex;align-items:center;justify-content:center;
+      border:3px solid var(--ink);border-radius:4px;font-size:46px;
+      box-shadow:5px 5px 0 var(--ink)}
+
+  /* 名称：纸底 + 左侧粗竖线，不加边框，五行连看才不吵 */
+  .nm{flex:0 0 268px;display:flex;flex-direction:column;justify-content:center;
+      gap:4px;padding-left:16px;border-left:8px solid var(--ink);min-width:0}
+  .nm .t{font-weight:900;font-size:31px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .nm .s{font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.14em;color:var(--mute)}
+
+  /* 进度条：底槽永远是纸+斜纹，填充永远是实色。剩下的长度靠纹理说话，
+     跟填充色深浅无关——第 5 名不会被"洗"成一个空盒子。 */
+  .bar{flex:1 1 auto;position:relative;min-width:0;overflow:hidden;
+       border:3px solid var(--ink);border-radius:4px;box-shadow:5px 5px 0 var(--ink);
+       display:flex;align-items:stretch}
+  .bar .fill{position:absolute;left:0;top:0;bottom:0;width:0}
+  .bar .vl{position:relative;z-index:2;margin-left:auto;padding:0 22px;font-size:38px;
+           background:var(--ink);color:var(--paper);
+           display:flex;align-items:center;justify-content:flex-end}
+  /* 填充右端压一条近黑竖线，填充到哪一眼能看清，不靠颜色深浅猜 */
+  .bar .fill::after{content:"";position:absolute;right:-3px;top:0;bottom:0;width:6px;background:var(--ink)}
+
+  .f1{background:var(--yellow)} .f2{background:var(--pink)} .f3{background:var(--blue)}
+  .f4{background:var(--green)} .f5{background:var(--orange)}
+  /* 名次牌统一用近黑字。k2 原来是白字印粉底（2.83:1）、
+     k3 白字印蓝底（3.84:1）——46px 的字按 WCAG 大字标准要 3.0:1，
+     粉底那一档没过。而近黑字印粉底是 6.76:1、印蓝底 5.00:1，都稳过。 */
+  .k1{background:var(--yellow)} .k2{background:var(--pink)}
+  .k3{background:var(--blue)} .k4{background:var(--green)}
+  .k5{background:var(--orange)}
+
+  .stripe{flex:0 0 auto;height:18px;border-top:3px solid var(--ink);border-bottom:3px solid var(--ink);
+          background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--yellow)10px 20px)}
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="top">
+    <div>
+      <div class="blk-eyebrow" id="eyebrow">RANKING / 本季</div>
+      <h1 id="title" data-fit-max="60" data-fit-min="34">卖得最狠的五件</h1>
+    </div>
+    <div class="note" id="note">单位：件</div>
+  </div>
+
+  <div class="board" id="board"></div>
+  <div class="stripe"></div>
+  <div class="blk-corner tl"></div><div class="blk-corner tr"></div>
+  <div class="blk-corner bl"></div><div class="blk-corner br"></div>
+</div>
+
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  // 兜底值直接来自 HTML 上的 data-composition-variables（B.vars 会自己读），
+  // 不用在 JS 里再抄一遍——上一轮就是抄漏了导致本地渲染时整块颜色失效。
+  var v = B.vars();
+  function set(id, val) { var e = document.getElementById(id); if (e && val != null && val !== '') e.textContent = val; }
+  set('eyebrow', v.eyebrow); set('title', v.title); set('note', v.note);
+
+  var rows = [
+    { n: v.r1Name, v: +v.r1Val, c: 1, s: 'TOP 1' },
+    { n: v.r2Name, v: +v.r2Val, c: 2, s: 'TOP 2' },
+    { n: v.r3Name, v: +v.r3Val, c: 3, s: 'TOP 3' },
+    { n: v.r4Name, v: +v.r4Val, c: 4, s: 'TOP 4' },
+    { n: v.r5Name, v: +v.r5Val, c: 5, s: 'TOP 5' }
+  ];
+  rows.forEach(function (r) { if (!isFinite(r.v) || r.v < 0) r.v = 0; r.n = r.n || '—'; });
+  var max = Math.max.apply(null, rows.map(function (r) { return r.v; })) || 1;
+
+  var board = document.getElementById('board'), html = '';
+  rows.forEach(function (r, i) {
+    r.pct = r.v > 0 ? Math.max(3, (r.v / max) * 100) : 0;
+    html += '<div class="row" id="row' + i + '">'
+      + '<div class="blk-rank rk k' + r.c + '" id="rk' + i + '">' + (i + 1) + '</div>'
+      + '<div class="nm"><span class="t" id="nm' + i + '">' + r.n + '</span>'
+      + '<span class="s">' + r.s + '</span></div>'
+      + '<div class="bar blk-track" id="bar' + i + '">'
+      + '<div class="blk-fill f' + r.c + '" id="fill' + i + '"></div>'
+      + '<span class="vl" id="vl' + i + '">0</span>'
+      + '</div></div>';
+  });
+  board.innerHTML = html;
+
+  rows.forEach(function (r, i) {
+    B.fit('#nm' + i, { max: 31, min: 17 });
+    B.fit('#vl' + i, { max: 38, min: 20 });
+  });
+  B.fit('#title', { max: 60, min: 34 });
+  B.fit('#note',  { max: 15, min: 11 });
+
+  var tl = B.tl();
+  tl.from('#title', { y: 16, opacity: 0, duration: 0.4, ease: 'power2.out' }, 0.05);
+  tl.from('.note', { x: 24, opacity: 0, duration: 0.4, ease: 'back.out(2)' }, 0.2);
+
+  rows.forEach(function (r, i) {
+    var at = 0.30 + i * 0.18;
+    B.in.drop(tl, '#row' + i, at, { dist: 54, rot: i % 2 ? 1.2 : -1.2, d: 0.42 });
+    // 填充条从 0 长到占比。必须动 width——早先用 wipe() 改 clip-path，
+    // 可 fill 元素自身宽度是 0，clip 改得再对也还是一条看不见的条子，
+    // 而 ink/字节数/YSTD 全部判它正常。
+    B.in.grow(tl, '#fill' + i, r.pct + '%', at + 0.14, { d: 0.5 });
+    B.countUp(tl, '#vl' + i, r.v, at + 0.14, 0.5);
+    B.in.press(tl, '#rk' + i, at + 0.48, { sh: '5px 5px 0 var(--ink)' });
+  });
+
+  tl.from('.stripe', { scaleX: 0, transformOrigin: 'left center', duration: 0.5, ease: 'power3.inOut' }, 0.9);
+  B.finish(tl);   // 角标收尾：只增不减，保证 settle 落在所有数字滚完之后
+  B.hold(tl);
+})();
+</script>
+</body></html>

@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "noun", "type": "string", "label": "名词", "default": "AI"}, {"id": "verbs", "type": "string", "label": "动词(逗号分隔)", "default": "调研,构建,编码,交付"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#filmWrap{ position:absolute; left:90px; top:0; width:860px; height:1080px; overflow:hidden; }
+#film{ position:absolute; left:0; top:275px; width:860px; will-change:transform; }
+.fc{ width:860px; height:530px; padding:60px; }
+.fc.dk{ background:#17181D; }
+.fc.lt{ background:#E8E8E2; }
+.fc .k{ font-size:20px; letter-spacing:6px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+.fc.dk .k{ color:var(--accent); }
+.fc.lt .k{ color:#3A7D44; }
+.fc .r{ height:16px; border-radius:8px; margin-top:30px; }
+.fc.dk .r{ background:rgba(255,255,255,.14); }
+.fc.lt .r{ background:rgba(0,0,0,.14); }
+#words{ position:absolute; left:1080px; top:0; width:760px; height:1080px; }
+#noun{ position:absolute; left:0; top:398px; font-size:130px; font-weight:700;
+  font-family:'Noto Serif SC','Source Han Serif SC','SimSun',serif; }
+.vb{ position:absolute; left:0; top:560px; font-size:88px; font-weight:400;
+  font-family:'Noto Serif SC','Source Han Serif SC','SimSun',serif; opacity:0; }
+#align{ position:absolute; left:80px; right:80px; top:539px; height:2px;
+  background:color-mix(in srgb, var(--accent) 35%, transparent); opacity:.4; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5.7" data-width="1920" data-height="1080">
+
+<div id="filmWrap"><div id="film">
+  <div class="fc dk"><div class="k">EVIDENCE 01</div>
+    <div class="r" style="width:60%"></div><div class="r" style="width:45%"></div><div class="r" style="width:52%"></div></div>
+  <div class="fc lt"><div class="k">EVIDENCE 02</div>
+    <div class="r" style="width:55%"></div><div class="r" style="width:48%"></div><div class="r" style="width:40%"></div></div>
+  <div class="fc dk"><div class="k">EVIDENCE 03</div>
+    <div class="r" style="width:58%"></div><div class="r" style="width:42%"></div><div class="r" style="width:50%"></div></div>
+  <div class="fc lt"><div class="k">EVIDENCE 04</div>
+    <div class="r" style="width:52%"></div><div class="r" style="width:56%"></div><div class="r" style="width:44%"></div></div>
+</div></div>
+<div id="words"><div id="noun"></div></div>
+
+    </div>
+    <script>
+      const FB = {"noun": "AI", "verbs": "调研,构建,编码,交付", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#noun').textContent=v.noun||'AI';
+const VERBS=(v.verbs||'调研,构建,编码,交付').split(',');
+const wordsBox=$('#words');
+const vEls=VERBS.map(wd=>{
+  const s=document.createElement('div'); s.className='vb'; s.textContent=wd;
+  wordsBox.appendChild(s); return s;
+});
+const film=$('#film');
+const PERIOD=40, T0=15, SCROLL=12, CARD=530;
+function cl(x){return Math.max(0,Math.min(1,x));}
+const sim={f:0};
+function paint(){
+  const f=sim.f;
+  // 步进滚动：只在切词窗口 ease-in-out 滚一卡高，其余零位移
+  let k=0, sp=0;
+  for(let t=1;t<VERBS.length;t++){
+    const a=T0+t*PERIOD; // 切词窗口起点
+    if(f>=a+SCROLL){k=t;sp=0;}
+    else if(f>=a){k=t-1;sp=cl((f-a)/SCROLL);sp=sp<.5?2*sp*sp:1-Math.pow(-2*sp+2,2)/2;break;}
+    else{k=t-1;sp=0;break;}
+  }
+  film.style.transform='translateY('+(-(k+sp)*CARD).toFixed(1)+'px)';
+  // 词接力：旧词 5f 灰化淡出 → 新词 7f 落位，先出后进不叠影
+  vEls.forEach((el,i)=>{
+    const a=T0+i*PERIOD;
+    let op=0, gray=0;
+    if(i===0&&f>=T0){op=cl((f-T0)/7);}
+    else if(i>0){op=cl((f-(a+5))/7);}
+    if(f>=a+PERIOD&&i<VERBS.length-1){ // 旧词退场
+      const q=cl((f-a-PERIOD)/5);
+      op=1-q; gray=q;
+    }
+    el.style.opacity=op.toFixed(3);
+    const c=Math.round(232-(232-110)*gray);
+    el.style.color='rgb('+c+','+c+','+c+')';
+  });
+}
+paint();
+tl.to(sim,{f:171,duration:F(171),ease:'none',onUpdate:paint},0);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

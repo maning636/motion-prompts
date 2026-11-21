@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（本期讲法标签）","default":"先拆条"},
+{"id":"title","name":"主标题","type":"string","label":"主标题（8–16 字）","default":"同样一件事，两种做法差在哪"},
+{"id":"leftLabel","name":"左标","type":"string","label":"被抽走那块的标签（2–6 字）","default":"常见做法"},
+{"id":"leftText","name":"左文","type":"string","label":"被抽走那块的正文（6–14 字）","default":"先做一遍再回头改"},
+{"id":"rightLabel","name":"右标","type":"string","label":"塞进来那块的标签（2–6 字）","default":"正确做法"},
+{"id":"rightText","name":"右文","type":"string","label":"塞进来那块的正文（6–14 字）","default":"先定稿再动手做"},
+{"id":"accent","name":"强调色","type":"color","label":"强调色（正确做法块底 / 凸点亮起色 / 分隔方块描边）","default":"#FFD429"},
+{"id":"brickColor","name":"配色包","type":"enum","label":"配色包（正确做法块的面色）","default":"mixed","options":[{"value":"yellow","label":"暖黄"},{"value":"pink","label":"桃粉"},{"value":"green","label":"薄荷"},{"value":"blue","label":"靛蓝"},{"value":"mixed","label":"四色轮转"}]},
+{"id":"entry","name":"入场母题","type":"enum","label":"入场母题（正确做法块从哪一侧塞进来）","default":"pushup","options":[{"value":"slam","label":"自上塞入"},{"value":"pushup","label":"自下塞入"},{"value":"rail","label":"左轨推入"}]},
+{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–6）","default":5.5},
+{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}
+]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>抽换对照双块</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 积木风 · 知识口播 · 抽换对照
+     左边「常见做法」块被向上抽走的同时，右边「正确做法」块从下方塞进同一卡位，
+     接缝处落下一枚 52px 白底方块当分隔。块宽只用 720 / 240，块高只用 120 / 360。 */
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --mod:240px; --mod-h:120px; --shadow:#0F0F0F; --background:var(--paper); --accent:#FFD429;
+  }
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--background);color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased}
+  .blk-noise{background-image:radial-gradient(rgba(15,15,15,.12) 1px,transparent 1px);
+    background-size:10px 10px}
+  .sh-s{box-shadow:4px 4px 0 var(--shadow)}
+  .sh-l{box-shadow:8px 8px 0 var(--shadow)}
+
+  .promo{position:absolute;left:0;top:0;width:1920px;height:56px;display:flex;
+    align-items:center;justify-content:space-between;padding:0 72px;
+    background:var(--ink);color:var(--white);font-family:var(--mono);
+    font-size:24px;font-weight:700;letter-spacing:.14em}
+  .promo .pc{color:var(--accent)}
+
+  .head{position:absolute;left:600px;top:120px;width:720px;display:flex;
+    flex-direction:column;gap:12px}
+  .head .eb{font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:.14em;
+    color:var(--ink);white-space:nowrap}
+  .head .ti{font-size:60px;font-weight:900;line-height:1.2;letter-spacing:0;
+    color:var(--ink);white-space:nowrap}
+
+  /* 卡位：两个块共用同一个 720×360 的槽位，先后占用 */
+  .slot{position:absolute;left:600px;top:330px;width:720px;height:360px}
+  .card{position:absolute;left:0;top:0;width:720px;height:360px;display:flex;
+    flex-direction:column;justify-content:center;gap:24px;padding:0 32px;
+    border:var(--bw) solid var(--ink);border-radius:4px;box-shadow:8px 8px 0 var(--shadow)}
+  .card .lb{font-family:var(--mono);font-size:28px;font-weight:700;letter-spacing:.14em;
+    color:inherit;white-space:nowrap}
+  .card .tx{font-size:56px;font-weight:900;line-height:1.2;letter-spacing:0;
+    color:inherit;white-space:nowrap}
+
+  /* 接缝分隔：52×52 白底方块，落定后压 2 帧 */
+  .seam{position:absolute;left:934px;top:484px;width:52px;height:52px;
+    background:var(--white);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:4px 4px 0 var(--shadow)}
+
+  .studbar{position:absolute;left:840px;top:736px;width:240px;height:60px}
+
+  .foot{position:absolute;left:0;bottom:0;width:1920px;height:64px;display:flex;
+    align-items:center;justify-content:space-between;padding:0 72px;
+    background:var(--ink);color:var(--white);font-family:var(--mono);
+    font-size:26px;font-weight:700;letter-spacing:.1em}
+  .foot em{font-style:normal;color:var(--accent)}
+  .divline{position:absolute;left:0;bottom:64px;width:1920px;height:20px;
+    border-top:3px solid var(--ink);border-bottom:3px solid var(--ink);
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="promo">
+    <span class="pc">BRICK / 积木风</span>
+    <span>误区抽换 · 同一卡位换块</span>
+  </div>
+
+  <div class="head" id="head">
+    <span class="eb" id="eyebrow" data-fit-max="30" data-fit-min="16">先拆条</span>
+    <h1 class="ti" id="title" data-fit-max="60" data-fit-min="28">同样一件事，两种做法差在哪</h1>
+  </div>
+
+  <div class="slot" id="slot">
+    <div class="card" id="old" style="background:#FFFFFF">
+      <span class="lb" id="leftLabel" data-fit-max="28" data-fit-min="16">常见做法</span>
+      <p class="tx" id="leftText" data-fit-max="56" data-fit-min="24">先做一遍再回头改</p>
+    </div>
+    <div class="card" id="new">
+      <span class="lb" id="rightLabel" data-fit-max="28" data-fit-min="16">正确做法</span>
+      <p class="tx" id="rightText" data-fit-max="56" data-fit-min="24">先定稿再动手做</p>
+    </div>
+  </div>
+
+  <div class="seam" id="seam"></div>
+
+  <div class="studbar" id="studbar">
+    <svg width="240" height="60" viewBox="0 0 240 60" fill="none" aria-hidden="true">
+      <circle class="sc" id="c1" cx="60"  cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+      <circle class="sc" id="c2" cx="180" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/>
+    </svg>
+  </div>
+
+  <div class="divline"></div>
+  <div class="foot">
+    <span>KB / 知识口播</span>
+    <span id="meta">对照 1 组 · 换位 1 次 · 凸点 2</span>
+  </div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+  ['eyebrow', 'title', 'leftLabel', 'leftText', 'rightLabel', 'rightText']
+    .forEach(function (k) { set(k, v[k]); });
+
+  var rs = document.documentElement.style;
+  if (v.accent) rs.setProperty('--accent', v.accent);
+  var ACC = v.accent || '#FFD429';
+
+  /* 配色包只决定「正确做法」块的面色；被抽走那块恒为白块，白块不占彩色块名额 */
+  var PACK = {
+    yellow: '#FFD429', pink: '#FF5FA2', green: '#2FD07A',
+    blue: '#3D7BFF', mixed: '#FFD429'
+  };
+  function inkOn(hex) {
+    var h = String(hex || '').replace('#', '');
+    if (h.length !== 6) return '#0F0F0F';
+    var f = function (c) { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    var L = 0.2126 * f(parseInt(h.slice(0, 2), 16)) +
+            0.7152 * f(parseInt(h.slice(2, 4), 16)) +
+            0.0722 * f(parseInt(h.slice(4, 6), 16));
+    return L > 0.42 ? '#0F0F0F' : '#FFFFFF';
+  }
+  var face = PACK[v.brickColor] || PACK.mixed;
+  var newCard = document.getElementById('new');
+  if (newCard) {
+    newCard.style.background = face;
+    ['lb', 'tx'].forEach(function (c) {
+      var t = newCard.querySelector('.' + c);
+      if (t) t.style.color = inkOn(face);
+    });
+  }
+  var oldCard = document.getElementById('old');
+  if (oldCard) {
+    ['lb', 'tx'].forEach(function (c) {
+      var t = oldCard.querySelector('.' + c);
+      if (t) t.style.color = '#0F0F0F';
+    });
+  }
+
+  /* 派生量：对照组数 / 换位次数 / 凸点枚数 */
+  var studs = [].slice.call(document.querySelectorAll('#studbar .sc'));
+  var meta = document.getElementById('meta');
+  if (meta) {
+    meta.innerHTML = '对照 <em>1</em> 组 · 换位 <em>1</em> 次 · 凸点 <em>' + studs.length + '</em>';
+  }
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：抽换是最典型的 reduced-motion 场景，整段撤掉；
+       终态直接给「正确做法」块，被抽走那块撤出画面，只留 ≤8px 微位移淡入。 */
+    gsap.set('#head', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#new',  { x: 0, y: 0, opacity: 1, boxShadow: '8px 8px 0 #0F0F0F' });
+    gsap.set('#seam', { x: 0, y: 0, opacity: 1, boxShadow: '4px 4px 0 #0F0F0F' });
+    gsap.set('#studbar', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#old', { visibility: 'hidden' });
+    if (studs.length) gsap.set(studs, { attr: { fill: ACC } });
+    tl.fromTo('#head',   { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .55, ease: 'power3.out' }, 0);
+    tl.fromTo('#slot',   { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .60, ease: 'power3.out' }, .16);
+    tl.fromTo('#studbar',{ opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .45, ease: 'power3.out' }, .30);
+    B.hold(tl, 1.15, 1.05);
+    return;
+  }
+
+  var stageRect = document.getElementById('stage').getBoundingClientRect();
+  var promoEl = document.querySelector('.promo');
+  var CEIL = promoEl ? Math.round(promoEl.getBoundingClientRect().bottom - stageRect.top) : 0;
+  function topOf(sel) {
+    var el = document.querySelector(sel);
+    return el ? el.getBoundingClientRect().top - stageRect.top : 0;
+  }
+  /* 入场起点一律按实测盒子贴到画布对应边上，任何时刻都不越框 */
+  function fromEdge(sel, m) {
+    var el = document.querySelector(sel);
+    if (!el) return { x: 0, y: 0 };
+    var r = el.getBoundingClientRect();
+    if (m === 'pushup') return { x: 0, y: Math.round(stageRect.bottom - r.bottom) };
+    if (m === 'rail')   return { x: Math.round(stageRect.left - r.left), y: 0 };
+    return { x: 0, y: Math.round(CEIL - (r.top - stageRect.top)) };
+  }
+
+  /* 眉标 / 主标题直落 */
+  tl.fromTo('#head', { y: CEIL - Math.round(topOf('#head')) },
+    { y: 0, duration: 0.26, ease: 'power4.out' }, 0.00);
+
+  /* 常见做法块自桌沿下方砸进卡位 */
+  tl.fromTo('#old', fromEdge('#old', 'slam'),
+    { x: 0, y: 0, duration: 0.26, ease: 'power4.out' }, 0.30);
+  tl.set('#old', { boxShadow: '8px 11px 0 #0F0F0F', immediateRender: false }, 0.56);
+  tl.to('#old', { boxShadow: '8px 8px 0 #0F0F0F', duration: 0.04, ease: 'steps(2)' }, 0.60);
+
+  /* 式 3 抽换：旧块向上抽走（加速离画，不减速），
+     同一拍里新块从下方塞进同一卡位。旧块抽到贴住画布上沿即撤出画面。 */
+  tl.fromTo('#old', { y: 0 }, { y: CEIL - Math.round(topOf('#old')), duration: 0.24, ease: 'power3.in' }, 1.60);
+  tl.set('#old', { visibility: 'hidden', immediateRender: false }, 1.86);
+
+  var mode = v.entry || 'pushup';
+  tl.fromTo('#new', fromEdge('#new', mode),
+    { x: 0, y: 0, duration: 0.26, ease: 'power4.out' }, 1.72);
+  tl.set('#new', { boxShadow: '8px 11px 0 #0F0F0F', immediateRender: false }, 1.98);
+  tl.to('#new', { boxShadow: '8px 8px 0 #0F0F0F', duration: 0.04, ease: 'steps(2)' }, 2.02);
+
+  /* 接缝处落下一枚 52px 白底方块当分隔，落定压 2 帧 */
+  tl.fromTo('#seam', { y: CEIL - Math.round(topOf('#seam')) },
+    { y: 0, duration: 0.24, ease: 'power4.out' }, 2.30);
+  tl.set('#seam', { boxShadow: '4px 7px 0 #0F0F0F', immediateRender: false }, 2.54);
+  tl.to('#seam', { boxShadow: '4px 4px 0 #0F0F0F', duration: 0.04, ease: 'steps(2)' }, 2.58);
+
+  /* 凸点阵逐枚硬切亮起（式 8，单枚间隔 ≥0.12s） */
+  tl.set(studs, { attr: { fill: '#FFFFFF' }, immediateRender: false }, 2.76);
+  studs.forEach(function (c, i) {
+    tl.set(c, { attr: { fill: ACC }, immediateRender: false }, 2.80 + i * 0.14);
+  });
+
+  var introEnd = tl.duration();
+  var TOTAL = Math.min(6, Math.max(5, Number(v.duration) || 5.5));
+  var holdAt = Math.min(introEnd, TOTAL - 0.8);
+  B.hold(tl, holdAt, Math.max(0.8, TOTAL - holdAt));
+})();
+</script>
+</body></html>

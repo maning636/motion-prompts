@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#stage{ position:absolute; inset:0; }
+#title{ position:absolute; left:960px; top:270px; translate:-50% -50%; font-size:110px; font-weight:900;
+  will-change:transform; }
+#title em{ color:var(--accent); font-style:normal; }
+#cards{ position:absolute; left:360px; top:520px; display:flex; gap:36px; }
+.dc{ width:264px; height:180px; border-radius:16px; background:color-mix(in srgb, var(--fg) 7%, transparent);
+  border:2px solid color-mix(in srgb, var(--fg) 20%, transparent); padding:26px; will-change:transform; }
+.dc .t{ font-size:26px; font-weight:800; }
+.dc .l{ margin-top:14px; height:10px; border-radius:5px; background:color-mix(in srgb, var(--fg) 25%, transparent); }
+.dc.hot{ border-color:var(--accent); }
+.dc.hot .t{ color:var(--accent); }
+#side{ position:absolute; right:0; top:200px; width:340px; height:680px; border-radius:20px 0 0 20px;
+  background:color-mix(in srgb, var(--accent) 12%, transparent);
+  border-left:3px solid var(--accent); padding:36px 30px; will-change:transform; }
+#side .h{ font-size:28px; font-weight:800; color:var(--accent); }
+#side .r{ margin-top:22px; height:12px; border-radius:6px; background:color-mix(in srgb, var(--fg) 26%, transparent); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5.0" data-width="1920" data-height="1080">
+
+<div id="stage">
+  <div id="title">连锁<em>入场</em></div>
+  <div id="cards">
+    <div class="dc"><div class="t">第一步</div><div class="l" style="width:80%"></div><div class="l" style="width:55%"></div></div>
+    <div class="dc"><div class="t">第二步</div><div class="l" style="width:70%"></div><div class="l" style="width:62%"></div></div>
+    <div class="dc"><div class="t">第三步</div><div class="l" style="width:85%"></div><div class="l" style="width:48%"></div></div>
+    <div class="dc hot" id="lastCard"><div class="t">撞进去</div><div class="l" style="width:76%"></div><div class="l" style="width:58%"></div></div>
+  </div>
+  <div id="side"><div class="h">侧边栏进场</div><div class="r" style="width:88%"></div><div class="r" style="width:70%"></div><div class="r" style="width:80%"></div><div class="r" style="width:52%"></div></div>
+</div>
+
+    </div>
+    <script>
+      const FB = {"accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+const stage=$('#stage');
+gsap.set('#title',{y:-320});
+gsap.set('#side',{x:420});
+gsap.set('#lastCard',{rotate:-3});
+// 标题竖砸 f0-14
+tl.to('#title',{y:0,duration:F(14),ease:'power2.in'},0);
+// 撞击震动 4f 衰减序列（幅度 10）
+const shk={a:0};
+tl.to(shk,{a:1,duration:F(4),ease:'none',onUpdate:()=>{
+  const seq=[10,-6,3,-1.2,0];
+  const i=Math.min(4,Math.floor(shk.a*5));
+  stage.style.transform='translateY('+seq[i]+'px)';
+}},F(14));
+tl.set(stage,{clearProps:'transform'},F(19));
+// 卡片依次弹起 60px 抛物线 12f，隔 5f（动量来自标题砸落）
+const cards=document.querySelectorAll('.dc');
+cards.forEach((c,i)=>{
+  const st=14+i*5;
+  tl.to(c,{y:-60,duration:F(6),ease:'power2.out'},F(st));
+  tl.to(c,{y:0,duration:F(6),ease:'power2.in'},F(st+6));
+});
+// 末卡落地 f44 → 侧边栏横滑进场（方向继承：末卡歪 3° 给出横向）
+tl.to('#side',{x:0,duration:F(12),ease:'power3.out'},F(44));
+const shk2={a:0};
+tl.to(shk2,{a:1,duration:F(4),ease:'none',onUpdate:()=>{
+  const seq=[6,-3.6,1.8,-0.7,0];
+  const i=Math.min(4,Math.floor(shk2.a*5));
+  stage.style.transform='translateX('+seq[i]+'px)';
+}},F(56));
+tl.set(stage,{clearProps:'transform'},F(61));
+// 收尾真静止
+tl.to({},{duration:F(89)},F(61));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

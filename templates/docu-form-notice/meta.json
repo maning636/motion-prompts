@@ -1,0 +1,16 @@
+{
+  "id": "docu-form-notice",
+  "name": "纪录片 B20 红色通告",
+  "description": "红色通告 · 皮影档案族 · docu-form 05",
+  "series": "docu",
+  "category": "纪录片皮影",
+  "tags": [
+    "纪录片皮影",
+    "档案模板",
+    "docu-form-red-notice"
+  ],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "createdAt": "2026-08-30T00:00:00.000Z"
+}

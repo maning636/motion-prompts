@@ -1,0 +1,18 @@
+{
+  "eyebrow": "LOCK ON · 准星聚焦",
+  "targetLabel": "核心命中率",
+  "targetValue": "92.4",
+  "targetUnit": "%",
+  "targetSub": "SYSTEM TARGET · 已锁定",
+  "p1Key": "响应时延",
+  "p1Val": "38 ms",
+  "p2Key": "回传频率",
+  "p2Val": "240 Hz",
+  "p3Key": "追踪置信度",
+  "p3Val": "0.987",
+  "p4Key": "信号强度",
+  "p4Val": "-42 dBm",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

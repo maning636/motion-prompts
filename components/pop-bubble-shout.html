@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"text","name":"喊出来的字","type":"string","label":"爆炸气泡里的字（2–4 字最像）","default":"咣！"},{"id":"accent","name":"爆炸色","type":"color","label":"爆炸气泡填充色","default":"#FF6B35"},{"id":"color","name":"字色","type":"color","label":"气泡里的文字颜色","default":"#FFF8EE"},{"id":"edge","name":"描边色","type":"color","label":"硬边 / 放射线深色","default":"#241C18"},{"id":"spikes","name":"尖角数","type":"number","label":"爆炸尖角数量 6–16","default":12},{"id":"fontSize","name":"字号","type":"number","label":"字号 px（超出爆炸形自动缩）","default":56},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":2.8}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>大叫爆炸气泡</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    /* 透明底：这层是挂件，底下是用户自己的实拍 */
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+
+  .p-grp { position: absolute; inset: 0; display: flex;
+           align-items: center; justify-content: center; }
+  /* 爆炸形：clip-path 多角星。硬阴影必须挂在外壳上——
+     filter 在 clip-path 之前渲染，写在被切的这一层会被整片裁掉。 */
+  .p-burstwrap { position: relative; width: 330px; height: 208px;
+                 filter: drop-shadow(5px 6px 0 var(--edge, #241C18)); }
+  .p-burst { position: absolute; inset: 0; background: var(--ac, #FF6B35); }
+  /* 字不能放在被 clip 的那层里（会被尖角切掉）。
+     也不能放在挂了 filter 的壳里——那会把整行字复制一份染成描边色。
+     所以它是爆炸形的兄弟节点，自己居中。 */
+  .p-shout {
+    position: absolute; left: 50%; top: 50%;
+    width: 330px; height: 208px; margin: -104px 0 0 -165px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .p-stx {
+    display: inline-block; white-space: nowrap;
+    font-size: var(--fs, 56px); font-weight: 900; line-height: 1;
+    letter-spacing: -.01em; color: var(--fg, #FFF8EE);
+    text-shadow: 4px 4px 0 var(--edge, #241C18);
+    transform-origin: 50% 50%;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* 放射线：从爆炸形后面甩出来 */
+  .p-spoke {
+    position: absolute; left: 50%; top: 50%;
+    width: 9px; height: 44px; margin-left: -4.5px; margin-top: -44px;
+    border-radius: 5px; background: var(--ac2, #FFC93C); opacity: 0;
+    transform-origin: 50% 100%;
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"咣！","accent":"#FF6B35","color":"#FFF8EE","edge":"#241C18","spikes":12,"fontSize":56,"duration":2.8};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--fg', v.color || FALLBACK.color);
+  root.style.setProperty('--edge', v.edge || FALLBACK.edge);
+  root.style.setProperty('--ac2', '#FFC93C');
+  const dur = parseFloat(v.duration) || 2.8;
+  const fs = parseFloat(v.fontSize) || 56;
+  root.style.setProperty('--fs', fs + 'px');
+  const text = String(v.text == null ? FALLBACK.text : v.text);
+  const spRaw = parseFloat(v.spikes);
+  const spikes = Math.max(6, Math.min(16, isNaN(spRaw) ? 12 : Math.round(spRaw)));
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text_, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text_ != null) el.textContent = text_;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  const grp = put('div', 'p-grp', '');
+  const spokes = [];
+  for (let i = 0; i < 12; i++) spokes.push(put('div', 'p-spoke', '', null, grp));
+  const bwrap = put('div', 'p-burstwrap', '', null, grp);
+  const burst = put('div', 'p-burst', '', null, bwrap);
+  const shout = put('div', 'p-shout', '', null, grp);
+  const label = put('span', 'p-stx', '', text, shout);
+
+  /* 爆炸形顶点：偶数号是尖角（外圈），奇数号是凹口（内圈）。
+     全部是 cos/sin 算出来的固定值，尖角之间再叠一点确定性的深浅，
+     让它像手画的而不是数学图形。这里不做任何随机。 */
+  (function makeBurst() {
+    const pts = [];
+    const jitter = [1, .92, 1.06, .96, 1.04, .9, 1.02, .94, 1.05, .93, 1.01, .97];
+    for (let i = 0; i < spikes * 2; i++) {
+      const out = i % 2 === 0;
+      const ang = (i / (spikes * 2)) * Math.PI * 2 - Math.PI / 2;
+      const wob = jitter[i % jitter.length];
+      const rx = out ? 50 * wob : 30;
+      const ry = out ? 50 * wob : 30;
+      pts.push((50 + Math.cos(ang) * rx).toFixed(2) + '% ' +
+               (50 + Math.sin(ang) * ry).toFixed(2) + '%');
+    }
+    burst.style.clipPath = 'polygon(' + pts.join(', ') + ')';
+  })();
+
+  const tl = gsap.timeline({ paused: true });
+  /* 注册：云渲染的 settle / 逐帧定位靠 window.__timelines 驱动时间轴 */
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 收口：字要留在爆炸形的中段，不能顶到尖角上 */
+  (function fit() {
+    root.style.setProperty('--fs', fs + 'px');
+    const natural = label.scrollWidth;
+    const avail = 236;
+    if (natural > avail) {
+      root.style.setProperty('--fs', Math.max(20, Math.floor(fs * avail / natural)) + 'px');
+    }
+  })();
+
+  // 炸开：从小到大甩出来，边甩边转正
+  tl.fromTo(grp, { scale: .2, rotation: -18, opacity: 0 },
+    { scale: 1.1, rotation: 6, opacity: 1, duration: .26, ease: 'power3.out',
+      immediateRender: false }, 0);
+  tl.to(grp, { scale: 1, rotation: -3, duration: .22, ease: 'back.out(2.4)' }, .26);
+  tl.to(grp, { scaleX: 1.04, scaleY: .93, duration: .08, yoyo: true, repeat: 1,
+    ease: 'power2.inOut' }, .46);
+
+  // 高频抖动：8 段短促位移，喊出来的那种抖
+  tl.fromTo(grp, { x: 0, y: 0 }, {
+    keyframes: [
+      { x: 3, y: -2.4, duration: .04, ease: 'none' },
+      { x: -2.8, y: 2.2, duration: .04, ease: 'none' },
+      { x: 2.4, y: 2.6, duration: .04, ease: 'none' },
+      { x: -2.2, y: -2.4, duration: .04, ease: 'none' },
+      { x: 2, y: -1.8, duration: .04, ease: 'none' },
+      { x: -1.6, y: 1.6, duration: .04, ease: 'none' },
+      { x: 1.2, y: 1.2, duration: .04, ease: 'none' },
+      { x: 0, y: 0, duration: .04, ease: 'none' }
+    ], immediateRender: false
+  }, .2);
+
+  // 字比形晚一拍，砸实
+  tl.fromTo(label, { scale: 1.5, opacity: 0 },
+    { scale: 1, opacity: 1, duration: .24, ease: 'back.out(2.8)',
+      immediateRender: false }, .1);
+
+  // 放射线爆开
+  const step = 360 / spokes.length;
+  spokes.forEach(function (sp, i) {
+    const a = i * step + 15;
+    tl.fromTo(sp, { scaleY: .2, scaleX: .6, rotation: a - 20, opacity: 0 },
+      { scaleY: 1.5, scaleX: 1, rotation: a, opacity: 1, duration: .3,
+        ease: 'back.out(2.2)', immediateRender: false }, .04 + i * .018);
+    tl.to(sp, { scaleY: 2.1, opacity: 0, duration: .3, ease: 'power2.in' }, .44 + i * .018);
+  });
+
+  // 喊完之后的余震，两下
+  tl.to(grp, { rotation: -1.5, duration: .16, yoyo: true, repeat: 3,
+    ease: 'sine.inOut' }, 1.0);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "id": "source-converge",
+  "name": "多源汇聚",
+  "description": "多来源线索（图标+标签）从四周错峰淡入，然后依次沿直线向中央汇聚融入，中央结论点高亮呼吸，讲清溯源/总结叙事。",
+  "category": "溯源叙事",
+  "tags": ["溯源叙事", "汇聚", "结论", "多源"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-20T00:00:00.000Z"
+}

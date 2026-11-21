@@ -1,0 +1,12 @@
+{
+  "id": "docu-stat-timeline",
+  "name": "时间轴·皮影档案",
+  "description": "5 节点横向时间轴，朱砂进度线扫入+节点错峰弹入，关键节点朱砂高亮（B 族皮影·纪录片档案风，2026-08-31）",
+  "category": "口播工厂",
+  "series": "docu",
+  "slot": "docu-puppet",
+  "tags": ["口播工厂","皮影档案","纪录片","docu-stat-timeline"],
+  "duration": 6,
+  "size": "1920×1080",
+  "status": "ready"
+}

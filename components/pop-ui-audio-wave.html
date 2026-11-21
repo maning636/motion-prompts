@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"label","name":"控件文案","type":"string","label":"控件说明文案","default":"音频波形"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.6}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>音频波形入场</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-halo { position: absolute; inset: 0;
+    background: radial-gradient(62% 74% at 50% 50%,
+      rgba(0,0,0,.56) 0%, rgba(0,0,0,.30) 54%, rgba(0,0,0,0) 84%); }
+  .p-label { position: absolute; font-size: 11px; font-weight: 700; letter-spacing: .18em;
+    color: rgba(255,248,238,.6); white-space: nowrap; }
+  /* 柱高全部由 JS 按时间写进来，所以这里只给形状 */
+  .p-wave { position: absolute; left: 87px; top: 92px; width: 306px; height: 96px;
+    display: flex; align-items: flex-end; gap: 6px; }
+  .p-bar { width: 7px; height: 4px; border-radius: 4px; flex: 0 0 auto;
+    background: linear-gradient(180deg, #FFC93C, var(--ac)); }
+  .p-base { position: absolute; left: 87px; top: 189px; width: 306px; height: 2px;
+    border-radius: 1px; background: rgba(255,248,238,.2); transform-origin: 0 50%; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"label":"音频波形","accent":"#FF6B35","duration":3.6};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || 3.6;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  const fits = [];
+  function fit(list) { fits.push.apply(fits, list); }
+  function runFit() {
+    fits.forEach((f) => {
+      const el = f.el;
+      el.style.fontSize = f.max + 'px';
+      const avail = f.box || el.clientWidth;
+      const ws = el.style.whiteSpace;
+      el.style.whiteSpace = 'nowrap';
+      const natural = el.scrollWidth;
+      el.style.whiteSpace = ws;
+      if (natural > avail) {
+        el.style.fontSize = Math.max(f.min, Math.floor(f.max * avail / natural)) + 'px';
+      }
+    });
+  }
+
+  put('div', 'p-halo');
+  const label = put('div', 'p-label', 'left:87px; top:52px;', v.label || FALLBACK.label);
+  const base = put('div', 'p-base');
+  const wave = put('div', 'p-wave');
+  const N = 24;
+  const bars = [];
+  for (let i = 0; i < N; i++) bars.push(put('div', 'p-bar', '', null, wave));
+
+  fit([{ el: label, max: 11, min: 9, box: 306 }]);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 柱高 = 纯函数（时间 → 高度）：入场包络 × 静息高度 × 律动正弦。
+     没有预先随机生成的一组高度，也没有累加状态，倒着 seek 也能重算出同一帧。 */
+  const RISE = 0.34, STAG = 0.035, T0 = 0.16, WA = 6.4;
+  const clamp01 = (x) => x < 0 ? 0 : (x > 1 ? 1 : x);
+  const outBack = (x) => { const c1 = 1.9, c3 = 2.9, u = x - 1; return 1 + c3 * u * u * u + c1 * u * u; };
+  const REST = [];
+  for (let i = 0; i < N; i++) REST.push(0.3 + 0.66 * Math.abs(Math.sin(i * 0.72 + 0.4)));
+  function paint() {
+    const t = tl.time();
+    const blendIn = clamp01((t - (T0 + N * STAG + 0.18)) / 0.5);
+    for (let i = 0; i < N; i++) {
+      const k = clamp01((t - (T0 + i * STAG)) / RISE);
+      const env = outBack(k);
+      const sway = 0.62 + 0.38 * Math.sin(t * WA + i * 0.55);
+      const amp = 1 + (sway - 1) * blendIn;
+      const h = 4 + 82 * REST[i] * env * amp * (1 - 0.16 * blendIn);
+      bars[i].style.height = h.toFixed(2) + 'px';
+    }
+    base.style.transform = 'scaleX(' + (0.3 + 0.7 * clamp01(t / 0.4)).toFixed(3) + ')';
+  }
+  tl.to({}, { duration: dur, onUpdate: paint }, 0);
+
+  tl.fromTo(label, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .3 }, .04);
+  tl.fromTo(base, { opacity: 0 }, { opacity: 1, duration: .3 }, .06);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  runFit();
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

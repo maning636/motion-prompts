@@ -1,0 +1,13 @@
+{
+  "id": "grid-to-hero",
+  "name": "六宫格聚合主视觉",
+  "description": "总-分叙事：六宫格缩略单元依次亮起，随后聚合放大成主视觉（单个大标题/大数字），表达由面到点。",
+  "category": "序列进程",
+  "tags": ["序列进程", "总-分叙事", "六宫格", "聚合", "主视觉", "由面到点"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-05T00:00:00.000Z"
+}

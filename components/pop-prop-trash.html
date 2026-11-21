@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FFC93C"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.2}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>手绘垃圾桶</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-scrap { position: absolute; background: #FFFDF5; border: 2.5px solid #241C18; }
+  .p-bin { position: absolute; left: 190px; top: 138px; width: 100px; height: 112px; }
+  .p-bin-body { position: absolute; left: 0; top: 0; width: 100px; height: 112px; }
+  /* 盖子铰在左下角，转轴写死在 0 100% */
+  .p-lid { position: absolute; left: 4px; top: 6px; width: 92px; height: 20px;
+    transform-origin: 0 100%; }
+  .p-puff { position: absolute; left: 222px; top: 150px; width: 36px; height: 18px;
+    border: 3px solid #241C18; border-radius: 50%; opacity: 0; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"accent":"#FFC93C","duration":3.2};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || FALLBACK.duration;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  /* ── 纸屑：先入 DOM 再入垃圾桶，靠遮挡关系「沉进去」 ─────── */
+  const SCRAPS = [
+    { x: 90, y: 66, w: 26, h: 20, clip: 'polygon(0 8%, 12% 0, 88% 4%, 100% 16%, 92% 100%, 10% 94%)', fill: '#FFFDF5' },
+    { x: 42, y: 100, w: 20, h: 24, clip: 'polygon(4% 0, 100% 6%, 94% 92%, 62% 100%, 0 88%)', fill: '#F6E7C4' },
+    { x: 122, y: 36, w: 30, h: 18, clip: 'polygon(0 6%, 96% 0, 100% 84%, 20% 100%)', fill: '#FFFDF5' },
+  ];
+  const MOUTH_X = 240, MOUTH_Y = 178;
+  const scraps = SCRAPS.map(function (s) {
+    return put('div', 'p-scrap',
+      'left:' + s.x + 'px;top:' + s.y + 'px;width:' + s.w + 'px;height:' + s.h + 'px;' +
+      'background:' + s.fill + ';clip-path:' + s.clip + ';');
+  });
+  const puffs = SCRAPS.map(function () {
+    return put('div', 'p-puff', 'left:' + (MOUTH_X - 18) + 'px;top:' + (MOUTH_Y - 22) + 'px;');
+  });
+
+  /* ── 垃圾桶本体 ─────────────────────────────────────────── */
+  const bin = put('div', 'p-bin');
+  const body = put('div', 'p-bin-body', '', null, bin);
+  body.innerHTML =
+    '<svg width="100" height="112" viewBox="0 0 100 112">' +
+    '<path d="M 10 20 L 90 20 L 81 106 L 19 106 Z" fill="#FFFDF5" stroke="#241C18" ' +
+    'stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<path d="M 32 30 L 36 96" fill="none" stroke="#241C18" stroke-width="2.4" ' +
+    'stroke-linecap="round" opacity=".55"/>' +
+    '<path d="M 50 30 L 50 96" fill="none" stroke="#241C18" stroke-width="2.4" ' +
+    'stroke-linecap="round" opacity=".55"/>' +
+    '<path d="M 68 30 L 64 96" fill="none" stroke="#241C18" stroke-width="2.4" ' +
+    'stroke-linecap="round" opacity=".55"/>' +
+    '<path d="M 25 104 L 75 104" fill="none" stroke="#241C18" stroke-width="2.6" ' +
+    'stroke-linecap="round"/>' +
+    '</svg>';
+  const lid = put('div', 'p-lid', '', null, bin);
+  lid.innerHTML =
+    '<svg width="98" height="32" viewBox="-3 -12 98 34" style="overflow:visible">' +
+    '<path d="M 32 -10 L 60 -10 L 62 -4 L 60 2 L 32 2 L 30 -4 Z" fill="#FFFDF5" ' +
+    'stroke="#241C18" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<path d="M 3 2 L 89 2 L 93 7 L 89 18 L 3 18 L 0 7 Z" fill="#FFFDF5" ' +
+    'stroke="#241C18" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<path d="M 8 8 L 84 8" fill="none" stroke="#241C18" stroke-width="2" ' +
+    'stroke-linecap="round" opacity=".45"/>' +
+    '</svg>';
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* 出现弹跳 + 落地压扁 */
+  tl.fromTo(bin, { y: 30, scale: .74, opacity: 0, rotate: -7 },
+    { y: 0, scale: 1, opacity: 1, rotate: 0, duration: .5, ease: 'back.out(2.2)' }, 0);
+  tl.fromTo(bin, { scaleY: 1, scaleX: 1 },
+    { scaleY: .82, scaleX: 1.1, duration: .1, ease: 'power2.out', yoyo: true, repeat: 1 }, .5);
+
+  /* 盖子翻开 */
+  tl.fromTo(lid, { rotate: 0 }, { rotate: -76, duration: .3, ease: 'back.out(2)' }, .58);
+
+  /* 内容倾倒：三片纸屑依次抛进去，抛物线落进桶口 */
+  scraps.forEach(function (el, i) {
+    const s = SCRAPS[i];
+    const dx = MOUTH_X - s.x, dy = MOUTH_Y - s.y;
+    const t0 = 0.84 + i * 0.2;
+    tl.fromTo(el, { scale: 0, rotate: -20, opacity: 0 },
+      { scale: 1, rotate: 0, opacity: 1, duration: .22, ease: 'back.out(3)' }, t0 - 0.22);
+    tl.fromTo(el, { x: 0, y: 0, rotate: -62 + i * 16 },
+      { x: dx * 0.56, y: dy * 0.34, rotate: -14, duration: .42, ease: 'power1.in' }, t0);
+    tl.to(el, { x: dx, y: dy, rotate: 28 + i * 12, duration: .24, ease: 'power2.in' }, t0 + .42);
+    tl.fromTo(puffs[i], { opacity: .8, scale: .5 },
+      { opacity: 0, scale: 1.5, duration: .32, ease: 'power2.out' }, t0 + .6);
+  });
+
+  /* 盖子合上 + 整只桶晃两下。
+     这里必须用 to() 而不是 fromTo()：fromTo 的 immediateRender 默认开，
+     建时间轴那一刻就把 from 值（rotate:-76）打到盖子上，
+     于是 t<0.58 还没开盖就已经是开着的了。to() 是到点了才取起始值。 */
+  tl.to(lid, { rotate: 9, duration: .12, ease: 'power2.in' }, 2.06);
+  tl.to(lid, { rotate: 0, duration: .26, ease: 'back.out(3.4)' }, 2.18);
+  tl.fromTo(bin, { scaleY: 1 }, { scaleY: .93, scaleX: 1.05, duration: .1, ease: 'power2.out',
+    yoyo: true, repeat: 1 }, 2.06);
+  tl.fromTo(bin, { x: 0 }, { x: 4, duration: .06, ease: 'none', yoyo: true, repeat: 5 }, 2.18);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

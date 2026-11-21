@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "组合视图"}, {"id": "subtitle", "type": "string", "label": "副标题", "default": "多个组件同屏展示"}, {"id": "mediaTL", "type": "string", "label": "左上视频", "default": "../composite-grid/assets/bar-chart-grow.webm"}, {"id": "mediaTR", "type": "string", "label": "右上视频", "default": "../composite-grid/assets/number-counter.webm"}, {"id": "mediaBL", "type": "string", "label": "左下视频", "default": "../composite-grid/assets/simple-flow-chart.webm"}, {"id": "mediaBR", "type": "string", "label": "右下视频", "default": "../composite-grid/assets/pull-quote-hero.webm"}, {"id": "scaleTL", "type": "number", "label": "左上缩放", "default": 0.5}, {"id": "scaleTR", "type": "number", "label": "右上缩放", "default": 0.5}, {"id": "scaleBL", "type": "number", "label": "左下缩放", "default": 0.5}, {"id": "scaleBR", "type": "number", "label": "右下缩放", "default": 0.5}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      /* ===== 奶油纸面贴纸工作台 · 设计令牌（见 design-systems/sticker-workbench/DESIGN.md） ===== */
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden;
+        font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden;
+        background: var(--background, #F5F0E6); color: var(--foreground, #1D1D20); }
+      .outer-frame{ position: absolute; inset: 0; border: 10px solid #1D1D20; pointer-events: none; z-index: 40; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; font-weight: 700; }
+      .fredoka{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; }
+      .corner-tag{ position: absolute; top: 74px; left: 120px; z-index: 30;
+        background: #FFFDF7; border: 4px solid #1D1D20; border-radius: 8px;
+        box-shadow: 10px 10px 0 #2A292B; padding: 14px 22px; transform: rotate(-2deg); }
+      .corner-tag span{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; font-weight: 700;
+        font-size: 24px; letter-spacing: 0.06em; text-transform: uppercase; }
+      .corner-index{ position: absolute; top: 84px; right: 120px; z-index: 30;
+        font-size: 20px; color: #4D4A48; }
+      .scene{ position: absolute; inset: 0; }
+      .panel{ background: #FFFDF7; border: 4px solid #1D1D20; border-radius: 10px;
+        box-shadow: 10px 10px 0 #2A292B; }
+      .chip{ display: inline-block; padding: 8px 20px; border: 4px solid #1D1D20; border-radius: 8px;
+        box-shadow: 6px 6px 0 #2A292B; font-size: 26px; font-weight: 800; line-height: 1.1; }
+      .chip-blue{ background: #3E7BF2; color: #FFFDF7; }
+      .chip-pink{ background: #F13B88; color: #FFFDF7; }
+      .chip-orange{ background: #FF9F1C; color: #1D1D20; }
+      .chip-lime{ background: #B9E833; color: #1D1D20; }
+      .chip-violet{ background: #B99AF7; color: #1D1D20; }
+      .chip-paper{ background: #FFFDF7; color: #1D1D20; }
+      .ttl{ font-size: 52px; font-weight: 900; line-height: 1.2; }
+      .sub{ font-size: 30px; font-weight: 700; line-height: 1.35; color: #4D4A48; }
+      .num{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; font-weight: 700; }
+      .title-center{ position: absolute; top: 200px; left: 0; width: 100%; text-align: center; z-index: 20; }
+      .sub-center{ position: absolute; top: 286px; left: 0; width: 100%; text-align: center; z-index: 20; }
+
+      .xwrap{ position: absolute; left: 280px; right: 280px; top: 290px; bottom: 230px; }
+      .xgrid{ display: grid; gap: 18px; width: 100%; height: 100%; }
+      .xcell{ border: 4px solid #1D1D20; border-radius: 10px; background: #FFFDF7;
+        box-shadow: 6px 6px 0 #2A292B; display: flex; align-items: center; justify-content: center;
+        font-size: 24px; font-weight: 800; text-align: center; padding: 10px; }
+      .xlegend{ display: flex; gap: 20px; margin-top: 24px; justify-content: center; }
+      .xline{ display: flex; align-items: center; gap: 30px; margin: 34px 0; }
+      .xline .xl{ width: 180px; font-size: 26px; font-weight: 800; text-align: right; }
+      .xline .xs{ flex: 1; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="outer-frame" id="frame"></div>
+      <div class="corner-tag" id="cornerTag"><span>COMPOSITE GRID</span></div>
+      <div class="corner-index mono" id="cornerIndex">04 / GRID</div>
+      <svg width="0" height="0" style="position:absolute"><defs>
+        <marker id="arrowHead" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto">
+          <path d="M1 1 L11 6 L1 11 Z" fill="#1D1D20" />
+        </marker>
+      </defs></svg>
+      <section class="scene" id="rootScene" data-start="0" data-duration="6" data-track-index="1">
+        <h2 class="ttl title-center" id="xTitle"></h2>
+        <p class="sub sub-center" id="xSub"></p>
+        <div class="xwrap" id="xWrap"></div>
+      </section>
+    </div>
+    <script>
+      const FB = {"title": "组合视图", "subtitle": "多个组件同屏展示", "mediaTL": "../composite-grid/assets/bar-chart-grow.webm", "mediaTR": "../composite-grid/assets/number-counter.webm", "mediaBL": "../composite-grid/assets/simple-flow-chart.webm", "mediaBR": "../composite-grid/assets/pull-quote-hero.webm", "scaleTL": 0.5, "scaleTR": 0.5, "scaleBL": 0.5, "scaleBR": 0.5};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $ = (id) => document.getElementById(id);
+      const T = (id, val) => { const el = $(id); if (el) el.textContent = val; };
+      const SP = (s) => String(s ?? '').split(',').map(x => x.trim()).filter(Boolean);
+      const SPN = (s) => SP(s).map(Number);
+      const scene = () => $('rootScene');
+      function el(tag, cls, parent, text){ const e = document.createElement(tag);
+        if (cls) e.className = cls; if (text != null) e.textContent = text;
+        (parent || scene()).appendChild(e); return e; }
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const SPRING = "back.out(1.4)";
+      function pop(sel, at, dx){ tl.fromTo(sel, { opacity: 0, x: dx || 0, scale: 0.88 },
+        { opacity: 1, x: 0, scale: 1, duration: 0.38, ease: SPRING }, at); }
+      function fade(sel, at){ tl.fromTo(sel, { opacity: 0 }, { opacity: 1, duration: 0.24 }, at); }
+      function drawArrow(line, at){ const len = line.getAttribute('stroke-dasharray');
+        tl.set(line, { attr: { "marker-end": "url(#arrowHead)" } }, at);
+        tl.fromTo(line, { strokeDashoffset: len }, { strokeDashoffset: 0, duration: 0.4, ease: "power2.inOut" }, at); }
+      tl.fromTo("#frame", { opacity: 0 }, { opacity: 1, duration: 0.18 }, 0);
+      tl.fromTo(["#cornerTag", "#cornerIndex"], { opacity: 0 }, { opacity: 1, duration: 0.18 }, 0);
+      T("xTitle", v.title || ""); T("xSub", v.subtitle || ""); if (!v.subtitle) $("xSub").style.display = "none";
+      const wrap = $("xWrap");
+      const g = el("div", "xgrid", wrap);
+      g.style.gridTemplateColumns = "1fr 1fr"; g.style.gridTemplateRows = "1fr 1fr";
+      const media = [v.mediaTL, v.mediaTR, v.mediaBL, v.mediaBR];
+      const scales = [v.scaleTL, v.scaleTR, v.scaleBL, v.scaleBR];
+      media.forEach((m0, i) => { const c = el("div", "xcell", g);
+        el("span", "", c, "素材: " + (m0 || "占位"));
+        const tag = el("span", "chip chip-paper", c, "×" + (scales[i] || "1"));
+        tag.style.cssText = "position:absolute;font-size:18px;padding:4px 10px";
+        c.style.position = "relative";
+        tag.style.right = "12px"; tag.style.bottom = "12px"; tag.style.position = "absolute";
+        tl.fromTo(c, { opacity: 0, scale: 0.88 }, { opacity: 1, scale: 1, duration: 0.36, ease: SPRING }, 0.3 + i * 0.25); });
+      tl.to("#rootScene", { opacity: 0, duration: 0.28, ease: "power2.in" }, 5.5);
+      tl.to(["#cornerTag", "#cornerIndex"], { opacity: 0, duration: 0.28 }, 5.5);
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

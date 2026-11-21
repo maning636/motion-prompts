@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"leftLabel","type":"string","label":"左侧标签","default":"方案 A"},
+  {"id":"leftTitle","type":"string","label":"左侧标题","default":"传统做法"},
+  {"id":"leftPoints","type":"string","label":"左侧要点（换行分隔）","default":"流程靠人盯\n跨部门拉群对齐\n出错再回炉返工\n汇报全靠截图与口头"},
+  {"id":"rightLabel","type":"string","label":"右侧标签","default":"方案 B"},
+  {"id":"rightTitle","type":"string","label":"右侧标题","default":"AI 协作流"},
+  {"id":"rightPoints","type":"string","label":"右侧要点（换行分隔）","default":"结构化卡片沉淀\n上下游语义互通\n实时校验与回放\n看板一键取数"},
+  {"id":"startPosition","type":"number","label":"滑杆起始位置（0=最左,100=最右）","default":28},
+  {"id":"endPosition","type":"number","label":"滑杆终点位置（0=最左,100=最右）","default":72},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity: .55;
+      }
+
+      /* ---------- 舞台：左右两半 ---------- */
+      .stage{
+        position:absolute; inset:0;
+      }
+      .half{
+        position:absolute; top:0; bottom:0;
+        padding: 96px 96px 120px;
+        display:flex; flex-direction:column; justify-content:flex-start;
+        opacity:0; will-change: transform, opacity;
+      }
+      .half.left  { left:0;   width:50%; padding-right: 220px; }
+      .half.right { right:0;  width:50%; padding-left: 220px; }
+      .half.warm  { background: linear-gradient(180deg, rgba(255,255,255,.015), transparent 60%); }
+      .half.cold  { background: linear-gradient(180deg, rgba(255,255,255,.015), transparent 60%); }
+
+      /* 左/右各自点阵底，让分缝更可读 */
+      .half.left::before, .half.right::before{
+        content:""; position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.035) 1px, transparent 1.5px);
+        background-size: 28px 28px;
+        mask-image: linear-gradient(180deg, #000 0%, transparent 70%);
+        -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 70%);
+      }
+      .half.left::after{
+        content:""; position:absolute; top:0; right:0; width:1px; height:100%;
+        background: linear-gradient(180deg, transparent 0%, rgba(255,255,255,.08) 30%, rgba(255,255,255,.08) 70%, transparent 100%);
+      }
+
+      /* ---------- 滑杆（竖向圆角把手 + 顶/底手柄 + 中线） ---------- */
+      .rail{
+        position:absolute; top:0; bottom:0;
+        left: 50%; transform: translateX(-50%);
+        width: 4px; pointer-events:none;
+        opacity:0;
+      }
+      .rail .track{
+        position:absolute; top:160px; bottom:160px; left:50%; transform:translateX(-50%);
+        width:2px; background: rgba(255,255,255,.12);
+      }
+      .rail .knob{
+        position:absolute; top:50%; left:50%;
+        transform: translate(-50%, -50%);
+        width: 56px; height: 56px; border-radius: 50%;
+        background: var(--accent, #00FF00);
+        box-shadow:
+          0 0 0 1px rgba(0,0,0,.35) inset,
+          0 0 24px color-mix(in srgb, var(--accent, #00FF00) 45%, transparent);
+        display:grid; place-items:center;
+        z-index: 4;
+      }
+      .rail .knob::before, .rail .knob::after{
+        content:""; position:absolute; top:50%; left:50%;
+        width:18px; height:2px; background: #0A0A0A; transform: translate(-50%, -50%);
+      }
+      .rail .knob::after{ transform: translate(-50%, -50%) rotate(90deg); }
+      .rail .cap{
+        position:absolute; left:50%; transform: translateX(-50%);
+        width: 22px; height: 22px; border-radius: 50%;
+        border: 1.5px solid var(--accent, #00FF00);
+        background: color-mix(in srgb, var(--accent, #00FF00) 18%, transparent);
+      }
+      .rail .cap.top{ top: 140px; }
+      .rail .cap.bot{ bottom: 140px; }
+
+      /* 滑杆沿中线移动（transform 控制），位置 0..100 */
+      .rail .knob, .rail .track{ transition: none; }
+
+      /* ---------- 文本元素 ---------- */
+      .chip{
+        display:inline-flex; align-items:center; gap:10px;
+        padding: 7px 16px; border:1px solid #2A2A2E; border-radius:999px;
+        font-size:18px; letter-spacing:.16em; color:#9CA3AF; text-transform:uppercase;
+        white-space: nowrap;
+      }
+      .chip b{ color: var(--accent, #00FF00); font-weight:700; letter-spacing:.05em; }
+      .title{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight:700; letter-spacing:-.02em;
+        font-size: 76px; line-height: 1.05;
+        margin: 22px 0 18px;
+      }
+      .right .title{ color: var(--foreground, #F4EFE7); }
+      .left  .title{ color: color-mix(in srgb, var(--foreground, #F4EFE7) 78%, transparent); }
+
+      .points{
+        list-style:none; padding:0; margin: 18px 0 0;
+        display:flex; flex-direction:column; gap: 14px;
+      }
+      .points li{
+        display:flex; gap: 14px; align-items:flex-start;
+        font-size: 26px; line-height: 1.45;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 82%, transparent);
+      }
+      .right .points li::before{
+        content:""; flex:none; margin-top: 14px;
+        width: 18px; height: 2px;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+      }
+      .left .points li::before{
+        content:""; flex:none; margin-top: 14px;
+        width: 18px; height: 2px;
+        background: #6B6B66;
+      }
+      .points li .num{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 14px; letter-spacing:.12em;
+        color: #6B6B66; margin-top: 6px; min-width: 26px;
+      }
+      .left .points li .num{ color: #6B6B66; }
+      .right .points li .num{ color: var(--accent, #00FF00); }
+
+      /* 脚注 chip 行 */
+      .footnote{
+        position:absolute; bottom: 56px; left: 96px; right: 96px;
+        display:flex; align-items:center; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 18px; letter-spacing:.06em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+      }
+      .footnote .pos-pct{
+        font-size: 30px; font-weight:700;
+        color: var(--accent, #00FF00);
+        letter-spacing: -.01em;
+      }
+      .footnote .pos-pct small{
+        font-size: 14px; font-weight:500;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+        margin-left: 6px;
+      }
+
+      /* 顶头小 eyebrow */
+      .eyebrow{
+        position:absolute; top: 56px; left: 96px; right: 96px;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.22em; text-transform:uppercase;
+        color: #8A8A85;
+      }
+      .eyebrow .acc{ color: var(--accent, #00FF00); font-weight: 700; letter-spacing:.18em; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="stage" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+
+        <div class="eyebrow">
+          <span><b class="acc">VS</b>&nbsp;&nbsp;COMPARE</span>
+          <span>split · slider</span>
+        </div>
+
+        <!-- 左半 -->
+        <div class="half left warm" id="halfLeft">
+          <span class="chip" id="chipLeft"><b id="chipLeftB">A</b><span id="chipLeftLab">方案 A</span></span>
+          <h2 class="title" id="titleLeft">传统做法</h2>
+          <ul class="points" id="pointsLeft">
+            <li><span class="num">01</span><span>流程靠人盯</span></li>
+            <li><span class="num">02</span><span>跨部门拉群对齐</span></li>
+            <li><span class="num">03</span><span>出错再回炉返工</span></li>
+            <li><span class="num">04</span><span>汇报全靠截图与口头</span></li>
+          </ul>
+        </div>
+
+        <!-- 右半 -->
+        <div class="half right cold" id="halfRight">
+          <span class="chip" id="chipRight"><b id="chipRightB">B</b><span id="chipRightLab">方案 B</span></span>
+          <h2 class="title" id="titleRight">AI 协作流</h2>
+          <ul class="points" id="pointsRight">
+            <li><span class="num">01</span><span>结构化卡片沉淀</span></li>
+            <li><span class="num">02</span><span>上下游语义互通</span></li>
+            <li><span class="num">03</span><span>实时校验与回放</span></li>
+            <li><span class="num">04</span><span>看板一键取数</span></li>
+          </ul>
+        </div>
+
+        <!-- 滑杆（顶帽 + 轨 + 把手 + 底帽） -->
+        <div class="rail" id="rail">
+          <div class="cap top"></div>
+          <div class="track"></div>
+          <div class="knob" id="knob"></div>
+          <div class="cap bot"></div>
+        </div>
+
+        <!-- 脚注：左名 + 位置% + 右名 -->
+        <div class="footnote">
+          <span id="footLeft">方案 A</span>
+          <span class="pos-pct"><span id="pctVal">50</span><small>%</small></span>
+          <span id="footRight">方案 B</span>
+        </div>
+
+      </section>
+    </div>
+    <script>
+      /* ----- 变量接线（与全库契约一致） ----- */
+      const fallback = {
+        leftLabel: "方案 A",
+        leftTitle: "传统做法",
+        leftPoints: "流程靠人盯\n跨部门拉群对齐\n出错再回炉返工\n汇报全靠截图与口头",
+        rightLabel: "方案 B",
+        rightTitle: "AI 协作流",
+        rightPoints: "结构化卡片沉淀\n上下游语义互通\n实时校验与回放\n看板一键取数",
+        startPosition: 28,
+        endPosition: 72,
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const $ = (id) => document.getElementById(id);
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      /* ----- 内容回填 ----- */
+      const setPoints = (hostId, raw) => {
+        const ul = $(hostId);
+        if (!ul) return;
+        const lines = String(raw ?? "").split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        const maxN = Math.min(Math.max(lines.length, 1), 4);
+        const padded = lines.slice(0, maxN);
+        while (padded.length < 4) padded.push("");
+        ul.innerHTML = padded.map((t, i) =>
+          `<li><span class="num">${String(i+1).padStart(2,"0")}</span><span>${escapeHtml(t)}</span></li>`
+        ).join("");
+      };
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      $("chipLeftLab").textContent  = v.leftLabel  || fallback.leftLabel;
+      $("chipLeftB").textContent    = String(v.leftLabel || fallback.leftLabel).trim().charAt(0).toUpperCase() || "A";
+      $("chipRightLab").textContent = v.rightLabel || fallback.rightLabel;
+      $("chipRightB").textContent   = String(v.rightLabel || fallback.rightLabel).trim().charAt(0).toUpperCase() || "B";
+      $("titleLeft").textContent    = v.leftTitle  || fallback.leftTitle;
+      $("titleRight").textContent   = v.rightTitle || fallback.rightTitle;
+      $("footLeft").textContent     = v.leftLabel  || fallback.leftLabel;
+      $("footRight").textContent    = v.rightLabel || fallback.rightLabel;
+      setPoints("pointsLeft",  v.leftPoints  || fallback.leftPoints);
+      setPoints("pointsRight", v.rightPoints || fallback.rightPoints);
+
+      /* ----- 滑杆位置控制（0..100 → -50%..+50%） ----- */
+      const rail = $("rail");
+      const knob = $("knob");
+      const pctVal = $("pctVal");
+      const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+      const setRailX = (pct) => {
+        const p = clamp(Number(pct) || 0, 0, 100);
+        rail.style.left = p + "%";
+        pctVal.textContent = String(Math.round(p));
+      };
+
+      const startP = clamp(Number(v.startPosition ?? fallback.startPosition), 0, 100);
+      const endP   = clamp(Number(v.endPosition   ?? fallback.endPosition),   0, 100);
+
+      /* ----- 时间线 ----- */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+      const tl = gsap.timeline({ paused: true });
+
+      // 入场：左半整体淡入 + 上移
+      tl.fromTo("#halfLeft",
+        { opacity: 0, y: 30 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 0.05);
+      // 左要点错峰
+      tl.fromTo("#pointsLeft li",
+        { opacity: 0, x: -18 },
+        { opacity: 1, x: 0, duration: 0.42, ease: "power2.out", stagger: 0.08 }, 0.25);
+
+      // 右半晚一拍入场
+      tl.fromTo("#halfRight",
+        { opacity: 0, y: 30 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 0.55);
+      tl.fromTo("#pointsRight li",
+        { opacity: 0, x: 18 },
+        { opacity: 1, x: 0, duration: 0.42, ease: "power2.out", stagger: 0.08 }, 0.75);
+
+      // 滑杆自身先淡入
+      tl.fromTo("#rail",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.35, ease: "power2.out" }, 0.4);
+      // 把手轻微呼吸（强调手感），贯穿整个动画
+      tl.fromTo("#knob",
+        { scale: 0.85 },
+        { scale: 1.0, duration: 0.45, ease: "back.out(1.6)" }, 0.55);
+      tl.to("#knob",
+        { scale: 1.06, duration: 1.2, ease: "sine.inOut", yoyo: true, repeat: 1 }, 1.4);
+
+      // 滑杆水平移动：占片长 ~40%（2.4s），power2.inOut，1.2s 起步
+      tl.to("#rail", {
+        left: endP + "%",
+        duration: 2.4,
+        ease: "power2.inOut"
+      }, 1.2);
+      // pctVal 文本与 timeline.time() 同步（避免 pause/seek 时不更新）
+      const railStart = 1.2, railDur = 2.4;
+      const easeInOut = (t) => 0.5 - 0.5 * Math.cos(Math.PI * t);
+      tl.eventCallback("onUpdate", () => {
+        const t = tl.time();
+        if (t < railStart) pctVal.textContent = String(Math.round(startP));
+        else if (t > railStart + railDur) pctVal.textContent = String(Math.round(endP));
+        else {
+          const p = easeInOut((t - railStart) / railDur);
+          pctVal.textContent = String(Math.round(startP + (endP - startP) * p));
+        }
+      });
+
+      // 结尾：把手轻微回弹 + 顶部 chip 高亮一下，停留 ~1s 可读
+      tl.to("#knob", { scale: 1.0, duration: 0.4, ease: "power2.out" }, 4.4);
+      tl.fromTo("#chipRight",
+        { boxShadow: "0 0 0 0 rgba(0,0,0,0)" },
+        { boxShadow: "0 0 0 0 rgba(0,0,0,0)",
+          duration: 0.001 }, 4.6);
+
+      // 初始化位置（必须在 fromTo 之后写 left，否则会被覆盖）
+      setRailX(startP);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

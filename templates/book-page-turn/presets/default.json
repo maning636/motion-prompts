@@ -1,0 +1,9 @@
+{
+  "vol": "VOL.15 · 视觉动效库",
+  "pageno": "P.075 → P.076",
+  "hint": "翻到下一页",
+  "imgA": "./assets/page-a.png",
+  "imgB": "./assets/page-b.png",
+  "accent": "#00FF00",
+  "duration": 5
+}

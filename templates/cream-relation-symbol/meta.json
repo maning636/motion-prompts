@@ -1,0 +1,11 @@
+{
+  "id": "cream-relation-symbol",
+  "name": "关系符大卡（奶油贴纸）",
+  "createdAt": "2026-08-29T00:00:00.000Z",
+  "energy": "中",
+  "suggestedDuration": "3–6s",
+  "knownPitfalls": [
+    "左右短句各超过 8 字会换行挤压符号区，保持短命题",
+    "符号变量传 3 个字符以上时字号降至 210px，多字符组合符号慎用"
+  ]
+}

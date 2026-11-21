@@ -1,0 +1,16 @@
+{
+  "id": "docu-form-stamp",
+  "name": "纪录片 B22 印章审批",
+  "description": "红色印章 · 皮影档案族 · docu-form 03",
+  "series": "docu",
+  "category": "纪录片皮影",
+  "tags": [
+    "纪录片皮影",
+    "档案模板",
+    "docu-form-stamp-approve"
+  ],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "createdAt": "2026-08-30T00:00:00.000Z"
+}

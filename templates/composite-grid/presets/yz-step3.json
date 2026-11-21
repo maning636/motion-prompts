@@ -1,0 +1,16 @@
+{
+  "title": "第三步 · 它按内容挑模板",
+  "subtitle": "数据→图表卡 · 故事→聊天气泡 · 观点→大字卡 · 流程→步骤卡",
+  "mediaTL": "./assets/bar-chart-grow.webm",
+  "mediaTR": "./assets/number-counter.webm",
+  "mediaBL": "./assets/simple-flow-chart.webm",
+  "mediaBR": "./assets/pull-quote-hero.webm",
+  "scaleTL": 0.5,
+  "scaleTR": 0.5,
+  "scaleBL": 0.5,
+  "scaleBR": 0.5,
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7",
+  "duration": 6.0
+}

@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"q","name":"投票问题","type":"string","label":"投票问题（10–20 字）","default":"你现在最缺的是哪一个？"},{"id":"a1","name":"选项甲","type":"string","label":"选项甲文字（4–10 字）","default":"选题标准"},{"id":"a2","name":"选项甲票数","type":"string","label":"选项甲票数（含单位，如 1,284 票）","default":"1,284 票"},{"id":"b1","name":"选项乙","type":"string","label":"选项乙文字（4–10 字）","default":"执行节奏"},{"id":"b2","name":"选项乙票数","type":"string","label":"选项乙票数（含单位）","default":"1,180 票"},{"id":"accent","name":"强调色","type":"color","label":"强调色（领先方色块）","default":"#FFD429"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","hidden":true,"default":"transparent","options":[{"value":"transparent","label":"透明底"},{"value":"mp4","label":"MP4 纯底"},{"value":"webm","label":"WebM 纯底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="投票贴：顶部 ink 问题条 + 左右两块等宽选项卡，领先方整块换强调色，百分比由两方票数算出后整数跳到位，两块落定后做反向微位移">
+<title>投票贴 · 你现在最缺的是哪一个</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 透明底贴片：--paper 不出现，底色与阴影色收进变量（风格规范 §7.1 / §7.2 规则 A） */
+  :root{ --shadow:#FFFFFF; --background:transparent; }
+
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--background);color:var(--ink);font-family:var(--sans)}
+
+  /* 问题条：ink 底白字，通栏级贴片（基因 10） */
+  #qh{position:absolute;left:96px;bottom:560px;width:1728px;height:120px;
+    display:flex;align-items:center;padding:0 36px;
+    background:var(--ink);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  #q{display:block;font-size:60px;font-weight:900;line-height:1.1;letter-spacing:0;color:var(--white);
+    white-space:nowrap;overflow:hidden}
+
+  /* 两块等宽选项卡：几何完全对称，色块不许长胖 */
+  .opt{position:absolute;bottom:296px;width:840px;height:240px;
+    display:flex;flex-direction:column;padding:24px 30px;
+    background:var(--white);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  #oa{left:96px}
+  #ob{left:984px;background:var(--accent)}
+
+  /* 选项编号方块：正方 + 3px 黑边 + 4px 直角，形状两方一致（基因 3） */
+  .r1{display:flex;align-items:center;gap:22px;height:84px}
+  .key{flex:0 0 auto;width:84px;height:84px;display:flex;align-items:center;justify-content:center;
+    background:var(--ink);color:var(--yellow);border:var(--bw) solid var(--ink);border-radius:4px;
+    font-family:var(--mono);font-weight:700;font-size:44px;line-height:1}
+  .opt span.tx{flex:1 1 auto;min-width:0;font-size:46px;font-weight:900;line-height:1.1;
+    letter-spacing:0;color:var(--ink);white-space:nowrap;overflow:hidden}
+  .rule{height:3px;background:var(--ink);margin-top:22px;flex:0 0 3px}
+  .r3{display:flex;align-items:baseline;justify-content:space-between;gap:20px;margin-top:18px}
+  .opt span.ct{font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:.04em;
+    color:var(--ink);white-space:nowrap;overflow:hidden}
+  .opt span.pc{font-family:var(--mono);font-weight:900;font-size:56px;line-height:1;letter-spacing:0;
+    color:var(--ink);font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="qh"><div id="q" data-fit-max="60" data-fit-min="30">你现在最缺的是哪一个？</div></div>
+  <div class="opt" id="oa">
+    <div class="r1"><span class="key">A</span><span class="tx" id="a1" data-fit-max="46" data-fit-min="24">选题标准</span></div>
+    <div class="rule"></div>
+    <div class="r3"><span class="ct" id="a2" data-fit-max="26" data-fit-min="16">1,284 票</span><span class="pc" id="ap">52%</span></div>
+  </div>
+  <div class="opt" id="ob">
+    <div class="r1"><span class="key">B</span><span class="tx" id="b1" data-fit-max="46" data-fit-min="24">执行节奏</span></div>
+    <div class="rule"></div>
+    <div class="r3"><span class="ct" id="b2" data-fit-max="26" data-fit-min="16">1,180 票</span><span class="pc" id="bp">48%</span></div>
+  </div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  var isT = (v.exportMode || 'transparent') === 'transparent';
+  var r = document.documentElement.style;
+  r.setProperty('--background', isT ? 'transparent' : '#0F0F0F');
+  r.setProperty('--shadow', isT ? '#FFFFFF' : '#0F0F0F');
+  if (v.accent) r.setProperty('--accent', v.accent);
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+  ['q', 'a1', 'a2', 'b1', 'b2'].forEach(function (k) { set(k, v[k]); });
+
+  /* 百分比从两方票数里解析出来，只影响画面上的数字，不参与时间轴长度计算。
+     解析不出来就退回 50 / 50，画面照样完整。 */
+  function votes(str) {
+    var m = String(str || '').replace(/,/g, '').match(/\d+/);
+    return m ? parseInt(m[0], 10) : 0;
+  }
+  var va = votes(v.a2), vb = votes(v.b2);
+  var tot = va + vb;
+  var pa = tot > 0 ? Math.round(va / tot * 100) : 50;
+  var pb = 100 - pa;
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：百分比直接给终值，只留终态 + ≤8px 微位移淡入（规范 §13.5） */
+    gsap.set('#qh', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#oa', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#ob', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#ap', { textContent: pa + '%' });
+    gsap.set('#bp', { textContent: pb + '%' });
+
+    tl.fromTo('#qh', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, 0);
+    tl.fromTo('#oa', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, .45);
+
+    B.hold(tl, 1.6, 1.2);
+    return;
+  }
+
+  var TOTAL = parseFloat(v.duration) > 0 ? parseFloat(v.duration) : 5;
+  var HOLD = 0.5;
+  var WIN = Math.max(1.6, TOTAL - HOLD);
+  var SH = isT ? '#FFFFFF' : '#0F0F0F';
+
+  /* 模 7 · 分格擦出：问题条自左分六格推出来 */
+  tl.fromTo('#qh', { clipPath: 'inset(0 100% 0 0)' },
+      { clipPath: 'inset(0 0% 0 0)', duration: .32, ease: 'steps(6)' }, 0)
+    .fromTo('#qh', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#qh', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+  tl.fromTo('#q', { x: -28 }, { x: 0, duration: .22, ease: 'power4.out' }, .18);
+
+  /* 模 2 · 对撞入位：左右两块自两侧拍入，落定瞬间阴影各压 2 帧再弹回原档 */
+  tl.fromTo('#oa', { x: -80 },
+      { x: 0, duration: .26, ease: 'power4.out' }, .24)
+    .fromTo('#oa', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#oa', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+  tl.fromTo('#ob', { x: 80 },
+      { x: 0, duration: .26, ease: 'power4.out' }, .3)
+    .fromTo('#ob', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#ob', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+  tl.fromTo('#a1', { x: -22 }, { x: 0, duration: .2, ease: 'power4.out' }, .44);
+  tl.fromTo('#b1', { x: 22 },  { x: 0, duration: .2, ease: 'power4.out' }, .5);
+
+  /* 百分比整数跳到终值：展示窗口写死 0.9s，onUpdate 只写 textContent，不做 DOM 测量 */
+  var na = { v: 0 }, nb = { v: 0 };
+  tl.to(na, { v: pa, duration: .9, ease: 'steps(8)',
+      onUpdate: function () {
+        var e = document.getElementById('ap');
+        if (e) e.textContent = String(Math.round(na.v)) + '%';
+      } }, .8);
+  tl.to(nb, { v: pb, duration: .9, ease: 'steps(8)',
+      onUpdate: function () {
+        var e = document.getElementById('bp');
+        if (e) e.textContent = String(Math.round(nb.v)) + '%';
+      } }, .8);
+
+  /* 两块反向微位移：领先方下压、另一方上抬，匀速往返 */
+  var T0 = 2.0;
+  var REP = Math.max(1, Math.round((WIN - T0) / .9));
+  var half = (WIN - T0) / (REP * 2);
+  tl.to('#ob', { y: 6, duration: half, ease: 'none', repeat: REP * 2 - 1, yoyo: true }, T0);
+  tl.to('#oa', { y: -6, duration: half, ease: 'none', repeat: REP * 2 - 2, yoyo: true }, T0 + half);
+
+  var end = tl.duration();
+  B.hold(tl, end, Math.max(HOLD, TOTAL - end));
+})();
+</script>
+</body></html>

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#view{ position:absolute; inset:0; perspective:600px; perspective-origin:5% 50%; overflow:hidden; }
+#page{ position:absolute; left:160px; top:90px; width:1600px; height:900px; border-radius:20px;
+  background:#101219; border:1px solid color-mix(in srgb, var(--fg) 14%, transparent);
+  transform-origin:50% 0%; will-change:transform; overflow:hidden; backface-visibility:hidden; }
+.pnav{ height:84px; display:flex; align-items:center; padding:0 54px; gap:34px;
+  border-bottom:1px solid color-mix(in srgb, var(--fg) 12%, transparent); }
+.pdot{ width:18px; height:18px; border-radius:50%; background:var(--accent); }
+.pnav .ni{ width:120px; height:16px; border-radius:8px; background:color-mix(in srgb, var(--fg) 20%, transparent); }
+.phero{ padding:64px 54px 0; }
+.pht{ font-size:84px; font-weight:900; line-height:1.12; }
+.pht em{ color:var(--accent); font-style:normal; }
+.phsub{ margin-top:26px; width:520px; height:18px; border-radius:9px;
+  background:color-mix(in srgb, var(--fg) 18%, transparent); }
+.prow{ display:flex; gap:30px; padding:54px; }
+.pcard{ flex:1; height:300px; border-radius:16px; background:color-mix(in srgb, var(--fg) 7%, transparent);
+  border:1px solid color-mix(in srgb, var(--fg) 15%, transparent); }
+.pcard.hot{ border-color:var(--accent); background:color-mix(in srgb, var(--accent) 10%, transparent); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4.833333333333333" data-width="1920" data-height="1080">
+
+<div id="view">
+  <div id="page">
+    <div class="pnav"><div class="pdot"></div><div class="ni"></div><div class="ni"></div><div class="ni"></div></div>
+    <div class="phero">
+      <div class="pht">掀开桌上的<br><em>图纸</em></div>
+      <div class="phsub"></div>
+    </div>
+    <div class="prow"><div class="pcard hot"></div><div class="pcard"></div><div class="pcard"></div></div>
+  </div>
+</div>
+
+    </div>
+    <script>
+      const FB = {"accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+const page=$('#page');
+// 初始：平躺 -80°，只见上缘窄带
+gsap.set(page,{rotationX:-80,scale:3.2,y:200,transformOrigin:'50% 0%'});
+// f25 起抬正：rotateX 关键帧 [-80, 2.6, -0.9, 0] @ f25→68→72→76
+tl.to(page,{rotationX:2.6,duration:F(43),ease:'power2.out'},F(25));
+tl.to(page,{rotationX:-0.9,duration:F(4),ease:'power1.inOut'},F(68));
+tl.to(page,{rotationX:0,duration:F(4),ease:'power1.out'},F(72));
+tl.to(page,{scale:1,y:0,duration:F(43),ease:'power2.out'},F(25));
+// perspective 600→1200、原点 5%→40% 联动
+tl.to('#view',{perspective:'1200px',perspectiveOrigin:'40% 50%',duration:F(51),ease:'power2.out'},F(25));
+// f76 后真静止
+tl.to({},{duration:F(69)},F(76));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

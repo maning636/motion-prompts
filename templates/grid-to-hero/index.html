@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"eyebrow","type":"string","label":"眉头小标","default":"TOTAL → FOCUS"},
+  {"id":"heroLabel","type":"string","label":"主视觉上方标签","default":"核心指标"},
+  {"id":"heroNumber","type":"string","label":"主视觉数字","default":"87%"},
+  {"id":"heroUnit","type":"string","label":"数字后缀","default":""},
+  {"id":"heroTitle","type":"string","label":"主视觉标题","default":"关键环节效率提升"},
+  {"id":"heroSub","type":"string","label":"主视觉副文","default":"六个维度收敛到一个判断"},
+  {"id":"cellLabels","type":"string","label":"六个单元标签（逗号分隔，6 条）","default":"收入,利润,用户,留存,GMV,增速"},
+  {"id":"cellValues","type":"string","label":"六个单元小数字（逗号分隔，6 条）","default":"42,68,120,76,93,68"},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity: .55;
+      }
+
+      /* ---------- eyebrow ---------- */
+      .eyebrow{
+        position:absolute; top:56px; left:96px; right:96px;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.22em; text-transform:uppercase;
+        color: #8A8A85;
+      }
+      .eyebrow .acc{ color: var(--accent, #00FF00); font-weight:700; letter-spacing:.18em; }
+      .eyebrow .arrow{
+        display:inline-flex; align-items:center; gap:8px;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+      }
+      .eyebrow .arrow svg{ display:block; }
+
+      /* ---------- 六宫格舞台 ---------- */
+      .stage{
+        position:absolute; inset:0;
+        display:grid; place-items:center;
+      }
+      .grid{
+        position:relative;
+        width: 1280px; height: 560px;
+        display:grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows:    repeat(2, 1fr);
+        gap: 24px;
+        transform-origin: 50% 50%;
+      }
+      .cell{
+        position:relative;
+        border:1px solid rgba(255,255,255,.10);
+        border-radius: 14px;
+        background:
+          linear-gradient(180deg,
+            color-mix(in srgb, var(--foreground, #F4EFE7) 2%, transparent),
+            transparent 70%);
+        padding: 26px 28px;
+        display:flex; flex-direction:column; justify-content:space-between;
+        will-change: transform, opacity;
+        opacity:0;
+        overflow:hidden;
+      }
+      .cell::before{
+        content:""; position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.025) 1px, transparent 1.5px);
+        background-size: 18px 18px;
+        mask-image: linear-gradient(180deg, #000 0%, transparent 60%);
+        -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 60%);
+      }
+      .cell .index{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 14px; letter-spacing:.18em; color:#6B6B66;
+      }
+      .cell .lab{
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+        font-size: 30px; font-weight:700; letter-spacing:.02em;
+        color: var(--foreground, #F4EFE7);
+      }
+      .cell .val{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 64px; font-weight:700; letter-spacing:-.02em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 82%, transparent);
+        line-height: 1;
+      }
+      /* 单元"亮起"那一刻的强调色描边 + 数值染色 */
+      .cell.lit{
+        border-color: color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+        box-shadow:
+          inset 0 0 0 1px color-mix(in srgb, var(--accent, #00FF00) 22%, transparent),
+          0 0 28px -10px color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+      }
+      .cell.lit .val{
+        color: var(--accent, #00FF00);
+        text-shadow: 0 0 18px color-mix(in srgb, var(--accent, #00FF00) 55%, transparent);
+      }
+      .cell.lit .lab{
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 90%, transparent);
+      }
+      .cell.lit .index{
+        color: var(--accent, #00FF00);
+      }
+
+      /* ---------- 中央主视觉（hero） ---------- */
+      .hero{
+        position:absolute;
+        left:50%; top:50%;
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity:0;
+        text-align:center;
+        width: 880px; max-width: 70%;
+        will-change: transform, opacity;
+      }
+      .hero .heroChip{
+        display:inline-flex; align-items:center; gap:10px;
+        padding: 7px 16px; border:1px solid #2A2A2E; border-radius:999px;
+        font-size: 16px; letter-spacing:.18em; color:#9CA3AF; text-transform:uppercase;
+        margin-bottom: 22px;
+      }
+      .hero .heroChip b{
+        color: var(--accent, #00FF00); font-weight:700; letter-spacing:.05em;
+      }
+      .hero .heroNum{
+        display:flex; align-items:baseline; justify-content:center; gap:8px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 220px; line-height: 1;
+        font-weight: 700; letter-spacing: -.03em;
+        color: var(--foreground, #F4EFE7);
+      }
+      .hero .heroNum .unit{
+        font-size: 56px;
+        color: var(--accent, #00FF00);
+        font-weight: 700;
+        letter-spacing: .02em;
+        text-shadow: 0 0 24px color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+      }
+      .hero .heroTitle{
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+        font-size: 56px; font-weight: 700;
+        letter-spacing: -.01em;
+        margin-top: 18px;
+        color: var(--foreground, #F4EFE7);
+      }
+      .hero .heroSub{
+        margin-top: 14px;
+        font-size: 22px;
+        letter-spacing: .04em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 60%, transparent);
+      }
+
+      /* hero 上场时套的"放大冲击"光晕 */
+      .heroPulse{
+        position:absolute; left:50%; top:50%;
+        width: 540px; height: 540px;
+        transform: translate(-50%, -50%) scale(0);
+        border-radius: 50%;
+        background:
+          radial-gradient(closest-side,
+            color-mix(in srgb, var(--accent, #00FF00) 35%, transparent),
+            transparent 70%);
+        pointer-events:none;
+        opacity:0;
+        will-change: transform, opacity;
+      }
+      .heroRing{
+        position:absolute; left:50%; top:50%;
+        width: 600px; height: 600px;
+        transform: translate(-50%, -50%) scale(0);
+        border:1px solid color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+        border-radius: 50%;
+        pointer-events:none;
+        opacity:0;
+        will-change: transform, opacity;
+      }
+
+      /* ---------- 脚注 ---------- */
+      .footnote{
+        position:absolute; bottom:56px; left:96px; right:96px;
+        display:flex; align-items:center; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 18px; letter-spacing:.06em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+      }
+      .footnote .stageTag{
+        display:inline-flex; align-items:center; gap:8px;
+      }
+      .footnote .stageTag .dot{
+        width: 8px; height: 8px; border-radius: 50%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 10px color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="stage" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+
+        <div class="eyebrow">
+          <span><b class="acc" id="eyebrowLeft">TOTAL → FOCUS</b></span>
+          <span class="arrow" id="eyebrowRight">
+            grid
+            <svg width="22" height="10" viewBox="0 0 22 10" fill="none" aria-hidden="true">
+              <path d="M0 5 H 18" stroke="currentColor" stroke-width="1"/>
+              <path d="M14 1 L20 5 L14 9" stroke="currentColor" stroke-width="1" fill="none"/>
+            </svg>
+            hero
+          </span>
+        </div>
+
+        <!-- 六宫格 -->
+        <div class="grid" id="grid">
+          <div class="cell" data-i="0"><span class="index">01</span><span class="lab">收入</span><span class="val">42</span></div>
+          <div class="cell" data-i="1"><span class="index">02</span><span class="lab">利润</span><span class="val">68</span></div>
+          <div class="cell" data-i="2"><span class="index">03</span><span class="lab">用户</span><span class="val">120</span></div>
+          <div class="cell" data-i="3"><span class="index">04</span><span class="lab">留存</span><span class="val">76</span></div>
+          <div class="cell" data-i="4"><span class="index">05</span><span class="lab">GMV</span><span class="val">93</span></div>
+          <div class="cell" data-i="5"><span class="index">06</span><span class="lab">增速</span><span class="val">68</span></div>
+        </div>
+
+        <!-- 主视觉（hero） -->
+        <div class="heroRing" id="heroRing"></div>
+        <div class="heroPulse" id="heroPulse"></div>
+        <div class="hero" id="hero">
+          <span class="heroChip"><b id="heroChipB">01</b><span id="heroChipLab">核心指标</span></span>
+          <div class="heroNum">
+            <span id="heroNum">87%</span><span class="unit" id="heroUnit"></span>
+          </div>
+          <div class="heroTitle" id="heroTitle">关键环节效率提升</div>
+          <div class="heroSub" id="heroSub">六个维度收敛到一个判断</div>
+        </div>
+
+        <!-- 脚注 -->
+        <div class="footnote">
+          <span class="stageTag"><span class="dot"></span><span id="stageLab">SIX THUMBS → HERO</span></span>
+          <span id="footRight">GRID → HERO</span>
+        </div>
+
+      </section>
+    </div>
+    <script>
+      /* ----- 变量接线（与全库契约一致） ----- */
+      const fallback = {
+        eyebrow: "TOTAL → FOCUS",
+        heroLabel: "核心指标",
+        heroNumber: "87%",
+        heroUnit: "",
+        heroTitle: "关键环节效率提升",
+        heroSub: "六个维度收敛到一个判断",
+        cellLabels: "收入,利润,用户,留存,GMV,增速",
+        cellValues: "42,68,120,76,93,68",
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim());
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      /* ----- 内容回填 ----- */
+      $("eyebrowLeft").textContent = v.eyebrow || fallback.eyebrow;
+
+      const labs = split(v.cellLabels);
+      const vals = split(v.cellValues);
+      const cells = document.querySelectorAll(".cell");
+      cells.forEach((cell, i) => {
+        const labEl = cell.querySelector(".lab");
+        const valEl = cell.querySelector(".val");
+        const idxEl = cell.querySelector(".index");
+        if (labs[i] != null) labEl.textContent = labs[i];
+        if (vals[i] != null) valEl.textContent = vals[i];
+        if (idxEl) idxEl.textContent = String(i + 1).padStart(2, "0");
+      });
+
+      $("heroChipLab").textContent = v.heroLabel || fallback.heroLabel;
+      // chip 的 b 元素作"序号装饰"，固定为 01（呼应六宫格的 01–06）
+      $("heroChipB").textContent   = "01";
+      $("heroNum").textContent     = v.heroNumber || fallback.heroNumber;
+      $("heroUnit").textContent    = v.heroUnit || "";
+      $("heroTitle").textContent   = v.heroTitle || fallback.heroTitle;
+      $("heroSub").textContent     = v.heroSub || fallback.heroSub;
+      $("footRight").textContent   = "GRID → HERO";
+
+      /* ----- 时间线 ----- */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+      const tl = gsap.timeline({ paused: true });
+
+      const grid     = $("grid");
+      const cellsA   = Array.from(document.querySelectorAll(".cell"));
+      const hero     = $("hero");
+      const heroRing = $("heroRing");
+      const heroPulse= $("heroPulse");
+      const stageLab = $("stageLab");
+
+      /* ---------- 阶段 1：六宫格错峰亮起（0.0–2.0s） ---------- */
+      tl.fromTo(cellsA,
+        { opacity: 0, y: 30 },
+        {
+          opacity: 1, y: 0,
+          duration: 0.55, ease: "power3.out",
+          stagger: 0.18,
+          onStart: function () {
+            // 当前这一格 + 它之前所有格全部亮起
+            const target = this.targets()[0];
+            if (!target) return;
+            const idx = cellsA.indexOf(target);
+            cellsA.forEach((c, i) => {
+              if (i <= idx) c.classList.add("lit");
+              else          c.classList.remove("lit");
+            });
+          }
+        }, 0.1);
+
+      // 全部亮起后做一次轻微"呼吸"，强调它们同时在线
+      tl.to(cellsA, { scale: 1.04, duration: 0.5, ease: "sine.inOut", yoyo: true, repeat: 1, stagger: 0.04 }, 1.7);
+
+      /* ---------- 阶段 2：六宫格聚拢到中心（2.0–3.6s） ---------- */
+      // 整组 grid 缩到中心、缩小、淡出
+      tl.to(grid, {
+        scale: 0.42,
+        x: () => -window.innerWidth / 2 + 640,   // 让 grid 中心对齐屏幕中心
+        y: 0,
+        duration: 1.0,
+        ease: "power3.inOut",
+        transformOrigin: "50% 50%",
+      }, 2.1);
+
+      // 单元自身再 x→0 / 缩小一点再重叠
+      tl.to(cellsA, {
+        scale: 0.7,
+        opacity: 0.35,
+        duration: 0.7,
+        ease: "power2.inOut",
+        stagger: 0.04,
+      }, 2.6);
+
+      // 让聚拢后的网格淡出，给 hero 腾场
+      tl.to(grid, { opacity: 0, duration: 0.45, ease: "power1.out" }, 3.4);
+
+      /* ---------- 阶段 3：主视觉登场（3.6–5.0s） ---------- */
+      // 光晕脉冲 + 圆环
+      tl.fromTo(heroPulse,
+        { scale: 0, opacity: 0 },
+        { scale: 1.6, opacity: 1, duration: 0.7, ease: "power3.out" }, 3.7);
+      tl.to(heroPulse, { scale: 2.4, opacity: 0, duration: 0.9, ease: "power2.out" }, 4.2);
+
+      tl.fromTo(heroRing,
+        { scale: 0, opacity: 0 },
+        { scale: 1.0, opacity: 1, duration: 0.5, ease: "power3.out" }, 3.8);
+      tl.to(heroRing, { scale: 1.08, opacity: 0, duration: 0.9, ease: "power2.out" }, 4.6);
+
+      // hero 自身：缩 0.5 → 1，opacity 0 → 1
+      tl.fromTo(hero,
+        { scale: 0.5, opacity: 0 },
+        { scale: 1.0, opacity: 1, duration: 0.7, ease: "back.out(1.4)" }, 3.9);
+
+      // hero 内部错峰：chip → 大数字 → 标题 → 副文
+      tl.fromTo("#heroChipLab",
+        { opacity: 0, y: 10 },
+        { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 4.15);
+      tl.fromTo("#heroNum",
+        { opacity: 0, y: 18, scale: 0.92 },
+        { opacity: 1, y: 0, scale: 1.0, duration: 0.65, ease: "power3.out" }, 4.30);
+      tl.fromTo("#heroTitle",
+        { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 4.65);
+      tl.fromTo("#heroSub",
+        { opacity: 0, y: 10 },
+        { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 4.85);
+
+      // 大数字轻呼吸一下，强调"这就是关键"
+      tl.to("#heroNum", { scale: 1.04, duration: 0.9, ease: "sine.inOut", yoyo: true, repeat: 1 }, 5.05);
+
+      /* ---------- 阶段 4：停留可读 ---------- */
+      // 什么都不做，留 1s 给观众读
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

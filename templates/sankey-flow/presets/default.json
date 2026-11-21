@@ -1,0 +1,10 @@
+{
+  "title": "流量转化漏斗",
+  "subtitle": "用户从访问到付费的流转分布",
+  "sources": "自然搜索,社交媒体,直接访问",
+  "targets": "注册,购买",
+  "values": "400,120;280,90;150,60",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

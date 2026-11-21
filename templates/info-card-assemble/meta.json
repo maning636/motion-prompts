@@ -1,0 +1,13 @@
+{
+  "id": "info-card-assemble",
+  "name": "信息卡拼合成版",
+  "description": "6 张信息卡片从画面四个边缘飞入，旋转回正后拼合成一张 2x3 平衡版面，落定后整体微浮。",
+  "category": "对比叙事",
+  "tags": ["信息卡", "飞入拼合", "序列进程", "版面组装"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-05T00:00:00.000Z"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "keyword-sticker",
+  "private": true,
+  "scripts": {
+    "render": "cd ../.. && npm run render -- keyword-sticker"
+  }
+}

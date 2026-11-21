@@ -1,0 +1,16 @@
+{
+  "id": "docu-form-redact",
+  "name": "纪录片 B24 审核清单",
+  "description": "审核清单 · 皮影档案族 · docu-form 06",
+  "series": "docu",
+  "category": "纪录片皮影",
+  "tags": [
+    "纪录片皮影",
+    "档案模板",
+    "docu-form-checklist-audit"
+  ],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "createdAt": "2026-08-30T00:00:00.000Z"
+}

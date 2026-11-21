@@ -1,0 +1,11 @@
+{
+  "query": "ai",
+  "item1": "AI 文案生成",
+  "item2": "AI 配音合成",
+  "item3": "打开素材库",
+  "item4": "渲染默认预设",
+  "item5": "分享项目链接",
+  "accent": "#00FF00",
+  "background": "#0A0A0F",
+  "foreground": "#F4F4F2"
+}

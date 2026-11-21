@@ -1,0 +1,13 @@
+{
+  "id": "word-slot-cycle",
+  "name": "槽位词循环",
+  "description": "固定句式中一个关键词槽位循环替换：旧词上滑出、新词从下滑入，循环 N 次，强调色落在替换词与进度指示上。",
+  "category": "文字动效",
+  "tags": ["文字动效", "槽位", "循环替换", "关键词"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-05T00:00:00.000Z"
+}

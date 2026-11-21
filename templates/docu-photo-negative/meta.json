@@ -1,0 +1,16 @@
+{
+  "id": "docu-photo-negative",
+  "name": "纪录片 B28 案件卷宗",
+  "description": "案件卷宗封面 · 皮影档案族 · docu-photo 04",
+  "series": "docu",
+  "category": "纪录片皮影",
+  "tags": [
+    "纪录片皮影",
+    "档案模板",
+    "docu-photo-dossier"
+  ],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "createdAt": "2026-08-30T00:00:00.000Z"
+}

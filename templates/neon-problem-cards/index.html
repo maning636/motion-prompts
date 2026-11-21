@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "titleEn", "type": "string", "label": "顶部英文小标签", "default": "WHY IT FALLS SHORT"}, {"id": "titleCn", "type": "string", "label": "顶部中文标题", "default": "简易版的三个问题"}, {"id": "c1Num", "type": "string", "label": "卡1编号", "default": "01"}, {"id": "c1En", "type": "string", "label": "卡1英文标签", "default": "NOT PERSISTENT"}, {"id": "c1Title", "type": "string", "label": "卡1中文标题", "default": "没法长期运行"}, {"id": "c1B1", "type": "string", "label": "卡1细节行1", "default": "多是 AI 临时的运行环境"}, {"id": "c1B2", "type": "string", "label": "卡1细节行2", "default": "不能后续一直使用"}, {"id": "c2Num", "type": "string", "label": "卡2编号", "default": "02"}, {"id": "c2En", "type": "string", "label": "卡2英文标签", "default": "JUST A COPY"}, {"id": "c2Title", "type": "string", "label": "卡2中文标题", "default": "界面是直接复刻的"}, {"id": "c2B1", "type": "string", "label": "卡2细节行1", "default": "不是你自己喜欢的页面"}, {"id": "c2B2", "type": "string", "label": "卡2细节行2", "default": "不够个性化"}, {"id": "c3Num", "type": "string", "label": "卡3编号", "default": "03"}, {"id": "c3En", "type": "string", "label": "卡3英文标签", "default": "NOT YOURS"}, {"id": "c3Title", "type": "string", "label": "卡3中文标题", "default": "不是从头按你来的"}, {"id": "c3B1", "type": "string", "label": "卡3细节行1", "default": ""}, {"id": "c3B2", "type": "string", "label": "卡3细节行2", "default": ""}, {"id": "duration", "type": "number", "label": "总时长（秒，演完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12);
+  color: var(--foreground, #F5F5F3); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+/* 左上标题组 */
+#titleGroup{ position:absolute; left:150px; top:110px; }
+.ten{ display:flex; align-items:center; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700;
+  font-size:26px; letter-spacing:8px; color:#10B981; text-transform:uppercase;
+  text-shadow:0 0 14px rgba(16,185,129,.45); max-width:1200px; white-space:nowrap; overflow:hidden; }
+.ten::before{ content:''; width:34px; height:3px; border-radius:2px; background:#10B981;
+  box-shadow:0 0 10px rgba(16,185,129,.7); margin-right:18px; flex:none; }
+.tcn{ margin-top:18px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:62px;
+  color:#FFFFFF; letter-spacing:2px; max-width:1200px; overflow-wrap:break-word; }
+
+/* 三卡横排 */
+.card{ position:absolute; top:320px; width:500px; height:560px; background:#12161C;
+  border:1px solid rgba(16,185,129,.55); border-radius:16px;
+  box-shadow:0 0 26px rgba(16,185,129,.22), 0 0 60px rgba(16,185,129,.08), inset 0 0 30px rgba(16,185,129,.04);
+  will-change:transform; }
+#card1{ left:150px; } #card2{ left:710px; } #card3{ left:1270px; }
+
+.cnum{ position:absolute; left:40px; top:34px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700;
+  font-size:62px; color:#10B981; text-shadow:0 0 18px rgba(16,185,129,.55); }
+.cx{ position:absolute; right:36px; top:44px; width:52px; height:52px; }
+.cx svg{ width:100%; height:100%; overflow:visible; }
+.cx .xstroke{ stroke:#EF4444; stroke-width:6; fill:none; stroke-linecap:round;
+  filter:drop-shadow(0 0 8px rgba(239,68,68,.65)); }
+.cen{ position:absolute; left:40px; right:40px; top:130px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  font-weight:700; font-size:22px; letter-spacing:6px; color:#34D399; text-transform:uppercase;
+  text-shadow:0 0 12px rgba(52,211,153,.4); white-space:nowrap; overflow:hidden; }
+.ct{ position:absolute; left:40px; right:40px; top:180px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  font-weight:700; font-size:38px; color:#FFFFFF; line-height:1.3; overflow-wrap:break-word; }
+.cdiv{ position:absolute; left:40px; right:40px; top:292px; height:1px;
+  background:linear-gradient(90deg, rgba(16,185,129,.5), rgba(16,185,129,.06)); }
+.cbullets{ position:absolute; left:40px; right:40px; top:324px; }
+.cb{ display:flex; align-items:flex-start; font-size:27px; color:#9CA3AF;
+  line-height:1.45; margin-bottom:22px; overflow-wrap:break-word; }
+.cb::before{ content:''; flex:none; width:9px; height:9px; border-radius:50%;
+  background:#10B981; box-shadow:0 0 8px rgba(16,185,129,.7); margin:12px 16px 0 0; }
+.cb:empty{ display:none; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div id="titleGroup">
+        <div class="ten" id="tEn"></div>
+        <div class="tcn" id="tCn"></div>
+      </div>
+
+      <div class="card" id="card1">
+        <div class="cnum e" id="n1"></div>
+        <div class="cx e"><svg viewBox="0 0 52 52"><circle class="xstroke" cx="26" cy="26" r="22"/><line class="xstroke" x1="17" y1="17" x2="35" y2="35"/><line class="xstroke" x1="35" y1="17" x2="17" y2="35"/></svg></div>
+        <div class="cen e" id="en1"></div>
+        <div class="ct e" id="ct1"></div>
+        <div class="cdiv e"></div>
+        <div class="cbullets"><div class="cb" id="b11"></div><div class="cb" id="b12"></div></div>
+      </div>
+
+      <div class="card" id="card2">
+        <div class="cnum e" id="n2"></div>
+        <div class="cx e"><svg viewBox="0 0 52 52"><circle class="xstroke" cx="26" cy="26" r="22"/><line class="xstroke" x1="17" y1="17" x2="35" y2="35"/><line class="xstroke" x1="35" y1="17" x2="17" y2="35"/></svg></div>
+        <div class="cen e" id="en2"></div>
+        <div class="ct e" id="ct2"></div>
+        <div class="cdiv e"></div>
+        <div class="cbullets"><div class="cb" id="b21"></div><div class="cb" id="b22"></div></div>
+      </div>
+
+      <div class="card" id="card3">
+        <div class="cnum e" id="n3"></div>
+        <div class="cx e"><svg viewBox="0 0 52 52"><circle class="xstroke" cx="26" cy="26" r="22"/><line class="xstroke" x1="17" y1="17" x2="35" y2="35"/><line class="xstroke" x1="35" y1="17" x2="17" y2="35"/></svg></div>
+        <div class="cen e" id="en3"></div>
+        <div class="ct e" id="ct3"></div>
+        <div class="cdiv e"></div>
+        <div class="cbullets"><div class="cb" id="b31"></div><div class="cb" id="b32"></div></div>
+      </div>
+    </div>
+    <script>
+      const FB = {"titleEn": "WHY IT FALLS SHORT", "titleCn": "简易版的三个问题", "c1Num": "01", "c1En": "NOT PERSISTENT", "c1Title": "没法长期运行", "c1B1": "多是 AI 临时的运行环境", "c1B2": "不能后续一直使用", "c2Num": "02", "c2En": "JUST A COPY", "c2Title": "界面是直接复刻的", "c2B1": "不是你自己喜欢的页面", "c2B2": "不够个性化", "c3Num": "03", "c3En": "NOT YOURS", "c3Title": "不是从头按你来的", "c3B1": "", "c3B2": "", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $=(s)=>document.querySelector(s);
+      const DUR=+v.duration>0?+v.duration:6;
+      $('[data-composition-id]').setAttribute('data-duration',String(DUR));
+      $('#tEn').textContent=v.titleEn||''; $('#tCn').textContent=v.titleCn||'';
+      for(const i of [1,2,3]){
+        $('#n'+i).textContent=v['c'+i+'Num']||'';
+        $('#en'+i).textContent=v['c'+i+'En']||'';
+        $('#ct'+i).textContent=v['c'+i+'Title']||'';
+        $('#b'+i+'1').textContent=v['c'+i+'B1']||'';
+        $('#b'+i+'2').textContent=v['c'+i+'B2']||'';
+      }
+
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+
+      /* 1. 标题组淡入上移（0.4s） */
+      tl.fromTo('#titleGroup',{opacity:0,y:30},{opacity:1,y:0,duration:0.6,ease:'power3.out'},0.4);
+      /* 2. 卡1 入场（0.7s），内部元素 stagger */
+      tl.fromTo('#card1',{opacity:0,y:70},{opacity:1,y:0,duration:0.7,ease:'power3.out'},0.7);
+      tl.fromTo('#card1 .e',{opacity:0,y:20},{opacity:1,y:0,duration:0.4,ease:'power2.out',stagger:0.08},0.85);
+      /* 3. 卡2 入场 + 卡1 bullets 出现（1.9s） */
+      tl.fromTo('#card2',{opacity:0,y:70},{opacity:1,y:0,duration:0.7,ease:'power3.out'},1.9);
+      tl.fromTo('#card2 .e',{opacity:0,y:20},{opacity:1,y:0,duration:0.4,ease:'power2.out',stagger:0.08},2.05);
+      tl.fromTo('#card1 .cb',{opacity:0,y:16},{opacity:1,y:0,duration:0.4,ease:'power2.out',stagger:0.15},1.9);
+      /* 4. 卡3 入场 + 卡2 bullets 出现（3.1s） */
+      tl.fromTo('#card3',{opacity:0,y:70},{opacity:1,y:0,duration:0.7,ease:'power3.out'},3.1);
+      tl.fromTo('#card3 .e',{opacity:0,y:20},{opacity:1,y:0,duration:0.4,ease:'power2.out',stagger:0.08},3.25);
+      tl.fromTo('#card2 .cb',{opacity:0,y:16},{opacity:1,y:0,duration:0.4,ease:'power2.out',stagger:0.15},3.1);
+      /* 5. 卡3 bullets 出现（有内容时） */
+      tl.fromTo('#card3 .cb',{opacity:0,y:16},{opacity:1,y:0,duration:0.4,ease:'power2.out',stagger:0.15},4.3);
+      /* 演完定格，无收尾出场动画 */
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

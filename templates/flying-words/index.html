@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"word1","type":"string","label":"词 1（顶部左上）","default":"从"},
+  {"id":"word2","type":"string","label":"词 2（顶部右上）","default":"碎片"},
+  {"id":"word3","type":"string","label":"词 3（左侧中）","default":"到"},
+  {"id":"word4","type":"string","label":"词 4（右侧中·强调）","default":"系统"},
+  {"id":"word5","type":"string","label":"词 5（左下）","default":"从"},
+  {"id":"word6","type":"string","label":"词 6（右下）","default":"复制"},
+  {"id":"word7","type":"string","label":"词 7（中左·强调）","default":"到"},
+  {"id":"word8","type":"string","label":"词 8（中右）","default":"重组"},
+  {"id":"leadWord","type":"string","label":"汇合后的主标题关键词","default":"重组"},
+  {"id":"subtitle","type":"string","label":"副标题（汇合后下方出现）","default":"把零散的信息流，聚成可复用的资产"},
+  {"id":"eyebrow","type":"string","label":"顶头 eyebrow 标签","default":"FLYING WORDS · 文字动效"},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: 56px 56px;
+        opacity: .55;
+      }
+
+      /* 顶头 eyebrow */
+      .eyebrow{
+        position:absolute; top:56px; left:96px; right:96px;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:16px; letter-spacing:.22em; text-transform:uppercase;
+        color:#8A8A85;
+      }
+      .eyebrow .acc{ color: var(--accent, #00FF00); font-weight:700; letter-spacing:.18em; }
+
+      /* 中心舞台 */
+      .stage{
+        position:absolute; inset:0;
+        display:grid; place-items:center;
+      }
+      .stage-inner{
+        position:relative;
+        width: 1500px; height: 640px;
+      }
+
+      /* 主标题（汇合后出现） */
+      .headline{
+        position:absolute; left:50%; top:44%;
+        transform: translate(-50%, -50%);
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight: 700;
+        font-size: 142px;
+        line-height: 1.05;
+        letter-spacing: -.02em;
+        color: var(--foreground, #F4EFE7);
+        text-align:center;
+        white-space: nowrap;
+        opacity: 0;
+        text-shadow:
+          0 0 28px color-mix(in srgb, var(--accent, #00FF00) 22%, transparent),
+          0 0 80px color-mix(in srgb, var(--accent, #00FF00) 14%, transparent);
+      }
+      .headline .lead{
+        color: var(--accent, #00FF00);
+        margin: 0 6px;
+        position: relative;
+      }
+
+      /* 副标题 */
+      .subtitle{
+        position:absolute; left:50%; top:86%;
+        transform: translate(-50%, -50%);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+        font-size: 30px;
+        letter-spacing: .04em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 72%, transparent);
+        opacity: 0;
+        white-space: nowrap;
+      }
+
+      /* 飞入词（小字号，沿四周入射，落位到主标题对应字位） */
+      .word{
+        position:absolute;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight: 700;
+        font-size: 56px;
+        line-height: 1;
+        letter-spacing: -.01em;
+        color: var(--foreground, #F4EFE7);
+        opacity: 0;
+        will-change: transform, opacity;
+        text-shadow: 0 0 18px rgba(0,0,0,.35);
+        /* 用 padding+box 给文字一个明确的盒子宽度，让 transform: translate 精确到位 */
+        padding: 0;
+        margin: 0;
+        white-space: nowrap;
+      }
+      .word.lead{
+        color: var(--accent, #00FF00);
+      }
+      /* 入射轨迹终点：词本体就是文字盒，无需 ghost 套壳 */
+      .word .ghost{ display:inline; }
+
+      /* 入射尾迹——每个词拖一条发光短线 */
+      .trail{
+        position:absolute; left:50%; top:50%;
+        width: 80px; height: 2px;
+        background: linear-gradient(90deg, transparent, var(--accent, #00FF00));
+        transform-origin: left center;
+        opacity: 0;
+        box-shadow: 0 0 6px color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+      }
+
+      /* 四个角的源点指示（轻微发光十字） */
+      .source-dot{
+        position:absolute; width:14px; height:14px; border-radius:50%;
+        background: color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+        box-shadow: 0 0 14px color-mix(in srgb, var(--accent, #00FF00) 80%, transparent);
+        opacity: 0;
+      }
+      .source-dot.tl{ top:120px;   left:140px; }
+      .source-dot.tr{ top:120px;   right:140px; }
+      .source-dot.ml{ top:50%; left:120px; transform: translateY(-50%); }
+      .source-dot.mr{ top:50%; right:120px; transform: translateY(-50%); }
+      .source-dot.bl{ bottom:140px; left:140px; }
+      .source-dot.br{ bottom:140px; right:140px; }
+
+      /* 落位闪光——每个词到位瞬间炸一下 */
+      .spark{
+        position:absolute; left:50%; top:50%;
+        width: 0; height: 0; border-radius:50%;
+        background: var(--accent, #00FF00);
+        transform: translate(-50%, -50%);
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      /* 脚注 */
+      .footnote{
+        position:absolute; bottom:56px; left:96px; right:96px;
+        display:flex; align-items:center; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size:18px; letter-spacing:.06em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+      }
+      .footnote .badge{
+        display:inline-flex; align-items:center; gap:10px;
+        padding:7px 16px; border:1px solid #2A2A2E; border-radius:999px;
+        color:#9CA3AF; font-size:16px; letter-spacing:.16em; text-transform:uppercase;
+      }
+      .footnote .badge b{ color: var(--accent, #00FF00); font-weight:700; letter-spacing:.05em; }
+      .footnote .count b{ color: var(--foreground, #F4EFE7); font-weight:700; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="stage" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+
+        <div class="eyebrow">
+          <span><b class="acc">FLY</b>&nbsp;&nbsp;WORDS · ASSEMBLE</span>
+          <span id="eyebrowRight">文字动效 · kinetic type</span>
+        </div>
+
+        <!-- 入射源点（4 角 + 2 侧 + 2 中侧，共 8 个） -->
+        <span class="source-dot tl"></span>
+        <span class="source-dot tr"></span>
+        <span class="source-dot ml"></span>
+        <span class="source-dot mr"></span>
+        <span class="source-dot bl"></span>
+        <span class="source-dot br"></span>
+
+        <!-- 飞入词（JS 动态生成） -->
+        <div class="stage-inner" id="stageInner">
+          <!-- 主标题（汇合后） -->
+          <h1 class="headline" id="headline"></h1>
+          <p class="subtitle" id="subtitle"></p>
+        </div>
+
+        <!-- 脚注 -->
+        <div class="footnote">
+          <span class="badge"><b>8</b>WORDS → 1 SENTENCE</span>
+          <span class="count" id="footCount">08 个关键词汇成 01 句主文案</span>
+          <span class="badge"><b>06</b>SECONDS</span>
+        </div>
+
+      </section>
+    </div>
+    <script>
+      /* ---------- 变量接线（与全库契约一致） ---------- */
+      const fallback = {
+        word1:"从", word2:"碎片", word3:"到", word4:"系统",
+        word5:"从", word6:"复制", word7:"到", word8:"重组",
+        leadWord:"重组",
+        subtitle:"把零散的信息流，聚成可复用的资产",
+        eyebrow:"FLYING WORDS · 文字动效",
+        accent:"#00FF00", background:"#12100E", foreground:"#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const $ = (id) => document.getElementById(id);
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      /* ---------- 内容回填 ---------- */
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      // 8 个词的入射点位：分 8 个方向（每 45° 一个）
+      // 坐标是相对于 stage-inner（1500x640），左上/右上/左中/右中/左下/右下/中左/中右
+      // 终点近似落在主标题行一条直线上的 8 个字位（视觉对齐"重组"为重心第 7 位）
+      const targetXs = [0.10, 0.22, 0.34, 0.46, 0.58, 0.70, 0.82, 0.94];
+      const targetY  = 0.46; // 主标题行居中
+
+      // 8 个起点（屏幕四周，单位 px，相对于 stage-inner）
+      const stageW = 1500, stageH = 640;
+      const startPositions = [
+        { x: -220,            y: -180,             side: "tl" }, // 词1 左上→顶左
+        { x:  stageW + 220,   y: -180,             side: "tr" }, // 词2 右上→顶右
+        { x: -260,            y: stageH * 0.46 - 40, side: "ml" }, // 词3 左中→左中
+        { x:  stageW + 260,   y: stageH * 0.46 - 40, side: "mr" }, // 词4 右中（强调）→右中
+        { x: -220,            y:  stageH + 180,    side: "bl" }, // 词5 左下→底左
+        { x:  stageW + 220,   y:  stageH + 180,    side: "br" }, // 词6 右下→底右
+        { x: -300,            y:  stageH * 0.18,   side: "ml2" }, // 词7 中上左→高
+        { x:  stageW + 300,   y:  stageH * 0.18,   side: "mr2" }, // 词8 中上右→高
+      ];
+
+      // 汇合后主标题：把 leadWord 着色，串成"··· + leadWord + ···"
+      // 视觉节奏：从 碎片 到 系统，从 复制 到 重组 —— 对仗
+      const words = [
+        v.word1, v.word2, v.word3, v.word4,
+        v.word5, v.word6, v.word7, v.word8,
+      ].map((s) => String(s ?? "").trim() || "·");
+      const lead = String(v.leadWord || words[7] || "").trim() || "重组";
+
+      // 主标题文本（汇合后）：「从 碎片 到 系统 ／ 从 复制 到 重组」
+      const hl = $("headline");
+      const lineA = `${escapeHtml(words[0])} ${escapeHtml(words[1])} ${escapeHtml(words[2])} <span class="lead">${escapeHtml(words[3])}</span>`;
+      const lineB = `${escapeHtml(words[4])} ${escapeHtml(words[5])} ${escapeHtml(words[6])} <span class="lead">${escapeHtml(words[7])}</span>`;
+      hl.innerHTML = `${lineA}<br/>${lineB}`;
+
+      const sub = $("subtitle");
+      sub.textContent = v.subtitle || fallback.subtitle;
+
+      const eyebrowRight = $("eyebrowRight");
+      if (eyebrowRight) eyebrowRight.textContent = v.eyebrow || fallback.eyebrow;
+
+      const footCount = $("footCount");
+      if (footCount) footCount.textContent = `08 个关键词 → 01 句主文案`;
+
+      // 生成 8 个飞入词 + 8 条尾迹
+      const stageInner = $("stageInner");
+      const flyEls = [];
+      const trailEls = [];
+      const sparkEls = [];
+
+      for (let i = 0; i < 8; i++) {
+        const start = startPositions[i];
+        const tx = targetXs[i] * stageW; // 终点 x
+        const ty = targetY * stageH;     // 终点 y
+
+        const el = document.createElement("div");
+        el.className = "word" + ((i === 3 || i === 7) ? " lead" : "");
+        el.id = `word-${i}`;
+        el.textContent = words[i];
+        // 初始位置 = 起点（屏幕外）
+        el.style.left = "0px";
+        el.style.top  = "0px";
+        stageInner.appendChild(el);
+
+        // 尾迹
+        const tr = document.createElement("div");
+        tr.className = "trail";
+        tr.id = `trail-${i}`;
+        // 起点位置 + 旋转指终点
+        const dx = tx - start.x;
+        const dy = ty - start.y;
+        const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+        stageInner.appendChild(tr);
+
+        // 落位闪光
+        const sp = document.createElement("div");
+        sp.className = "spark";
+        sp.id = `spark-${i}`;
+        sp.style.left = `${tx}px`;
+        sp.style.top  = `${ty}px`;
+        stageInner.appendChild(sp);
+
+        flyEls.push({ el, from: { x: start.x, y: start.y }, to: { x: tx, y: ty }, start: start });
+        trailEls.push({ el: tr, from: { x: start.x, y: start.y }, to: { x: tx, y: ty }, ang: ang });
+        sparkEls.push({ el: sp, at: { x: tx, y: ty } });
+      }
+
+      // 主标题预置：隐藏，等飞入全部完成再揭示
+      hl.style.opacity = 0;
+      sub.style.opacity = 0;
+
+      /* ---------- 时间线 ---------- */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+      const tl = gsap.timeline({ paused: true });
+
+      // 入场：源点点亮（0.0–0.3s，错峰）
+      tl.fromTo(".source-dot", { opacity: 0, scale: 0 }, { opacity: 1, scale: 1, duration: 0.35, ease: "power2.out", stagger: 0.05 }, 0.05);
+
+      // 8 个词飞入（0.3–3.6s，错峰 stagger 0.32s）
+      // 每个词的入场：轨迹 + 旋转 + 缩放 power3.out，0.7s
+      const flyStart = 0.35;
+      const flyStagger = 0.30;
+      for (let i = 0; i < flyEls.length; i++) {
+        const { el, from, to } = flyEls[i];
+        const t0 = flyStart + i * flyStagger;
+        tl.fromTo(el,
+          { opacity: 0, x: from.x, y: from.y, scale: 0.7, rotation: i % 2 === 0 ? -8 : 8 },
+          { opacity: 1, x: to.x, y: to.y, scale: 1.0, rotation: 0, duration: 0.75, ease: "power3.out" },
+          t0);
+        // 尾迹跟随飞入：从起点拉伸到 50% 长度（弱发光描边）
+        const tr = trailEls[i].el;
+        const ang = trailEls[i].ang;
+        tl.fromTo(tr,
+          { opacity: 0, x: from.x, y: from.y, rotation: ang, scaleX: 0 },
+          { opacity: 0.55, x: from.x, y: from.y, rotation: ang, scaleX: 0.55, duration: 0.45, ease: "power2.out" },
+          t0);
+        tl.to(tr,
+          { opacity: 0, scaleX: 0, duration: 0.25, ease: "power2.in" },
+          t0 + 0.55);
+        // 落位闪光：词到位瞬间炸开
+        const sp = sparkEls[i].el;
+        tl.fromTo(sp,
+          { opacity: 0, width: 0, height: 0 },
+          { opacity: 0.9, width: 90, height: 90, duration: 0.18, ease: "power3.out" },
+          t0 + 0.72);
+        tl.to(sp,
+          { opacity: 0, width: 220, height: 220, duration: 0.42, ease: "power2.out" },
+          t0 + 0.88);
+      }
+
+      // 词到位后淡入消失（让主标题接管），错峰
+      const flyEnd = flyStart + (flyEls.length - 1) * flyStagger + 0.75;
+      tl.to(flyEls.map(f => f.el), {
+        opacity: 0, duration: 0.35, ease: "power2.in", stagger: 0.04,
+      }, flyEnd);
+
+      // 主标题揭示：汇合后整体淡入 + 微 y 位移（3.85s 起）
+      tl.fromTo(hl,
+        { opacity: 0, y: 18, clipPath: "inset(0 0 100% 0)" },
+        { opacity: 1, y: 0, clipPath: "inset(0 0 0% 0)", duration: 0.7, ease: "power3.out" },
+        flyEnd + 0.15);
+      // 强调词下划线 scaleX 0→1
+      tl.to("#headline .lead::after", { /* CSS 类选择器在 GSAP 中对伪元素支持有限，改用 JS 标记 */
+        duration: 0.001, onComplete: () => {
+          hl.querySelectorAll(".lead").forEach(ld => {
+            ld.style.setProperty("--under-show", "1");
+          });
+        }
+      }, flyEnd + 0.5);
+      // 用 GSAP 直接动画 underline 的 scaleX（通过覆盖样式）
+      tl.fromTo("#headline .lead",
+        { },
+        { duration: 0.6, ease: "power3.out",
+          onStart: () => {
+            hl.querySelectorAll(".lead").forEach(ld => {
+              ld.style.setProperty("animation", "under-grow .55s cubic-bezier(.2,.7,.2,1) forwards");
+            });
+          }
+        }, flyEnd + 0.55);
+
+      // 副标题
+      tl.fromTo(sub,
+        { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "power2.out" },
+        flyEnd + 0.85);
+
+      // 源点点淡出（防止干扰主标题）
+      tl.to(".source-dot", { opacity: 0, duration: 0.4, ease: "power2.in", stagger: 0.04 }, flyEnd + 0.2);
+
+      // 结尾：主标题轻微呼吸强调（停留可读）
+      tl.fromTo("#headline",
+        { letterSpacing: "-0.02em" },
+        { letterSpacing: "-0.005em", duration: 1.6, ease: "sine.inOut", yoyo: true, repeat: 1 }, DUR - 1.8);
+
+      window.__timelines.main = tl;
+    </script>
+    <style>
+      /* 注入主标题 lead 词的下划线动效 keyframes（GSAP 选择器对 ::after 不友好，绕路） */
+      @keyframes under-grow {
+        from { transform: translateX(-50%, 4px) scaleX(0); }
+        to   { transform: translateX(0, 0) scaleX(1); }
+      }
+      /* lead 词整体：轻微 lift，使下划线对齐 baseline */
+      #headline .lead{ display:inline-block; position:relative; }
+      #headline .lead::after{
+        content:""; position:absolute; left:0; right:0; bottom:-12px; height:6px;
+        background: var(--accent, #00FF00);
+        border-radius: 3px;
+        transform-origin: left center;
+        transform: scaleX(0);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+      }
+    </style>
+  </body>
+</html>

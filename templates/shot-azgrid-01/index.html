@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+.gcell{ position:absolute; width:570px; height:300px; border-radius:8px; background:#16181F;
+  border:3px solid #05060A; box-sizing:border-box; padding:30px; visibility:hidden; will-change:transform; }
+.gcell .gt{ font-size:34px; font-weight:800; }
+.gcell .gl{ margin-top:18px; height:12px; border-radius:6px; background:color-mix(in srgb, var(--fg) 24%, transparent); }
+.gcell.hot{ background:color-mix(in srgb, var(--accent) 18%, #101218); border-color:var(--accent); }
+.gcell.hot .gt{ color:var(--accent); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="3.3333333333333335" data-width="1920" data-height="1080">
+<div id="wall9" style="position:absolute;inset:0"><div class="gcell" id="g0" style="left:75px;top:90px"><div class="gt">批量渲染</div><div class="gl" style="width:75%"></div><div class="gl" style="width:52%"></div></div><div class="gcell" id="g1" style="left:675px;top:90px"><div class="gt">模板库</div><div class="gl" style="width:75%"></div><div class="gl" style="width:52%"></div></div><div class="gcell" id="g2" style="left:1275px;top:90px"><div class="gt">提示词</div><div class="gl" style="width:75%"></div><div class="gl" style="width:52%"></div></div><div class="gcell" id="g3" style="left:75px;top:410px"><div class="gt">一键配音</div><div class="gl" style="width:75%"></div><div class="gl" style="width:52%"></div></div><div class="gcell hot" id="g4" style="left:675px;top:410px"><div class="gt">导演审查</div><div class="gl" style="width:75%"></div><div class="gl" style="width:52%"></div></div><div class="gcell" id="g5" style="left:1275px;top:410px"><div class="gt">字幕对齐</div><div class="gl" style="width:75%"></div><div class="gl" style="width:52%"></div></div><div class="gcell" id="g6" style="left:75px;top:730px"><div class="gt">品牌色</div><div class="gl" style="width:75%"></div><div class="gl" style="width:52%"></div></div><div class="gcell" id="g7" style="left:675px;top:730px"><div class="gt">多格式</div><div class="gl" style="width:75%"></div><div class="gl" style="width:52%"></div></div><div class="gcell" id="g8" style="left:1275px;top:730px"><div class="gt">云同步</div><div class="gl" style="width:75%"></div><div class="gl" style="width:52%"></div></div></div>
+    </div>
+    <script>
+      const FB = {"accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+const ORDER=[4, 0, 7, 2, 5, 1, 8, 3, 6];
+// 十六分音符乱序逐格硬入（零淡化）：每 2f 一格，3f scale 1.18→1 + 2f 加深脉冲
+ORDER.forEach((idx,k)=>{
+  const el='#g'+idx, cue=k*2;
+  tl.set(el,{visibility:'visible'},F(cue));
+  tl.fromTo(el,{scale:1.18},{scale:1,duration:F(3),ease:'power2.out'},F(cue));
+  tl.fromTo(el,{filter:'brightness(.6)'},{filter:'brightness(1)',duration:F(2),
+    onComplete:()=>gsap.set(el,{clearProps:'filter'})},F(cue));
+});
+// 满墙呼吸一拍（scale 1.0↔1.015）
+tl.to('#wall9',{scale:1.015,duration:F(6),ease:'sine.inOut',transformOrigin:'50% 50%'},F(20));
+tl.to('#wall9',{scale:1,duration:F(6),ease:'sine.inOut'},F(26));
+// 中心格 14f 放大 3.28x 吞屏（描边滑出画外）
+tl.to('#g4',{scale:3.28,duration:F(14),ease:'power2.in',zIndex:50},F(34));
+tl.to(['#g0','#g1','#g2','#g3','#g5','#g6','#g7','#g8'],{opacity:0,duration:F(8)},F(40));
+// 收尾真静止（补齐到 100f）
+tl.to({},{duration:F(52)},F(48));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,16 @@
+{
+ "name": "排序条形榜 · 九十天学一件事的账",
+ "description": "按数值真排序的名次榜，名次牌 + 长条 + 大数三段式撑满整行",
+ "category": "数据可视化",
+ "tags": [
+  "积木社",
+  "chart",
+  "sun",
+  "snappy"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "card",
+ "when": "数据卡片 / 排序条形榜"
+}

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"position","type":"string","label":"位置（top-left/top-right/bottom-left/bottom-right）","default":"top-right"},{"id":"size","type":"number","label":"圆形直径（px）","default":240},{"id":"borderWidth","type":"number","label":"边框宽度（px）","default":4},{"id":"showPip","type":"string","label":"是否显示小三角指示器（true/false）","default":"true"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      /* ===== 奶油纸面贴纸工作台 · 设计令牌（见 design-systems/sticker-workbench/DESIGN.md） =====
+         Canvas #F5F0E6 / Paper #FFFDF7 / Ink #1D1D20 / InkSoft #4D4A48 / LineSoft #C9C0B2
+         Blue #3E7BF2 / Pink #F13B88 / Orange #FF9F1C / Lime #B9E833 / Violet #B99AF7 / Shadow #2A292B */
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden;
+        font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden;
+        background: var(--background, #F5F0E6); color: var(--foreground, #1D1D20); }
+      /* 全片固定 Ink 外框 10px */
+      .outer-frame{ position: absolute; inset: 0; border: 10px solid #1D1D20; pointer-events: none; z-index: 40; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; font-weight: 700; }
+
+      /* 角落元数据：mono 编号，避开摄像头所在角 */
+      .corner-index{ position: absolute; top: 84px; left: 120px; z-index: 30;
+        font-size: 20px; color: #4D4A48; }
+
+      /* 摄像头圆形贴纸：Paper 底 + Ink 描边 + 硬投影 */
+      .scene{ position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+      .webcam{ position: absolute; border-radius: 50%; background: #FFFDF7;
+        border: 4px solid #1D1D20; box-shadow: 10px 10px 0 #2A292B;
+        display: flex; align-items: center; justify-content: center; }
+      .placeholder{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; font-weight: 700;
+        font-size: 20px; color: #4D4A48; text-align: center; line-height: 1.3; }
+      /* Lime 小三角指示器：接通/确认焦点，最后弹出 */
+      .pip{ position: absolute; width: 34px; height: 30px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="outer-frame" id="frame"></div>
+      <div class="corner-index mono" id="cornerIndex">CAM 01 / OVERLAY</div>
+
+      <section id="scene" class="scene" data-start="0" data-duration="6" data-track-index="1">
+        <div class="webcam" id="webcam">
+          <div class="placeholder" id="placeholder">camera<br/>mask</div>
+          <svg class="pip" id="pip" viewBox="0 0 34 30">
+            <path d="M4 3 L31 15 L4 27 Z" fill="#B9E833" stroke="#1D1D20" stroke-width="4" stroke-linejoin="round" />
+          </svg>
+        </div>
+      </section>
+    </div>
+    <script>
+      const fallback = { position: "top-right", size: 240, borderWidth: 4, showPip: "true" };
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+
+      /* 位置：遵守奶油安全区（左右 120 / 顶 74 / 底预留 168，另让开硬投影） */
+      const size = Number(v.size) || 240;
+      const M = { side: 120, top: 74, bottom: 190 };
+      const positions = {
+        "top-left": { left: M.side, top: M.top },
+        "top-right": { right: M.side, top: M.top },
+        "bottom-left": { left: M.side, bottom: M.bottom },
+        "bottom-right": { right: M.side, bottom: M.bottom }
+      };
+      const pos = positions[v.position] || positions["top-right"];
+      const webcam = document.getElementById("webcam");
+      webcam.style.width = size + "px";
+      webcam.style.height = size + "px";
+      Object.assign(webcam.style, pos);
+      webcam.style.borderWidth = (Number(v.borderWidth) || 4) + "px";
+
+      /* 小三角指示器：放在圆外缘，指向画面中心 */
+      const pip = document.getElementById("pip");
+      const showPip = String(v.showPip).toLowerCase() === "true";
+      if (showPip) {
+        if (v.position === "top-left") { pip.style.left = "-12px"; pip.style.bottom = "8px"; pip.style.transform = "rotate(35deg) scaleX(-1)"; }
+        else if (v.position === "bottom-right") { pip.style.right = "-12px"; pip.style.top = "8px"; pip.style.transform = "rotate(35deg)"; }
+        else if (v.position === "bottom-left") { pip.style.left = "-12px"; pip.style.top = "8px"; pip.style.transform = "rotate(-35deg) scaleX(-1)"; }
+        else { pip.style.right = "-12px"; pip.style.bottom = "8px"; pip.style.transform = "rotate(-35deg)"; }
+      } else {
+        pip.style.display = "none";
+      }
+
+      /* 动效：贴纸落桌。圆形弹性落位，一次轻微强调，Lime 指示器最后锁定。 */
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const SPRING = "back.out(1.4)";
+      tl.fromTo("#frame", { opacity: 0 }, { opacity: 1, duration: 0.18 }, 0);
+      tl.fromTo("#cornerIndex", { opacity: 0 }, { opacity: 1, duration: 0.18 }, 0);
+      tl.fromTo("#webcam", { opacity: 0, scale: 0.76 }, { opacity: 1, scale: 1, duration: 0.34, ease: SPRING }, 0.2);
+      tl.fromTo("#placeholder", { opacity: 0 }, { opacity: 1, duration: 0.2 }, 0.5);
+      /* 一次轻微强调 1.00 → 1.035 → 1.00 */
+      tl.to("#webcam", { scale: 1.035, duration: 0.18, ease: "power2.out" }, 0.7);
+      tl.to("#webcam", { scale: 1, duration: 0.2, ease: "power2.inOut" }, 0.88);
+      if (showPip) {
+        tl.fromTo("#pip", { opacity: 0, scale: 0.5 }, { opacity: 1, scale: 1.12, duration: 0.14, ease: "power2.out" }, 1.1);
+        tl.to("#pip", { scale: 1, duration: 0.12, ease: "power2.inOut" }, 1.24);
+      }
+      tl.to(["#scene", "#cornerIndex"], { opacity: 0, duration: 0.28, ease: "power2.in" }, 5.5);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

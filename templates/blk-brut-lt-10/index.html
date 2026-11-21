@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"flag","name":"顶部小条","type":"string","label":"顶部 mono 小条（2–8 字）","default":"LIMITED"},{"id":"num","name":"折扣数","type":"string","label":"折扣数字（1–3 个字符，如 8 / 8.5）","default":"8"},{"id":"unit","name":"折扣单位","type":"string","label":"折扣单位（1 字）","default":"折"},{"id":"note","name":"说明","type":"string","label":"胶囊右侧说明（6–14 字）","default":"仅剩最后 3 天"},{"id":"accent","name":"强调色","type":"color","label":"强调色（胶囊底）","default":"#FF5FA2"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","hidden":true,"default":"transparent","options":[{"value":"transparent","label":"透明底"},{"value":"mp4","label":"MP4 纯底"},{"value":"webm","label":"WebM 纯底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="折扣标签贴：ink 小条压在强调色胶囊上沿，胶囊内 900 大折扣数字 + 单位字，右侧 ink 说明块自右补上，数字 steps(6) 跳到位后两层做反向微位移">
+<title>折扣标签贴 · 8 折</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 透明底贴片：--paper 不出现，底色与阴影色收进变量（风格规范 §7.1 / §7.2 规则 A） */
+  :root{ --shadow:#FFFFFF; --background:transparent; }
+
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--background);color:var(--ink);font-family:var(--sans)}
+
+  /* 胶囊：9999px 是全系列唯一允许的非直角圆角（基因 3 / §3.2） */
+  #df{position:absolute;left:120px;bottom:200px;width:620px;height:176px;
+    display:flex;align-items:center;justify-content:center;gap:12px;
+    background:var(--accent);border:var(--bw) solid var(--ink);border-radius:9999px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  #num{display:block;font-size:132px;font-weight:900;line-height:1;letter-spacing:0;color:var(--ink);
+    font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;white-space:nowrap;overflow:hidden}
+  #unit{display:block;font-size:56px;font-weight:900;line-height:1;letter-spacing:0;color:var(--ink);
+    white-space:nowrap}
+
+  /* 顶部小条压在胶囊上沿：兄弟件靠固定坐标摆位，胶囊定高让几何可预期 */
+  #fl{position:absolute;left:180px;bottom:352px;width:320px;height:64px;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--ink);color:var(--yellow);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  #flag{display:block;font-family:var(--mono);font-weight:700;font-size:24px;letter-spacing:.14em;
+    line-height:1;color:var(--yellow);white-space:nowrap;overflow:hidden}
+
+  /* 右侧说明块：白底 ink 字，与胶囊并排不重叠 */
+  #nt{position:absolute;left:786px;bottom:200px;width:520px;height:176px;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--white);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  #note{display:block;padding:0 34px;font-size:46px;font-weight:900;line-height:1.16;letter-spacing:0;
+    color:var(--ink);text-align:center;white-space:nowrap;overflow:hidden}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="df"><span id="num" data-fit-max="132" data-fit-min="64">8</span><span id="unit" data-fit-max="56" data-fit-min="28">折</span></div>
+  <div id="fl"><span id="flag" data-fit-max="24" data-fit-min="14">LIMITED</span></div>
+  <div id="nt"><div id="note" data-fit-max="46" data-fit-min="24">仅剩最后 3 天</div></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  var isT = (v.exportMode || 'transparent') === 'transparent';
+  var r = document.documentElement.style;
+  r.setProperty('--background', isT ? 'transparent' : '#0F0F0F');
+  r.setProperty('--shadow', isT ? '#FFFFFF' : '#0F0F0F');
+  if (v.accent) r.setProperty('--accent', v.accent);
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+  ['flag', 'num', 'unit', 'note'].forEach(function (k) { set(k, v[k]); });
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：跳数与错峰全部去掉，只留终态 + ≤8px 微位移淡入（规范 §13.5） */
+    gsap.set('#df', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#fl', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#nt', { x: 0, y: 0, opacity: 1 });
+
+    tl.fromTo('#df', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, 0);
+    tl.fromTo('#fl', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, .45);
+
+    B.hold(tl, 1.6, 1.2);
+    return;
+  }
+
+  var TOTAL = parseFloat(v.duration) > 0 ? parseFloat(v.duration) : 5;
+  var HOLD = 0.5;
+  var WIN = Math.max(1.6, TOTAL - HOLD);
+  var SH = isT ? '#FFFFFF' : '#0F0F0F';
+
+  /* 模 1 · 硬着陆：胶囊自左 80px 拍入，落定瞬间阴影压 2 帧再弹回原档 */
+  tl.fromTo('#df', { x: -80 },
+      { x: 0, duration: .26, ease: 'power4.out' }, 0)
+    .fromTo('#df', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#df', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+  /* 模 7 · 分格擦出：说明块自左分六格推出来 */
+  tl.fromTo('#nt', { clipPath: 'inset(0 100% 0 0)' },
+      { clipPath: 'inset(0 0% 0 0)', duration: .32, ease: 'steps(6)' }, .18);
+  tl.fromTo('#note', { x: 26 }, { x: 0, duration: .22, ease: 'power4.out' }, .4);
+  /* 顶部小条自上落位，压在胶囊上沿 */
+  tl.fromTo('#fl', { y: -34 },
+      { y: 0, duration: .24, ease: 'power4.out' }, .3)
+    .fromTo('#fl', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#fl', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+
+  /* 模 4 · 整数跳数：展示窗口写死 1.0s，数字只决定显示值（规范 §15 回调专项）。
+     8.5 这类带小数的折扣按「跳的是数值」处理，取整会让 8.5 显示成 9，所以直接读文本，
+     只让数字层做一次 steps 落位而不是连续滚动。 */
+  var e8 = document.getElementById('num');
+  if (e8) tl.fromTo(e8, { scale: .82 }, { scale: 1, duration: .22, ease: 'power3.out' }, .3);
+
+  /* 三层反向微位移：胶囊下压、小条与说明块上抬，匀速往返 */
+  var T0 = 1.1;
+  var REP = Math.max(1, Math.round((WIN - T0) / .9));
+  var half = (WIN - T0) / (REP * 2);
+  tl.to('#df', { y: 6, duration: half, ease: 'none', repeat: REP * 2 - 1, yoyo: true }, T0);
+  tl.to('#fl', { y: -5, duration: half, ease: 'none', repeat: REP * 2 - 2, yoyo: true }, T0 + half);
+  tl.to('#nt', { y: -4, duration: half, ease: 'none', repeat: REP * 2 - 2, yoyo: true }, T0 + half);
+
+  var end = tl.duration();
+  B.hold(tl, end, Math.max(HOLD, TOTAL - end));
+})();
+</script>
+</body></html>

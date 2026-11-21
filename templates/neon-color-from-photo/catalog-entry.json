@@ -1,0 +1,34 @@
+{
+  "id": "neon-color-from-photo",
+  "name": "照片取色演示卡",
+  "description": "荧光绿照片取色演示：左侧照片卡配四张色卡，虚线圆点连到右侧手机样机，屏幕假UI用取色主色染色，适合讲'从照片生成配色'。",
+  "category": "产品演示",
+  "tags": [
+    "照片取色",
+    "配色生成",
+    "手机样机",
+    "荧光绿",
+    "口播"
+  ],
+  "duration": 6,
+  "slot": "concept",
+  "when": "口播讲解'给它一张照片、从照片取色生成界面配色'这类能力演示时",
+  "assets": [
+    {
+      "id": "imgPhoto",
+      "type": "image",
+      "label": "照片（留空=CSS渐变抽象画占位）"
+    }
+  ],
+  "path": "templates/neon-color-from-photo",
+  "size": "1920×1080",
+  "formats": [
+    "mp4"
+  ],
+  "defaultFormat": "mp4",
+  "preview": "https://maning789link.top/hub/renders/neon-color-from-photo/sample.webm",
+  "status": "ready",
+  "tier": "free",
+  "no": null,
+  "series": "shot"
+}

@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "全球 AI 助手用户量竞速"}, {"id": "items", "type": "string", "label": "条目名（逗号分隔）", "default": "星核,蓝湖,苍梧,极光,白鹭,玄鸟"}, {"id": "data", "type": "string", "label": "每年数值（条目间用分号，年份间用逗号）", "default": "12,20,34,52,78,110,150;40,55,68,80,95,108,120;8,14,26,44,70,102,138;60,72,80,86,90,96,100;30,42,58,70,82,90,98;5,10,18,30,48,66,88"}, {"id": "yearStart", "type": "number", "label": "起始年份", "default": 2019}, {"id": "yearEnd", "type": "number", "label": "结束年份", "default": 2025}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #070907; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #EDF5EE;
+        background-image: radial-gradient(rgba(255,255,255,.04) 1px, transparent 1.5px); background-size: 46px 46px; }
+      .rc-head{ position: absolute; left: 110px; top: 60px; }
+      .rc-head h1{ font-size: 44px; font-weight: 800; letter-spacing: .03em; }
+      .rc-sub{ margin-top: 10px; font-size: 20px; letter-spacing: .3em; color: #7D8A80;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+      .rc-chart{ position: absolute; left: 110px; top: 200px; width: 1240px; height: 720px; }
+      .rc-row{ position: absolute; left: 0; width: 100%; height: 118px; display: flex; align-items: center; }
+      .rc-name{ width: 190px; padding-right: 26px; text-align: right; font-size: 30px; font-weight: 700;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .rc-track{ position: relative; flex: 1; height: 62px; }
+      .rc-bar{ position: absolute; left: 0; top: 0; height: 100%; border-radius: 0 10px 10px 0; }
+      .rc-val{ position: absolute; top: 50%; transform: translateY(-50%);
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 28px; color: #E7EFE8; white-space: nowrap; }
+      .rc-ywrap{ position: absolute; right: 80px; bottom: 30px; text-align: right; }
+      .rc-ytag{ font-size: 24px; letter-spacing: .5em; color: #7D8A80; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+      .rc-year{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 280px; line-height: 1;
+        color: var(--accent, #00FF00); text-shadow: 0 0 70px color-mix(in srgb, var(--accent) 35%, transparent); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="rc-head"><h1 id="title"></h1><div class="rc-sub" id="sub">BAR CHART RACE · SMOOTH RANK</div></div>
+      <div class="rc-chart" id="chart"></div>
+      <div class="rc-ywrap"><div class="rc-ytag">YEAR</div><div class="rc-year" id="year">2019</div></div>
+
+    </div>
+    <script>
+      const fallback = {"title": "全球 AI 助手用户量竞速", "items": "星核,蓝湖,苍梧,极光,白鹭,玄鸟", "data": "12,20,34,52,78,110,150;40,55,68,80,95,108,120;8,14,26,44,70,102,138;60,72,80,86,90,96,100;30,42,58,70,82,90,98;5,10,18,30,48,66,88", "yearStart": 2019, "yearEnd": 2025, "accent": "#00FF00", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      document.documentElement.style.setProperty("--accent", V.accent ?? "#00FF00");
+      $("title").textContent = V.title;
+      const names = split(V.items);
+      const y0 = Number(V.yearStart), y1 = Number(V.yearEnd);
+      const table = String(V.data).split(";").map((r) => r.split(",").map(Number));
+      const cols = table[0].length;
+      const years = [];
+      for (let i = 0; i < cols; i++) years.push(y0 + (y1 - y0) * (i / (cols - 1)));
+      const maxV = Math.max(...table.flat());
+      const chart = $("chart"), rowH = 118, maxW = 990;
+      const rows = names.map((nm) => {
+        const row = document.createElement("div");
+        row.className = "rc-row";
+        row.innerHTML = `<span class="rc-name"></span><div class="rc-track"><div class="rc-bar"></div><span class="rc-val"></span></div>`;
+        row.querySelector(".rc-name").textContent = nm;
+        chart.appendChild(row);
+        return row;
+      });
+      // ①数值相邻两年平滑插值
+      const valAt = (i, yf) => {
+        let k = 0;
+        while (k < cols - 2 && yf > years[k + 1]) k++;
+        const span = years[k + 1] - years[k] || 1;
+        const f = Math.max(0, Math.min(1, (yf - years[k]) / span));
+        return table[i][k] + (table[i][k + 1] - table[i][k]) * f;
+      };
+      const pos = names.map((_, i) => i);
+      const initOrder = names.map((_, i) => i).sort((a, b) => valAt(b, y0) - valAt(a, y0));
+      initOrder.forEach((idx, r) => { pos[idx] = r; });
+      const draw = (yf) => {
+        const vals = names.map((_, i) => valAt(i, yf));
+        const order = names.map((_, i) => i).sort((a, b) => vals[b] - vals[a]);
+        // ②名次本身也当平滑数值：反超是滑过去不是瞬移；竞速结束后直接归位（保证任意 seek 定格都对齐）
+        const done = yf >= y1 - 1e-6;
+        order.forEach((idx, r) => { pos[idx] = done ? r : pos[idx] + (r - pos[idx]) * 0.18; });
+        names.forEach((_, i) => {
+          const row = rows[i], bar = row.querySelector(".rc-bar"), val = row.querySelector(".rc-val");
+          row.style.top = (pos[i] * rowH) + "px";
+          const wpx = Math.max(6, (vals[i] / maxV) * maxW);
+          bar.style.width = wpx + "px";
+          const isTop = order[0] === i;
+          bar.style.background = isTop
+            ? "linear-gradient(90deg, color-mix(in srgb, var(--accent) 55%, transparent), var(--accent))"
+            : `color-mix(in srgb, var(--accent) ${Math.max(10, (0.42 - pos[i] * 0.055) * 100)}%, transparent)`;
+          bar.style.boxShadow = isTop ? "0 0 26px color-mix(in srgb, var(--accent) 45%, transparent)" : "none";
+          row.querySelector(".rc-name").style.color = isTop ? "var(--accent)" : "#C9D4CB";
+          val.style.left = (wpx + 18) + "px";
+          val.textContent = Math.round(vals[i]).toLocaleString("en-US");
+        });
+        $("year").textContent = String(Math.round(yf));
+      };
+      draw(y0);
+      const master = { p: 0 };
+      tl.fromTo(["#title", "#sub"], { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.5 }, 0);
+      tl.fromTo(".rc-row", { opacity: 0 }, { opacity: 1, duration: 0.4, stagger: 0.07 }, 0);
+      // ③全部挂在同一根主 progress 上从头拉到尾
+      tl.to(master, { p: 1, duration: 2.8, ease: "none",
+        onUpdate: () => draw(y0 + (y1 - y0) * master.p) }, 0.5);
+      // 数值到顶后名次再滑行收敛 0.7s，定格时行位已完全归位
+      tl.to({}, { duration: 0.01, onUpdate: () => draw(y1) }, 3.3);
+      tl.to({}, { duration: 0.7, onUpdate: () => draw(y1) }, 3.31);
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

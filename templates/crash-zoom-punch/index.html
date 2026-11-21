@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"eyebrow","type":"string","label":"眉题（小字）","default":"CLOSER LOOK · 焦点"},
+  {"id":"setupText","type":"string","label":"铺垫说明（被推近的画面）","default":"镜头里原本只有这样一段日常"},
+  {"id":"punchLine","type":"string","label":"金句（强调出场）","default":"但真正值得讲的就一句。"},
+  {"id":"punchLead","type":"string","label":"金句引子（chip 上的字母）","default":"PUNCH"},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity:.55;
+      }
+
+      /* scene-shell：取景全屏层（与 #root 满屏对位，便于测试与定位） */
+      .scene-shell{
+        position:absolute; inset:0;
+        opacity:1;
+      }
+
+      /* 取景框外框：四个角的 L 形记号 */
+      .frame-marks{
+        position:absolute; inset: 96px 96px;
+        pointer-events:none; opacity:0;
+      }
+      .frame-marks span{
+        position:absolute; width: 28px; height: 28px;
+        border: 1.5px solid color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+      }
+      .frame-marks .tl{ top:0;    left:0;    border-right:none;  border-bottom:none; }
+      .frame-marks .tr{ top:0;    right:0;   border-left:none;   border-bottom:none; }
+      .frame-marks .bl{ bottom:0; left:0;    border-right:none;  border-top:none;    }
+      .frame-marks .br{ bottom:0; right:0;   border-left:none;   border-top:none;    }
+
+      /* 镜头本体：被推近的 stage */
+      .stage{
+        position:absolute; left:50%; top:50%;
+        width: 1920px; height: 1080px;
+        transform-origin: 50% 50%;
+        transform: translate(-50%, -50%) scale(1);
+        will-change: transform, filter, opacity;
+        opacity: 0;
+      }
+
+      /* 画中画的「铺陈画面」：一个小卡片，模拟场景被相机锁定 */
+      .scene{
+        position:absolute; left: 50%; top: 50%;
+        transform: translate(-50%, -50%);
+        width: 980px; min-height: 360px;
+        padding: 56px 64px;
+        border-radius: 16px;
+        border: 1px solid color-mix(in srgb, var(--foreground, #F4EFE7) 10%, transparent);
+        background:
+          linear-gradient(180deg,
+            color-mix(in srgb, var(--foreground, #F4EFE7) 4%, transparent),
+            color-mix(in srgb, var(--foreground, #F4EFE7) 1%, transparent));
+        display:flex; flex-direction:column; justify-content:center;
+        gap: 22px;
+      }
+      .scene::before{
+        content:""; position:absolute; inset:0; pointer-events:none; border-radius:16px;
+        background-image: radial-gradient(rgba(255,255,255,.06) 1px, transparent 1.5px);
+        background-size: 22px 22px;
+        mask-image: linear-gradient(180deg, #000 0%, transparent 85%);
+        -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 85%);
+      }
+      .scene .chip{
+        align-self:flex-start;
+        display:inline-flex; align-items:center; gap:10px;
+        padding: 7px 16px; border:1px solid #2A2A2E; border-radius:999px;
+        font-size:18px; letter-spacing:.16em; color:#9CA3AF; text-transform:uppercase;
+      }
+      .scene .chip b{
+        color: var(--accent, #00FF00);
+        font-weight:700; letter-spacing:.05em;
+      }
+      .scene .setup{
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+        font-size: 44px; line-height: 1.32; letter-spacing: -.01em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 86%, transparent);
+      }
+      .scene .setup .dim{
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 48%, transparent);
+      }
+
+      /* 金句：相机推近之后的「主角」 */
+      .punch{
+        position:absolute; left: 50%; top: 50%;
+        transform: translate(-50%, -50%) scale(0.92);
+        width: 1280px;
+        text-align: left;
+        opacity: 0; will-change: transform, opacity, clip-path;
+      }
+      .punch .lead{
+        display:inline-flex; align-items:center; gap: 14px;
+        padding: 9px 20px; border-radius: 999px;
+        background: color-mix(in srgb, var(--accent, #00FF00) 16%, transparent);
+        border: 1.5px solid color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 18px; letter-spacing: .22em;
+        color: var(--accent, #00FF00);
+        text-transform: uppercase;
+        margin-bottom: 24px;
+        box-shadow: 0 0 28px color-mix(in srgb, var(--accent, #00FF00) 35%, transparent);
+      }
+      .punch .lead .dot{
+        width: 8px; height: 8px; border-radius: 50%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 10px var(--accent, #00FF00);
+      }
+      .punch .line{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight: 700;
+        font-size: 120px; line-height: 1.06; letter-spacing: -.02em;
+        color: var(--foreground, #F4EFE7);
+        text-shadow:
+          0 0 1px rgba(0,0,0,.6),
+          0 6px 28px rgba(0,0,0,.55);
+      }
+      .punch .line em{
+        font-style: normal;
+        color: var(--accent, #00FF00);
+        background: linear-gradient(180deg,
+          color-mix(in srgb, var(--accent, #00FF00) 22%, transparent),
+          transparent 70%);
+        padding: 0 10px;
+        border-radius: 8px;
+      }
+      .punch .rule{
+        margin-top: 28px;
+        width: 220px; height: 4px; border-radius: 2px;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 18px color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+      }
+
+      /* 冲击闪帧：相机推近到位那一瞬的高对比外框 */
+      .punch-flash{
+        position:absolute; inset: 0; pointer-events:none;
+        opacity: 0;
+        background:
+          radial-gradient(60% 50% at 50% 50%,
+            color-mix(in srgb, var(--accent, #00FF00) 22%, transparent) 0%,
+            transparent 70%),
+          linear-gradient(180deg,
+            color-mix(in srgb, var(--accent, #00FF00) 5%, transparent) 0%,
+            transparent 30%,
+            transparent 70%,
+            color-mix(in srgb, var(--accent, #00FF00) 5%, transparent) 100%);
+      }
+      .punch-flash::before, .punch-flash::after{
+        content:""; position:absolute; left:0; right:0; height: 60px;
+        background: linear-gradient(180deg,
+          color-mix(in srgb, var(--accent, #00FF00) 35%, transparent),
+          transparent);
+      }
+      .punch-flash::before{ top: 0;    }
+      .punch-flash::after { bottom: 0; transform: scaleY(-1); }
+
+      /* 速度线：镜头推进时的斜向条纹（克制版本，4 道） */
+      .speedlines{
+        position:absolute; inset:0; pointer-events:none;
+        opacity:0; mix-blend-mode: screen;
+      }
+      .speedlines i{
+        position:absolute; left: -20%; right: -20%;
+        height: 2px;
+        background: linear-gradient(90deg,
+          transparent 0%,
+          color-mix(in srgb, var(--accent, #00FF00) 70%, transparent) 50%,
+          transparent 100%);
+        transform-origin: 50% 50%;
+      }
+      .speedlines i:nth-child(1){ top: 38%; transform: rotate(-8deg); }
+      .speedlines i:nth-child(2){ top: 46%; transform: rotate(-6deg); }
+      .speedlines i:nth-child(3){ top: 54%; transform: rotate( 6deg); }
+      .speedlines i:nth-child(4){ top: 62%; transform: rotate( 8deg); }
+
+      /* 顶部 eyebrow */
+      .topbar{
+        position:absolute; top: 56px; left: 96px; right: 96px;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.22em; text-transform:uppercase;
+        color: #8A8A85;
+        z-index: 6;
+      }
+      .topbar .acc{
+        color: var(--accent, #00FF00); font-weight: 700; letter-spacing:.18em;
+      }
+
+      /* 底部：取景信息条（REC / 时码） */
+      .recmeta{
+        position:absolute; bottom: 56px; left: 96px; right: 96px;
+        display:flex; align-items:center; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.18em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+        z-index: 6;
+      }
+      .recmeta .rec{
+        display:inline-flex; align-items:center; gap: 10px;
+      }
+      .recmeta .rec .dot{
+        width: 9px; height: 9px; border-radius: 50%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 10px var(--accent, #00FF00);
+      }
+      .recmeta .tc{
+        font-variant-numeric: tabular-nums;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 75%, transparent);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene-shell" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+
+        <!-- 顶部 eyebrow -->
+        <div class="topbar" id="topbar">
+          <span id="topbarLeft"><b class="acc">ZOOM</b>&nbsp;&nbsp;CRASH IN</span>
+          <span id="topbarRight">transition · camera push</span>
+        </div>
+
+        <!-- 镜头本体（被整体推近的 stage） -->
+        <div class="stage" id="stage">
+
+          <!-- 速度线（推近过程中出现） -->
+          <div class="speedlines" id="speedlines">
+            <i></i><i></i><i></i><i></i>
+          </div>
+
+          <!-- 取景框角标 -->
+          <div class="frame-marks" id="frameMarks">
+            <span class="tl"></span><span class="tr"></span>
+            <span class="bl"></span><span class="br"></span>
+          </div>
+
+          <!-- 被推近之前的「铺陈画面」 -->
+          <div class="scene" id="establishing">
+            <span class="chip" id="chipEstab"><b id="chipEstabB">·</b><span id="chipEstabLab">establishing shot</span></span>
+            <div class="setup" id="setupText">镜头里原本只有这样一段日常</div>
+          </div>
+
+          <!-- 推近到位之后「金句」登场 -->
+          <div class="punch" id="punch">
+            <span class="lead" id="punchLead">
+              <span class="dot"></span><span id="punchLeadText">PUNCH</span>
+            </span>
+            <div class="line" id="punchLine">但真正值得讲的就一句。</div>
+            <div class="rule"></div>
+          </div>
+
+          <!-- 推近到位那一瞬的冲击闪帧 -->
+          <div class="punch-flash" id="punchFlash"></div>
+        </div>
+
+        <!-- 底部 REC / 时码 -->
+        <div class="recmeta" id="recmeta">
+          <span class="rec"><span class="dot"></span><span>REC</span></span>
+          <span class="tc" id="tc">00:00:00:00</span>
+        </div>
+
+      </section>
+    </div>
+
+    <script>
+      /* =========================================================
+         变量接线（与全库契约一致）
+         ========================================================= */
+      const fallback = {
+        eyebrow: "CLOSER LOOK · 焦点",
+        setupText: "镜头里原本只有这样一段日常",
+        punchLine: "但真正值得讲的就一句。",
+        punchLead: "PUNCH",
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const $ = (id) => document.getElementById(id);
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      /* ====== 文案回填 ====== */
+      $("setupText").textContent = v.setupText || fallback.setupText;
+      $("punchLine").textContent = v.punchLine || fallback.punchLine;
+      $("punchLeadText").textContent = v.punchLead || fallback.punchLead;
+      // chip 第一字
+      const leadFirst = String(v.punchLead || fallback.punchLead).trim().charAt(0).toUpperCase() || "P";
+      $("chipEstabB").textContent = leadFirst;
+
+      /* ====== 时码（与 timeline.time 同步） ====== */
+      const tc = $("tc");
+      const fmtTc = (t) => {
+        const total = Math.max(0, t);
+        const m = Math.floor(total / 60);
+        const s = Math.floor(total % 60);
+        const cs = Math.floor((total - Math.floor(total)) * 100);
+        return (
+          String(m).padStart(2,"0") + ":" +
+          String(s).padStart(2,"0") + ":" +
+          String(cs).padStart(2,"0")
+        );
+      };
+
+      /* ====== 时间线 ====== */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+      const tl = gsap.timeline({ paused: true });
+
+      /* ----- A · 取景框 + 顶/底栏先到位（铺陈） ----- */
+      tl.fromTo("#scene", { opacity: 0 }, { opacity: 1, duration: 0.45, ease: "power2.out" }, 0);
+      tl.fromTo("#topbar", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 0.05);
+      tl.fromTo("#recmeta", { opacity: 0, y:  10 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 0.05);
+      tl.fromTo("#frameMarks", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 0.15);
+
+      /* ----- B · 镜头铺陈画面淡入（被推近的目标） ----- */
+      tl.fromTo("#stage", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out" }, 0.15);
+      tl.fromTo("#establishing",
+        { opacity: 0, y: 18 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.25);
+
+      /* ----- C · 急推镜头：scale 1.0 → 1.25 + 速度线 + 轻微 motion blur 模拟 ----- */
+      // 用 power3.in：起步慢、终端极快，符合「急推」
+      tl.to("#stage", {
+        scale: 1.25,
+        duration: 0.55,
+        ease: "power3.in"
+      }, 1.05);
+
+      // 速度线在推近过程中淡入 + 横向位移（用 x 模拟「飞过」），结束瞬间淡出
+      tl.fromTo("#speedlines",
+        { opacity: 0 },
+        { opacity: 0.85, duration: 0.18, ease: "power1.in" }, 1.15);
+      tl.fromTo("#speedlines i",
+        { x: "-30%" },
+        { x: "30%", duration: 0.55, ease: "power3.in", stagger: 0.02 }, 1.05);
+      tl.to("#speedlines", { opacity: 0, duration: 0.18, ease: "power2.out" }, 1.6);
+
+      /* ----- D · 冲击定格：scale 1.25 → 1.28 → 1.25（0.18s 喘息），闪帧高对比 ----- */
+      tl.to("#stage", {
+        scale: 1.28,
+        duration: 0.09,
+        ease: "power2.out"
+      }, 1.6);
+      tl.to("#stage", {
+        scale: 1.25,
+        duration: 0.18,
+        ease: "power3.out"
+      }, 1.69);
+
+      // 闪帧：先升到峰值，再快速收回
+      tl.fromTo("#punchFlash",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.06, ease: "power1.out" }, 1.6);
+      tl.to("#punchFlash", { opacity: 0, duration: 0.32, ease: "power2.out" }, 1.66);
+
+      // 取景框角标在冲击瞬间闪一下强调色
+      tl.to("#frameMarks span",
+        { borderColor: "var(--accent,#00FF00)", duration: 0.08, ease: "power1.out" }, 1.6);
+      tl.to("#frameMarks span",
+        { borderColor: "", duration: 0.4, ease: "power2.out" }, 1.7);
+
+      /* ----- E · 铺陈画面被推近后淡出，金句登场 ----- */
+      tl.to("#establishing", { opacity: 0, y: -12, duration: 0.32, ease: "power2.in" }, 1.6);
+
+      // 金句入场：clip-path 从左侧 wipe 出 + 轻微 scale
+      tl.fromTo("#punch",
+        { opacity: 0, scale: 0.92, clipPath: "inset(0 100% 0 0)" },
+        { opacity: 1, scale: 1.0,  clipPath: "inset(0 0%   0 0)",
+          duration: 0.55, ease: "power3.out" }, 1.78);
+
+      // 金句内部错峰：lead chip → line → rule
+      tl.fromTo("#punch .lead",
+        { opacity: 0, x: -16 },
+        { opacity: 1, x: 0, duration: 0.42, ease: "power2.out" }, 1.9);
+      tl.fromTo("#punch .line",
+        { opacity: 0, y: 18 },
+        { opacity: 1, y: 0,  duration: 0.55, ease: "power3.out" }, 2.0);
+      tl.fromTo("#punch .rule",
+        { scaleX: 0, transformOrigin: "left center" },
+        { scaleX: 1, duration: 0.45, ease: "power3.out" }, 2.45);
+
+      /* ----- F · 结尾：镜头轻微回拉到 1.18 留可读（约 1s） ----- */
+      tl.to("#stage", { scale: 1.18, duration: 0.9, ease: "power2.inOut" }, 5.1);
+
+      /* ----- 时码同步 ----- */
+      tl.eventCallback("onUpdate", () => {
+        tc.textContent = fmtTc(tl.time());
+      });
+      tc.textContent = fmtTc(0);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

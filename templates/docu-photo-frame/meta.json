@@ -1,0 +1,16 @@
+{
+  "id": "docu-photo-frame",
+  "name": "纪录片 B27 红圈标记",
+  "description": "红圈重点标记 · 皮影档案族 · docu-photo 03",
+  "series": "docu",
+  "category": "纪录片皮影",
+  "tags": [
+    "纪录片皮影",
+    "档案模板",
+    "docu-photo-red-circle"
+  ],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "createdAt": "2026-08-30T00:00:00.000Z"
+}

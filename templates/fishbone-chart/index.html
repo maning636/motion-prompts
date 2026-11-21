@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"title","type":"string","label":"标题","default":"故障根因分析"},{"id":"subtitle","type":"string","label":"副标题","default":"主干问题 + 6 类成因斜插"},{"id":"problem","type":"string","label":"问题陈述","default":"服务响应延迟"},{"id":"categories","type":"string","label":"原因类别（逗号分隔）","default":"人,方法,工具,环境,数据,反馈"},{"id":"causes","type":"string","label":"每类原因（| 分隔组）","default":"经验不足|流程模糊|工具链复杂|网络抖动|数据缺失|监控滞后"},{"id":"accent","type":"color","label":"强调色","default":"#00FF00"},{"id":"background","type":"color","label":"背景色","default":"#12100E"},{"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+*{ box-sizing: border-box;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      html, body{ margin: 0; width: 1920px; height: 1080px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .scene{ position: absolute; inset: 0; width: 100%; height: 100%; padding: 96px 112px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .header{ margin-bottom: 32px;font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+      .title{ margin: 0; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 64px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; }
+      .subtitle{ margin: 12px 0 0; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-size: 24px; font-weight: 400; opacity: 0.55; }
+      .chart-area{ position: relative; width: 100%; height: 680px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .chart-svg{ width: 100%; height: 100%; overflow: visible;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .spine{ stroke: var(--accent); stroke-width: 5; fill: none; stroke-linecap: round;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .bone{ stroke: rgba(244,239,231,0.18); stroke-width: 2; fill: none;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .head-box{ fill: var(--accent);font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+      .head-text{ fill: #f4efe7; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 22px; font-weight: 700; text-anchor: middle; }
+      .cat-label{ fill: #f4efe7; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-size: 20px; font-weight: 700; text-anchor: middle; }
+      .cause-label{ fill: rgba(244,239,231,0.7); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-size: 18px; font-weight: 500; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene clip" data-start="0" data-duration="6" data-track-index="1">
+        <div class="header">
+          <h1 class="title" id="title"></h1>
+          <p class="subtitle" id="subtitle"></p>
+        </div>
+        <div class="chart-area">
+          <svg class="chart-svg" id="chart-svg" viewBox="0 0 1696 680" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+      </section>
+    </div>
+    <script>
+      const fallback = { title: "故障根因分析", subtitle: "主干问题 + 6 类成因斜插", problem: "服务响应延迟", categories: "人,方法,工具,环境,数据,反馈", causes: "经验不足|流程模糊|工具链复杂|网络抖动|数据缺失|监控滞后", accent: "#00FF00", background: "#12100E", foreground: "#F4EFE7" };
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4EFE7");
+      document.documentElement.style.setProperty("--background", v.background ?? "#12100E");
+      document.documentElement.style.setProperty("--accent", v.accent);
+      const root = document.getElementById("root");
+      root.style.backgroundColor = v.background;
+      root.style.color = v.foreground;
+      document.getElementById("title").textContent = v.title;
+      document.getElementById("subtitle").textContent = v.subtitle;
+      const categories = String(v.categories).split(",").map(s => s.trim()).filter(Boolean);
+      const causes = String(v.causes).split("|").map(g => g.split(",").map(s => s.trim()).filter(Boolean));
+      const svg = document.getElementById("chart-svg");
+      const W = 1696, H = 680;
+      const spineY = H / 2 + 40;
+      const headX = W - 180, tailX = 120;
+
+      const spine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      spine.setAttribute("x1", tailX); spine.setAttribute("y1", spineY);
+      spine.setAttribute("x2", headX); spine.setAttribute("y2", spineY);
+      spine.setAttribute("class", "spine");
+      svg.appendChild(spine);
+
+      const head = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+      head.setAttribute("points", `${headX},${spineY - 36} ${headX + 120},${spineY} ${headX},${spineY + 36}`);
+      head.setAttribute("class", "head-box");
+      svg.appendChild(head);
+      const headText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      headText.setAttribute("x", headX + 54); headText.setAttribute("y", spineY + 6);
+      headText.setAttribute("class", "head-text");
+      headText.textContent = v.problem;
+      svg.appendChild(headText);
+
+      const topCats = categories.filter((_, i) => i % 2 === 0);
+      const bottomCats = categories.filter((_, i) => i % 2 === 1);
+      const usableW = headX - tailX - 80;
+      const step = usableW / Math.max(categories.length, 1);
+
+      function place(cat, i, isTop) {
+        const x = tailX + 60 + i * step;
+        const endY = isTop ? spineY - 160 : spineY + 160;
+        const bone = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        bone.setAttribute("x1", x); bone.setAttribute("y1", spineY);
+        bone.setAttribute("x2", x + (isTop ? 40 : -40)); bone.setAttribute("y2", endY);
+        bone.setAttribute("class", "bone");
+        svg.appendChild(bone);
+        const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        label.setAttribute("x", x + (isTop ? 40 : -40)); label.setAttribute("y", endY + (isTop ? -12 : 28));
+        label.setAttribute("class", "cat-label");
+        label.textContent = cat;
+        svg.appendChild(label);
+        const causeList = causes[i] || [];
+        causeList.forEach((c, j) => {
+          const cy = endY + (isTop ? 24 + j * 26 : -32 - j * 26);
+          const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+          t.setAttribute("x", x + (isTop ? 40 : -40)); t.setAttribute("y", cy);
+          t.setAttribute("class", "cause-label");
+          t.setAttribute("text-anchor", "middle");
+          t.textContent = c;
+          svg.appendChild(t);
+        });
+      }
+
+      topCats.forEach((cat, i) => place(cat, i * 2, true));
+      bottomCats.forEach((cat, i) => place(cat, i * 2 + 1, false));
+
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(".title", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.1);
+      tl.fromTo(".subtitle", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.25);
+      const spineLen = headX - tailX;
+      spine.style.strokeDasharray = spineLen; spine.style.strokeDashoffset = spineLen;
+      tl.to(spine, { strokeDashoffset: 0, duration: 0.8, ease: "power2.out" }, 0.5);
+      tl.fromTo(".head-box", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.5, ease: "power2.out" }, 1.0);
+      tl.fromTo(".head-text", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 1.2);
+      document.querySelectorAll(".bone").forEach((b, i) => {
+        const len = Math.sqrt(160 * 160 + 40 * 40);
+        b.style.strokeDasharray = len; b.style.strokeDashoffset = len;
+        tl.to(b, { strokeDashoffset: 0, duration: 0.4, ease: "power2.out" }, 1.1 + i * 0.1);
+      });
+      tl.fromTo(".cat-label", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, stagger: 0.08, ease: "power2.out" }, 1.4);
+      tl.fromTo(".cause-label", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.35, stagger: 0.05, ease: "power2.out" }, 1.7);
+      tl.to(".scene", { opacity: 0, y: -16, duration: 0.5, ease: "power2.in" }, 5.3);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

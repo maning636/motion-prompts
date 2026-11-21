@@ -1,0 +1,12 @@
+{
+  "name": "docu-title-chapter",
+  "version": "1.0.0",
+  "description": "章节大标题·皮影档案",
+  "main": "index.html",
+  "hyperframes": "0.7.109",
+  "scripts": {
+    "render": "node ../../scripts/render.mjs"
+  },
+  "author": "maning",
+  "license": "UNLICENSED"
+}

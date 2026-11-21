@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"eyebrow","type":"string","label":"顶部眉题","default":"DEPTH · 03"},
+  {"id":"title","type":"string","label":"主标题","default":"纵深不是特效，是信息层级"},
+  {"id":"subtitle","type":"string","label":"副标题","default":"把同一个画面推到背景里做残影，前景反而更沉"},
+  {"id":"keyNumber","type":"string","label":"关键数字","default":"6.5x"},
+  {"id":"unit","type":"string","label":"数字单位","default":"视觉深度倍增"},
+  {"id":"ghostCount","type":"number","label":"背景残影层数（1-3）","default":3},
+  {"id":"ghostBlur","type":"number","label":"残影模糊强度（px）","default":28},
+  {"id":"ghostDrift","type":"number","label":"残影漂移距离（px）","default":48},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.045) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity:.55;
+      }
+
+      /* ---------- 主内容舞台（中央内容） ---------- */
+      .stage{
+        position:absolute; inset:0;
+        display:grid; place-items:center;
+      }
+
+      /* ---------- 残影层（与主前景同位，但用 transform 错位偏移 + 模糊虚影） ---------- */
+      .ghost-layer{
+        position:absolute; inset:0;
+        display:grid; place-items:center;
+        pointer-events:none;
+        will-change: opacity;
+      }
+      .ghost-card{
+        position:relative;
+        width: 940px; padding: 56px 72px 64px;
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 18px;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.005)),
+          var(--background, #12100E);
+        box-shadow: 0 0 0 1px rgba(255,255,255,.02) inset;
+        will-change: transform, filter;
+      }
+
+      /* 主前景卡（清晰） */
+      .hero{
+        position:relative;
+        width: 940px; padding: 56px 72px 64px;
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 18px;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.008)),
+          var(--background, #12100E);
+        box-shadow:
+          0 24px 60px rgba(0,0,0,.55),
+          0 0 0 1px rgba(255,255,255,.04) inset,
+          0 0 80px color-mix(in srgb, var(--accent, #00FF00) 12%, transparent);
+        z-index: 5;
+        will-change: transform, opacity;
+      }
+
+      /* ---------- 文本元素 ---------- */
+      .eyebrow{
+        display:inline-flex; align-items:center; gap:14px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 18px; letter-spacing:.28em; text-transform:uppercase;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 60%, transparent);
+        margin: 0 0 18px;
+      }
+      .eyebrow .dot{
+        width: 8px; height: 8px; border-radius: 50%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+      }
+      .eyebrow b{ color: var(--accent, #00FF00); font-weight: 700; letter-spacing:.20em; }
+
+      .hero h1{
+        margin: 0 0 18px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight: 700; letter-spacing: -.02em;
+        font-size: 56px; line-height: 1.10;
+        color: var(--foreground, #F4EFE7);
+        white-space: nowrap;
+      }
+      .hero .sub{
+        margin: 0 0 36px;
+        font-size: 26px; line-height: 1.45;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 72%, transparent);
+      }
+      .hero .keyrow{
+        display:flex; align-items:baseline; gap: 22px;
+        border-top: 1px solid rgba(255,255,255,.08);
+        padding-top: 24px;
+      }
+      .hero .key{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 92px; line-height: 1; font-weight: 700;
+        letter-spacing: -.04em;
+        color: var(--accent, #00FF00);
+        text-shadow: 0 0 24px color-mix(in srgb, var(--accent, #00FF00) 45%, transparent);
+      }
+      .hero .unit{
+        font-size: 22px; letter-spacing:.06em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 75%, transparent);
+        max-width: 280px;
+      }
+
+      /* 残影里的弱化样式（不显示眉题 chip，颜色降低） */
+      .ghost-card h1{
+        margin: 0 0 18px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight: 700; letter-spacing: -.02em;
+        font-size: 58px; line-height: 1.10;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 38%, transparent);
+        white-space: nowrap;
+      }
+      .ghost-card .sub{
+        margin: 0 0 36px;
+        font-size: 26px; line-height: 1.45;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 24%, transparent);
+      }
+      .ghost-card .keyrow{
+        display:flex; align-items:baseline; gap: 22px;
+        border-top: 1px solid rgba(255,255,255,.05);
+        padding-top: 24px;
+      }
+      .ghost-card .key{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 92px; line-height: 1; font-weight: 700;
+        letter-spacing: -.04em;
+        color: color-mix(in srgb, var(--accent, #00FF00) 42%, transparent);
+      }
+      .ghost-card .unit{
+        font-size: 22px; letter-spacing:.06em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 28%, transparent);
+        max-width: 280px;
+      }
+
+      /* ---------- 角标（顶/底 角标辅助线） ---------- */
+      .corner{
+        position:absolute;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 14px; letter-spacing:.24em; text-transform:uppercase;
+        color: #6B6B66;
+        z-index: 6;
+      }
+      .corner.tl{ top: 56px; left: 88px; }
+      .corner.tr{ top: 56px; right: 88px; }
+      .corner.bl{ bottom: 56px; left: 88px; }
+      .corner.br{ bottom: 56px; right: 88px; }
+      .corner b{ color: var(--accent, #00FF00); font-weight:700; letter-spacing:.20em; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6.5" data-width="1920" data-height="1080">
+      <section id="scene" class="stage" data-start="0" data-duration="6.5" data-track-index="1">
+
+        <div class="gridbg"></div>
+
+        <!-- 三个残影层（在主前景之前渲染，位于主前景之下） -->
+        <div class="ghost-layer" id="ghostFar" data-layer="far"></div>
+        <div class="ghost-layer" id="ghostMid" data-layer="mid"></div>
+        <div class="ghost-layer" id="ghostNear" data-layer="near"></div>
+
+        <!-- 主前景 -->
+        <article class="hero" id="hero">
+          <p class="eyebrow" id="heroEyebrow"><span class="dot"></span><b id="heroEyebrowB">DEPTH</b><span id="heroEyebrowTail">· 03</span></p>
+          <h1 id="heroTitle">纵深不是特效，是信息层级</h1>
+          <p class="sub" id="heroSub">把同一个画面推到背景里做残影，前景反而更沉</p>
+          <div class="keyrow">
+            <span class="key" id="heroKey">6.5x</span>
+            <span class="unit" id="heroUnit">视觉深度倍增</span>
+          </div>
+        </article>
+
+        <!-- 角标 -->
+        <div class="corner tl"><b>FAR</b>&nbsp;&nbsp;ECHO · 03</div>
+        <div class="corner tr">BED · <b>BLUR</b></div>
+        <div class="corner bl">clean-room · 1920×1080</div>
+        <div class="corner br"><b>06:50</b>&nbsp;&nbsp;duration</div>
+
+      </section>
+    </div>
+    <script>
+      /* ===== 变量接线 ===== */
+      const fallback = {
+        eyebrow: "DEPTH · 03",
+        title: "纵深不是特效，是信息层级",
+        subtitle: "把同一个画面推到背景里做残影，前景反而更沉",
+        keyNumber: "6.5x",
+        unit: "视觉深度倍增",
+        ghostCount: 3,
+        ghostBlur: 28,
+        ghostDrift: 48,
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      const $ = (id) => document.getElementById(id);
+      const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+      /* ===== 文本回填 ===== */
+      $("heroTitle").textContent = v.title || fallback.title;
+      $("heroSub").textContent = v.subtitle || fallback.subtitle;
+      $("heroKey").textContent = v.keyNumber || fallback.keyNumber;
+      $("heroUnit").textContent = v.unit || fallback.unit;
+      $("heroEyebrowTail").textContent = "· " + String(v.eyebrow || fallback.eyebrow).replace(/^.*?·\s*/, "");
+
+      /* ===== 残影卡内容生成（克隆 hero 结构，弱化样式） ===== */
+      const heroInner = $("hero").innerHTML;
+      const cardHtml = (eyebrowStr) => {
+        return `<div class="ghost-card"><p class="eyebrow">${escapeHtml(eyebrowStr)}</p>${heroInner.replace(/<p class="eyebrow"[\s\S]*?<\/p>/, "")}</div>`;
+      };
+      // 三层错位方向（每层 base 偏移相对 hero 中心，用 px 直接指定）
+      const ghostLayers = [
+        { host: "ghostFar",  label: "DEPTH · 03 / far",  base: { x: -260, y: -160 }, amp: { x: 30, y: 18 },  dur: 6.5, blurMult: 0.9, scale: 1.10, opacity: 0.32 },
+        { host: "ghostMid",  label: "DEPTH · 03 / mid",  base: { x:  240, y:  130 }, amp: { x: -22, y: 24 }, dur: 5.4, blurMult: 0.7, scale: 1.06, opacity: 0.48 },
+        { host: "ghostNear", label: "DEPTH · 03 / near", base: { x:  -90, y:  220 }, amp: { x: 18, y: -16 }, dur: 4.2, blurMult: 0.45, scale: 1.04, opacity: 0.62 },
+      ];
+
+      const totalGhost = clamp(Math.round(Number(v.ghostCount ?? fallback.ghostCount) || 1), 1, 3);
+      const blurPx = clamp(Number(v.ghostBlur ?? fallback.ghostBlur) || 0, 4, 80);
+      const driftPx = clamp(Number(v.ghostDrift ?? fallback.ghostDrift) || 0, 8, 200);
+
+      for (let i = 0; i < totalGhost; i++) {
+        const cfg = ghostLayers[i];
+        const host = $(cfg.host);
+        if (!host) continue;
+        host.innerHTML = cardHtml(cfg.label);
+        const card = host.querySelector(".ghost-card");
+        const layerBlur = blurPx * cfg.blurMult;
+        card.style.filter = `blur(${layerBlur}px)`;
+        // 起始：base 偏移 × driftPx 系数 + 大 scale，透明
+        const startX = cfg.base.x * (driftPx / 48);
+        const startY = cfg.base.y * (driftPx / 48);
+        gsap.set(card, { x: startX, y: startY, scale: cfg.scale });
+        host.style.opacity = "0";
+      }
+      // 多余的层彻底隐藏
+      for (let i = totalGhost; i < ghostLayers.length; i++) {
+        const host = $(ghostLayers[i].host);
+        if (host) host.style.display = "none";
+      }
+
+      /* ===== 时间线 ===== */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6.5;
+      const tl = gsap.timeline({ paused: true });
+
+      // 主前景入场：clip-path wipe + fade + y30
+      tl.fromTo("#hero",
+        { opacity: 0, y: 30, clipPath: "inset(0 0 18% 0)" },
+        { opacity: 1, y: 0, clipPath: "inset(0 0 0% 0)", duration: 0.7, ease: "power3.out" }, 0.10);
+
+      // 主前景文字层 stagger
+      tl.fromTo(".hero .eyebrow",
+        { opacity: 0, x: -16 },
+        { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 0.30);
+      tl.fromTo(".hero h1",
+        { opacity: 0, y: 18 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 0.45);
+      tl.fromTo(".hero .sub",
+        { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 0.65);
+      tl.fromTo(".hero .keyrow",
+        { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 0.85);
+
+      // 主前景关键数字轻微 pop 强调
+      tl.fromTo(".hero .key",
+        { scale: 0.92 },
+        { scale: 1.0, duration: 0.45, ease: "back.out(1.6)" }, 1.0);
+
+      // 残影层：错峰淡入 + 慢漂移（背景层先于近层稳定入场）
+      // 用 ghostLayers 顺序（far → mid → near）依次入
+      const ghostEnterStart = 0.20;
+      ghostLayers.slice(0, totalGhost).forEach((cfg, i) => {
+        const card = $(cfg.host).querySelector(".ghost-card");
+        if (!card) return;
+        const enterAt = ghostEnterStart + i * 0.18;
+        const baseX = cfg.base.x * (driftPx / 48);
+        const baseY = cfg.base.y * (driftPx / 48);
+        // 入场：从更远偏移与稍大缩放 → 稳定 base
+        const fromX = baseX * 1.4;
+        const fromY = baseY * 1.4;
+        const toX = baseX;
+        const toY = baseY;
+        const fromScale = cfg.scale + 0.04;
+        const toScale = cfg.scale;
+        // 越远的层越透明（far 更虚），越近的越显
+        const targetOpacity = cfg.opacity;
+        tl.fromTo($(cfg.host),
+          { opacity: 0 },
+          { opacity: targetOpacity, duration: 0.7, ease: "power2.out" }, enterAt);
+        tl.fromTo(card,
+          { x: fromX, y: fromY, scale: fromScale },
+          { x: toX, y: toY, scale: toScale, duration: 0.9, ease: "power3.out" }, enterAt);
+
+        // 慢漂移：分层不同方向、速度，呼吸式
+        const driftDur = cfg.dur;
+        const driftToX = toX + cfg.amp.x;
+        const driftToY = toY + cfg.amp.y;
+        tl.to(card, {
+          x: driftToX, y: driftToY, scale: toScale + 0.012,
+          duration: driftDur, ease: "sine.inOut"
+        }, enterAt + 0.9);
+      });
+
+      // 主前景呼吸（轻微 scale 1.0 ↔ 1.025），强调"前景比背景沉"
+      tl.to("#hero", {
+        scale: 1.025, duration: 1.6, ease: "sine.inOut", yoyo: true, repeat: 1
+      }, 2.4);
+
+      // 角落角标错落入场
+      tl.fromTo(".corner.tl", { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 0.15);
+      tl.fromTo(".corner.tr", { opacity: 0, x:  10 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 0.20);
+      tl.fromTo(".corner.bl", { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 0.25);
+      tl.fromTo(".corner.br", { opacity: 0, x:  10 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 0.30);
+
+      // 结尾：主前景关键数字轻轻一推回 1.0（与呼吸结束同步），停留可读
+      tl.to(".hero .key", { scale: 1.0, duration: 0.35, ease: "power2.out" }, DUR - 0.9);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

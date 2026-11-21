@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "kicker", "type": "string", "label": "顶部小标签", "default": "数据 · DATA"}, {"id": "title", "type": "string", "label": "标题", "default": "这组数据，说明了一切"}, {"id": "imgBg", "type": "image", "label": "锁定背景", "default": "./assets/bg.png"}, {"id": "bigValue", "type": "string", "label": "大数字", "default": "73%"}, {"id": "bigLabel", "type": "string", "label": "大数字说明", "default": "的人都选错了重点"}, {"id": "label1", "type": "string", "label": "柱1标签", "default": "刷题"}, {"id": "val1", "type": "number", "label": "柱1数值", "default": 38}, {"id": "label2", "type": "string", "label": "柱2标签", "default": "考证"}, {"id": "val2", "type": "number", "label": "柱2数值", "default": 55}, {"id": "label3", "type": "string", "label": "柱3标签", "default": "实习"}, {"id": "val3", "type": "number", "label": "柱3数值", "default": 72}, {"id": "label4", "type": "string", "label": "柱4标签", "default": "提问"}, {"id": "val4", "type": "number", "label": "柱4数值", "default": 91}, {"id": "strokeColor", "type": "color", "label": "错位描边色", "default": "#E53935"}, {"id": "duration", "type": "number", "label": "总时长（秒，弹完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #EEE8D8); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #EEE8D8);
+  color: var(--foreground, #1D1D20); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.bgimg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.kicker{ position:absolute; left:90px; top:64px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700;
+  font-size:26px; letter-spacing:.3em; border:3px solid #1D1D20; padding:10px 24px; }
+.ctitle{ position:absolute; left:90px; top:150px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:64px; }
+.big{ position:absolute; right:110px; top:120px; text-align:right; }
+.big .bv{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:900; font-size:150px; line-height:1;
+  color:var(--stroke,#E53935); -webkit-text-stroke:5px #1D1D20; }
+.big .bl{ font-size:34px; margin-top:10px; letter-spacing:.08em; }
+.chart{ position:absolute; left:50%; bottom:150px; transform:translateX(-50%);
+  display:flex; align-items:flex-end; gap:90px; height:480px; }
+.col{ display:flex; flex-direction:column; align-items:center; gap:18px; }
+.bar{ width:170px; background:#1D1D20; border:5px solid #1D1D20; will-change:transform;
+  box-shadow:10px 10px 0 var(--stroke,#E53935); }
+.cv{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:40px; }
+.cl{ font-size:32px; letter-spacing:.1em; background:#F5F2EB; border:3px solid #1D1D20; padding:4px 18px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+<img class="bgimg" id="bg" alt="">
+<div class="kicker" id="k"></div>
+<div class="ctitle" id="t"></div>
+<div class="big"><div class="bv" id="bv"></div><div class="bl" id="bl"></div></div>
+<div class="chart" id="chart"></div>
+    </div>
+    <script>
+      const FB = {"kicker": "数据 · DATA", "title": "这组数据，说明了一切", "imgBg": "./assets/bg.png", "bigValue": "73%", "bigLabel": "的人都选错了重点", "label1": "刷题", "val1": 38, "label2": "考证", "val2": 55, "label3": "实习", "val3": 72, "label4": "提问", "val4": 91, "strokeColor": "#E53935", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+const $=(s)=>document.querySelector(s);
+const F=(f)=>f/30;
+const DUR=+v.duration>0?+v.duration:6;
+$('[data-composition-id]').setAttribute('data-duration',String(DUR));
+document.documentElement.style.setProperty('--stroke',v.strokeColor||'#E53935');
+$('#k').textContent=v.kicker||''; $('#t').textContent=v.title||'';
+$('#bv').textContent=v.bigValue||''; $('#bl').textContent=v.bigLabel||'';
+$('#bg').src=v.imgBg||'';
+
+const chart=$('#chart');
+const bars=[];
+for(let i=1;i<=4;i++){
+  const val=Math.min(100,Math.max(0,+v['val'+i]||0));
+  const col=document.createElement('div');col.className='col';
+  col.innerHTML='<div class="cv">'+val+'</div><div class="bar" style="height:'+(val*3.6)+'px"></div><div class="cl">'+(v['label'+i]||'')+'</div>';
+  chart.appendChild(col);bars.push(col.querySelector('.bar'));
+}
+
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+tl.fromTo('#k',{opacity:0,x:-24},{opacity:1,x:0,duration:F(10),ease:'power3.out'},F(2));
+tl.fromTo('#t',{opacity:0,y:24},{opacity:1,y:0,duration:F(12),ease:'power3.out'},F(5));
+tl.fromTo('.big',{opacity:0,scale:.8},{opacity:1,scale:1,duration:F(12),ease:'back.out(1.8)'},F(9));
+bars.forEach((b,i)=>{
+  tl.fromTo(b,{scaleY:0,transformOrigin:'bottom center'},{scaleY:1,duration:F(14),ease:'back.out(1.4)'},F(14)+i*F(7));
+});
+tl.fromTo('.cv,.cl',{opacity:0},{opacity:1,duration:F(8),stagger:F(3)},F(20));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

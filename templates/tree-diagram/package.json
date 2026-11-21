@@ -1,0 +1,7 @@
+{
+  "name": "tree-diagram",
+  "private": true,
+  "scripts": {
+    "render": "cd ../.. && npm run render -- tree-diagram"
+  }
+}

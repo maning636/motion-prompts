@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "从想法到系统"}, {"id": "time1", "type": "string", "label": "节点一编号", "default": "01"}, {"id": "label1", "type": "string", "label": "节点一", "default": "做一次"}, {"id": "time2", "type": "string", "label": "节点二编号", "default": "02"}, {"id": "label2", "type": "string", "label": "节点二", "default": "存模板"}, {"id": "time3", "type": "string", "label": "节点三编号", "default": "03"}, {"id": "label3", "type": "string", "label": "节点三", "default": "反复生成"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+*{ box-sizing: border-box; }
+html, body{ margin:0; width:1920px; height:1080px; overflow:hidden; background: var(--background, #F5F0E6); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #F5F0E6); color: var(--foreground, #1D1D20);
+  font-family:'Noto Sans SC','PingFang SC',sans-serif; }
+.scene{ position:absolute; inset:0; padding:64px 80px; }
+.card{ background:#FFFDF7; border:3px solid #1D1D20; border-radius:16px; box-shadow:6px 6px 0 #2A292B; }
+.tape{ position:absolute; width:120px; height:32px; background:rgba(185,232,51,.6); border:2px solid #1D1D20;
+  border-radius:4px; transform:rotate(-5deg); z-index:5; }
+.tape.pink{ background:rgba(241,59,136,.35); transform:rotate(4deg); }
+.tape.blue{ background:rgba(62,123,242,.3); transform:rotate(-3deg); }
+.chip{ display:inline-flex; align-items:center; gap:8px; padding:6px 14px; background:#FFFDF7; border:3px solid #1D1D20;
+  border-radius:999px; font-family:'Fredoka','Arial Rounded MT Bold',sans-serif; font-weight:700; font-size:18px;
+  letter-spacing:.1em; text-transform:uppercase; white-space:nowrap; box-shadow:4px 4px 0 #2A292B; }
+.chip.lime{ background:#B9E833; } .chip.blue{ background:#3E7BF2; color:#FFFDF7; }
+.chip.pink{ background:#F13B88; color:#FFFDF7; } .chip.orange{ background:#FF9F1C; }
+.num{ font-family:'Fredoka','Arial Rounded MT Bold',sans-serif; font-weight:700; }
+.mono{ font-family:'IBM Plex Mono','JetBrains Mono',monospace; font-weight:700; }
+.dashline{ border:none; border-top:3px dashed #1D1D20; }
+</style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="card" style="position:absolute;left:60px;top:56px;padding:16px 28px;">
+          <span class="chip orange">PATH</span>
+          <h1 id="title" class="num" style="display:inline-block;margin:0 0 0 16px;font-size:40px;vertical-align:middle;"></h1>
+        </div>
+        <div style="position:absolute;left:100px;right:100px;top:480px;">
+          <hr class="dashline" style="margin:0;" />
+          <div id="fill" style="position:absolute;left:0;top:-4px;height:10px;width:0;background:#B9E833;border:2px solid #1D1D20;border-radius:6px;"></div>
+          <div id="nodes" style="display:flex;justify-content:space-between;margin-top:-16px;"></div>
+        </div>
+        <style>
+          .tnode{ width:320px; text-align:center; opacity:0; transform:translateY(40px); }
+          .tdot{ width:30px; height:30px; margin:0 auto 20px; border-radius:50%; background:#FFFDF7; border:4px solid #1D1D20; box-shadow:3px 3px 0 #2A292B; }
+          .tt{ font-size:20px; font-weight:700; color:#4D4A48; letter-spacing:.15em; }
+          .tlab{ display:inline-block; margin-top:12px; padding:14px 24px; background:#FFFDF7; border:3px solid #1D1D20; border-radius:14px; box-shadow:5px 5px 0 #2A292B; font-size:30px; font-weight:900; }
+          .tnode.hot .tlab{ background:#B9E833; }
+        </style>
+
+      </section>
+    </div>
+    <script>
+      const fallback = {"title": "从想法到系统", "time1": "01", "label1": "做一次", "time2": "02", "label2": "存模板", "time3": "03", "label3": "反复生成", "accent": "#00FF00", "foreground": "#F4EFE7", "exportMode": "transparent"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.documentElement.style.setProperty("--accent", v.accent ?? "#00FF00");
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const DUR = 6;
+      const countTo = (el, target, at, dur = 1.1, dec = 0) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(target) || 0, duration: dur, ease: "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+
+      $("title").textContent = v.title;
+      const data = [[v.time1, v.label1], [v.time2, v.label2], [v.time3, v.label3]].filter((x) => x[1]);
+      data.forEach(([t, lab], i) => {
+        const n = document.createElement("div");
+        n.className = "tnode" + (i === data.length - 1 ? " hot" : "");
+        n.innerHTML = `<div class="tdot"></div><div class="tt mono">${t}</div><div class="tlab">${lab}</div>`;
+        $("nodes").appendChild(n);
+      });
+      tl.to("#fill", { width: "100%", duration: 2.4, ease: "power2.inOut" }, 0.5);
+      document.querySelectorAll(".tnode").forEach((n, i) => {
+        tl.to(n, { opacity: 1, y: 0, duration: 0.5, ease: "back.out(1.6)" }, 0.6 + i * 0.8);
+      });
+      tl.to(".scene", { opacity: 0, duration: 0.5 }, DUR - 0.6);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

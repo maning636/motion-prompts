@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "合同标题", "default": "自动化服务合作协议"}, {"id": "clauses", "type": "string", "label": "条款（逗号分隔）", "default": "乙方负责脚本与素材的日常维护,甲方保留最终发布审核权,数据归属甲方所有,合作期限一年自动续期"}, {"id": "signame", "type": "string", "label": "签名文字", "default": "张 明"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      #root{ background: #F1EDE0; font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; color: #1D1D20; }
+      .paper{ position: absolute; left: 390px; top: 80px; width: 1140px; height: 920px;
+        background: #FFFDF7; border: 2px solid #1D1D20; padding: 52px 76px;
+        box-shadow: 10px 10px 0 rgba(29,29,32,.10); }
+      .p-title{ font-size: 48px; font-weight: 900; text-align: center; letter-spacing: .08em; }
+      .p-rule{ width: 420px; height: 6px; margin: 20px auto 34px; background: #1D1D20; transform-origin: left center; }
+      .p-clause{ font-size: 27px; font-weight: 600; line-height: 1.6; padding: 10px 0;
+        border-bottom: 1px dashed rgba(29,29,32,.18); display: flex; gap: 18px; }
+      .p-clause .no{ flex: none; font-weight: 900; }
+      .p-signbox{ margin-top: 44px; display: flex; align-items: flex-end; gap: 30px; }
+      .p-slabel{ font-size: 30px; font-weight: 800; padding-bottom: 14px; }
+      .p-sig{ position: relative; width: 380px; height: 130px; border-bottom: 2.5px solid #1D1D20; }
+      .p-sig svg{ position: absolute; left: 10px; bottom: 6px; width: 340px; height: 110px; overflow: visible; }
+      .p-sig path{ fill: none; stroke: #1D1D20; stroke-width: 5; stroke-linecap: round; }
+      .p-sname{ font-size: 26px; font-weight: 700; color: #3A3733; padding-bottom: 14px; }
+      .p-date{ margin-left: auto; font-size: 26px; font-weight: 700; color: #3A3733; padding-bottom: 14px; }
+      .p-date .u{ display: inline-block; width: 170px; border-bottom: 2px solid #1D1D20; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="paper" id="paper">
+        <h1 class="p-title" id="title"></h1>
+        <div class="p-rule" id="rule"></div>
+        <div id="clauses"></div>
+        <div class="p-signbox" id="signbox">
+          <span class="p-slabel">甲方（签字）：</span>
+          <span class="p-sig"><svg viewBox="0 0 340 110"><path id="sigPath" d="M 18 82 C 48 18 76 104 106 52 C 130 14 156 92 186 48 C 210 18 232 88 262 52 C 282 30 304 58 326 42"/></svg></span>
+          <span class="p-sname" id="signName"></span>
+          <span class="p-date">日期：<span class="u"></span></span>
+        </div>
+      </div>
+
+    </div>
+    <script>
+      const fallback = {"title": "自动化服务合作协议", "clauses": "乙方负责脚本与素材的日常维护,甲方保留最终发布审核权,数据归属甲方所有,合作期限一年自动续期", "signame": "张 明", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      $("title").textContent = V.title;
+      $("signName").textContent = V.signame;
+      const cn = ["第一条", "第二条", "第三条", "第四条", "第五条", "第六条"];
+      const clauses = split(V.clauses);
+      const box = $("clauses");
+      clauses.forEach((c, i) => {
+        const d = document.createElement("div");
+        d.className = "p-clause";
+        d.innerHTML = `<span class="no">${cn[i] ?? "第" + (i + 1) + "条"}</span><span class="t"></span>`;
+        d.querySelector(".t").textContent = c;
+        box.appendChild(d);
+      });
+      const sig = $("sigPath");
+      const len = sig.getTotalLength();
+      sig.style.strokeDasharray = String(len);
+      sig.style.strokeDashoffset = String(len);
+      tl.fromTo("#paper", { y: 44, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, 0);
+      tl.fromTo("#title", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 0.2);
+      tl.fromTo("#rule", { scaleX: 0 }, { scaleX: 1, duration: 0.4, ease: "power3.out" }, 0.45);
+      tl.fromTo(".p-clause", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.3, stagger: 0.18, ease: "power2.out" }, 0.65);
+      const tSign = 0.65 + clauses.length * 0.18 + 0.3;
+      tl.fromTo("#signbox", { opacity: 0 }, { opacity: 1, duration: 0.3 }, tSign);
+      tl.to(sig, { strokeDashoffset: 0, duration: 0.95, ease: "power1.inOut" }, tSign + 0.25);
+      tl.fromTo("#signName", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.3 }, tSign + 1.15);
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

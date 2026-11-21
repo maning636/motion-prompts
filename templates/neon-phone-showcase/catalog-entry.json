@@ -1,0 +1,34 @@
+{
+  "id": "neon-phone-showcase",
+  "name": "手机发光展示卡",
+  "description": "荧光绿手机展示卡：右滑入发光 iPhone 样机配屏幕假 UI 或截图，左侧标题关键词高亮+步骤行，适合产品演示讲解。",
+  "category": "产品演示",
+  "tags": [
+    "手机样机",
+    "荧光绿",
+    "产品演示",
+    "界面展示",
+    "口播"
+  ],
+  "duration": 6,
+  "slot": "concept",
+  "when": "口播展示手机 App 界面或个人工作台页面，需要样机包装配合标题讲解时",
+  "assets": [
+    {
+      "id": "imgScreen",
+      "type": "image",
+      "label": "屏幕截图（留空=内置假UI）"
+    }
+  ],
+  "path": "templates/neon-phone-showcase",
+  "size": "1920×1080",
+  "formats": [
+    "mp4"
+  ],
+  "defaultFormat": "mp4",
+  "preview": "https://maning789link.top/hub/renders/neon-phone-showcase/sample.webm",
+  "status": "ready",
+  "tier": "free",
+  "no": null,
+  "series": "shot"
+}

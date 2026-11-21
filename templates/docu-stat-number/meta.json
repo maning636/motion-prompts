@@ -1,0 +1,12 @@
+{
+  "id": "docu-stat-number",
+  "name": "大数字·皮影档案",
+  "description": "宋体巨号数字+朱砂下划线+档案元数据侧栏，适合关键指标强调（B 族皮影·纪录片档案风，2026-08-31）",
+  "category": "口播工厂",
+  "series": "docu",
+  "slot": "docu-puppet",
+  "tags": ["口播工厂","皮影档案","纪录片","docu-stat-number"],
+  "duration": 6,
+  "size": "1920×1080",
+  "status": "ready"
+}

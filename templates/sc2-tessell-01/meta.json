@@ -1,0 +1,13 @@
+{
+  "id": "sc2-tessell-01",
+  "name": "马赛克格重构",
+  "series": "sc2",
+  "createdAt": "2026-08-16T08:00:00.000Z",
+  "energy": "中",
+  "suggestedDuration": 6,
+  "knownPitfalls": [
+    "格阵固定 6×4=24 块，title+hl 合计超过 10 字会逼近 1400px 页宽，长标题需减字号",
+    "desc 用中文分号「；」切两行，只给一行则第二行留空（允许），超过两行会被丢弃",
+    "翻面用 transformPerspective 3D 翻转，低性能机器抽帧偶发栅格化抖动，属正常"
+  ]
+}

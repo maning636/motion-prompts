@@ -1,0 +1,13 @@
+{
+  "id": "crash-zoom-punch",
+  "name": "急推镜头·金句冲击",
+  "description": "急推镜头转场：相机从 1.0 快速推到 1.25（power3.in），配合速度线、闪帧与 1.25→1.28→1.25 的冲击定格，将视觉重心从铺陈画面切换到金句出场，强调金句一击必达。",
+  "category": "转场镜头",
+  "tags": ["转场", "镜头", "冲击", "急推", "金句"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-20T00:00:00.000Z"
+}

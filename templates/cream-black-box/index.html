@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "大模型黑盒"}, {"id": "subtitle", "type": "string", "label": "副标题", "default": "输入与输出明确，中间过程不可解释"}, {"id": "inputLabel", "type": "string", "label": "输入标签", "default": "Prompt"}, {"id": "outputLabel", "type": "string", "label": "输出标签", "default": "Answer"}, {"id": "boxLabel", "type": "string", "label": "黑盒内标签", "default": "175B 参数 · 不可解释"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      /* ===== 奶油纸面贴纸工作台 · 设计令牌（见 design-systems/sticker-workbench/DESIGN.md） ===== */
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden;
+        font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden;
+        background: var(--background, #F5F0E6); color: var(--foreground, #1D1D20); }
+      .outer-frame{ position: absolute; inset: 0; border: 10px solid #1D1D20; pointer-events: none; z-index: 40; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; font-weight: 700; }
+      .fredoka{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; }
+      .corner-tag{ position: absolute; top: 74px; left: 120px; z-index: 30;
+        background: #FFFDF7; border: 4px solid #1D1D20; border-radius: 8px;
+        box-shadow: 10px 10px 0 #2A292B; padding: 14px 22px; transform: rotate(-2deg); }
+      .corner-tag span{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; font-weight: 700;
+        font-size: 24px; letter-spacing: 0.06em; text-transform: uppercase; }
+      .corner-index{ position: absolute; top: 84px; right: 120px; z-index: 30;
+        font-size: 20px; color: #4D4A48; }
+      .scene{ position: absolute; inset: 0; }
+      .panel{ background: #FFFDF7; border: 4px solid #1D1D20; border-radius: 10px;
+        box-shadow: 10px 10px 0 #2A292B; }
+      .chip{ display: inline-block; padding: 8px 20px; border: 4px solid #1D1D20; border-radius: 8px;
+        box-shadow: 6px 6px 0 #2A292B; font-size: 26px; font-weight: 800; line-height: 1.1; }
+      .chip-blue{ background: #3E7BF2; color: #FFFDF7; }
+      .chip-pink{ background: #F13B88; color: #FFFDF7; }
+      .chip-orange{ background: #FF9F1C; color: #1D1D20; }
+      .chip-lime{ background: #B9E833; color: #1D1D20; }
+      .chip-violet{ background: #B99AF7; color: #1D1D20; }
+      .chip-paper{ background: #FFFDF7; color: #1D1D20; }
+      .ttl{ font-size: 52px; font-weight: 900; line-height: 1.2; }
+      .sub{ font-size: 30px; font-weight: 700; line-height: 1.35; color: #4D4A48; }
+      .num{ font-family: 'Fredoka', 'Arial Rounded MT Bold', sans-serif; font-weight: 700; }
+      .title-center{ position: absolute; top: 200px; left: 0; width: 100%; text-align: center; z-index: 20; }
+      .sub-center{ position: absolute; top: 286px; left: 0; width: 100%; text-align: center; z-index: 20; }
+
+      .chain{ position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+        padding: 60px 120px 0; }
+      .cnode{ position: relative; width: 330px; flex: none; text-align: center; padding: 66px 26px 38px; }
+      .cnode.hot{ border-color: #1D1D20; }
+      .cnode .ct{ position: absolute; top: -26px; left: 50%; transform: translateX(-50%) rotate(-2deg);
+        white-space: nowrap; }
+      .cnode .cl{ font-size: 32px; font-weight: 800; line-height: 1.3; }
+      .cnode .cs{ margin-top: 12px; font-size: 22px; font-weight: 700; color: #4D4A48; line-height: 1.35; }
+      .cnode .cseal{ position: absolute; right: -16px; top: -16px; width: 40px; height: 40px; border-radius: 50%;
+        background: #B9E833; border: 4px solid #1D1D20; display: flex; align-items: center; justify-content: center;
+        font-family: 'Fredoka', sans-serif; font-size: 22px; font-weight: 700; }
+      .cnode.inkbox{ background: #1D1D20; }
+      .cnode.inkbox .cl{ color: #FFFDF7; }
+      .carrow{ width: 110px; flex: none; height: 60px; position: relative; }
+      .carrow svg{ position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+      .cplus{ width: 110px; flex: none; display: flex; align-items: center; justify-content: center; }
+      .cplus span{ width: 72px; height: 72px; border-radius: 50%; background: #FFFDF7; border: 4px solid #1D1D20;
+        box-shadow: 6px 6px 0 #2A292B; display: flex; align-items: center; justify-content: center;
+        font-family: 'Fredoka', sans-serif; font-size: 40px; font-weight: 700; }
+      .cloop{ position: absolute; left: 0; right: 0; top: 100%; height: 120px; pointer-events: none; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="outer-frame" id="frame"></div>
+      <div class="corner-tag" id="cornerTag"><span>BLACK BOX</span></div>
+      <div class="corner-index mono" id="cornerIndex">07 / FLOW</div>
+      <svg width="0" height="0" style="position:absolute"><defs>
+        <marker id="arrowHead" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto">
+          <path d="M1 1 L11 6 L1 11 Z" fill="#1D1D20" />
+        </marker>
+      </defs></svg>
+      <section class="scene" id="rootScene" data-start="0" data-duration="6" data-track-index="1">
+        <h2 class="ttl title-center" id="cTitle"></h2>
+        <p class="sub sub-center" id="cSub"></p>
+        <div class="chain" id="cChain"></div>
+      </section>
+    </div>
+    <script>
+      const FB = {"title": "大模型黑盒", "subtitle": "输入与输出明确，中间过程不可解释", "inputLabel": "Prompt", "outputLabel": "Answer", "boxLabel": "175B 参数 · 不可解释"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $ = (id) => document.getElementById(id);
+      const T = (id, val) => { const el = $(id); if (el) el.textContent = val; };
+      const SP = (s) => String(s ?? '').split(',').map(x => x.trim()).filter(Boolean);
+      const SPN = (s) => SP(s).map(Number);
+      const scene = () => $('rootScene');
+      function el(tag, cls, parent, text){ const e = document.createElement(tag);
+        if (cls) e.className = cls; if (text != null) e.textContent = text;
+        (parent || scene()).appendChild(e); return e; }
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const SPRING = "back.out(1.4)";
+      function pop(sel, at, dx){ tl.fromTo(sel, { opacity: 0, x: dx || 0, scale: 0.88 },
+        { opacity: 1, x: 0, scale: 1, duration: 0.38, ease: SPRING }, at); }
+      function fade(sel, at){ tl.fromTo(sel, { opacity: 0 }, { opacity: 1, duration: 0.24 }, at); }
+      function drawArrow(line, at){ const len = line.getAttribute('stroke-dasharray');
+        tl.set(line, { attr: { "marker-end": "url(#arrowHead)" } }, at);
+        tl.fromTo(line, { strokeDashoffset: len }, { strokeDashoffset: 0, duration: 0.4, ease: "power2.inOut" }, at); }
+      tl.fromTo("#frame", { opacity: 0 }, { opacity: 1, duration: 0.18 }, 0);
+      tl.fromTo(["#cornerTag", "#cornerIndex"], { opacity: 0 }, { opacity: 1, duration: 0.18 }, 0);
+      T("cTitle", v.title || ""); T("cSub", v.subtitle || ""); if (!v.subtitle) $("cSub").style.display = "none";
+      const chain = $("cChain");
+      const ARROW = '<svg viewBox="0 0 110 60" fill="none"><line x1="6" y1="30" x2="92" y2="30" stroke="#1D1D20" stroke-width="4" stroke-dasharray="86" stroke-dashoffset="86"/></svg>';
+      function addNode(label, sub, tag, tagCls, opt) {
+        const n = el("article", "panel cnode" + (opt && opt.ink ? " inkbox" : ""), chain);
+        if (tag) el("span", "chip " + tagCls + " ct", n, tag);
+        el("p", "cl", n, label);
+        if (sub) el("p", "cs", n, sub);
+        if (opt && opt.seal) el("div", "cseal", n, "✓");
+        return n;
+      }
+      function addArrow() { const a = el("div", "carrow", chain); a.innerHTML = ARROW; return a.querySelector("line"); }
+      function addPlus() { const p = el("div", "cplus", chain); el("span", "", p, "+"); return p; }
+      const nodes = [], arrows = [];
+      nodes.push(addNode(v.inputLabel, "", "输入", "chip-blue"));
+      arrows.push(addArrow());
+      nodes.push(addNode(v.boxLabel, "", "?", "chip-orange", { ink: true }));
+      arrows.push(addArrow());
+      nodes.push(addNode(v.outputLabel, "", "输出", "chip-lime", { seal: true }));
+      nodes.forEach((n, i) => {
+        pop(n, 0.3 + i * 0.55, -48);
+        if (i > 0) drawArrow(arrows[i - 1], 0.3 + i * 0.55 - 0.18);
+      });
+      const seals = chain.querySelectorAll(".cseal");
+      if (seals.length) tl.fromTo(seals, { opacity: 0, scale: 0.5 },
+        { opacity: 1, scale: 1, duration: 0.2, ease: SPRING }, 0.3 + nodes.length * 0.55);
+      tl.to("#rootScene", { opacity: 0, duration: 0.28, ease: "power2.in" }, 5.5);
+      tl.to(["#cornerTag", "#cornerIndex"], { opacity: 0, duration: 0.28 }, 5.5);
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

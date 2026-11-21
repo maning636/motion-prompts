@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "imgBg", "type": "image", "label": "背景图（空则深黑底）", "default": ""}, {"id": "imgAvatar", "type": "image", "label": "圆形头像（空则剪影占位）", "default": ""}, {"id": "ringColor", "type": "color", "label": "圆环颜色", "default": "#10B981"}, {"id": "duration", "type": "number", "label": "总时长（秒，演完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12);
+  color: var(--foreground, #F5F5F3); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+/* 背景：有图铺满，统一压暗 */
+.bgimg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; }
+.bgdim{ position:absolute; inset:0; background:rgba(10,13,18,.72); display:none; }
+
+/* 左下角圆形头像小窗 */
+.pip{ position:absolute; left:72px; bottom:108px; width:280px; height:280px; will-change:transform; }
+.pip-face{ position:absolute; inset:0; border-radius:50%; overflow:hidden; background:#1F242C; }
+.pip-face img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; }
+.pip-face svg{ position:absolute; inset:0; width:100%; height:100%; }
+.pip-ring{ position:absolute; inset:-6px; border-radius:50%; border:5px solid #10B981;
+  pointer-events:none; will-change:box-shadow; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <img class="bgimg" id="bg" alt="">
+      <div class="bgdim" id="dim"></div>
+
+      <div class="pip" id="pip">
+        <div class="pip-face">
+          <svg viewBox="0 0 280 280" id="ph">
+            <!-- 默认占位：深灰底 + 人物剪影 -->
+            <rect width="280" height="280" fill="#1F242C"/>
+            <circle cx="140" cy="108" r="46" fill="#3A414D"/>
+            <path d="M140 168 C 92 168 58 202 52 252 L 228 252 C 222 202 188 168 140 168 Z" fill="#3A414D"/>
+          </svg>
+          <img id="avatar" alt="">
+        </div>
+        <div class="pip-ring" id="ring"></div>
+      </div>
+    </div>
+    <script>
+      const FB = {"imgBg": "", "imgAvatar": "", "ringColor": "#10B981", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $=(s)=>document.querySelector(s);
+      const DUR=+v.duration>0?+v.duration:6;
+      $('[data-composition-id]').setAttribute('data-duration',String(DUR));
+
+      /* 背景槽：有图铺满+压暗，空则保持深黑底 */
+      if(v.imgBg){ $('#bg').src=v.imgBg; $('#bg').style.display='block'; $('#dim').style.display='block'; }
+
+      /* 头像槽：有图 cover 填充，空则保留 SVG 剪影占位 */
+      if(v.imgAvatar){ $('#avatar').src=v.imgAvatar; $('#avatar').style.display='block'; $('#ph').style.display='none'; }
+
+      /* 圆环颜色与发光（由 ringColor 派生 rgba） */
+      const rc=v.ringColor||'#10B981';
+      const hex=rc.replace('#','');
+      const r=parseInt(hex.substr(0,2),16), g=parseInt(hex.substr(2,2),16), b=parseInt(hex.substr(4,2),16);
+      const glow=(a)=>`0 0 ${Math.round(14+30*a)}px rgba(${r},${g},${b},${(0.30+0.5*a).toFixed(2)}), 0 0 ${Math.round(40+60*a)}px rgba(${r},${g},${b},${(0.10+0.25*a).toFixed(2)})`;
+      const ring=$('#ring');
+      ring.style.borderColor=rc;
+      ring.style.boxShadow=glow(0);
+
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+
+      /* 1. 0.3s 圆窗从下方滑入 + 淡入 */
+      tl.fromTo('#pip',{y:140,opacity:0},{y:0,opacity:1,duration:0.6,ease:'power3.out'},0.3);
+      /* 2. 圆环呼吸发光（有限次，两次呼吸后定格） */
+      tl.fromTo(ring,{boxShadow:glow(0)},{boxShadow:glow(1),duration:0.55,ease:'sine.inOut',repeat:3,yoyo:true},0.9);
+      /* 演完定格，无收尾出场动画 */
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

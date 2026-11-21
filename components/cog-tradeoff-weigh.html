@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"color","name":"字色","type":"color","label":"正文颜色","default":"#F4F1EA"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#E8A048"},{"id":"panel","name":"面板底","type":"color","label":"文字块底色","default":"rgba(12,12,18,.68)"},{"id":"fontScale","name":"字号缩放","type":"number","label":"字号缩放（1 = 默认）","default":1},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":4.6},{"id":"aName","name":"路线 A","type":"string","label":"左栏标题","default":"先把产品做扎实"},{"id":"aCost","name":"A 的代价","type":"string","label":"左栏代价","default":"三个月不见收入，现金压在库存里"},{"id":"bName","name":"路线 B","type":"string","label":"右栏标题","default":"先把渠道铺开"},{"id":"bCost","name":"B 的代价","type":"string","label":"右栏代价","default":"两个月见效，但退货率压不下来"},{"id":"test","name":"判据","type":"string","label":"底部判据","default":"账上能撑几个月不慌，就选 A；撑不过三个月，选 B"}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>二选一 · 两条路的代价</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    /* 透明底：底下是用户自己的实拍或录屏 */
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+
+  /* 文字块后面的一块半透明面板——只护住字，不铺满屏。
+     满屏面板会被云渲染 settle 当成"面积最大的一帧"，抢掉底片的定格。 */
+  .panel {
+    position: absolute; left: 22px; right: 22px;
+    background: var(--panel); border-radius: 14px; opacity: 0;
+    box-shadow: 0 10px 34px rgba(0,0,0,.28);
+  }
+  .lb { font-size: 12px; font-weight: 700; letter-spacing: .22em;
+        text-transform: uppercase; color: var(--ac); }
+  .lb.mut { color: rgba(244,241,234,.42); }
+  .tx { color: var(--fg); line-height: 1.28; }
+  /* 文字装在一个 inline-block 里：要量「文字排出来多宽」时只能量它。
+     直接量 .tx（left/right 撑满的块级）拿到的是容器宽 400px；
+     用 Range.getBoundingClientRect 又会被祖先 transform 放大——
+     预览页把组件放大 2 倍看时，划线就长成了两倍。offsetWidth 是布局宽，
+     两者都不受影响。 */
+  .tx > i { display: inline-block; font-style: normal; }
+  .sub { color: rgba(244,241,234,.62); line-height: 1.4; }
+  .rule { position: absolute; left: 0; height: 2px; background: var(--ac);
+          transform-origin: 0 50%; }
+  .no { position: absolute; display: flex; align-items: center; justify-content: center;
+        border: 2px solid var(--ac); color: var(--ac);
+        font-family: ui-monospace, Consolas, monospace; font-weight: 800; }
+  /* 竖排连接线：因果链用它 */
+  .conn { position: absolute; width: 2px; background: var(--ac); transform-origin: 50% 0; }
+  .hit { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: var(--ac); }
+
+  /* 无面板的两条（尺度标尺 / 数量级切换）需要一层软晕把字托起来。
+     云渲染对 external 图层**不合成底片**，组件预览被渲在浅灰底上，
+     #F4F1EA 的浅色字在浅灰上几乎看不见——指标全绿、图是坏的。
+     opt-* 和 beat-* 早就带了这层，cog 族因为都有面板一直没发现这个缺口。
+     带面板的四条不要加：面板本身就是底板，再压一层晕会发闷。 */
+  .halo { position: absolute; inset: 0;
+          background: radial-gradient(74% 84% at 50% 50%,
+            rgba(0,0,0,.62) 0%, rgba(0,0,0,.36) 54%, rgba(0,0,0,0) 84%); }
+  /* 尺度标尺的字偏左（标题在左上、量级在左下），晕心跟着往左挪。
+     写成复合选择器 .halo.halo-l 而不是独立一条 .halo-l：
+     修饰类不该有自己的独立规则（audit_dom 的 D8 就是查这个），
+     独立规则会和别的组件的同名类撞车。 */
+  .halo.halo-l { background: radial-gradient(76% 90% at 34% 50%,
+            rgba(0,0,0,.60) 0%, rgba(0,0,0,.34) 56%, rgba(0,0,0,0) 86%); }
+  /* 底色/字色三类：HEAD 里没有，但这一批用到了。
+     漏掉的直接后果是「透明件上的黑字」——body 没设 color，
+     没命中任何类的元素一律继承成 rgb(0,0,0)，叠在深色实拍上等于隐形。 */
+  .mu { color: rgba(244,241,234,.5); letter-spacing: .06em; }
+  .mono { font-family: ui-monospace, Consolas, monospace; }
+  .ac { color: var(--ac); }
+  /* 术语卡 */
+  .term { color: var(--fg); font-weight: 900; letter-spacing: .02em; }
+  /* 修饰类必须自带前缀。原来的 .yes / .no 里那个 no 撞上了 HEAD 的
+     `.no { border: 2px solid var(--ac) }`（坑位清单的序号牌），
+     于是「不适用」整行凭空多出一圈橙框——DOM 读数完全正常，
+     只有把组件单独渲在中灰底上才看得见。 */
+  .bnd { position: absolute; left: 20px; right: 20px; display: flex; gap: 10px;
+         align-items: flex-start; }
+  .bnd .tag2 { flex: 0 0 auto; padding: 3px 9px; border-radius: 6px;
+              font-size: 11px; font-weight: 700; letter-spacing: .1em; }
+  .bnd.is-yes .tag2 { background: var(--ac); color: #14140F; }
+  .bnd.is-no .tag2 { background: rgba(244,241,234,.14); color: rgba(244,241,234,.72); }
+  .bnd .bd { flex: 1 1 auto; color: rgba(244,241,234,.72); }
+  /* 正反对照 */
+  .ab { position: absolute; top: 13px; bottom: 13px; width: 196px; border-radius: 10px;
+        background: rgba(244,241,234,.06); }
+  .ab .h { font-size: 11px; font-weight: 700; letter-spacing: .2em; margin-bottom: 8px;
+           padding: 0 12px; }
+  .ab .b2 { color: rgba(244,241,234,.78); padding: 2px 12px 0; }
+  /* 数字打脸 */
+  /* .num 必须自己带 color：正文 div 没命中任何带 color 的类时会继承
+     body 的默认黑，压在深色面板上=看不见。加 color 之后 .num.sub 会被
+     这里盖掉 .sub 的灰，所以「你以为」那行只挂 .sub。 */
+  .num { display: block; width: 100%; text-align: center; font-weight: 900;
+         color: var(--fg); font-variant-numeric: tabular-nums; }
+  .gap { position: absolute; left: 50%; top: 176px; transform: translateX(-50%);
+         display: flex; align-items: center; gap: 12px; }
+  .gap .l { width: 56px; height: 2px; background: var(--ac); }
+  /* 尺度标尺 */
+  .ruler { position: absolute; right: 26px; top: 18px; bottom: 18px; width: 2px;
+           background: rgba(244,241,234,.22); }
+  .ruler .m { position: absolute; left: -3px; width: 8px; height: 2px;
+              background: rgba(244,241,234,.5); }
+  .ruler .m.maj { left: -6px; width: 14px; background: var(--ac); }
+  .ruler .t { position: absolute; right: 14px; white-space: nowrap;
+              font-family: ui-monospace, Consolas, monospace; font-size: 11px;
+              letter-spacing: .06em; color: rgba(244,241,234,.7);
+              transform: translateY(-50%); }
+  /* 不能写成 left:50% + translate(-50%,-50%)：那样容器是 shrink-to-fit，
+     可用宽度只剩右半边 240px。MiSans 下「100× 更大」约 225px 刚好塞得下，
+     云渲染拿不到字体、回退到更宽的字面就被挤断，「更大」竖成两行。
+     改成左右拉满 + justify-content:center，宽度不再受字体影响。 */
+  .mag { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+         display: flex; align-items: baseline; justify-content: center; gap: 10px; }
+  .mag .x { font-size: 66px; font-weight: 900; color: var(--fg); letter-spacing: -.01em;
+            white-space: nowrap; }
+  .mag .u { font-size: 20px; font-weight: 700; color: var(--ac);
+            letter-spacing: .14em; white-space: nowrap; }
+
+  /* ── 权衡 ── */
+  .tk { position: absolute; top: 14px; width: 190px; border-radius: 10px;
+        background: rgba(244,241,234,.06); }
+  .tk .hd { font-size: 15px; font-weight: 800; padding: 10px 12px 0; }
+  .tk .bd2 { font-size: 12.5px; line-height: 1.5; color: rgba(244,241,234,.7);
+             padding: 6px 12px 10px; }
+  .tk.a .hd { color: var(--ac); }
+  .tk.b .hd { color: rgba(244,241,234,.8); }
+  .vs { position: absolute; left: 50%; top: 30px; width: 30px; height: 30px;
+        margin-left: -15px; border-radius: 50%; background: #14140F;
+        border: 2px solid var(--ac); color: var(--ac);
+        display: flex; align-items: center; justify-content: center;
+        font: 800 10px/1 ui-monospace, Consolas, monospace; letter-spacing: .04em; }
+  /* ── 等式 ── */
+  .eq { position: absolute; left: 20px; right: 20px; text-align: center;
+        font-weight: 900; letter-spacing: .01em; font-variant-numeric: tabular-nums; }
+  .eq em { font-style: normal; color: var(--ac); }
+  .eq s { text-decoration: none; color: rgba(244,241,234,.45); padding: 0 4px; }
+  /* ── 曲线 ── */
+  .cv { position: absolute; left: 20px; right: 20px; }
+  .cv .ln { position: absolute; left: 0; right: 0; height: 1px;
+            background: rgba(244,241,234,.14); }
+  .cv .dot { position: absolute; width: 11px; height: 11px; border-radius: 50%;
+             margin: -5.5px 0 0 -5.5px; background: var(--ac);
+             box-shadow: 0 0 0 4px rgba(232,160,72,.22); }
+  /* ── 成本拆解 ── */
+  .led { position: absolute; left: 20px; right: 20px; }
+  .led .nm { font-size: 13px; font-weight: 700; color: var(--fg); }
+  .led .pc { font-size: 12px; color: rgba(244,241,234,.55); text-align: right;
+             font-variant-numeric: tabular-nums; }
+  .led .track { position: absolute; left: 0; right: 0; height: 6px; border-radius: 3px;
+                background: rgba(244,241,234,.10); overflow: hidden; }
+  .led .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0;
+               border-radius: 3px; background: var(--ac); }
+  .led .fill2 { background: rgba(244,241,234,.42); }
+  /* ── 二维判据 ── */
+  .quad { position: absolute; left: 44px; top: 40px; width: 176px; height: 128px; }
+  .quad .cell { position: absolute; width: 84px; height: 60px; padding: 7px 8px;
+                border: 1px solid rgba(244,241,234,.12); font-size: 11.5px;
+                line-height: 1.35; color: rgba(244,241,234,.6); }
+  .quad .cell.on { border-color: var(--ac); background: rgba(232,160,72,.14);
+                   color: var(--fg); font-weight: 700; }
+  .quad .axis { position: absolute; background: rgba(244,241,234,.28); }
+  /* ── 引述 ── */
+  .qm { font-size: 56px; line-height: .8; color: var(--ac); opacity: .5;
+        font-family: Georgia, 'Times New Roman', serif; }
+  .qt { font-size: 19px; font-weight: 800; line-height: 1.45; color: var(--fg); }
+  .qa { font-size: 11.5px; color: rgba(244,241,234,.5); letter-spacing: .06em; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"color":"#F4F1EA","accent":"#E8A048","panel":"rgba(12,12,18,.68)","fontScale":1,"duration":4.6,"aName":"先把产品做扎实","aCost":"三个月不见收入，现金压在库存里","bName":"先把渠道铺开","bCost":"两个月见效，但退货率压不下来","test":"账上能撑几个月不慌，就选 A；撑不过三个月，选 B"};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--fg', v.color || FALLBACK.color);
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--panel', v.panel || FALLBACK.panel);
+  const dur = parseFloat(v.duration) || 4.6;
+  const scale = parseFloat(v.fontScale) || 1;
+
+  const stage = document.getElementById('stage');
+  const build = 
+(stage, put, fit, v, FB, scale) => {
+  const H = Math.round(15 * scale), D = Math.round(12.5 * scale), T = Math.round(11 * scale);
+  const panel = put('div', 'panel', 'top:30px;height:180px');
+  const lb = put('div', 'lb mut', 'position:absolute;left:20px;top:10px;', '两条路', panel);
+  const a = put('div', 'tk a', 'left:20px;height:96px;', null, panel);
+  const b = put('div', 'tk b', 'right:20px;height:96px;', null, panel);
+  const ah = put('div', 'hd', '', v.aName || FB.aName, a);
+  const bh = put('div', 'hd', '', v.bName || FB.bName, b);
+  const at = put('div', 'bd2', '', v.aCost || FB.aCost, a);
+  const bt = put('div', 'bd2', '', v.bCost || FB.bCost, b);
+  const vs = put('div', 'vs', '', 'VS', panel);
+  const rule = put('div', '', 'position:absolute;left:20px;right:20px;top:128px;height:1px;' +
+    'background:rgba(244,241,234,.16);', null, panel);
+  const kl = put('div', 'lb', 'position:absolute;left:20px;top:140px;', '判据', panel);
+  const kt = put('div', 'sub', 'position:absolute;left:72px;right:20px;top:142px;' +
+    'font-size:' + D + 'px;', v.test || FB.test, panel);
+  fit([{ el: ah, max: H, min: Math.round(12 * scale), box: 166 },
+       { el: bh, max: H, min: Math.round(12 * scale), box: 166 },
+       { el: at, max: D, min: Math.round(10 * scale), box: 166 },
+       { el: bt, max: D, min: Math.round(10 * scale), box: 166 },
+       { el: kt, max: D, min: Math.round(10 * scale), box: 324 }]);
+  return {
+    build(tl, dur) {
+      tl.fromTo(panel, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: .34, ease: 'power3.out' }, 0);
+      tl.fromTo(lb, { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: .26 }, .04);
+      tl.fromTo(a, { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: .4, ease: 'power3.out' }, .1);
+      tl.fromTo(b, { opacity: 0, x: 20 }, { opacity: 1, x: 0, duration: .4, ease: 'power3.out' }, .22);
+      tl.fromTo(vs, { opacity: 0, scale: .5 }, { opacity: 1, scale: 1, duration: .3, ease: 'back.out(2.4)' }, .46);
+      tl.fromTo(rule, { scaleX: 0, transformOrigin: '0 50%' },
+        { scaleX: 1, duration: .34, ease: 'power2.inOut' }, .5);
+      tl.fromTo([kl, kt], { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .3, stagger: .06 }, .6);
+      tl.to({}, { duration: .3 }, dur - .3);
+    }
+  };
+}
+;
+
+  /* 每一项 {el, max, min, box}：量自然宽度，超了就缩字号。
+     中文宽度对字号极其敏感，写死字号必然在某组文案上溢出——
+     上一轮 blk-* 那批「文字溢出」的根因就是这个。 */
+  const fits = [];
+  function fit(list) { fits.push.apply(fits, list); }
+  function runFit() {
+    fits.forEach((f) => {
+      const el = f.el;
+      el.style.fontSize = f.max + 'px';
+      const avail = f.box || el.clientWidth;
+      /* 量真实排版宽，只能靠临时 nowrap。
+         之前两版都错在这：
+           ① 直接量 .tx（left/right 撑满的块级）——一换行 scrollWidth 就等于
+              容器宽，量出来永远是 avail，fit 形同虚设；
+           ② 为此在父元素里塞一个装着同样文字的 inline-block span 来量——
+              同一段话在页面上渲染了两遍（肉眼看到的就是「重影」），
+              而且 inline-block 自己的宽度是 shrink-to-fit，量短句时
+              同样会被容器宽吃掉。
+         nowrap 一次性解决两个：文字不折行，scrollWidth 就是它本该多宽；
+         量完恢复，长句该折还是折。 */
+      const ws = el.style.whiteSpace;
+      el.style.whiteSpace = 'nowrap';
+      const natural = el.scrollWidth;
+      el.style.whiteSpace = ws;
+      if (natural > avail) {
+        el.style.fontSize = Math.max(f.min, Math.floor(f.max * avail / natural)) + 'px';
+      }
+    });
+  }
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  const ctx = build(stage, put, fit, v, FALLBACK, scale);
+  ctx.fitTargets && ctx.fitTargets();
+
+  const tl = gsap.timeline({ paused: true });
+  /* 注册：云渲染的 settle / 逐帧定位靠 window.__timelines 驱动时间轴。
+     组件曾全部没注册，渲染停在第 0 帧、整层空。 */
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+  ctx.build(tl, dur);
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  /* 收口必须放在建完时间轴之后、第一次渲染之前：
+     量的时候元素还没被补间动过，量到的是真实排版宽度。 */
+  runFit();
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

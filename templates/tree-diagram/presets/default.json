@@ -1,0 +1,10 @@
+{
+  "title": "内容分类树",
+  "subtitle": "从根主题到具体子类的层级展开",
+  "root": "自媒体内容",
+  "branches": "图文,视频",
+  "leaves": "公众号,小红书,短视频,长视频",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

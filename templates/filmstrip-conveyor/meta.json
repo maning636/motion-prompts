@@ -1,0 +1,13 @@
+{
+  "id": "filmstrip-conveyor",
+  "name": "胶片齿孔横条传送",
+  "description": "横贯画面的胶片齿孔条像传送带一样由左向右推进，每格胶片含标题/年代/简述，齿孔节奏地把一个个画面顶入中央高亮槽，叙事一条历程或合集。",
+  "category": "转场镜头",
+  "tags": ["转场镜头", "胶片", "传送带", "历程叙事", "合集叙事"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-05T00:00:00.000Z"
+}

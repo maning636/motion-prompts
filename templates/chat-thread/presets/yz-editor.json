@@ -1,0 +1,8 @@
+{
+  "title": "你的 AI 剪辑师",
+  "subtitle": "做过四百条片子 坐在你旁边",
+  "messages": "user: 文案给你 帮我做成视频\nassistant: 收到 我先通读拆重点\nassistant: 模板我挑 字幕我对 片子我出\nuser: 好 那我就只管内容了",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

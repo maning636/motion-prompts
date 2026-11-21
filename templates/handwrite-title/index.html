@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "text", "type": "string", "label": "手写文字", "default": "长期主义"}, {"id": "sub", "type": "string", "label": "副标题", "default": "TIME WILL TELL"}, {"id": "ink", "type": "color", "label": "墨色", "default": "#F4EFE7"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "duration", "type": "number", "label": "总时长（秒，写完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0F0E0C); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0F0E0C);
+  color: var(--foreground, #F4EFE7); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.hw{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:8px; }
+.ch{ position:relative; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:900; font-size:220px; color:var(--ink);
+  overflow:hidden; }
+.ch .mask{ position:absolute; inset:0; background:#0F0E0C; transform-origin:right center; }
+.pen{ position:absolute; width:18px; height:18px; border-radius:50%; background:var(--accent);
+  box-shadow:0 0 24px var(--accent); opacity:0; }
+.flourish{ position:absolute; left:50%; top:790px; width:600px; margin-left:-300px; height:14px; }
+.flourish .line{ position:absolute; inset:0; background:var(--accent); border-radius:7px;
+  transform:scaleX(0); transform-origin:left center; }
+.sub{ position:absolute; left:0; right:0; top:850px; text-align:center; font-size:32px;
+  letter-spacing:.6em; color:rgba(244,239,231,.5); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+<div class="hw" id="hw"></div>
+<div class="pen" id="pen"></div>
+<div class="flourish"><div class="line" id="fl"></div></div>
+<div class="sub" id="sub"></div>
+    </div>
+    <script>
+      const FB = {"text": "长期主义", "sub": "TIME WILL TELL", "ink": "#F4EFE7", "accent": "#00FF00", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+const $=(s)=>document.querySelector(s);
+const F=(f)=>f/30;
+const DUR=+v.duration>0?+v.duration:6;
+$('[data-composition-id]').setAttribute('data-duration',String(DUR));
+document.documentElement.style.setProperty('--ink',v.ink||'#F4EFE7');
+document.documentElement.style.setProperty('--accent',v.accent||'#00FF00');
+$('#sub').textContent=v.sub||'';
+
+const hw=$('#hw');
+const chars=[...(v.text||'')];
+for(const c of chars){
+  const s=document.createElement('span');s.className='ch';
+  s.innerHTML='<span class="glyph">'+c+'</span><span class="mask"></span>';
+  hw.appendChild(s);
+}
+const masks=[...document.querySelectorAll('.mask')];
+const glyphSpans=[...document.querySelectorAll('.ch')];
+
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+/* 逐字"书写"：遮罩从右向左揭开，笔尖跟随 */
+const per=F(16);
+masks.forEach((m,i)=>{
+  const at=F(6)+i*per;
+  const r=glyphSpans[i].getBoundingClientRect();
+  tl.set('#pen',{opacity:1},at);
+  tl.fromTo('#pen',{x:r.left-960+r.width*0.1,y:r.top-540+r.height*0.85},
+    {x:r.left-960+r.width*0.95,y:r.top-540+r.height*0.2,duration:per,ease:'power1.inOut'},at);
+  tl.fromTo(m,{scaleX:1},{scaleX:0,duration:per,ease:'power1.inOut'},at);
+  tl.fromTo(glyphSpans[i],{rotation:-3},{rotation:0,duration:per,ease:'power1.out'},at);
+});
+const end=F(6)+masks.length*per;
+tl.to('#pen',{opacity:0,duration:F(6)},end);
+tl.fromTo('#fl',{scaleX:0},{scaleX:1,duration:F(14),ease:'power2.inOut'},end+F(2));
+tl.fromTo('#sub',{opacity:0},{opacity:1,duration:F(12),ease:'power2.out'},end+F(8));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

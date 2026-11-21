@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "窗口标题", "default": "prompt.txt — codex"}, {"id": "lines", "type": "string", "label": "prompt 行（逗号分隔）", "default": "01 同一张图做清晰背景、方形封面、半露圆形碟片,02 碟片中心用透明 CD 圆环,03 右侧歌词持续上滚，当前句金色同步高亮,04 底部加频谱和播放控件,05 所有运动放进同一条时间线"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #0E100F; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #EDF2EE; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      .corner{ position: absolute; width: 34px; height: 34px; border: 3px solid var(--ac, #00FF00); }
+      .c-tl{ left: -3px; top: -3px; border-right: none; border-bottom: none; }
+      .c-tr{ right: -3px; top: -3px; border-left: none; border-bottom: none; }
+      .c-bl{ left: -3px; bottom: -3px; border-right: none; border-top: none; }
+      .c-br{ right: -3px; bottom: -3px; border-left: none; border-top: none; }
+      .tc{ position: absolute; right: 90px; top: 84px; text-align: right; font-family: 'IBM Plex Mono', monospace;
+        font-size: 20px; letter-spacing: .22em; color: rgba(237,242,238,.5); line-height: 1.9; z-index: 6; }
+      .tpc-glow{ position: absolute; left: 50%; top: 54%; transform: translate(-50%,-50%); width: 1500px; height: 900px;
+        background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 7%, transparent), transparent 70%); pointer-events: none; }
+      .tpc-win{ position: absolute; left: 50%; top: 54%; transform: translate(-50%,-50%); width: 1240px; min-height: 700px;
+        background: #0B0D0C; border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent); border-radius: 14px; overflow: hidden;
+        box-shadow: 0 40px 120px rgba(0,0,0,.6); z-index: 4; }
+      .tpc-bar{ height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 24px;
+        background: #101311; border-bottom: 1px solid rgba(237,242,238,.08); }
+      .tpc-dot{ width: 16px; height: 16px; border-radius: 50%; }
+      .tpc-t{ margin-left: 16px; font-size: 20px; color: rgba(237,242,238,.55); letter-spacing: .14em; }
+      .tpc-body{ padding: 38px 48px 48px; font-size: 31px; line-height: 2.05; }
+      .tpc-line{ white-space: nowrap; overflow: hidden; }
+      .tpc-pfx{ color: var(--ac); margin-right: 16px; }
+      .tpc-cur{ display: inline-block; width: 16px; height: 30px; background: var(--ac); vertical-align: -4px; margin-left: 6px; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="tpc-glow"></div>
+      <div class="tpc-win" id="win">
+        <div class="tpc-bar">
+          <span class="tpc-dot" style="background:#FF5F57"></span>
+          <span class="tpc-dot" style="background:#FEBC2E"></span>
+          <span class="tpc-dot" style="background:#28C840"></span>
+          <span class="tpc-t mono" id="wtitle"></span>
+        </div>
+        <div class="tpc-body mono" id="body"></div>
+      </div>
+
+    </div>
+    <script>
+      const fallback = {"title": "prompt.txt — codex", "lines": "01 同一张图做清晰背景、方形封面、半露圆形碟片,02 碟片中心用透明 CD 圆环,03 右侧歌词持续上滚，当前句金色同步高亮,04 底部加频谱和播放控件,05 所有运动放进同一条时间线", "accent": "#00FF00", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      document.documentElement.style.setProperty("--ac", V.accent ?? "#00FF00");
+      $("wtitle").textContent = V.title;
+      const lines = split(V.lines);
+      const body = $("body"), txtEls = [];
+      lines.forEach(() => {
+        const d = document.createElement("div");
+        d.className = "tpc-line";
+        d.innerHTML = '<span class="tpc-pfx">›</span><span class="tpc-txt"></span>';
+        body.appendChild(d);
+        txtEls.push(d.querySelector(".tpc-txt"));
+      });
+      const cursor = document.createElement("span");
+      cursor.className = "tpc-cur";
+      const SCENE = 5.2, TYPE = 0.6;
+      const starts = lines.map((_, i) => 0.45 + i * 0.72);
+      const master = { p: 0 };
+      // 打字机 seek-safe：按 t 直接求每行字符数，禁 setInterval
+      const applyFrame = () => {
+        const t = master.p * SCENE;
+        let ai = -1;
+        lines.forEach((txt, i) => {
+          const local = Math.min(Math.max((t - starts[i]) / TYPE, 0), 1);
+          txtEls[i].textContent = txt.slice(0, Math.floor(local * txt.length));
+          if (t >= starts[i]) ai = i;
+        });
+        if (ai >= 0) txtEls[ai].appendChild(cursor);
+      };
+      tl.fromTo("#win", { opacity: 0, scale: 0.965, y: 30 }, { opacity: 1, scale: 1, y: 0, duration: 0.55, ease: "power3.out" }, 0);
+      tl.to(master, { p: 1, duration: SCENE, ease: "none", onUpdate: applyFrame }, 0.3);
+      applyFrame();
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

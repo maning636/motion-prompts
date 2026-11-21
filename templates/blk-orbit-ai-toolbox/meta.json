@@ -1,0 +1,16 @@
+{
+ "name": "环绕 · 把 AI 塞进日常的六个位置",
+ "description": "中心一枚大圆压住画面，四周卫星卡沿椭圆环绕，径向铺开的另一种读法",
+ "category": "信息卡片",
+ "tags": [
+  "积木社",
+  "orbit",
+  "cobalt",
+  "calm"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "card",
+ "when": "数据卡片 / 环绕"
+}

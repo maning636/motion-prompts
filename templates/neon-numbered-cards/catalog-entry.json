@@ -1,0 +1,28 @@
+{
+  "id": "neon-numbered-cards",
+  "name": "霓虹编号双卡",
+  "description": "深黑底荧光绿霓虹描边双编号卡，标题+两卡递进滑入，卡1图标弹红叉表状态更新，适合知识口播要点讲解。",
+  "category": "信息卡片",
+  "tags": [
+    "编号卡片",
+    "霓虹",
+    "要点讲解",
+    "递进",
+    "口播"
+  ],
+  "duration": 6,
+  "slot": "concept",
+  "when": "口播讲两个并列要点或好处，需要递进呈现并标注状态更新时",
+  "assets": [],
+  "path": "templates/neon-numbered-cards",
+  "size": "1920×1080",
+  "formats": [
+    "mp4"
+  ],
+  "defaultFormat": "mp4",
+  "preview": "https://maning789link.top/hub/renders/neon-numbered-cards/sample.webm",
+  "status": "ready",
+  "tier": "free",
+  "no": null,
+  "series": "shot"
+}

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "imgBg", "type": "image", "label": "背景图（空则深黑底+暗角）", "default": ""}, {"id": "imgMedia", "type": "image", "label": "媒体图（空则 CSS 假文档）", "default": ""}, {"id": "caption", "type": "string", "label": "框下说明文字", "default": "把你的文档丢给它"}, {"id": "layout", "type": "enum", "label": "媒体框位置", "default": "left", "options": [{"value": "left", "label": "左半屏"}, {"value": "right", "label": "右半屏"}]}, {"id": "duration", "type": "number", "label": "总时长（秒，演完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+:root{
+  --acc:#10B981; --accHi:#34D399;
+  --accA85:rgba(16,185,129,.85); --accA50:rgba(16,185,129,.5);
+  --accA35:rgba(16,185,129,.35); --accA12:rgba(16,185,129,.12); --accA05:rgba(16,185,129,.05);
+}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12);
+  color: var(--foreground, #F5F5F3); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+/* 背景：有图铺满+55%压暗；空则深黑底+暗角 */
+.bgimg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; }
+.bgdim{ position:absolute; inset:0; background:rgba(0,0,0,.55); display:none; }
+.vignette{ position:absolute; inset:0; display:none;
+  background:radial-gradient(ellipse at center, rgba(0,0,0,0) 46%, rgba(0,0,0,.55) 100%); }
+
+/* 半屏舞台：3D 透视容器 */
+.stage{ position:absolute; top:0; width:960px; height:1080px; perspective:1200px; }
+.stage.left{ left:0; } .stage.right{ left:960px; }
+
+/* 媒体框：1px 绿描边 + 外发光 + 轻微投影 */
+.frame{ position:absolute; left:100px; top:236px; width:760px; height:560px;
+  background:#12161C; border:1px solid var(--accA85); border-radius:16px;
+  box-shadow:0 0 26px var(--accA35), 0 0 60px var(--accA12), inset 0 0 30px var(--accA05),
+    0 24px 48px rgba(0,0,0,.45);
+  padding:16px; will-change:transform,opacity; transform-style:preserve-3d; }
+.media{ position:relative; width:100%; height:100%; border-radius:10px; overflow:hidden; background:#1B212B; }
+.media img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; }
+
+/* CSS 假文档：白色卡片 + 灰色横线段落 */
+.doc{ position:absolute; inset:0; background:#F5F6F7; padding:56px 60px; }
+.doc .dt{ width:52%; height:34px; border-radius:6px; background:#9AA3AE; margin-bottom:40px; }
+.doc .dl{ height:18px; border-radius:5px; background:#D3D8DE; margin-bottom:26px; }
+.doc .dl.w1{ width:100%; } .doc .dl.w2{ width:94%; } .doc .dl.w3{ width:98%; }
+.doc .dl.w4{ width:76%; margin-bottom:44px; }
+.doc .dl.w5{ width:100%; } .doc .dl.w6{ width:88%; } .doc .dl.w7{ width:60%; }
+
+/* 框下 caption */
+.caption{ position:absolute; left:100px; width:760px; top:856px; text-align:center;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:32px; color:#E8EAED;
+  letter-spacing:1px; max-width:760px; overflow-wrap:break-word; }
+.caption::before{ content:''; display:inline-block; width:12px; height:12px; border-radius:3px;
+  background:var(--acc); box-shadow:0 0 12px var(--accA50); margin-right:16px; vertical-align:middle; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <img class="bgimg" id="bg" alt="">
+      <div class="bgdim" id="dim"></div>
+      <div class="vignette" id="vig"></div>
+
+      <div class="stage left" id="stage" data-layout-allow-overflow>
+        <div class="frame" id="frame" data-layout-allow-overflow>
+          <div class="media">
+            <div class="doc" id="doc">
+              <div class="dt"></div>
+              <div class="dl w1"></div><div class="dl w2"></div><div class="dl w3"></div><div class="dl w4"></div>
+              <div class="dl w5"></div><div class="dl w6"></div><div class="dl w7"></div>
+            </div>
+            <img id="media" alt="">
+          </div>
+        </div>
+        <div class="caption" id="captionTxt"></div>
+      </div>
+    </div>
+    <script>
+      const FB = {"imgBg": "", "imgMedia": "", "caption": "把你的文档丢给它", "layout": "left", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $=(s)=>document.querySelector(s);
+      const DUR=+v.duration>0?+v.duration:6;
+      $('[data-composition-id]').setAttribute('data-duration',String(DUR));
+
+      /* 背景槽：有图铺满+55%压暗；空则深黑底+暗角 */
+      if(v.imgBg){
+        $('#bg').src=v.imgBg; $('#bg').style.display='block'; $('#dim').style.display='block';
+      }else{
+        $('#vig').style.display='block';
+      }
+
+      /* 媒体槽：有图 cover 填充，空则保留 CSS 假文档 */
+      if(v.imgMedia){ $('#media').src=v.imgMedia; $('#media').style.display='block'; $('#doc').style.display='none'; }
+
+      /* 半屏布局：left / right */
+      const isRight = String(v.layout||'left')==='right';
+      const stage=$('#stage');
+      stage.classList.remove('left','right');
+      stage.classList.add(isRight?'right':'left');
+      /* 倾斜方向：朝向屏幕中轴微斜（左半屏 rotationY 正，右半屏负） */
+      const tiltDir = isRight ? -1 : 1;
+
+      $('#captionTxt').textContent=v.caption||'';
+
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+
+      /* 1. 框体斜角飞入：rotationY 24° + 侧方位移 + 透明 → 归位保持 6° 微斜角 */
+      tl.fromTo('#frame',
+        {rotationY:24*tiltDir, x:-140*tiltDir, opacity:0},
+        {rotationY:6*tiltDir, x:0, opacity:1, duration:1.0, ease:'power3.out'},0.3);
+      /* 2. 入场后一次轻微回弹呼吸，强化"定格在微斜角"的存在感 */
+      tl.to('#frame',{rotationY:4.5*tiltDir, duration:0.4, ease:'sine.inOut'},1.35);
+      tl.to('#frame',{rotationY:6*tiltDir, duration:0.4, ease:'sine.inOut'},1.75);
+      /* 3. caption 淡入上移 */
+      tl.fromTo('#captionTxt',{opacity:0,y:20},{opacity:1,y:0,duration:0.55,ease:'power2.out'},1.9);
+      /* 演完定格：补 set 占满 data-duration 防黑帧 */
+      tl.set('#root',{opacity:1},DUR);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

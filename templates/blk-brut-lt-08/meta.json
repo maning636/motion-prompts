@@ -1,0 +1,16 @@
+{
+ "name": "金句贴",
+ "description": "强调色引号方块压住白底卡片左上角，卡内 900 大字金句 + 3px 规则 + mono 署名；引号方块盖章落位后与卡片反向微位移",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "quote",
+  "callout",
+  "pink"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "口播与短片里抛出一句可以单独截图传播的结论时"
+}

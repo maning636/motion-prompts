@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"docKicker","type":"string","label":"文档眉标","default":"SOURCE · DOC"},
+  {"id":"docTitle","type":"string","label":"文档标题","default":"季度经营复盘"},
+  {"id":"docMeta","type":"string","label":"文档元信息","default":"2026 Q2 · 内部资料"},
+  {"id":"docLines","type":"string","label":"文档要点（换行分隔）","default":"营收同比 +18.4%，用户基数扩至 3.6M\nAI 协作流已覆盖 78% 常规任务\n交付周期由 12 天压缩至 4 天\n团队满意度提升 21 个百分点"},
+  {"id":"pillKicker","type":"string","label":"结论眉标","default":"VERDICT"},
+  {"id":"pillTitle","type":"string","label":"结论标题","default":"结论：继续加大 AI 投入"},
+  {"id":"pillSub","type":"string","label":"结论副文案","default":"建议下季度预算 +35%"},
+  {"id":"dealKicker","type":"string","label":"交易眉标","default":"DEAL"},
+  {"id":"dealAmount","type":"string","label":"交易金额","default":"¥ 12.8M"},
+  {"id":"dealNote","type":"string","label":"交易备注","default":"签约 · 2026-08-19"},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+      .stage{
+        position:absolute; inset:0;
+      }
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity: .55;
+      }
+
+      /* 顶栏 */
+      .eyebrow{
+        position:absolute; top: 56px; left: 96px; right: 96px;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.22em; text-transform:uppercase;
+        color: #8A8A85;
+      }
+      .eyebrow .acc{ color: var(--accent, #00FF00); font-weight: 700; letter-spacing:.18em; }
+
+      /* 左文档面板 */
+      #docPanel{
+        position:absolute; left: 96px; top: 148px;
+        width: 720px; height: 800px;
+        background: linear-gradient(180deg, rgba(255,255,255,.045) 0%, rgba(255,255,255,.02) 100%);
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 18px;
+        padding: 48px 44px;
+        display:flex; flex-direction:column;
+        overflow:hidden;
+        opacity: 0;
+        will-change: transform, opacity;
+        box-shadow: 0 30px 60px rgba(0,0,0,.35);
+      }
+      #docPanel::before{
+        content:""; position:absolute; left:0; top:0; bottom:0; width:4px;
+        background: linear-gradient(180deg, var(--accent, #00FF00), transparent 70%);
+        opacity: .8;
+      }
+      .doc-kicker{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 14px; letter-spacing: .28em; color: #8A8A85;
+        display:flex; align-items:center; gap: 10px;
+      }
+      .doc-kicker::before{
+        content:""; width: 22px; height: 2px; background: var(--accent, #00FF00);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--accent, #00FF00) 55%, transparent);
+      }
+      .doc-title{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight:700; letter-spacing:-.01em;
+        font-size: 52px; line-height: 1.1;
+        margin: 18px 0 12px;
+        color: var(--foreground, #F4EFE7);
+      }
+      .doc-meta{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.14em; color: #8A8A85;
+        margin-bottom: 28px;
+      }
+      .doc-rule{
+        height: 1px; width: 100%;
+        background: linear-gradient(90deg, rgba(255,255,255,.18), rgba(255,255,255,0));
+        margin: 0 0 22px;
+      }
+      .doc-lines{
+        list-style:none; padding:0; margin: 0;
+        display:flex; flex-direction:column; gap: 18px;
+      }
+      .doc-lines li{
+        display:flex; gap: 16px; align-items:flex-start;
+        font-size: 24px; line-height: 1.5;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 88%, transparent);
+      }
+      .doc-lines li .n{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 14px; letter-spacing:.14em;
+        color: var(--accent, #00FF00); margin-top: 6px; min-width: 30px;
+        padding-top: 2px;
+      }
+      .doc-lines li .t{ flex:1; }
+
+      .doc-foot{
+        margin-top: auto;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 14px; letter-spacing:.22em; color: #6B6B66;
+      }
+      .doc-foot .dot{
+        width: 8px; height: 8px; border-radius: 50%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 10px color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+      }
+
+      /* 右侧：结论 + 交易 pill 轨道 */
+      #rightCol{
+        position:absolute; right: 96px; top: 148px;
+        width: 996px; height: 800px;
+        display:flex; flex-direction:column;
+        justify-content: center; gap: 36px;
+      }
+
+      .pill{
+        position:relative;
+        display:flex; align-items:center; gap: 32px;
+        padding: 32px 40px;
+        border-radius: 24px;
+        background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.02));
+        border: 1px solid rgba(255,255,255,.10);
+        box-shadow: 0 24px 60px rgba(0,0,0,.35);
+        overflow:hidden;
+      }
+      .pill::before{
+        content:""; position:absolute; left:0; top:0; bottom:0; width:5px;
+      }
+      #pillVerdict{ width: 900px; }
+      #pillVerdict::before{ background: color-mix(in srgb, var(--accent, #00FF00) 70%, transparent); }
+      #pillDeal{
+        width: 780px;
+        background: linear-gradient(90deg,
+          color-mix(in srgb, var(--accent, #00FF00) 12%, rgba(255,255,255,.02)) 0%,
+          rgba(255,255,255,.02) 60%);
+        border-color: color-mix(in srgb, var(--accent, #00FF00) 35%, rgba(255,255,255,.10));
+      }
+      #pillDeal::before{ background: var(--accent, #00FF00); }
+
+      .pill-icon{
+        flex:none;
+        width: 68px; height: 68px; border-radius: 16px;
+        display:grid; place-items:center;
+        background: color-mix(in srgb, var(--accent, #00FF00) 14%, transparent);
+        border: 1px solid color-mix(in srgb, var(--accent, #00FF00) 35%, transparent);
+        color: var(--accent, #00FF00);
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 26px; font-weight: 700; letter-spacing:.06em;
+      }
+      #pillDeal .pill-icon{
+        background: var(--accent, #00FF00);
+        color: #0A0A0A;
+        border-color: transparent;
+        box-shadow: 0 0 24px color-mix(in srgb, var(--accent, #00FF00) 40%, transparent);
+      }
+
+      .pill-body{ flex:1; min-width:0; }
+      .pill-kicker{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 14px; letter-spacing:.24em; color: #8A8A85;
+        margin-bottom: 6px;
+      }
+      #pillDeal .pill-kicker{ color: color-mix(in srgb, var(--accent, #00FF00) 78%, #8A8A85); }
+      .pill-title{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 34px; font-weight: 700; letter-spacing:-.01em;
+        line-height: 1.15; color: var(--foreground, #F4EFE7);
+      }
+      .pill-sub{
+        margin-top: 6px;
+        font-size: 20px; line-height: 1.4;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 70%, transparent);
+      }
+      #dealAmount{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 68px; font-weight: 700; letter-spacing:-.02em;
+        color: var(--accent, #00FF00); line-height: 1;
+        text-shadow: 0 0 24px color-mix(in srgb, var(--accent, #00FF00) 35%, transparent);
+      }
+      #dealNote{
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+        font-size: 20px; color: color-mix(in srgb, var(--foreground, #F4EFE7) 70%, transparent);
+        margin-top: 8px; letter-spacing: .04em;
+      }
+
+      .pill-arrow{
+        flex:none; width: 40px; height: 2px;
+        background: color-mix(in srgb, var(--foreground, #F4EFE7) 20%, transparent);
+        position:relative;
+      }
+      .pill-arrow::after{
+        content:""; position:absolute; right:-1px; top:50%;
+        width: 10px; height: 10px;
+        border-top: 2px solid color-mix(in srgb, var(--foreground, #F4EFE7) 40%, transparent);
+        border-right: 2px solid color-mix(in srgb, var(--foreground, #F4EFE7) 40%, transparent);
+        transform: translateY(-50%) rotate(45deg);
+      }
+      #pillDeal .pill-arrow{
+        background: color-mix(in srgb, var(--accent, #00FF00) 40%, transparent);
+      }
+      #pillDeal .pill-arrow::after{
+        border-top-color: var(--accent, #00FF00);
+        border-right-color: var(--accent, #00FF00);
+      }
+
+      /* 底部小注 */
+      .footnote{
+        position:absolute; bottom: 56px; left: 96px; right: 96px;
+        display:flex; align-items:center; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.22em;
+        color: #6B6B66;
+      }
+      .footnote .acc{ color: var(--accent, #00FF00); font-weight: 700; }
+
+      /* pill 初始状态：滑入前不可见 */
+      .pill{ opacity: 0; will-change: transform, opacity; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="stage" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+
+        <div class="eyebrow">
+          <span><b class="acc">DOC</b>&nbsp;&nbsp;→&nbsp;&nbsp;DEAL</span>
+          <span>doc · park · pill · deal</span>
+        </div>
+
+        <!-- 左文档面板 -->
+        <div id="docPanel">
+          <div class="doc-kicker" id="docKicker">SOURCE · DOC</div>
+          <h2 class="doc-title" id="docTitle">季度经营复盘</h2>
+          <div class="doc-meta" id="docMeta">2026 Q2 · 内部资料</div>
+          <div class="doc-rule"></div>
+          <ul class="doc-lines" id="docLines">
+            <li><span class="n">01</span><span class="t">营收同比 +18.4%，用户基数扩至 3.6M</span></li>
+            <li><span class="n">02</span><span class="t">AI 协作流已覆盖 78% 常规任务</span></li>
+            <li><span class="n">03</span><span class="t">交付周期由 12 天压缩至 4 天</span></li>
+            <li><span class="n">04</span><span class="t">团队满意度提升 21 个百分点</span></li>
+          </ul>
+          <div class="doc-foot">
+            <span>DOC-2026-Q2-04</span>
+            <span class="dot"></span>
+          </div>
+        </div>
+
+        <!-- 右侧：结论 pill + 交易 pill 轨道 -->
+        <div id="rightCol">
+          <div id="pillTrack">
+            <div class="pill" id="pillVerdict">
+              <div class="pill-icon">V</div>
+              <div class="pill-body">
+                <div class="pill-kicker" id="pillKicker">VERDICT</div>
+                <div class="pill-title" id="pillTitle">结论：继续加大 AI 投入</div>
+                <div class="pill-sub" id="pillSub">建议下季度预算 +35%</div>
+              </div>
+              <div class="pill-arrow"></div>
+            </div>
+          </div>
+
+          <div class="pill" id="pillDeal">
+            <div class="pill-icon">¥</div>
+            <div class="pill-body">
+              <div class="pill-kicker" id="dealKicker">DEAL</div>
+              <div id="dealAmount">¥ 12.8M</div>
+              <div id="dealNote">签约 · 2026-08-19</div>
+            </div>
+            <div class="pill-arrow"></div>
+          </div>
+        </div>
+
+        <div class="footnote">
+          <span>source → verdict → deal</span>
+          <span class="acc">CLEAN-ROOM · FDE</span>
+        </div>
+
+      </section>
+    </div>
+    <script>
+      /* ----- 变量接线（与全库契约一致） ----- */
+      const fallback = {
+        docKicker: "SOURCE · DOC",
+        docTitle: "季度经营复盘",
+        docMeta: "2026 Q2 · 内部资料",
+        docLines: "营收同比 +18.4%，用户基数扩至 3.6M\nAI 协作流已覆盖 78% 常规任务\n交付周期由 12 天压缩至 4 天\n团队满意度提升 21 个百分点",
+        pillKicker: "VERDICT",
+        pillTitle: "结论：继续加大 AI 投入",
+        pillSub: "建议下季度预算 +35%",
+        dealKicker: "DEAL",
+        dealAmount: "¥ 12.8M",
+        dealNote: "签约 · 2026-08-19",
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const $ = (id) => document.getElementById(id);
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      $("docKicker").textContent = v.docKicker  || fallback.docKicker;
+      $("docTitle").textContent  = v.docTitle   || fallback.docTitle;
+      $("docMeta").textContent   = v.docMeta    || fallback.docMeta;
+
+      const ul = $("docLines");
+      if (ul) {
+        const lines = String(v.docLines ?? fallback.docLines)
+          .split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 4);
+        ul.innerHTML = lines.map((t, i) =>
+          `<li><span class="n">${String(i+1).padStart(2,"0")}</span><span class="t">${escapeHtml(t)}</span></li>`
+        ).join("");
+      }
+
+      $("pillKicker").textContent = v.pillKicker || fallback.pillKicker;
+      $("pillTitle").textContent  = v.pillTitle  || fallback.pillTitle;
+      $("pillSub").textContent    = v.pillSub    || fallback.pillSub;
+      $("dealKicker").textContent = v.dealKicker || fallback.dealKicker;
+      $("dealAmount").textContent = v.dealAmount || fallback.dealAmount;
+      $("dealNote").textContent   = v.dealNote   || fallback.dealNote;
+
+      /* ----- 时间线 ----- */
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      // 1. 文档面板：从左侧停靠滑入 + 淡入
+      tl.fromTo("#docPanel",
+        { opacity: 0, x: -80 },
+        { opacity: 1, x: 0, duration: 0.75, ease: "power3.out" }, 0.15);
+
+      // 文档内部：眉标 → 标题 → 元信息 → 分割线 → 要点错峰
+      tl.fromTo("#docKicker, #docTitle, #docMeta",
+        { opacity: 0, y: 16 },
+        { opacity: 1, y: 0, duration: 0.42, ease: "power2.out", stagger: 0.08 }, 0.55);
+      tl.fromTo("#docPanel .doc-rule",
+        { scaleX: 0, transformOrigin: "left center" },
+        { scaleX: 1, duration: 0.5, ease: "power3.out" }, 0.9);
+      tl.fromTo("#docLines li",
+        { opacity: 0, x: -14 },
+        { opacity: 1, x: 0, duration: 0.45, ease: "power2.out", stagger: 0.1 }, 1.05);
+      tl.fromTo("#docPanel .doc-foot",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.4, ease: "power2.out" }, 1.6);
+
+      // 2. 结论 pill：从右侧滑入 + 微弹
+      tl.fromTo("#pillVerdict",
+        { opacity: 0, x: 220 },
+        { opacity: 1, x: 0, duration: 0.75, ease: "power3.out" }, 1.5);
+      // 结论 pill 图标微弹（back.out）
+      tl.fromTo("#pillVerdict .pill-icon",
+        { scale: 0.6 },
+        { scale: 1, duration: 0.55, ease: "back.out(1.7)" }, 1.75);
+
+      // 3. 交易 pill：更晚滑入 + 强调色发光脉冲
+      tl.fromTo("#pillDeal",
+        { opacity: 0, x: 260 },
+        { opacity: 1, x: 0, duration: 0.8, ease: "power3.out" }, 2.3);
+      tl.fromTo("#pillDeal .pill-icon",
+        { scale: 0.5 },
+        { scale: 1, duration: 0.6, ease: "back.out(1.8)" }, 2.6);
+      // 金额数字：轻微缩放弹入 + 发光脉冲
+      tl.fromTo("#dealAmount",
+        { opacity: 0, scale: 0.9, transformOrigin: "left center" },
+        { opacity: 1, scale: 1, duration: 0.55, ease: "back.out(1.4)" }, 2.8);
+      // 金额呼吸：sine.inOut 双向
+      tl.to("#dealAmount",
+        { scale: 1.04, duration: 0.9, ease: "sine.inOut", yoyo: true, repeat: 1, transformOrigin: "left center" }, 3.6);
+      tl.to("#dealAmount",
+        { scale: 1, duration: 0.3, ease: "power2.out" }, 5.4);
+
+      // 结尾：文档面板轻微回稳（微缩放）+ 两侧箭头同步呼吸
+      tl.fromTo("#docPanel",
+        { scale: 1 },
+        { scale: 1.005, duration: 0.6, ease: "sine.inOut", yoyo: true, repeat: 1, transformOrigin: "center center" }, 4.4);
+
+      // 脚注
+      tl.fromTo(".footnote",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.4, ease: "power2.out" }, 0.3);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

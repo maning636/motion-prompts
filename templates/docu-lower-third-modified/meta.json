@@ -1,0 +1,21 @@
+{
+  "name": "docu-lower-third-modified",
+  "title": "变形字幕条·皮影档案",
+  "category": "口播工厂",
+  "series": "docu",
+  "sub-series": "lower-third",
+  "attribution": "HyperFrames",
+  "license": "internal-paid-member",
+  "clip-ref": null,
+  "source-template": "docu-puppet",
+  "use-case": ["reveal"],
+  "tags": ["docu-lower-third-modified", "docu", "lower-third", "reveal"],
+  "duration": 6,
+  "fps": 30,
+  "resolution": "1920x1080",
+  "data-composition-id": "docu-lower-third-modified-2026-09-01",
+  "created": "2026-09-01",
+  "updated": "2026-09-01",
+  "author": "maning",
+  "status": "draft"
+}

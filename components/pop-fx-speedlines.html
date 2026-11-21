@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"text","name":"文案","type":"string","label":"主文案","default":"冲！"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"accent2","name":"次强调色","type":"color","label":"次强调色","default":"#FFC93C"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":2.4}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>集中速度线</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-tint { position: absolute; inset: 0; background: rgba(12, 12, 18, .48); }
+  .p-halo { position: absolute; inset: 0;
+    background: radial-gradient(70% 80% at 50% 50%, rgba(0,0,0,.52) 0%, rgba(0,0,0,.28) 54%, rgba(0,0,0,0) 84%); }
+  .p-ln { position: absolute; left: 240px; top: 135px; margin-top: -1.5px;
+    transform-origin: 0 50%; opacity: 0; will-change: transform, opacity; border-radius: 2px; }
+  .p-focus { position: absolute; left: 240px; top: 135px; width: 150px; height: 150px; margin: -75px 0 0 -75px;
+    border-radius: 50%; border: 3px solid rgba(255,255,255,.55); opacity: 0; will-change: transform, opacity; }
+  .p-wordrow { position: absolute; left: 0; right: 0; top: 100px; display: flex; justify-content: center; }
+  .p-word { display: inline-block; white-space: nowrap; font-size: 62px; font-weight: 900;
+    line-height: 1.06; color: var(--fg); -webkit-text-stroke: 3px var(--ink);
+    text-shadow: 6px 6px 0 rgba(0,0,0,.85); }
+  .p-bot { position: absolute; left: 50%; top: 178px; margin-left: -19px; width: 38px; height: 34px;
+    background: var(--ac); border: 3px solid var(--ink); border-radius: 6px 6px 3px 3px; }
+  .p-bot::before, .p-bot::after { content: ''; position: absolute; top: 7px; width: 6px; height: 8px;
+    background: var(--ink); border-radius: 50%; }
+  .p-bot::before { left: 6px; }
+  .p-bot::after { right: 6px; }
+  .p-bot i { position: absolute; left: 9px; bottom: 4px; width: 20px; height: 9px;
+    border-bottom: 3px solid var(--ink); border-radius: 0 0 12px 12px; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"冲！","accent":"#FF6B35","accent2":"#FFC93C","duration":2.4};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  const dur = parseFloat(v.duration) || 2.4;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--ac2', v.accent2 || FALLBACK.accent2);
+  root.style.setProperty('--fg', '#FFF8EE');
+  root.style.setProperty('--ink', '#1B1B24');
+  const text = String(v.text == null ? FALLBACK.text : v.text);
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, tx, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (tx != null) el.textContent = tx;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  put('div', 'p-tint');
+  put('div', 'p-halo');
+
+  /* 速度线参数全部由序号推导：角度抖动、长度、粗细、颜色都固定，
+     只有「伸多长 / 有多亮」随 t 变化。 */
+  const H = (i, s) => {
+    let x = (Math.imul(i + 1, 374761393) + Math.imul(s + 11, 668265263)) >>> 0;
+    x = (x ^ (x >>> 13)) >>> 0;
+    x = Math.imul(x, 1274126177) >>> 0;
+    return ((x >>> 8) & 0xffff) / 65535;
+  };
+  const N = 56;
+  const lines = [];
+  for (let i = 0; i < N; i++) {
+    const ang = (i / N) * 360 + (H(i, 1) * 22 - 11);
+    const len = 150 + Math.round(H(i, 2) * 190);
+    const th = 2 + Math.round(H(i, 3) * 4);
+    const col = i % 5 === 0 ? '#FFFFFF' : (i % 2 ? 'var(--ac)' : 'var(--ac2)');
+    const el = put('div', 'p-ln',
+      'width:' + len + 'px;height:' + th + 'px;margin-top:-' + (th / 2) + 'px;' +
+      'background:linear-gradient(90deg, rgba(255,255,255,0) 0%, ' + col + ' 42%, ' + col + ' 100%);');
+    el.dataset.ang = ang.toFixed(2);
+    el.dataset.lab = (0.55 + H(i, 4) * 0.45).toFixed(3);
+    lines.push(el);
+  }
+
+  const focus = put('div', 'p-focus');
+  const bot = put('div', 'p-bot');
+  put('i', '', '', null, bot);
+  const row = put('div', 'p-wordrow');
+  const word = put('div', 'p-word', '', text, row);
+
+  function fitText(el, maxPx, avail, minPx) {
+    el.style.fontSize = maxPx + 'px';
+    el.style.whiteSpace = 'nowrap';
+    const natural = el.scrollWidth;
+    if (natural > avail && natural > 0) {
+      el.style.fontSize = Math.max(minPx, Math.floor(maxPx * avail / natural)) + 'px';
+    }
+  }
+  fitText(word, 62, 400, 22);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+  tl.fromTo(word, { scale: .15, opacity: 0, rotate: -10 },
+    { scale: 1, opacity: 1, rotate: -3, duration: .4, ease: 'back.out(2.6)' }, .02);
+  tl.fromTo(bot, { scale: .15, opacity: 0 },
+    { scale: 1, opacity: 1, duration: .34, ease: 'back.out(3)' }, .06);
+
+  /* 两轮爆开：主爆 0.10s 冲到顶，0.46s 再来一次弱一档的。
+     纯 t 的函数，无随机、无累加。 */
+  const wave = (t, t0, peak) => {
+    if (t <= t0) return 0;
+    if (t <= t0 + .06) return peak * (t - t0) / .06;
+    return peak * Math.exp(-(t - t0 - .06) * 3.6);
+  };
+  const env = (t) => Math.max(wave(t, .04, 1), wave(t, .46, .48));
+
+  const P = { t: 0 };
+  const paint = (t) => {
+    const E = env(t);
+    for (let i = 0; i < N; i++) {
+      const el = lines[i];
+      const d = i * .0032;
+      const u = Math.max(0, Math.min(1, (t - d - .04) / .26));
+      const g = 1 - Math.pow(1 - u, 2);        /* ease-out，线是「甩」出去的 */
+      el.style.transform = 'rotate(' + el.dataset.ang + 'deg) scaleX(' + g.toFixed(3) + ')';
+      el.style.opacity = (E * parseFloat(el.dataset.lab)).toFixed(3);
+    }
+    const fu = Math.max(0, Math.min(1, (t - .04) / .7));
+    focus.style.transform = 'scale(' + (.25 + fu * 1.9).toFixed(3) + ')';
+    focus.style.opacity = ((1 - fu) * .6).toFixed(3);
+    word.style.filter = 'brightness(' + (1 + E * .35).toFixed(2) + ')';
+    bot.style.filter = 'brightness(' + (1 + E * .3).toFixed(2) + ')';
+  };
+  tl.fromTo(P, { t: 0 }, {
+    t: dur, duration: dur, ease: 'none',
+    onUpdate() { paint(P.t); }
+  }, 0);
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+  paint(0);
+})();
+</script>
+</body>
+</html>

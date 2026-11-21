@@ -1,0 +1,13 @@
+{
+  "id": "page-gray-cards-stamp",
+  "name": "灰卡点亮入场组（盖章式）",
+  "series": "page",
+  "createdAt": "2026-08-16T08:00:00.000Z",
+  "energy": "中",
+  "suggestedDuration": 6,
+  "knownPitfalls": [
+    "items 支持中英文分号分隔，最多取前 4 条；超出会被截掉",
+    "印章文字建议 2-4 个字，太长会顶出卡片右缘",
+    "duration 小于 5 时逐张盖章节拍会被压缩，盖章震感可能与下一张点亮重叠"
+  ]
+}

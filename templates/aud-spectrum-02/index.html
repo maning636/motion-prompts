@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "eyebrow", "name": "眉标", "type": "string", "label": "眉标（mono + 大字距，≤12 字）", "default": "SPECTRUM / 八段"}, {"id": "titleA", "name": "主标题 · 前段", "type": "string", "label": "主标题第一行（普通字，≤6 字）", "default": "八个频段，"}, {"id": "titleB", "name": "主标题 · 彩色词块", "type": "string", "label": "主标题第二行（强调色块里的词，≤4 字）", "default": "从低到高"}, {"id": "bands", "name": "频段名", "type": "string", "label": "八个频段名，用全角竖线｜分隔（每段≤5 字，如 频段A｜频段B｜…）", "default": "超低｜底鼓｜低音｜中低｜中音｜中高｜ Presence｜空气"}, {"id": "peaks", "name": "音频包络", "type": "string", "label": "离线 RMS 包络（JSON 数组，整数 0–1000；换音轨后用离线脚本重算）", "default": "14,117,117,14,212,76,14,237,139,1000,190,294,158,658,101,547,206,481,718,60,389,73,661,60,908,380,212,288,108,146,247,946,120,358,57,696,60,611,130,617,639,38,421,155,699,70,424,51"}, {"id": "accent", "name": "强调色", "type": "color", "label": "强调色（段内柱 / 段级电平条 / 当前段名）", "default": "#FFD429"}, {"id": "duration", "name": "总时长", "type": "number", "label": "总时长（秒，须等于音轨长度 5.6）", "default": 5.6}, {"id": "exportMode", "name": "导出格式", "type": "enum", "label": "Format", "default": "mp4", "hidden": true, "options": [{"value": "mp4", "label": "MP4"}, {"value": "webm", "label": "WebM"}, {"value": "transparent", "label": "透明底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>八段频谱 · 从最低频到最高音</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  @media (prefers-reduced-motion: reduce){
+    /* transition-property 的初始值是 all，只压 duration 会让**所有内联样式改动**
+       都变成 0.01ms 的过渡——本族每条都有 JS 写死的内联几何（播放头 left/top、
+       峰值保持线 bottom），降级分支里会卡在 CSS 旧值不动，渲染出错误位置，
+       而 motion-qc 只看最终帧出框、不看降级分支的几何正确性，全绿也照样错。
+       补上 transition-property:none 与 animation-name:none 才是完整写法。 */
+    .anim{transition-duration:.01ms !important;animation-duration:.01ms !important;
+      transition-property:none !important;animation-name:none !important}
+  }
+
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --accent:#FFD429;
+  }
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--paper);color:var(--ink);font-family:var(--sans);
+    display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+  .promo{flex:0 0 auto;height:56px;display:flex;align-items:center;justify-content:center;
+    gap:14px;background:var(--accent);color:var(--ink);font-size:22px;font-weight:700;
+    letter-spacing:.06em}
+  .promo .ptag{font-family:var(--mono);font-size:22px;font-weight:700;letter-spacing:.12em;
+    background:var(--ink);color:var(--white);padding:3px 14px;border-radius:9999px}
+  .promo .parw{font-weight:900}
+
+  .main{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;padding:40px 72px 34px}
+
+  .hd{flex:0 0 auto;height:32px;display:flex;align-items:center;gap:22px;line-height:32px}
+  .hd .eyebrow{font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:.14em;
+    min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hd .cnt{margin-left:auto;flex:0 0 auto;font-family:var(--mono);font-weight:900;font-size:24px;
+    letter-spacing:.1em;padding:4px 16px;border:var(--bw) solid var(--ink);border-radius:9999px;
+    background:var(--white);white-space:nowrap}
+
+  .stack{flex:0 0 auto;margin-top:24px}
+  .line{display:block;font-size:84px;font-weight:900;line-height:1.05;white-space:nowrap}
+  .chip{display:inline-block;line-height:1;padding:0 18px;background:var(--blue);color:var(--white);
+    border:var(--bw) solid var(--ink);border-radius:4px;box-shadow:8px 8px 0 var(--ink)}
+  .sub{min-width:0;margin-top:14px;font-size:29px;font-weight:700;line-height:1.4;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* 八段：每段 6 根柱 = 6 个包络桶，整段高度是该段的真实形状 */
+  .bands{flex:0 0 auto;margin-top:30px;display:flex;gap:10px}
+  .bands .b{flex:1 1 0;min-width:0;height:280px;background:var(--white);
+    border:var(--bw) solid var(--ink);border-radius:4px;display:flex;align-items:flex-end;
+    justify-content:space-between;padding:0 8px;overflow:hidden}
+  .bands .b.hit{border-color:var(--accent);box-shadow:6px 6px 0 var(--ink)}
+  .bands i{display:block;width:14px;height:8px;border-radius:9999px;background:var(--ink)}
+  #head{position:absolute;left:72px;top:0;width:5px;height:280px;background:var(--accent);z-index:6}
+  #head .cap{position:absolute;left:-8px;top:-9px;width:21px;height:21px;background:var(--ink);
+    border:var(--bw) solid var(--paper);border-radius:4px}
+
+  .bnames{flex:0 0 auto;margin-top:12px;display:flex;gap:10px}
+  .bnames span{flex:1 1 0;min-width:0;font-family:var(--mono);font-weight:700;font-size:19px;
+    letter-spacing:.02em;text-align:center;padding:6px 2px;border-radius:4px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--mute)}
+
+  .levels{flex:0 0 auto;margin-top:auto;display:flex;gap:10px;align-items:flex-end;height:64px}
+  .levels .lv{flex:1 1 0;min-width:0;position:relative;height:100%;background:var(--white);
+    border:var(--bw) solid var(--ink);border-radius:4px;overflow:hidden}
+  .levels .lv .lvb{position:absolute;left:0;bottom:0;width:100%;height:0;background:var(--accent)}
+
+  .stripe{flex:0 0 auto;height:20px;border-top:var(--bw) solid var(--ink);
+    border-bottom:var(--bw) solid var(--ink);
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+  .foot{flex:0 0 auto;height:66px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 72px;background:var(--ink);color:var(--white)}
+  .foot .fm{font-family:var(--mono);font-weight:700;font-size:22px;letter-spacing:.14em;
+    color:var(--yellow)}
+  .foot .fc{font-size:25px;font-weight:700;white-space:nowrap}
+  #head,#head .cap{transition:none}
+</style>
+<style>
+/* [公开版] 原实拍视频未随仓分发，此处为占位块 */
+.pub-media-placeholder{
+  background:
+    repeating-linear-gradient(135deg, rgba(255,255,255,.05) 0 12px, rgba(255,255,255,.11) 12px 24px),
+    rgba(120,120,130,.22);
+  border:1px dashed rgba(255,255,255,.22);
+  border-radius:10px;
+  position:relative;
+}
+.pub-media-placeholder::after{
+  content:"公开版未包含实拍素材";
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  font:400 20px/1.4 'PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,sans-serif;
+  color:rgba(255,255,255,.62);
+  letter-spacing:.04em;
+}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="promo anim" id="promo">
+    <span class="ptag">8 BAND</span><span class="ptx">八段频谱 · 段内形状 + 段级电平</span><span class="parw">→</span>
+  </div>
+
+  <div class="main anim" id="main">
+    <div class="hd">
+      <span class="eyebrow anim" id="eyebrow">SPECTRUM / 八段</span>
+      <span class="cnt anim" id="bndcnt">8 × 6 = 48</span>
+    </div>
+    <div class="stack">
+      <span class="line anim" id="titleA" data-fit-max="84" data-fit-min="42">八个频段，</span>
+      <span class="line anim" id="lineB"><span class="chip" id="titleB" data-fit-max="84" data-fit-min="42">从低到高</span></span>
+      <p class="sub anim" id="sub" data-fit-max="29" data-fit-min="15">段里的六根柱是这条声音在那一段的真实形状</p>
+    </div>
+    <div class="bands anim" id="bands"></div>
+    <div class="bnames anim" id="bnames"></div>
+    <div class="levels anim" id="levels"></div>
+  </div>
+
+  <div id="head"><span class="cap"></span></div>
+
+  <div class="stripe anim" id="stripe"></div>
+  <div class="foot anim" id="foot">
+    <span class="fm">AUD / 2026</span><span class="fc">最下面一排是段级电平，扫到谁谁亮</span>
+  </div></div>
+<!-- [公开版] 原音轨 音轨 voice-07.wav（未随仓分发） 未随仓分发（体积/授权原因）。波形与包络数据已内置，动画照常播放。 -->
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  /* ---------- 音频包络：offline RMS，烘在 peaks 变量里 ----------
+     这份数组来自 音轨 voice-07.wav（未随仓分发） 的离线解码（RMS，48 桶，归一到 0–1000），
+     由 离线包络脚本（未随仓分发） 算出，同时落一份
+     assets/voice-07.peaks.json 作溯源。
+     换音轨：换 wav → 重跑离线脚本 → 把新数组填进 peaks → 同步 duration 与
+     <audio data-duration>。这是一条显式的、算一次的步骤，不是缺陷。
+     为什么绝不接实时 AnalyserNode：无头渲染是逐帧 seek 采样，媒体在采集模式下
+     是 seek 不是 play（hyperframes runtime 的 allowLiveTimelineSeek 在
+     __HF_RENDER_CAPTURE_MODE 下为 false），探针接在暂停的元素上读到的不是
+     「此刻在放什么」；motion-qc 的探针同样是无序 seek。 */
+  var FALLBACK_PEAKS = '14,117,117,14,212,76,14,237,139,1000,190,294,158,658,101,547,206,481,718,60,389,73,661,60,908,380,212,288,108,146,247,946,120,358,57,696,60,611,130,617,639,38,421,155,699,70,424,51';
+  function parsePeaks(src) {
+    var raw = String(src == null ? '' : src).replace(/[\s\[\]]/g, '');
+    var parts = raw ? raw.split(',') : [];
+    var out = [];
+    for (var i = 0; i < parts.length; i++) {
+      var n = parseFloat(parts[i]);
+      if (isFinite(n)) out.push(Math.max(0, Math.min(1000, n)));
+    }
+    return out.length >= 8 ? out : parsePeaks(FALLBACK_PEAKS);
+  }
+  var PEAKS = parsePeaks(v.peaks);
+  function peakAt(k) {
+    return PEAKS[Math.max(0, Math.min(PEAKS.length - 1, k))];
+  }
+
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  ['eyebrow','titleA','titleB'].forEach(function (k) { set(k, v[k]); });
+  var BN = String(v.bands == null || v.bands === ''
+    ? '超低｜底鼓｜低音｜中低｜中音｜中高｜ Presence｜空气' : v.bands)
+    .split('｜').map(function (s) { return s.trim(); });
+  while (BN.length < 8) BN.push('频段' + (BN.length + 1));
+
+
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+
+  /* 音频窗口：时间轴总长严格等于音轨长度，尾部留 0.6s 静音 + 定格。
+     禁止用变量值推算总长（数值填大会撞 SMOKE_TOO_LONG）。 */
+  var TOTAL = Math.min(6.5, Math.max(5, Number(v.duration) || 5.6));
+  var AUDIO_LEN = 5.6;
+  var WIN = Math.max(1.2, Math.min(TOTAL - 0.6, AUDIO_LEN));
+  var N = PEAKS.length;
+
+  var BANDS = 8, PER = 6, BARS = BANDS * PER;   /* 48 根柱 = 48 个包络桶 */
+  var MAXH = 210, MINH = 8, STEPS = N, SEG = WIN / STEPS;
+  var LVMAX = 58, LVMIN = 4;
+
+  /* 段内的柱高是该段 6 个桶的真实形状——静态但忠实；
+     真正在动的是下面那一排「段级电平」：一个以当前时间桶为中心的钟形权重。 */
+  function barAt(i) {
+    return Math.max(MINH, Math.round(PEAKS[i % N] / 1000 * MAXH));
+  }
+  /* 段级电平：段 b 的静态量级 = 该段 6 个桶的最大值；
+     动态权重 = 以当前桶为中心、标准差 3.2 桶的高斯窗——所以同时有 3–5 段亮着，
+     而不是只剩一段在动。全部只依赖 k。 */
+  function bandPeak(b) {
+    var m = 0;
+    for (var j = 0; j < PER; j++) if (PEAKS[b * PER + j] > m) m = PEAKS[b * PER + j];
+    return m;
+  }
+  function levelAt(b, k) {
+    var c = (b + 0.5) * PER;
+    var d = (k - c) / 3.2;
+    var w = Math.exp(-d * d / 2);
+    return Math.max(LVMIN, Math.round(bandPeak(b) / 1000 * w * LVMAX));
+  }
+  function bandAt(k) {
+    return Math.max(0, Math.min(BANDS - 1, Math.floor(k / PER)));
+  }
+
+  var bandsRoot = document.getElementById('bands'), cells = [], bars = [];
+  for (var b = 0; b < BANDS; b++) {
+    var cell = document.createElement('span'); cell.className = 'b';
+    for (var j = 0; j < PER; j++) {
+      var el = document.createElement('i');
+      el.style.height = barAt(b * PER + j) + 'px';
+      cell.appendChild(el); bars.push(el);
+    }
+    bandsRoot.appendChild(cell); cells.push(cell);
+  }
+  var namesRoot = document.getElementById('bnames'), nameEls = [];
+  for (var b2 = 0; b2 < BANDS; b2++) {
+    var sp = document.createElement('span');
+    sp.textContent = BN[b2];
+    namesRoot.appendChild(sp); nameEls.push(sp);
+  }
+  var lvRoot = document.getElementById('levels'), lvEls = [];
+  for (var b3 = 0; b3 < BANDS; b3++) {
+    var d = document.createElement('span'); d.className = 'lv';
+    var b4 = document.createElement('span'); b4.className = 'lvb';
+    d.appendChild(b4); lvRoot.appendChild(d); lvEls.push(b4);
+  }
+  document.getElementById('bndcnt').textContent = BANDS + ' × ' + PER + ' = ' + BARS;
+
+  B.fitAll();
+
+  var head = document.getElementById('head');
+  var wr = bandsRoot.getBoundingClientRect();
+  var sr = document.getElementById('stage').getBoundingClientRect();
+  var SPAN = Math.max(10, wr.width - 5);
+  head.style.left = (wr.left - sr.left) + 'px';
+  head.style.top = (wr.top - sr.top) + 'px';
+  head.style.height = wr.height + 'px';
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var tl = B.tl();
+
+  function slam(sel, at, dx, dy, d) {
+    tl.fromTo(sel, { x: dx, y: dy },
+      { x: 0, y: 0, duration: d || 0.26, ease: 'power4.out' }, at);
+  }
+  function press(sel, rest, at) {
+    tl.set(sel, { boxShadow: rest, immediateRender: false }, at);
+    tl.to(sel, { boxShadow: rest.replace(/(\d+)px (\d+)px/, function (_, a, b) {
+      return a + 'px ' + (parseInt(b, 10) + 3) + 'px'; }), duration: 0.04, ease: 'steps(2)' }, at + 0.04);
+    tl.to(sel, { boxShadow: rest, duration: 0.04, ease: 'steps(2)' }, at + 0.08);
+  }
+  function fadeInReduce(ids, start) {
+    for (var i = 0; i < ids.length; i++) {
+      tl.fromTo(ids[i], { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: i === ids.length - 1 ? .6 : .5, ease: 'power3.out' },
+        start + i * 0.08);
+    }
+  }
+
+  function paintBand(k) {
+    var cur = bandAt(k);
+    for (var b = 0; b < BANDS; b++) {
+      cells[b].className = b === cur ? 'b hit' : 'b';
+      nameEls[b].style.background = b === cur ? 'var(--accent)' : 'transparent';
+      nameEls[b].style.color = b === cur ? '#0F0F0F' : 'var(--mute)';
+    }
+  }
+
+  if (reduce) {
+    var still = Math.round(N * 0.62);
+    gsap.set(lvEls, { height: (function (k) {
+      return function (i) { return levelAt(i, k) + 'px'; }; })(still) });
+    paintBand(still);
+    gsap.set('#head', { x: SPAN * 0.62, y: 0, opacity: 1 });
+    fadeInReduce(['#promo', '#main', '#head', '#stripe', '#foot'], 0);
+    B.hold(tl, 1.15, 1.15);
+    return;
+  }
+
+  slam('#promo', 0.00, 0, -56, 0.26);
+  slam('#eyebrow', 0.14, 0, -20, 0.22);
+  slam('#bndcnt', 0.22, 24, -20, 0.22);
+  slam('#titleA', 0.36, -34, -34, 0.28);
+  slam('#lineB', 0.52, -34, -34, 0.28);
+  press('#titleB', '8px 8px 0 ' + '#0F0F0F', 0.80);
+  slam('#sub', 0.70, 0, -20, 0.24);
+  slam('#bands', 0.86, 0, 22, 0.26);
+  slam('#bnames', 0.94, 0, 14, 0.22);
+  slam('#levels', 1.00, 0, 18, 0.24);
+
+  /* ---- 音频驱动：段级电平条逐桶 tween ---- */
+  for (var k = 0; k < STEPS; k++) {
+    tl.to(lvEls, { height: (function (kk) {
+      return function (i) { return levelAt(i, kk) + 'px'; }; })(k), duration: SEG, ease: 'none' }, k * SEG);
+    tl.call((function (kk) { return function () { paintBand(kk); }; })(k), null, k * SEG);
+  }
+  tl.fromTo('#head', { x: 0 }, { x: SPAN, duration: WIN, ease: 'none' }, 0);
+
+  slam('#foot', 0.98, 0, 26, 0.26);
+  tl.fromTo('#stripe', { backgroundPositionX: '0px' },
+    { backgroundPositionX: '40px', duration: 0.8, ease: 'none' }, 1.10);
+
+  /* 收尾：音频窗口走完后补一段静止，时间轴总长恰好等于音轨长度，
+     样片视频与音轨严丝合缝，最后一拍是「已播完」的定格画面。 */
+  var introEnd = tl.duration();
+  B.hold(tl, introEnd, Math.max(0.4, TOTAL - introEnd));
+})();
+</script>
+</body></html>

@@ -1,0 +1,23 @@
+{
+  "title": "从一个想法到一套系统",
+  "eyebrow": "PATH · 历程",
+  "time1": "01",
+  "label1": "做一次",
+  "caption1": "先用脚本跑通一个最小闭环",
+  "time2": "02",
+  "label2": "存模板",
+  "caption2": "把成功的版本沉淀为可复用资产",
+  "time3": "03",
+  "label3": "反复生成",
+  "caption3": "每次微调参数，让产物持续变好",
+  "time4": "04",
+  "label4": "形成系统",
+  "caption4": "资产 × 流程 × 节奏，跑成长期资产",
+  "time5": "05",
+  "label5": "规模复制",
+  "caption5": "从单点实验到可复用的生产管线",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7",
+  "exportMode": "transparent"
+}

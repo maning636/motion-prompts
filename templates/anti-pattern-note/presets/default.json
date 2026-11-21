@@ -1,0 +1,9 @@
+{
+  "title": "同一个坑，两种写法",
+  "wrong": "让两圈花瓣各自错开旋转——蒙版接缝直接穿帮",
+  "correct": "内外两圈同角同速，一次转完——窗口扫过，景物钉在原地",
+  "img1": "./placeholder-1.png",
+  "img2": "./placeholder-2.png",
+  "accent": "#00FF00",
+  "duration": 6
+}

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"title","type":"string","label":"标题","default":"把知识讲清楚的三步"},{"id":"step1","type":"string","label":"步骤一","default":"定义问题"},{"id":"desc1","type":"string","label":"步骤一说明","default":"先说它解决什么"},{"id":"step2","type":"string","label":"步骤二","default":"拆开机制"},{"id":"desc2","type":"string","label":"步骤二说明","default":"再讲为什么成立"},{"id":"step3","type":"string","label":"步骤三","default":"给出动作"},{"id":"desc3","type":"string","label":"步骤三说明","default":"最后落到怎么做"},{"id":"accent","type":"color","label":"强调色","default":"#00FF00"},{"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},{"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"}]}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+*{ box-sizing: border-box; }
+html, body{ margin:0; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0A0B); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0A0B); color: var(--foreground, #F5F5F4);
+  font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.scene{ position:absolute; inset:0; padding:72px 88px; }
+.gridbg{ position:absolute; inset:0; pointer-events:none;
+  background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px); background-size:48px 48px; }
+.chip{ display:inline-flex; align-items:center; gap:10px; padding:8px 16px; border:1px solid #2A2A2E; border-radius:999px;
+  font-size:18px; letter-spacing:.16em; color:#9CA3AF; text-transform:uppercase; white-space:nowrap; }
+.chip b{ color:var(--accent,#00FF00); font-weight:700; letter-spacing:.05em; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; }
+.wipe{ clip-path: inset(0 100% 0 0); }
+</style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+        <header style="position:relative;z-index:2;margin-bottom:60px;">
+          <span class="chip"><b>FLOW</b>流程</span>
+          <h1 id="title" class="num" style="margin:18px 0 0;font-size:52px;"></h1>
+        </header>
+        <div style="display:flex;align-items:stretch;gap:0;">
+          <div class="step" style="flex:1;">
+            <div class="scard"><span class="snum num">01</span><h3 class="stitle num"></h3><p class="sdesc"></p></div>
+          </div>
+          <div class="sarrow">→</div>
+          <div class="step" style="flex:1;">
+            <div class="scard"><span class="snum num">02</span><h3 class="stitle num"></h3><p class="sdesc"></p></div>
+          </div>
+          <div class="sarrow">→</div>
+          <div class="step" style="flex:1;">
+            <div class="scard"><span class="snum num">03</span><h3 class="stitle num"></h3><p class="sdesc"></p></div>
+          </div>
+        </div>
+        <style>
+          .scard{ height:100%; padding:44px 36px; border:1px solid #2A2A2E; border-radius:18px; background:rgba(255,255,255,.02); opacity:0; transform:translateY(60px); }
+          .snum{ font-size:80px; color:transparent; -webkit-text-stroke:2px var(--accent,#00FF00); line-height:1; }
+          .stitle{ margin:22px 0 12px; font-size:40px; }
+          .sdesc{ margin:0; font-size:24px; line-height:1.7; color:#9CA3AF; }
+          .sarrow{ align-self:center; padding:0 26px; font-size:52px; color:var(--accent,#00FF00); opacity:0; }
+        </style>
+
+      </section>
+    </div>
+    <script>
+      const fallback = {"title": "把知识讲清楚的三步", "step1": "定义问题", "desc1": "先说它解决什么", "step2": "拆开机制", "desc2": "再讲为什么成立", "step3": "给出动作", "desc3": "最后落到怎么做", "accent": "#00FF00", "foreground": "#F4EFE7", "exportMode": "transparent"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4EFE7");
+      document.documentElement.style.setProperty("--accent", v.accent ?? "#00FF00");
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const DUR = 6;
+      const countTo = (el, target, at, dur = 1.1, dec = 0) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(target) || 0, duration: dur, ease: "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+
+      $("title").textContent = v.title;
+      const steps = [[v.step1, v.desc1], [v.step2, v.desc2], [v.step3, v.desc3]];
+      document.querySelectorAll(".scard").forEach((card, i) => {
+        card.querySelector(".stitle").textContent = steps[i][0] || "";
+        card.querySelector(".sdesc").textContent = steps[i][1] || "";
+      });
+      tl.fromTo("header", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.6, ease: "power3.out" }, 0.1);
+      tl.to(".scard", { opacity: 1, y: 0, duration: 0.6, ease: "back.out(1.6)", stagger: 0.5 }, 0.5);
+      tl.to(".sarrow", { opacity: 1, duration: 0.3, stagger: 0.5 }, 0.9);
+      tl.to(".scene", { clipPath: "inset(0 0 0 100%)", duration: 0.5, ease: "power2.in" }, DUR - 0.6);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

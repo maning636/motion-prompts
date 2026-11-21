@@ -1,0 +1,19 @@
+{
+ "id": "beatfull-ring",
+ "name": "节拍环 · 每一拍走一格",
+ "description": "一圈 bpb 个点，指针每拍转一格，右侧同步换这一拍落什么。改拍号，圈上点数跟着变。",
+ "category": "数据与图表",
+ "tags": [
+  "节拍",
+  "循环",
+  "环形",
+  "BPM"
+ ],
+ "duration": 4.8,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "",
+ "when": "讲一个循环动作 / 循环感的视觉表达",
+ "series": "night",
+ "createdAt": "2026-10-03T10:20:00.000Z"
+}

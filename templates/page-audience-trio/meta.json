@@ -1,0 +1,13 @@
+{
+  "id": "page-audience-trio",
+  "name": "黑横幅+三受众卡整页",
+  "series": "page",
+  "createdAt": "2026-08-16T08:00:00.000Z",
+  "energy": "中",
+  "suggestedDuration": 6,
+  "knownPitfalls": [
+    "cards 格式为「标签|说明」，只取前 3 条，缺竖线会导致说明为空",
+    "说明文字建议 24 字以内（约两行），超出行会顶到卡片底部绿条",
+    "横幅标题建议 8 字以内，过长会与右侧 mono 角标 AUDIENCE · 03 相撞"
+  ]
+}

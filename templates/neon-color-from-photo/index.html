@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "titleCn", "type": "string", "label": "中文标题（整句）", "default": "甚至可以给它一张照片"}, {"id": "titleAccent", "type": "string", "label": "标题高亮词（绿色，须为标题子串）", "default": "给它一张照片"}, {"id": "imgPhoto", "type": "image", "label": "照片（留空=CSS渐变抽象画占位）", "default": ""}, {"id": "swatch1", "type": "color", "label": "色卡1（浅）", "default": "#F3F4F6"}, {"id": "swatch2", "type": "color", "label": "色卡2（主色，手机UI染色）", "default": "#10B981"}, {"id": "swatch3", "type": "color", "label": "色卡3（灰）", "default": "#9CA3AF"}, {"id": "swatch4", "type": "color", "label": "色卡4（深）", "default": "#1F2937"}, {"id": "captionLeft", "type": "string", "label": "色卡下方灰字说明", "default": "从照片里取色"}, {"id": "duration", "type": "number", "label": "总时长（秒，演完定格）", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background: var(--background, #0A0D12);
+  color: var(--foreground, #F5F5F3); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+
+/* 顶部标题 */
+.ctitle{ position:absolute; left:0; right:0; top:86px; text-align:center;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:68px; letter-spacing:2px;
+  white-space:nowrap; color:#FFFFFF; }
+.ctitle .acc{ color:#34D399; text-shadow:0 0 20px rgba(52,211,153,.6); position:relative; padding:0 4px; }
+.ctitle .acc::after{ content:''; position:absolute; left:6px; right:6px; bottom:-12px; height:5px;
+  border-radius:3px; background:#10B981; box-shadow:0 0 14px rgba(16,185,129,.8); }
+
+/* 左侧照片卡 */
+.photocard{ position:absolute; left:220px; top:270px; width:480px; height:560px;
+  background:#12161C; border:1px solid rgba(16,185,129,.85); border-radius:16px;
+  box-shadow:0 0 26px rgba(16,185,129,.35), 0 0 60px rgba(16,185,129,.12),
+    inset 0 0 30px rgba(16,185,129,.05); padding:14px; will-change:transform; }
+.photo{ position:relative; width:452px; height:532px; border-radius:10px; overflow:hidden; }
+.ph-grad{ position:absolute; inset:0; }
+.ph-img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; z-index:2; }
+
+/* 色卡行 + 说明 */
+.swrow{ position:absolute; left:305px; top:862px; display:flex; gap:18px; }
+.sw{ width:64px; height:64px; border-radius:12px; border:1px solid rgba(255,255,255,.16);
+  will-change:transform; }
+.sw.picked{ border:1px solid rgba(52,211,153,.9);
+  box-shadow:0 0 16px rgba(16,185,129,.55), 0 0 36px rgba(16,185,129,.2); }
+.capl{ position:absolute; left:220px; width:480px; top:956px; text-align:center;
+  font-size:26px; color:#9CA3AF; letter-spacing:2px; max-width:480px; overflow-wrap:break-word; }
+
+/* 中间虚线 + 移动圆点 */
+.linewrap{ position:absolute; left:740px; top:580px; width:0; height:40px; overflow:hidden; }
+.linewrap svg{ display:block; width:500px; height:40px; overflow:visible; }
+.dline{ stroke:rgba(16,185,129,.8); stroke-width:3; stroke-dasharray:14 12; stroke-linecap:round;
+  filter:drop-shadow(0 0 6px rgba(16,185,129,.5)); }
+.dot{ fill:#34D399; filter:drop-shadow(0 0 8px rgba(52,211,153,.8)); opacity:0; }
+
+/* 右侧手机样机 */
+.phone{ position:absolute; left:1300px; top:110px; width:400px; height:866px;
+  background:#12161C; border:1px solid rgba(16,185,129,.9); border-radius:60px;
+  box-shadow:0 0 30px rgba(16,185,129,.4), 0 0 80px rgba(16,185,129,.14),
+    inset 0 0 24px rgba(16,185,129,.06); will-change:transform; }
+.screen{ position:absolute; left:14px; top:14px; width:372px; height:838px;
+  border-radius:47px; overflow:hidden; background:#EEF2F0; }
+.notch{ position:absolute; left:50%; top:24px; width:118px; height:30px; margin-left:-59px;
+  background:#0A0D12; border-radius:15px; z-index:5; }
+
+/* 屏幕内置假 UI（主色 = swatch2 染色） */
+.fui{ position:absolute; inset:0; padding:64px 20px 20px; }
+.fbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; }
+.fbar .ft{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:22px; color:#111827; }
+.fbar .fd{ width:34px; height:34px; border-radius:50%; background:var(--ui);
+  box-shadow:0 0 10px var(--uiA50); }
+.fcard{ background:#FFFFFF; border-radius:16px; padding:18px; margin-bottom:16px;
+  box-shadow:0 2px 8px rgba(10,13,18,.06); }
+.frow{ display:flex; align-items:center; gap:12px; }
+.fsq{ width:40px; height:40px; border-radius:10px; background:var(--uiA25); flex:none; }
+.fsq.g2{ background:var(--uiA45); } .fsq.g3{ background:var(--uiA65); }
+.flines{ flex:1; }
+.fl{ height:10px; border-radius:5px; background:#E5E7EB; margin-bottom:8px; }
+.fl:last-child{ margin-bottom:0; }
+.fl.w60{ width:60%; } .fl.w40{ width:40%; } .fl.w80{ width:80%; }
+.fl.hi{ background:var(--uiHi); }
+.fgrid{ display:flex; gap:16px; }
+.fmini{ flex:1; background:#FFFFFF; border-radius:16px; padding:16px;
+  box-shadow:0 2px 8px rgba(10,13,18,.06); }
+.fnum{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:26px; color:#111827; margin-bottom:10px; }
+.fnum span{ color:var(--ui); }
+.fchip{ height:44px; border-radius:12px; background:var(--ui); margin-bottom:16px;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight:700; font-size:20px; color:#FFFFFF;
+  box-shadow:0 0 12px var(--uiA50); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="ctitle" id="titleWrap"></div>
+
+      <div class="photocard" id="photoCard">
+        <div class="photo">
+          <div class="ph-grad" id="phGrad"></div>
+          <img class="ph-img" id="phImg" alt="" />
+        </div>
+      </div>
+      <div class="swrow" id="swRow">
+        <div class="sw" id="sw1"></div>
+        <div class="sw picked" id="sw2"></div>
+        <div class="sw" id="sw3"></div>
+        <div class="sw" id="sw4"></div>
+      </div>
+      <div class="capl e" id="capL"></div>
+
+      <div class="linewrap" id="lineWrap">
+        <svg viewBox="0 0 500 40" data-layout-allow-overflow>
+          <line class="dline" x1="6" y1="20" x2="494" y2="20"/>
+          <circle class="dot" id="dot1" cx="70" cy="20" r="8"/>
+          <circle class="dot" id="dot2" cx="230" cy="20" r="8"/>
+          <circle class="dot" id="dot3" cx="390" cy="20" r="8"/>
+        </svg>
+      </div>
+
+      <div class="phone" id="phone">
+        <div class="screen">
+          <div class="fui" id="fui">
+            <div class="fbar fc">
+              <div class="ft">早安，小雨</div>
+              <div class="fd"></div>
+            </div>
+            <div class="fchip fc">今日配色已生成</div>
+            <div class="fcard fc">
+              <div class="frow">
+                <div class="fsq"></div>
+                <div class="flines"><div class="fl w80"></div><div class="fl w60"></div></div>
+              </div>
+            </div>
+            <div class="fgrid fc">
+              <div class="fmini"><div class="fnum">52.4<span>%</span></div><div class="fl w60 hi"></div><div class="fl w40"></div></div>
+              <div class="fmini"><div class="fnum">¥2,860</div><div class="fl w60"></div><div class="fl w40 hi"></div></div>
+            </div>
+            <div class="fcard fc" style="margin-top:16px;">
+              <div class="frow">
+                <div class="fsq g2"></div>
+                <div class="flines"><div class="fl w60 hi"></div><div class="fl w80"></div></div>
+              </div>
+            </div>
+            <div class="fcard fc">
+              <div class="frow">
+                <div class="fsq g3"></div>
+                <div class="flines"><div class="fl w80"></div><div class="fl w40"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="notch"></div>
+      </div>
+    </div>
+    <script>
+      const FB = {"titleCn": "甚至可以给它一张照片", "titleAccent": "给它一张照片", "imgPhoto": "", "swatch1": "#F3F4F6", "swatch2": "#10B981", "swatch3": "#9CA3AF", "swatch4": "#1F2937", "captionLeft": "从照片里取色", "duration": 6};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      const $=(s)=>document.querySelector(s);
+      const DUR=+v.duration>0?+v.duration:6;
+      $('[data-composition-id]').setAttribute('data-duration',String(DUR));
+
+      const hex2rgb=(h)=>{
+        const m=/^#?([0-9a-f]{6})$/i.exec(String(h||'').trim());
+        if(!m) return null;
+        const n=parseInt(m[1],16);
+        return [n>>16&255, n>>8&255, n&255];
+      };
+      const rgba=(c,a)=>c?('rgba('+c[0]+','+c[1]+','+c[2]+','+a+')'):'rgba(16,185,129,'+a+')';
+
+      const s1=String(v.swatch1||'#F3F4F6'), s2=String(v.swatch2||'#10B981'),
+            s3=String(v.swatch3||'#9CA3AF'), s4=String(v.swatch4||'#1F2937');
+
+      /* 标题：titleCn 中出现 titleAccent 的部分染绿，否则高亮词接在句尾 */
+      const cn=String(v.titleCn??''), acc=String(v.titleAccent??'');
+      const tCn=$('#titleWrap');
+      if(acc && cn.includes(acc)){
+        const i=cn.indexOf(acc);
+        tCn.textContent='';
+        tCn.append(document.createTextNode(cn.slice(0,i)));
+        const sp=document.createElement('span'); sp.className='acc'; sp.textContent=acc;
+        tCn.append(sp, document.createTextNode(cn.slice(i+acc.length)));
+      }else{
+        tCn.textContent=cn;
+        if(acc){ const sp=document.createElement('span'); sp.className='acc'; sp.textContent=acc; tCn.append(sp); }
+      }
+
+      /* 照片槽：填了路径就用图片铺满，否则 CSS 渐变抽象画占位（用四色卡取色） */
+      const img=String(v.imgPhoto||'');
+      if(img){ const im=$('#phImg'); im.src=img; im.style.display='block'; }
+      const c1=hex2rgb(s1), c2=hex2rgb(s2), c3=hex2rgb(s3), c4=hex2rgb(s4);
+      $('#phGrad').style.background=
+        'radial-gradient(circle at 30% 22%, '+rgba(c1,.28)+' 0%, rgba(0,0,0,0) 55%),'+
+        'radial-gradient(circle at 72% 58%, '+rgba(c2,.42)+' 0%, rgba(0,0,0,0) 60%),'+
+        'radial-gradient(circle at 38% 86%, '+rgba(c3,.30)+' 0%, rgba(0,0,0,0) 55%),'+
+        'linear-gradient(160deg, '+(c4?s4:'#1F2937')+' 0%, #0A0D12 100%)';
+
+      /* 色卡填色 */
+      $('#sw1').style.background=s1; $('#sw2').style.background=s2;
+      $('#sw3').style.background=s3; $('#sw4').style.background=s4;
+      $('#capL').textContent=v.captionLeft||'';
+
+      /* 手机假 UI 用 swatch2 染色（取色生成的主色） */
+      (function(){
+        const st=document.documentElement.style;
+        st.setProperty('--ui', c2?s2:'#10B981');
+        st.setProperty('--uiA25', rgba(c2,.25));
+        st.setProperty('--uiA45', rgba(c2,.45));
+        st.setProperty('--uiA65', rgba(c2,.65));
+        st.setProperty('--uiA50', rgba(c2,.5));
+        const hi=c2?[Math.round(c2[0]+(255-c2[0])*.35),Math.round(c2[1]+(255-c2[1])*.35),Math.round(c2[2]+(255-c2[2])*.35)]:null;
+        st.setProperty('--uiHi', rgba(hi,.9));
+      })();
+
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+
+      /* 1. 标题淡入上移 */
+      tl.fromTo('#titleWrap',{opacity:0,y:36},{opacity:1,y:0,duration:0.6,ease:'power3.out'},0.25);
+      /* 2. 左照片卡从左滑入 */
+      tl.fromTo('#photoCard',{x:-140,opacity:0},{x:0,opacity:1,duration:0.7,ease:'power3.out'},0.7);
+      /* 3. 色卡 stagger 弹入 */
+      tl.fromTo('.sw',{opacity:0,scale:0.3,transformOrigin:'50% 50%'},
+        {opacity:1,scale:1,duration:0.45,ease:'back.out(1.8)',stagger:0.12},1.15);
+      /* 4. 左卡说明淡入 */
+      tl.fromTo('#capL',{opacity:0,y:14},{opacity:1,y:0,duration:0.5,ease:'power2.out'},1.55);
+      /* 5. 虚线从左到右画出（宽度揭示） */
+      tl.to('#lineWrap',{width:500,duration:0.7,ease:'power2.inOut'},1.8);
+      /* 6. 圆点出现并沿虚线缓慢漂移（有限次 yoyo，演完回到原位） */
+      tl.to('.dot',{opacity:1,duration:0.3,ease:'power1.out'},2.45);
+      tl.to('.dot',{x:56,duration:0.9,ease:'sine.inOut',yoyo:true,repeat:3,stagger:0.45},2.6);
+      /* 7. 手机从右滑入，轻微旋转归位 */
+      tl.fromTo('#phone',{x:300,opacity:0,rotate:4},
+        {x:0,opacity:1,rotate:0,duration:0.9,ease:'power3.out'},2.5);
+      /* 8. 屏幕假 UI 卡片 stagger */
+      tl.fromTo('.fc',{opacity:0,y:18},{opacity:1,y:0,duration:0.4,ease:'power2.out',stagger:0.08},3.15);
+      /* 9. 时间线补齐到总时长：防止渲染器 seek 超出末端回退黑帧 */
+      tl.set('#root',{willChange:'auto'},DUR);
+      /* 演完定格，无收尾出场动画 */
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

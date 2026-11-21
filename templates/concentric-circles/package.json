@@ -1,0 +1,7 @@
+{
+  "name": "concentric-circles",
+  "private": true,
+  "scripts": {
+    "render": "cd ../.. && npm run render -- concentric-circles"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": "docu-photo-polaroid",
+  "name": "纪录片 B26 旧报纸剪报",
+  "description": "旧报纸剪报 · 皮影档案族 · docu-photo 02",
+  "series": "docu",
+  "category": "纪录片皮影",
+  "tags": [
+    "纪录片皮影",
+    "档案模板",
+    "docu-photo-newspaper"
+  ],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "createdAt": "2026-08-30T00:00:00.000Z"
+}

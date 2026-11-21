@@ -1,0 +1,10 @@
+{
+  "conceptA": "RAG",
+  "descA": "检索增强生成",
+  "conceptB": "开卷考试",
+  "descB": "可以翻书查资料的考试",
+  "dimension": "先查资料再回答",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

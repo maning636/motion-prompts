@@ -1,0 +1,7 @@
+{
+  "name": "subtitle-highlight",
+  "private": true,
+  "scripts": {
+    "render": "cd ../.. && npm run render -- subtitle-highlight"
+  }
+}

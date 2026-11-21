@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "把原理拼成提示词"}, {"id": "rows", "type": "string", "label": "行（中文|英文标签，逗号分隔）", "default": "舞台·深色底加星空|SCENE,排列·离中心决定一切|DISTANCE,轮转·先快后慢|POWER4.OUT,定格·中心放大加光晕|FOCUS LOCK,声音·经过中心敲一下|POSITION→TICK,交付·单文件直接跑|DELIVER"}, {"id": "kicker", "type": "string", "label": "眉题", "default": "STEP 03 · ASSEMBLE THE PROMPT"}, {"id": "tc", "type": "string", "label": "右上角码（\\n 换行）", "default": "00:56 → 01:12\n逐行点亮"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #0E100F; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #EDF2EE; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      .corner{ position: absolute; width: 34px; height: 34px; border: 3px solid var(--ac, #00FF00); }
+      .c-tl{ left: -3px; top: -3px; border-right: none; border-bottom: none; }
+      .c-tr{ right: -3px; top: -3px; border-left: none; border-bottom: none; }
+      .c-bl{ left: -3px; bottom: -3px; border-right: none; border-top: none; }
+      .c-br{ right: -3px; bottom: -3px; border-left: none; border-top: none; }
+      .tc{ position: absolute; right: 90px; top: 84px; text-align: right; font-family: 'IBM Plex Mono', monospace;
+        font-size: 20px; letter-spacing: .22em; color: rgba(237,242,238,.5); line-height: 1.9; z-index: 6; }
+      .pal-head{ position: absolute; left: 90px; top: 76px; z-index: 6; }
+      .pal-kicker{ font-size: 20px; letter-spacing: .3em; color: var(--ac); }
+      .pal-title{ margin-top: 14px; font-size: 62px; font-weight: 900; }
+      .pal-rows{ position: absolute; left: 50%; top: 290px; transform: translateX(-50%); width: 1360px; z-index: 4; }
+      .pal-row{ position: relative; display: flex; align-items: center; gap: 28px; padding: 26px 34px;
+        border-top: 1px solid rgba(237,242,238,.12); opacity: .3; }
+      .pal-row:last-child{ border-bottom: 1px solid rgba(237,242,238,.12); }
+      .pal-bar{ position: absolute; left: 0; top: 20px; bottom: 20px; width: 4px; background: var(--ac);
+        transform: scaleY(0); transform-origin: 50% 0; }
+      .pal-idx{ font-size: 22px; color: rgba(237,242,238,.5); width: 56px; }
+      .pal-txt{ flex: 1; font-size: 34px; font-weight: 700; }
+      .pal-chip{ font-size: 20px; letter-spacing: .12em; padding: 10px 22px; border: 1.5px solid color-mix(in srgb, var(--ac, #00FF00) 50%, transparent);
+        border-radius: 999px; color: var(--ac); white-space: nowrap; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="pal-head"><div class="pal-kicker mono" id="kicker"></div><div class="pal-title" id="title"></div></div>
+      <div class="tc mono" id="tc"></div>
+      <div class="pal-rows" id="rows"></div>
+
+    </div>
+    <script>
+      const fallback = {"title": "把原理拼成提示词", "rows": "舞台·深色底加星空|SCENE,排列·离中心决定一切|DISTANCE,轮转·先快后慢|POWER4.OUT,定格·中心放大加光晕|FOCUS LOCK,声音·经过中心敲一下|POSITION→TICK,交付·单文件直接跑|DELIVER", "kicker": "STEP 03 · ASSEMBLE THE PROMPT", "tc": "00:56 → 01:12\n逐行点亮", "accent": "#00FF00", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      document.documentElement.style.setProperty("--ac", V.accent ?? "#00FF00");
+      const ac = V.accent ?? "#00FF00";
+      $("title").textContent = V.title;
+      $("kicker").textContent = V.kicker;
+      const tcEl = $("tc");
+      String(V.tc ?? "").split("\n").forEach((ln, i) => {
+        if (i) tcEl.appendChild(document.createElement("br"));
+        tcEl.appendChild(document.createTextNode(ln));
+      });
+      const rows = split(V.rows);
+      const rowsEl = $("rows");
+      rows.forEach((r, i) => {
+        const parts = r.split("|").map((s) => s.trim());
+        const d = document.createElement("div");
+        d.className = "pal-row";
+        d.innerHTML = '<span class="pal-bar"></span><span class="pal-idx mono">' + String(i + 1).padStart(2, "0") +
+          '</span><span class="pal-txt"></span><span class="pal-chip mono"></span>';
+        d.querySelector(".pal-txt").textContent = parts[0] || r;
+        d.querySelector(".pal-chip").textContent = parts[1] || ("STEP 0" + (i + 1));
+        rowsEl.appendChild(d);
+      });
+      const rowEls = Array.from(rowsEl.children);
+      tl.fromTo([".pal-head", ".tc"], { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.1 }, 0.1);
+      tl.fromTo(rowEls, { opacity: 0, y: 26 }, { opacity: 0.3, y: 0, duration: 0.4, stagger: 0.09, ease: "power3.out" }, 0.3);
+      rowEls.forEach((r, i) => {
+        const t = 0.95 + i * 0.3;
+        tl.to(r, { opacity: 1, duration: 0.22 }, t);
+        tl.to(r.querySelector(".pal-bar"), { scaleY: 1, duration: 0.22, ease: "power2.out" }, t);
+        tl.to(r.querySelector(".pal-chip"), { backgroundColor: ac, color: "#0B0E0B", borderColor: ac, duration: 0.22 }, t);
+      });
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

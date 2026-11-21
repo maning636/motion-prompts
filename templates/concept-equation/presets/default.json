@@ -1,0 +1,13 @@
+{
+  "title": "可靠回答的组成",
+  "subtitle": "两个要素组合产生结果",
+  "leftA": "模型能力",
+  "leftADesc": "推理与表达",
+  "leftB": "上下文资料",
+  "leftBDesc": "检索到的证据",
+  "result": "可靠回答",
+  "resultDesc": "有依据的输出",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "bed-echo-blur",
+  "name": "背景回声式模糊残影",
+  "description": "主内容清晰居中，背景层是同内容的放大模糊虚影缓慢漂移，营造纵深感。",
+  "category": "转场镜头",
+  "tags": ["转场镜头", "纵深", "回声", "模糊残影", "背景层"],
+  "duration": 6.5,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-05T00:00:00.000Z"
+}

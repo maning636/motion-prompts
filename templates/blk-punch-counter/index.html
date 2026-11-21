@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"eyebrow","name":"眉标","type":"string","label":"顶部眉标","default":"BLOCKBRUT / 2026"},
+  {"id":"title","name":"主标题","type":"string","label":"主标题","default":"把想法砸成实物"},
+  {"id":"pill","name":"右上角标签","type":"string","label":"右上角标签","default":"已交付 128+ 项目"},
+  {"id":"bigLabel","name":"大数字标签","type":"string","label":"大数字上方标签","default":"已交付项目"},
+  {"id":"bigValue","name":"大数字","type":"number","label":"大数字","default":"128"},
+  {"id":"bigUnit","name":"单位","type":"string","label":"单位后缀","default":"个"},
+  {"id":"bigFootL","name":"大块脚注左","type":"string","label":"大块脚注 · 左","default":"YEAR 2017 — 2026"},
+  {"id":"bigFootR","name":"大块脚注右","type":"string","label":"大块脚注 · 右","default":"★ 4.9 好评"},
+  {"id":"s1Label","name":"指标一标签","type":"string","label":"指标一 · 标签","default":"平均出稿"},
+  {"id":"s1Value","name":"指标一数值","type":"string","label":"指标一 · 数值","default":"3 周"},
+  {"id":"s2Label","name":"指标二标签","type":"string","label":"指标二 · 标签","default":"按时交付"},
+  {"id":"s2Value","name":"指标二数值","type":"string","label":"指标二 · 数值","default":"100%"},
+  {"id":"s3Label","name":"指标三标签","type":"string","label":"指标三 · 标签","default":"返工率"},
+  {"id":"s3Value","name":"指标三数值","type":"string","label":"指标三 · 数值","default":"0"},
+  {"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FFD429"}
+]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>积木大数 · 项目战绩</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--paper);color:var(--ink);
+        font-family:var(--sans);display:flex;flex-direction:column;
+        padding:64px 72px 0}
+
+  .top{display:flex;align-items:flex-end;justify-content:space-between;gap:40px;flex:0 0 auto}
+  .top h1{font-size:60px;margin:8px 0 0;font-weight:900;line-height:1.05;letter-spacing:-.01em}
+  .pill{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.1em;
+        padding:9px 20px;border:3px solid var(--ink);border-radius:9999px;
+        background:var(--white);box-shadow:4px 4px 0 var(--ink);white-space:nowrap}
+
+  .main{flex:1 1 auto;display:flex;gap:30px;margin-top:38px;min-height:0}
+
+  /* 左：主数字块。上一版这块是空的一个洞——强调色在本地取不到，
+     整块背景失效，只剩一个数字漂在空盒子里。这一版给它加了两层内容：
+     刻度条（和下面的进度语义件同源）+ 年度柱阵，让它自己撑得住。 */
+  .hero{flex:0 0 800px;display:flex;flex-direction:column;
+        border:3px solid var(--ink);border-radius:4px;
+        background:var(--accent,#FFD429);
+        box-shadow:10px 10px 0 var(--ink);padding:28px 36px 24px;overflow:hidden;position:relative}
+  .hero .lbl{font-family:var(--mono);font-weight:700;font-size:15px;letter-spacing:.14em;
+             display:flex;justify-content:space-between;align-items:baseline}
+  .hero .numwrap{flex:0 0 auto;display:flex;align-items:flex-end;gap:12px;margin-top:2px}
+  .hero .num{font-family:var(--mono);font-weight:700;font-size:250px;line-height:.84;
+             letter-spacing:-.06em;display:flex;align-items:baseline;transform-origin:left bottom;
+             font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+  .hero .unit{font-size:54px;font-weight:700;letter-spacing:0;padding-bottom:16px}
+
+  /* 年度柱阵：12 根柱子，本身是一份数据，不是装饰 */
+  .bars{flex:1 1 auto;display:flex;align-items:flex-end;gap:7px;min-height:0;margin-top:18px}
+  .bars i{flex:1 1 0;background:var(--ink);display:block;min-height:4px}
+  .hero .foot{font-family:var(--mono);font-weight:700;font-size:13px;letter-spacing:.1em;
+              border-top:3px solid var(--ink);padding-top:10px;margin-top:12px;display:flex;
+              justify-content:space-between;align-items:center;gap:20px}
+
+  /* 右：三块指标 */
+  .stats{flex:1 1 auto;display:flex;flex-direction:column;gap:22px;min-width:0}
+  .stat{flex:1 1 0;display:flex;align-items:center;gap:26px;
+        border:3px solid var(--ink);border-radius:4px;padding:0 32px;min-height:0;
+        box-shadow:6px 6px 0 var(--ink);overflow:hidden}
+  .stat .k{font-family:var(--mono);font-weight:700;font-size:16px;letter-spacing:.12em;
+           flex:0 0 190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stat .v{font-family:var(--mono);font-weight:700;font-size:70px;line-height:1;
+           letter-spacing:-.03em;white-space:nowrap}
+  .s1{background:var(--white);color:var(--ink)}
+  /* 近黑字而不是白字：粉底白字只有 2.83:1，蓝底白字 3.84:1 也在及格线上晃。
+     按 palette_contrast.py 的实算，蓝底黑字 5.00:1、粉底黑字 6.76:1，
+     两个都比白字稳，而且和全库其余素材的用字一致。 */
+  .s2{background:var(--blue);color:var(--ink)}
+  .s3{background:var(--pink);color:var(--ink)}
+  .stripe{flex:0 0 auto;height:18px;border-top:3px solid var(--ink);border-bottom:3px solid var(--ink);
+          background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--pink)10px 20px)}
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="top">
+    <div>
+      <div class="blk-eyebrow" id="eyebrow">BLOCKBRUT / 2026</div>
+      <h1 id="title" data-fit-max="60" data-fit-min="34">把想法砸成实物</h1>
+    </div>
+    <div class="pill" id="pill">已交付 128+ 项目</div>
+  </div>
+
+  <div class="main">
+    <div class="hero" id="hero">
+      <div class="lbl"><span id="bigLabel">已交付项目</span><span>2017 — 2026</span></div>
+      <div class="numwrap">
+        <div class="num" id="num"><span id="numVal">0</span><span class="unit" id="bigUnit">个</span></div>
+      </div>
+      <div class="bars" id="bars"></div>
+      <div class="foot"><span id="bigFootL">YEAR 2017 — 2026</span><span id="bigFootR">★ 4.9 好评</span></div>
+    </div>
+
+    <div class="stats">
+      <div class="stat s1" id="st1">
+        <span class="k" id="s1Label">平均出稿</span><span class="v" id="s1Value">3 周</span>
+      </div>
+      <div class="stat s2" id="st2">
+        <span class="k" id="s2Label">按时交付</span><span class="v" id="s2Value">100%</span>
+      </div>
+      <div class="stat s3" id="st3">
+        <span class="k" id="s3Label">返工率</span><span class="v" id="s3Value">0</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="stripe"></div>
+  <div class="blk-corner tl"></div><div class="blk-corner tr"></div>
+  <div class="blk-corner bl"></div><div class="blk-corner br"></div>
+</div>
+
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  // 兜底值由 B.vars() 直接从 HTML 的 data-composition-variables 读出，
+  // 本地没有宿主注入变量时也不会出现「强调色丢失 → 大数字块变成空洞」。
+  var v = B.vars();
+  function set(id, val) { var e = document.getElementById(id); if (e && val != null && val !== '') e.textContent = val; }
+  ['eyebrow','title','pill','bigLabel','bigUnit','bigFootL','bigFootR',
+   's1Label','s1Value','s2Label','s2Value','s3Label','s3Value']
+    .forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+
+  // 年度柱阵：10 年交付量，写死一组有起伏的量级，比随机数好看也更像真数据
+  var series = [4, 7, 6, 11, 9, 15, 13, 19, 22, 21];
+  var bh = document.getElementById('bars');
+  bh.innerHTML = series.map(function (n) {
+    return '<i style="height:' + Math.round(n / 22 * 100) + '%"></i>';
+  }).join('');
+
+  // 排版收口
+  B.fit('#num',   { max: 250, min: 120 });
+  B.fit('#title', { max: 60,  min: 34  });
+  ['#s1Value','#s2Value','#s3Value'].forEach(function (s) { B.fit(s, { max: 70, min: 32 }); });
+  ['#s1Label','#s2Label','#s3Label'].forEach(function (s) { B.fit(s, { max: 16, min: 12 }); });
+  ['#pill','#bigLabel','#bigFootL','#bigFootR'].forEach(function (s) { B.fit(s, { max: 14, min: 10 }); });
+
+  var target = Number(v.bigValue != null && v.bigValue !== '' ? v.bigValue : 128) || 0;
+
+  var tl = B.tl();
+  B.in.drop(tl, '#hero', 0.05, { dist: 200, rot: -2.5, d: 0.58 });
+  B.in.pop(tl,  '#st1', 0.34, { d: 0.4 });
+  B.in.pop(tl,  '#st2', 0.48, { d: 0.4 });
+  B.in.pop(tl,  '#st3', 0.62, { d: 0.4 });
+  tl.from('#title', { y: 16, opacity: 0, duration: 0.4, ease: 'power2.out' }, 0.5);
+  tl.from('.pill', { x: 22, opacity: 0, duration: 0.4, ease: 'back.out(2)' }, 0.6);
+  tl.from('#bars i', { scaleY: 0, transformOrigin: 'bottom center', duration: 0.4,
+      ease: 'back.out(2)', stagger: 0.04 }, 0.68);
+  // 数字必须比其他元素**先**滚完。settle 取的是可见面积最大的一帧，
+  // 如果数字滚到最后一帧，最大面积可能正好落在 87% 的中间值上，
+  // 预视图上就写成 111 而不是 128。配合 tabular-nums（字宽不变、面积不抖），
+  // 时间轴尾部只剩静止，最大面积必然落在终值帧。
+  B.countUp(tl, '#numVal', target, 0.45, 0.8);
+  B.in.press(tl, '#hero', 1.3, { sh: '10px 10px 0 var(--ink)' });
+  tl.from('.stripe', { scaleX: 0, transformOrigin: 'left center', duration: 0.5, ease: 'power3.inOut' }, 0.9);
+  B.finish(tl, 1.75);   // 角标收尾：只增不减，保证 settle 落在数字滚完之后
+  B.hold(tl, 2.25, 0.6);
+})();
+</script>
+</body></html>

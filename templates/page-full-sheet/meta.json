@@ -1,0 +1,13 @@
+{
+  "id": "page-full-sheet",
+  "name": "整页素材卡（满幅书页展示）",
+  "series": "page",
+  "createdAt": "2026-08-16T08:00:00.000Z",
+  "energy": "低",
+  "suggestedDuration": 5,
+  "knownPitfalls": [
+    "img1 建议竖版 3:4（如 1080×1440），横版图会被 cover 裁掉两侧只剩中间一条",
+    "页眉标签压在图上缘，图本身顶部内容会被 vol/pageno 胶囊遮住约 60px，排版时避开",
+    "图注固定在图内左下，素材图该区域避免放关键信息"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "id": "unit-grid-proportion",
+  "name": "单元网格占比点亮",
+  "description": "由 rows×cols 个单元组成的方阵，按 categories 给出的百分比依次点亮，视觉表达构成比例。可配 4–10 行/列。",
+  "category": "对比叙事",
+  "tags": ["对比叙事", "单元网格", "构成比例", "占比", "百分比"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-05T00:00:00.000Z"
+}

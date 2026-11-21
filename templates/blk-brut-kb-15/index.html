@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（mono + 大字距）","default":"EMPHASIS / 重点词"},
+{"id":"pre","name":"标题前半","type":"string","label":"大标题前半（会自动接住重点词）","default":"真正卡住你的"},
+{"id":"kw","name":"重点词","type":"string","label":"会脉冲放大的重点词（2–4 字）","default":"判断"},
+{"id":"post","name":"标题后半","type":"string","label":"大标题后半","default":"，不是工具"},
+{"id":"note","name":"注脚","type":"string","label":"底部 mono 注脚","default":"脉冲次数封顶 3 次 · 本片 3 次"},
+{"id":"frameLabel","name":"取景框标签","type":"string","label":"取景框左上角 mono 标签","default":"ZOOM ×3"},
+{"id":"accent","name":"强调色","type":"color","label":"重点词块 + 取景框角标","default":"#FF5FA2"},
+{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–8）","default":5.5},
+{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>重点词放大脉冲 · 真正卡住你的判断，不是工具</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 字号阶梯 = 风格规范基因 8 的 76/48/24/17/13/11 在 1920×1080 画布上等比放大 2.0，即 152/96/48/34/26/22。 */
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --accent:#FF5FA2;
+  }
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--paper);color:var(--ink);font-family:var(--sans);
+    display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+  .sh-m{box-shadow:6px 6px 0 var(--ink)}
+  .sh-l{box-shadow:8px 8px 0 var(--ink)}
+
+  .top{flex:0 0 auto;display:flex;align-items:center;gap:22px;padding:44px 88px 0}
+  .eyebrow{font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:.14em;
+    white-space:nowrap;flex:0 0 auto}
+  .dot{flex:0 0 auto;margin-left:auto;width:26px;height:26px;border-radius:9999px;
+    background:var(--accent);border:var(--bw) solid var(--ink);box-shadow:3px 3px 0 var(--ink)}
+
+  /* 取景框：3px 实线围一圈，纯装饰件也必须撞黑边（基因 6 / 基因 7） */
+  .frame{flex:1 1 auto;min-height:0;position:relative;display:flex;
+    align-items:center;justify-content:center;margin:34px 88px 0;
+    border:var(--bw) solid var(--ink);background:var(--paper)}
+  .flabel{position:absolute;top:0;left:0;font-family:var(--mono);font-weight:700;
+    font-size:22px;letter-spacing:.12em;padding:8px 18px;background:var(--accent);
+    color:var(--ink);border-right:var(--bw) solid var(--ink);border-bottom:var(--bw) solid var(--ink);
+    white-space:nowrap}
+  .fbody{position:relative;padding:0 70px}
+  /* 中文大字：块级 + nowrap，交给 B.fit() 按容器实测缩放，字距 0 */
+  .dl{display:block;white-space:nowrap;font-weight:900;font-size:118px;line-height:1.2;
+    letter-spacing:0;text-align:center}
+  .kw{display:inline-block;padding:0 20px;background:var(--accent);color:var(--ink);
+    border:var(--bw) solid var(--ink);border-radius:4px;box-shadow:6px 6px 0 var(--ink);
+    line-height:1.14}
+
+  .footrow{flex:0 0 auto;display:flex;align-items:center;gap:22px;padding:34px 88px 44px}
+  .note{font-family:var(--mono);font-weight:700;font-size:22px;letter-spacing:.12em;
+    color:var(--mute);white-space:nowrap;flex:0 1 auto;min-width:0;
+    overflow:hidden;text-overflow:ellipsis}
+  .rule{flex:1 1 auto;border-top:var(--bw) solid var(--ink)}
+  .stripe{flex:0 0 auto;height:20px;border-top:var(--bw) solid var(--ink);
+    border-bottom:var(--bw) solid var(--ink);
+    background:repeating-linear-gradient(-45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+
+  @media (prefers-reduced-motion: reduce){
+    .anim{transition-duration:.01ms !important;animation-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="top anim" id="top">
+    <span class="eyebrow anim" id="eyebrow" data-fit-max="26" data-fit-min="16">EMPHASIS / 重点词</span>
+    <span class="dot anim" id="dot"></span>
+  </div>
+
+  <div class="frame anim" id="frame">
+    <span class="flabel anim" id="frameLabel" data-fit-max="22" data-fit-min="14">ZOOM ×3</span>
+    <div class="fbody">
+      <div class="dl" id="dl" data-fit-max="118" data-fit-min="56"><span id="pre">真正卡住你的</span><span class="kw" id="kw">判断</span><span id="post">，不是工具</span></div>
+    </div>
+  </div>
+
+  <div class="footrow anim" id="footrow">
+    <span class="note anim" id="note" data-fit-max="22" data-fit-min="14">脉冲次数封顶 3 次 · 本片 3 次</span>
+    <span class="rule anim" id="rule"></span>
+  </div>
+
+  <div class="stripe anim" id="stripe"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  ['eyebrow', 'frameLabel', 'pre', 'kw', 'post', 'note'].forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+
+  B.fitAll();
+  var tl = B.tl();
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (reduce) {
+    gsap.set('.anim', { x: 0, y: 0, scaleX: 1, scale: 1, rotate: 0 });
+    /* 降级：不做任何缩放脉冲，只留终态 + ≤8px 微位移 */
+    gsap.set('#kw', { scale: 1 });
+    tl.fromTo('#top',     { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0);
+    tl.fromTo('#frame',   { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' }, 0.12);
+    tl.fromTo('#footrow', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.55, ease: 'power3.out' }, 0.3);
+    tl.fromTo('#stripe',  { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }, 0.46);
+    B.hold(tl, 1.2, 1.1);
+    return;
+  }
+
+  function slam(sel, at, dx, dy, d) {
+    tl.fromTo(sel, { x: dx, y: dy },
+      { x: 0, y: 0, duration: d, ease: 'power4.out' }, at);
+  }
+
+  slam('#top',   0.00, -28, -20, 0.24);
+  slam('#dot',   0.14,  28, -28, 0.22);
+  /* 模 7 分格揭示：取景框四周同时从外向内收，读起来像镜头在合拢 */
+  tl.fromTo('#frame', { clipPath: 'inset(0 100% 0 0)' },
+    { clipPath: 'inset(0 0% 0 0%)', duration: 0.36, ease: 'steps(8)' }, 0.22);
+  slam('#frameLabel', 0.42, -20, -20, 0.22);
+  slam('#dl',         0.56,   0, -24, 0.26);
+
+  /* 重点词脉冲：**有限**段，repeat:2 + yoyo 共 3 次，绝不写 repeat:-1
+     （repeat:-1 会把 tl.duration() 撑到 1e10s，云渲染 settle 取帧直接失效）。
+     脉冲幅度只有 1.06，不越 1.08 的红线。 */
+  tl.to('#kw', { scale: 1.06, duration: 0.14, ease: 'steps(2)',
+    repeat: 2, yoyo: true }, 0.96);
+
+  /* 模 9 阴影档位脉冲：词块跟着换一次档再换回来，只在档位间 steps 跳 */
+  tl.to('#kw', { boxShadow: '10px 10px 0 #0F0F0F', duration: 0.06, ease: 'steps(2)' }, 1.02);
+  tl.to('#kw', { boxShadow: '6px 6px 0 #0F0F0F', duration: 0.06, ease: 'steps(2)' }, 1.08);
+
+  slam('#footrow', 1.56, 0, 24, 0.26);
+  tl.fromTo('#rule', { scaleX: 0, transformOrigin: 'left center' },
+    { scaleX: 1, duration: 0.28, ease: 'power4.out' }, 1.68);
+  slam('#note',    1.82, 0, -16, 0.22);
+  /* 模 7 分格揭示：斜纹带从左逐格推出 */
+  tl.fromTo('#stripe', { clipPath: 'inset(0 100% 0 0)' },
+    { clipPath: 'inset(0 0% 0 0%)', duration: 0.34, ease: 'steps(8)' }, 1.96);
+  /* 模 6：斜纹带匀速滚动，位移取 20px 整周期，ease:none */
+  tl.fromTo('#stripe', { backgroundPositionX: '0px' },
+    { backgroundPositionX: '40px', duration: 1.0, ease: 'none' }, 2.30);
+
+  var introEnd = 3.30;
+  var total = Math.min(8, Math.max(5, Number(v.duration) || 5.5));
+  B.hold(tl, introEnd, Math.max(0.6, total - introEnd));
+})();
+</script>
+</body></html>

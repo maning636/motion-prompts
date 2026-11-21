@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-CN" data-audit-offcanvas="扫描线/拖尾在画布上方 y=-130 起扫，取景框收回后不再进画" data-composition-variables='[{"id":"text","name":"文案","type":"string","label":"扫描提示语","default":"扫描中"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#2EC4B6"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":2.8}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>扫描取景</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-tint { position: absolute; inset: 0; background: rgba(12, 12, 18, .34); }
+  .p-halo { position: absolute; inset: 0;
+    background: radial-gradient(70% 80% at 50% 50%, rgba(0,0,0,.46) 0%, rgba(0,0,0,.22) 56%, rgba(0,0,0,0) 86%); }
+  /* 被扫描的内容：一张缩略卡 + 方块角色，一眼认得出这是在扫什么 */
+  .p-card { position: absolute; left: 50%; top: 135px; width: 196px; height: 118px; margin: -59px 0 0 -98px;
+    border-radius: 10px; background: rgba(255, 248, 238, .10);
+    border: 2px solid rgba(255, 248, 238, .22); }
+  .p-csun { position: absolute; left: 50%; top: 42px; width: 30px; height: 30px; margin: -15px 0 0 -15px;
+    border-radius: 50%; background: var(--ac); opacity: .9; }
+  .p-cbar { position: absolute; bottom: 20px; width: 16px; border-radius: 3px 3px 0 0;
+    background: rgba(255, 248, 238, .34); }
+  .p-char { position: absolute; left: 50%; top: 64px; width: 30px; height: 28px; margin-left: -15px;
+    background: var(--ac); border: 3px solid #1B1B24; border-radius: 5px 5px 3px 3px; }
+  .p-char::before, .p-char::after { content: ''; position: absolute; top: 5px; width: 5px; height: 7px;
+    background: #1B1B24; border-radius: 50%; }
+  .p-char::before { left: 5px; }
+  .p-char::after { right: 5px; }
+  .p-char i { position: absolute; left: 7px; bottom: 3px; width: 16px; height: 8px;
+    border-bottom: 3px solid #1B1B24; border-radius: 0 0 10px 10px; }
+  .p-box { position: absolute; left: 50%; top: 135px; width: 96px; height: 58px; margin: -29px 0 0 -48px;
+    border: 2px solid var(--ac); border-radius: 6px; opacity: 0; transform-origin: 50% 50%; }
+  .p-corn { position: absolute; left: 240px; top: 135px; width: 34px; height: 34px;
+    margin: -17px 0 0 -17px; opacity: 0; will-change: transform, opacity;
+    border-color: var(--ac); border-style: solid; border-width: 0; }
+  .p-corn.tl { border-top-width: 4px; border-left-width: 4px; border-top-left-radius: 6px; }
+  .p-corn.tr { border-top-width: 4px; border-right-width: 4px; border-top-right-radius: 6px; }
+  .p-corn.bl { border-bottom-width: 4px; border-left-width: 4px; border-bottom-left-radius: 6px; }
+  .p-corn.br { border-bottom-width: 4px; border-right-width: 4px; border-bottom-right-radius: 6px; }
+  .p-trail { position: absolute; left: 0; width: 480px; height: 96px; opacity: 0; will-change: transform, opacity;
+    background: linear-gradient(180deg, rgba(46,196,182,0) 0%, rgba(46,196,182,.16) 62%, rgba(46,196,182,.52) 100%); }
+  .p-scan { position: absolute; left: 0; width: 480px; height: 3px; opacity: 0; will-change: transform, opacity;
+    background: var(--ac); box-shadow: 0 0 12px rgba(46,196,182,.9); }
+  .p-label { position: absolute; left: 0; right: 0; top: 205px; display: flex; justify-content: center;
+    align-items: center; gap: 8px; }
+  .p-lbl { display: inline-block; white-space: nowrap; font-size: 22px; font-weight: 700; letter-spacing: .06em;
+    color: #FFF8EE; -webkit-text-stroke: 3px rgba(27,27,36,.92); paint-order: stroke fill; }
+  .p-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ac); transform-origin: 50% 50%; }
+  .p-prog { position: absolute; left: 50%; top: 236px; width: 210px; height: 5px; margin-left: -105px;
+    border-radius: 3px; background: rgba(255, 248, 238, .18); overflow: hidden; }
+  .p-progf { position: absolute; left: 0; top: 0; height: 100%; width: 0; border-radius: 3px;
+    background: linear-gradient(90deg, var(--ac), var(--ac)); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"扫描中","accent":"#2EC4B6","duration":2.8};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  const dur = parseFloat(v.duration) || 2.8;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--fg', '#FFF8EE');
+  root.style.setProperty('--ink', '#1B1B24');
+  const text = String(v.text == null ? FALLBACK.text : v.text);
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, tx, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (tx != null) el.textContent = tx;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  put('div', 'p-tint');
+  put('div', 'p-halo');
+
+  const card = put('div', 'p-card');
+  put('div', 'p-csun', '', null, card);
+  put('div', 'p-cbar', 'left:28px;height:26px;', null, card);
+  put('div', 'p-cbar', 'left:50px;height:38px;', null, card);
+  put('div', 'p-cbar', 'left:132px;height:30px;', null, card);
+  put('div', 'p-cbar', 'left:154px;height:44px;', null, card);
+  const chr = put('div', 'p-char', '', null, card);
+  put('i', '', '', null, chr);
+  const box = put('div', 'p-box');
+
+  const trail = put('div', 'p-trail');
+  const scan = put('div', 'p-scan');
+  const corners = ['tl', 'tr', 'bl', 'br'].map((k) => put('div', 'p-corn ' + k));
+
+  const lab1 = put('div', 'p-label');
+  const dot1 = put('div', 'p-dot', '', null, lab1);
+  put('span', 'p-lbl', '', text, lab1);
+  const lab2 = put('div', 'p-label', 'top:205px;opacity:0;');
+  const dot2 = put('div', 'p-dot', 'background:var(--ac);', null, lab2);
+  put('span', 'p-lbl', '', '已锁定', lab2);
+  const prog = put('div', 'p-prog');
+  /* 注意 parent 必须传 prog：put() 的第 5 个参数缺省是 stage，
+     漏传就会把进度条填块直接挂到 #stage 上——它自己 left:0/top:0/height:100%，
+     于是变成一层铺满 480×270 的实色，第二次扫描之后整屏糊成一块纯青。 */
+  const progf = put('div', 'p-progf', '', null, prog);
+
+  function fitText(el, maxPx, avail, minPx) {
+    el.style.fontSize = maxPx + 'px';
+    el.style.whiteSpace = 'nowrap';
+    const natural = el.scrollWidth;
+    if (natural > avail && natural > 0) {
+      el.style.fontSize = Math.max(minPx, Math.floor(maxPx * avail / natural)) + 'px';
+    }
+  }
+  fitText(lab1.querySelector('.p-lbl'), 22, 320, 12);
+  fitText(lab2.querySelector('.p-lbl'), 22, 320, 12);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+  tl.fromTo(card, { scale: .86, opacity: .3 },
+    { scale: 1, opacity: 1, duration: .3, ease: 'power3.out' }, 0);
+  tl.fromTo(prog, { scaleX: 0 }, { scaleX: 1, duration: .3, ease: 'power2.out' }, 0);
+  /* 「扫描中」圆点的闪烁**不能**用 repeat:-1 的无限循环补间：
+     无限重复的子补间会把整条时间轴的 totalDuration 撑到 1e10，
+     渲染器读到的时长就变成 10000000000.10。改由 paint() 按绝对时间算。 */
+
+  /* 取景框从大收到小，带一点过冲 */
+  const shrink = (t) => {
+    if (t <= .05) return 0;
+    const u = Math.max(0, Math.min(1, (t - .05) / .48));
+    const c1 = 1.9, c3 = c1 + 1, k = u - 1;
+    return 1 + c3 * k * k * k + c1 * k * k;
+  };
+  /* 两趟扫描：慢的一趟全速，快的一趟弱一档 */
+  const sweep = (t) => {
+    if (t >= .12 && t <= .78) return { y: -34 + (t - .12) / .66 * 344, o: 1 };
+    if (t >= .95 && t <= 1.26) return { y: -34 + (t - .95) / .31 * 344, o: .45 };
+    return { y: -34, o: 0 };
+  };
+
+  const P = { t: 0 };
+  const paint = (t) => {
+    const s = shrink(t);
+    const hx = 212 - s * 118;
+    const hy = 118 - s * 66;
+    const cx = hx - 17, cy = hy - 17;
+    corners[0].style.transform = 'translate3d(' + (-cx).toFixed(1) + 'px,' + (-cy).toFixed(1) + 'px,0)';
+    corners[1].style.transform = 'translate3d(' + cx.toFixed(1) + 'px,' + (-cy).toFixed(1) + 'px,0)';
+    corners[2].style.transform = 'translate3d(' + (-cx).toFixed(1) + 'px,' + cy.toFixed(1) + 'px,0)';
+    corners[3].style.transform = 'translate3d(' + cx.toFixed(1) + 'px,' + cy.toFixed(1) + 'px,0)';
+    const done = t >= 1.28;
+    let co = 1;
+    if (t < .05) co = (t / .05) * (1 - s * .12);
+    else if (done) co = .55 + .45 * Math.abs(Math.sin((t - 1.28) * 6));
+    if (co > 1) co = 1;
+    for (let i = 0; i < corners.length; i++) corners[i].style.opacity = co.toFixed(3);
+    const sw = sweep(t);
+    scan.style.transform = 'translate3d(0,' + sw.y.toFixed(2) + 'px,0)';
+    scan.style.opacity = sw.o.toFixed(3);
+    trail.style.transform = 'translate3d(0,' + (sw.y - 96).toFixed(2) + 'px,0)';
+    trail.style.opacity = (sw.o * .9).toFixed(3);
+    const pu = Math.max(0, Math.min(1, (t - .12) / 1.16));
+    progf.style.width = (pu * 100).toFixed(1) + '%';
+    const pDone = Math.max(0, Math.min(1, (t - 1.28) / .18));
+    lab1.style.opacity = (1 - pDone).toFixed(3);
+    lab2.style.opacity = pDone.toFixed(3);
+    box.style.opacity = pDone.toFixed(3);
+    box.style.transform = 'scale(' + (1 + (1 - pDone) * .2).toFixed(3) + ')';
+    /* 状态圆点的呼吸：0.5 + 0.5*sin，纯 t 的函数，替代原来的无限循环补间 */
+    const blink = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 7.6));
+    const bs = 0.72 + 0.28 * blink;
+    dot1.style.opacity = blink.toFixed(3);
+    dot1.style.transform = 'scale(' + bs.toFixed(3) + ')';
+    dot2.style.opacity = (pDone * blink).toFixed(3);
+    dot2.style.transform = 'scale(' + bs.toFixed(3) + ')';
+  };
+  tl.fromTo(P, { t: 0 }, {
+    t: dur, duration: dur, ease: 'none',
+    onUpdate() { paint(P.t); }
+  }, 0);
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+  paint(0);
+})();
+</script>
+</body>
+</html>

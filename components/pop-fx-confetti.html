@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="zh-CN" data-audit-offcanvas="彩纸爆开后飞出画布上方，是抛物线的自然结果" data-composition-variables='[{"id":"text","name":"文案","type":"string","label":"主文案","default":"撒花！"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#FF6B35"},{"id":"accent2","name":"次强调色","type":"color","label":"次强调色","default":"#FFC93C"},{"id":"accent3","name":"辅助色","type":"color","label":"辅助色","default":"#2EC4B6"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":2.8}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>彩纸粒子爆撒</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .p-tint { position: absolute; inset: 0; background: rgba(12, 12, 18, .46); }
+  .p-halo { position: absolute; inset: 0;
+    background: radial-gradient(70% 80% at 50% 50%, rgba(0,0,0,.50) 0%, rgba(0,0,0,.26) 54%, rgba(0,0,0,0) 84%); }
+  .p-wordrow { position: absolute; left: 0; right: 0; top: 96px; display: flex; justify-content: center; }
+  .p-word { display: inline-block; white-space: nowrap; font-size: 66px; font-weight: 900;
+    line-height: 1.06; color: var(--fg); -webkit-text-stroke: 3px var(--ink);
+    text-shadow: 6px 6px 0 rgba(0,0,0,.85); }
+  .p-bit { position: absolute; left: 0; top: 0; will-change: transform, opacity;
+    transform-origin: 50% 50%; backface-visibility: visible; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"撒花！","accent":"#FF6B35","accent2":"#FFC93C","accent3":"#2EC4B6","duration":2.8};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  const dur = parseFloat(v.duration) || 2.8;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--ac2', v.accent2 || FALLBACK.accent2);
+  root.style.setProperty('--ac3', v.accent3 || FALLBACK.accent3);
+  root.style.setProperty('--fg', '#FFF8EE');
+  root.style.setProperty('--ink', '#1B1B24');
+  const text = String(v.text == null ? FALLBACK.text : v.text);
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, tx, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (tx != null) el.textContent = tx;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  put('div', 'p-tint');
+  put('div', 'p-halo');
+
+  const row = put('div', 'p-wordrow');
+  const word = put('div', 'p-word', '', text, row);
+
+  /* ── 确定性哈希：用「序号 i」推出一组固定参数 ────────────────────────
+     这里绝不能调用随机数：云渲染 settle 会来回扫时间轴，
+     扫到 t=1.2s 和再扫回 t=1.2s 必须拿到同一批粒子，否则定格帧不可复现。
+     这里是对 i 做整数散列，纯函数、可重复、跨浏览器一致。 */
+  const H = (i, s) => {
+    let x = (Math.imul(i + 1, 374761393) + Math.imul(s + 3, 668265263)) >>> 0;
+    x = (x ^ (x >>> 13)) >>> 0;
+    x = Math.imul(x, 1274126177) >>> 0;
+    return ((x >>> 8) & 0xffff) / 65535;
+  };
+
+  const N = 38;
+  const PAL = ['var(--ac)', 'var(--ac2)', 'var(--ac3)', '#FFF8EE', '#FF4D8D'];
+  const bits = [];
+  for (let i = 0; i < N; i++) {
+    const shape = i % 4;                       /* 0 圆 / 1 长条 / 2 三角 / 3 五角星 */
+    let css = '';
+    if (shape === 0) {
+      css = 'width:11px;height:11px;border-radius:50%;';
+    } else if (shape === 1) {
+      css = 'width:8px;height:19px;border-radius:2px;';
+    } else if (shape === 2) {
+      css = 'width:14px;height:13px;clip-path:polygon(50% 0%, 100% 100%, 0% 100%);';
+    } else {
+      css = 'width:16px;height:16px;clip-path:polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);';
+    }
+    const el = put('div', 'p-bit', css + 'background:' + PAL[i % 5] + ';opacity:0;');
+    bits.push({
+      el: el,
+      x0: 34 + H(i, 1) * 412,
+      y0: 126 + H(i, 2) * 44,
+      delay: H(i, 3) * .34,
+      vy0: -(150 + H(i, 12) * 140),
+      g: 78 + H(i, 5) * 64,
+      swayA: 12 + H(i, 6) * 26,
+      swayW: 1.6 + H(i, 7) * 2.2,
+      ph: H(i, 8) * 6.2832,
+      spin: (H(i, 9) * 2 - 1) * 520,
+      flipW: 2.4 + H(i, 10) * 3.2,
+      flip0: H(i, 11) * 6.2832,
+      r0: H(i, 2) * 360
+    });
+  }
+
+  function fitText(el, maxPx, avail, minPx) {
+    el.style.fontSize = maxPx + 'px';
+    el.style.whiteSpace = 'nowrap';
+    const natural = el.scrollWidth;
+    if (natural > avail && natural > 0) {
+      el.style.fontSize = Math.max(minPx, Math.floor(maxPx * avail / natural)) + 'px';
+    }
+  }
+  fitText(word, 66, 400, 22);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+  tl.fromTo(word, { scale: .18, opacity: 0, rotate: -12 },
+    { scale: 1, opacity: 1, rotate: -3, duration: .46, ease: 'back.out(2.8)' }, .04);
+
+  const back = (x) => { const c1 = 1.70158, c3 = c1 + 1; const k = x - 1; return 1 + c3 * k * k * k + c1 * k * k; };
+  const smooth = (a, b, x) => {
+    if (b <= a) return x >= b ? 1 : 0;
+    const u = Math.max(0, Math.min(1, (x - a) / (b - a)));
+    return u * u * (3 - 2 * u);
+  };
+
+  const P = { t: 0 };
+  /* 彩纸的「时间 → 画面」是纯函数：给定 t，算出这一帧每一片彩纸的位置。
+     没有任何累加量，没有随机数，回扫到同一个 t 必然得到同一帧。 */
+  const paint = (t) => {
+    const fadeOut = 1 - smooth(2.05, dur - .04, t);
+    for (let i = 0; i < bits.length; i++) {
+      const b = bits[i];
+      const age = t - b.delay;
+      if (age <= 0) { b.el.style.opacity = '0'; continue; }
+      const x = b.x0 + b.swayA * Math.sin(t * b.swayW + b.ph);
+      const y = b.y0 + b.vy0 * age + 0.5 * b.g * age * age;
+      if (y > 300) { b.el.style.opacity = '0'; continue; }
+      const rot = b.r0 + b.spin * age;
+      const flip = b.flip0 + b.flipW * age;
+      const s = age < .26 ? Math.max(.02, back(age / .26)) : 1;
+      /* 翻面：转到背面时压暗，正面时还原亮度——不需要双面元素 */
+      const bright = .52 + .48 * Math.abs(Math.cos(flip));
+      let o = smooth(0, .09, age) * fadeOut;
+      if (y > 250) o *= 1 - smooth(250, 300, y);
+      b.el.style.transform = 'translate3d(' + x.toFixed(2) + 'px,' + y.toFixed(2) + 'px,0) rotate(' +
+        rot.toFixed(1) + 'deg) rotateY(' + (flip * 57.2958).toFixed(1) + 'deg) scale(' + s.toFixed(3) + ')';
+      b.el.style.opacity = o.toFixed(3);
+      b.el.style.filter = 'brightness(' + bright.toFixed(3) + ')';
+    }
+    word.style.filter = 'saturate(' + (1 + 1.1 * (1 - smooth(.1, 1.0, t))).toFixed(2) + ')';
+  };
+  tl.fromTo(P, { t: 0 }, {
+    t: dur, duration: dur, ease: 'none',
+    onUpdate() { paint(P.t); }
+  }, 0);
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+  paint(0);
+})();
+</script>
+</body>
+</html>

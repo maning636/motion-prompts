@@ -1,0 +1,28 @@
+{
+  "id": "neon-step-dots",
+  "name": "霓虹步骤点线卡",
+  "description": "深黑底荧光绿三步流程条：绿色描边圆圈内白色数字，圈间发光横线依次画出连接，圈下白色标签加底部灰色注释，适合口播讲步骤流程。",
+  "category": "信息卡片",
+  "tags": [
+    "步骤流程",
+    "霓虹",
+    "荧光绿",
+    "要点讲解",
+    "口播"
+  ],
+  "duration": 6,
+  "slot": "concept",
+  "when": "口播讲解三步式流程、新手引导步骤，需要点线递进呈现时",
+  "assets": [],
+  "path": "templates/neon-step-dots",
+  "size": "1920×1080",
+  "formats": [
+    "mp4"
+  ],
+  "defaultFormat": "mp4",
+  "preview": "https://maning789link.top/hub/renders/neon-step-dots/sample.webm",
+  "status": "ready",
+  "tier": "free",
+  "no": null,
+  "series": "shot"
+}

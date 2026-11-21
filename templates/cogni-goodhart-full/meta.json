@@ -1,0 +1,19 @@
+{
+ "id": "cogni-goodhart-full",
+ "name": "指标失效 · 一旦成为目标就失效",
+ "description": "同一个指标三段走：没人考核时有信息量，开始考核后开始被优化，全面对齐后已经没信息量了。",
+ "category": "图解与流程",
+ "tags": [
+  "认知类",
+  "指标",
+  "KPI",
+  "考核"
+ ],
+ "duration": 3.9,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "",
+ "when": "讲 KPI / 讲考核 / 讲数据造假",
+ "series": "night",
+ "createdAt": "2026-10-03T10:20:00.000Z"
+}

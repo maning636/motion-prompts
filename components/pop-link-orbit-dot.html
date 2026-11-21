@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"accent","name":"强调色","type":"color","label":"运动点色","default":"#FF6B35"},{"id":"accent2","name":"次强调","type":"color","label":"轨迹色","default":"#2EC4B6"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.2}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>沿路径运动点</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+
+  .p-lo-halo {
+    position: absolute; left: 80px; top: 26px; width: 320px; height: 218px;
+    background: radial-gradient(58% 62% at 50% 50%,
+      rgba(0, 0, 0, .46) 0%, rgba(0, 0, 0, .22) 56%, rgba(0, 0, 0, 0) 86%);
+  }
+  /* 轨迹：一个纯 CSS 的椭圆环当"轨道"，只做淡淡的底衬 */
+  .p-lo-orbit {
+    position: absolute; left: 50%; top: 50%;
+    width: 250px; height: 158px; margin: -79px 0 0 -125px;
+    border: 2px dashed rgba(255, 248, 238, .22);
+    border-radius: 50%;
+    opacity: 0; will-change: transform, opacity;
+  }
+  /* 中心靶点，交代这条轨道绕着什么转 */
+  .p-lo-core {
+    position: absolute; left: 50%; top: 50%;
+    width: 16px; height: 16px; margin: -8px 0 0 -8px;
+    border-radius: 50%; background: var(--ac2, #2EC4B6);
+    opacity: 0; will-change: transform, opacity;
+  }
+  .p-lo-coreRing {
+    position: absolute; left: 50%; top: 50%;
+    width: 16px; height: 16px; margin: -8px 0 0 -8px;
+    border: 2px solid var(--ac2, #2EC4B6); border-radius: 50%;
+    opacity: 0; will-change: transform, opacity;
+  }
+  /* 拖尾：几个相位依次滞后的圆点 */
+  .p-lo-trail {
+    position: absolute; left: 0; top: 0;
+    border-radius: 50%; background: var(--ac, #FF6B35);
+    opacity: 0; will-change: transform;
+  }
+  /* 主点 */
+  .p-lo-dot {
+    position: absolute; left: 0; top: 0;
+    width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px;
+    border-radius: 50%; background: var(--ac, #FF6B35);
+    box-shadow: 0 0 0 3px rgba(255, 248, 238, .30), 0 3px 8px rgba(0, 0, 0, .45);
+    opacity: 0; will-change: transform;
+  }
+  .p-lo-tag {
+    position: absolute; left: 0; right: 0; top: 30px; text-align: center;
+    font-size: 12px; line-height: 1; font-weight: 800; letter-spacing: .2em;
+    color: #FFF8EE; white-space: nowrap;
+    will-change: transform, opacity;
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"accent":"#FF6B35","accent2":"#2EC4B6","duration":3.2};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--ac2', v.accent2 || FALLBACK.accent2);
+  const dur = parseFloat(v.duration) || 3.2;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  put('div', 'p-lo-halo');
+  const tag = put('div', 'p-lo-tag', null, 'ORBIT', stage);
+  const orbit = put('div', 'p-lo-orbit');
+  const coreRing = put('div', 'p-lo-coreRing');
+  const core = put('div', 'p-lo-core');
+
+  /* 拖尾：5 个点，尺寸/透明度按固定比例递减（常量表，不是随机）。
+     CSS 里 opacity:0 是第 0 帧的状态，进场由时间轴负责。 */
+  const TRAIL_N = 5;
+  const trail = [];
+  const trailTarget = [];
+  for (let i = 1; i <= TRAIL_N; i++) {
+    const s = 1 - i * 0.155;
+    const d = put('div', 'p-lo-trail',
+      'width:' + (15 * s).toFixed(1) + 'px;height:' + (15 * s).toFixed(1) +
+      'px;margin:' + (-7.5 * s).toFixed(1) + 'px 0 0 ' + (-7.5 * s).toFixed(1) + 'px;');
+    trail.push(d);
+    trailTarget.push(0.46 * (1 - i / (TRAIL_N + 1)));
+  }
+  const dot = put('div', 'p-lo-dot');
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  /* ─────────────────────────────────────────────────────────
+     轨迹函数：心形参数方程，纯函数 t → (x, y)，无任何插件。
+     精简版 gsap.min.js 不含沿路径插件（不在这个包里），
+     所以把曲线写成 f(t)，在 onUpdate 里按 tl.time() 求值——
+     §3.1 红线 5 要的「时间 → 画面」纯函数写法，
+     settle 来回扫时间轴也一定得到同一帧。
+     ───────────────────────────────────────────────────────── */
+
+  /* 心形参数方程的包围盒（先采一圈，把范围归一化到轨道尺寸） */
+  let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+  for (let i = 0; i <= 180; i++) {
+    const a = i / 180 * Math.PI * 2;
+    const hx = 16 * Math.pow(Math.sin(a), 3);
+    const hy = -(13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a));
+    if (hx < minX) minX = hx;
+    if (hx > maxX) maxX = hx;
+    if (hy < minY) minY = hy;
+    if (hy > maxY) maxY = hy;
+  }
+  const spanX = maxX - minX, spanY = maxY - minY;
+  const BOX_W = 250, BOX_H = 158;
+  const SCALE = Math.min(BOX_W / spanX, BOX_H / spanY);
+  const CX = 240, CY = 135;
+
+  /* t: 0→1 走完一圈，返回舞台坐标 */
+  function curve(t) {
+    const a = t * Math.PI * 2;
+    const hx = 16 * Math.pow(Math.sin(a), 3);
+    const hy = -(13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a));
+    return {
+      x: CX + (hx - (minX + maxX) / 2) * SCALE,
+      y: CY + (hy - (minY + maxY) / 2) * SCALE
+    };
+  }
+
+  const LAPS = 2;
+  const RUN = Math.max(1.2, dur - 1.0);
+
+  /* 建 DOM 时就把第 0 帧的位置写死。
+     如果不写，settle 停在第 0 帧时这几个点是上一轮 onUpdate 留下的旧位置。 */
+  function place(el, t) {
+    const p = curve(t);
+    el.style.transform = 'translate(' + p.x.toFixed(2) + 'px,' + p.y.toFixed(2) + 'px)';
+  }
+  place(dot, 0);
+  for (let i = 0; i < TRAIL_N; i++) place(trail[i], -(i + 1) * 0.052);
+
+  /* 驱动器：一个空 tween 只负责推进时间，位置全由 curve(tl 归一化时间) 决定。
+     位置改的是 style.transform，不碰 GSAP 管的 opacity/scale，互不打架。 */
+  function driver(segDur) {
+    return {
+      duration: segDur, ease: 'none',
+      onUpdate: function () {
+        const p = tl.time() / RUN * LAPS;          /* 已经走了几圈（可带小数） */
+        place(dot, p);
+        for (let i = 0; i < TRAIL_N; i++) {
+          place(trail[i], p - (i + 1) * 0.052);     /* 每个拖尾点滞后固定相位 */
+        }
+      }
+    };
+  }
+
+  /* ① 轨道和靶点先落位 */
+  tl.fromTo(tag, { y: -8, opacity: 0 },
+    { y: 0, opacity: 1, duration: .30, ease: 'power2.out' }, 0);
+  tl.fromTo(orbit, { scale: .70, opacity: 0 },
+    { scale: 1, opacity: 1, duration: .44, ease: 'back.out(2.2)' }, .06);
+  tl.fromTo(core, { scale: 0, opacity: 0 },
+    { scale: 1, opacity: 1, duration: .26, ease: 'back.out(3.2)' }, .28);
+  tl.fromTo(coreRing, { scale: .3, opacity: 0 },
+    { scale: 1, opacity: .8, duration: .26, ease: 'back.out(2.6)' }, .28);
+
+  /* ② 轨道转起来（背景缓转，强化"绕行"） */
+  tl.fromTo(orbit, { rotation: 0 },
+    { rotation: 360 * LAPS, duration: RUN, ease: 'none' }, .40);
+  tl.fromTo(coreRing, { rotation: 0 },
+    { rotation: -360 * LAPS, duration: RUN, ease: 'none' }, .40);
+
+  /* ③ 主点 + 拖尾沿曲线匀速绕行 */
+  tl.fromTo(dot, { opacity: 0 }, { opacity: 1, duration: .18, ease: 'power2.out' }, .40);
+  for (let i = 0; i < TRAIL_N; i++) {
+    tl.fromTo(trail[i], { opacity: 0 },
+      { opacity: trailTarget[i], duration: .22, ease: 'power2.out' }, .46 + i * .03);
+  }
+  tl.to({}, driver(RUN), .40);
+
+  /* ④ 收尾：靶点脉冲 + 整体淡出 */
+  const tail = Math.max(.40 + RUN + .15, dur - .70);
+  tl.to(core, { scale: 1.5, duration: .20, ease: 'power2.out' }, tail);
+  tl.to(core, { scale: 1, duration: .28, ease: 'back.out(2.6)' }, tail + .20);
+  tl.to(dot, { opacity: 0, scale: .4, duration: .24, ease: 'power2.in' }, dur - .45);
+  tl.to(trail, { opacity: 0, duration: .24, ease: 'power2.in' }, dur - .45);
+  tl.to(orbit, { opacity: 0, duration: .26, ease: 'power2.in' }, dur - .45);
+  tl.to(tag, { opacity: 0, duration: .22, ease: 'power2.in' }, dur - .45);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"pack","name":"规格包","type":"enum","label":"规格包（配色 / 字体 / 曲线）","options":[{"label":"暗色科技","value":"dark"},{"label":"奶油贴纸","value":"cream"},{"label":"单色克制","value":"mono"},{"label":"夜航","value":"night"}],"default":"night"},{"id":"eyebrow","name":"眉标","type":"string","label":"眉标","default":"THE OPTION"},{"id":"title","name":"标题","type":"string","label":"标题","default":"算不准的时候，先留后路"},{"id":"note","name":"收口","type":"string","label":"底部判据","default":"期权思维不是保守，"},{"id":"foot","name":"落款","type":"string","label":"底部一句话","default":"能等，本身就是一种资源。"},{"id":"a","name":"路A","type":"string","label":"路 A 内容","default":"看准了就一把梭"},{"id":"an","name":"路A注","type":"string","label":"路 A 说明","default":"对了收益最大，错了没有第二次"},{"id":"b","name":"路B","type":"string","label":"路 B 内容","default":"干脆不做"},{"id":"bn","name":"路B注","type":"string","label":"路 B 说明","default":"没有风险，也没有变化"},{"id":"c","name":"路C","type":"string","label":"路 C 内容","default":"小成本先试"},{"id":"cn","name":"路C注","type":"string","label":"路 C 说明","default":"上行留着，下行封顶"}]'>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="三条路：全押（对了最大，错了没第二次）、干脆不做（没风险也没变化）、小成本先试（上行留着下行封顶）。">
+<title>期权思维 · 先留后路</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<link rel="stylesheet" href="../_lib/packs.css">
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script>
+<!-- packs.js 必须排在 blocks.js **之后**：blocks.js 结尾是 global.BBlocks = BB，
+     会把它整个替换掉。谁先加载谁的东西就没了，表现是 B.pack is not a function。 -->
+<script src="../_lib/packs.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<style>
+  /* 底色和字色**必须来自规格包**，不能写死。
+     写死 #000 + #F4F1EA 的时候，四个包里只有 dark / night 正常：
+     cream 的 --pk-fg 是 #2A2118、mono 是 #14140F，两个都是**深字**，
+     压在这个写死的黑底上 → 标题、标签、说明全糊掉。
+     而写死字面量色的元素（比如 rgba(244,241,234,.82)）反而还看得见，
+     画面上就成了一半能看一半不能看——比全黑更难认。
+     一共 33 条模板中招（混剪 5 + 认知 22 + 节拍 6）。
+
+     注意区分两层契约（packs.css 顶部注释里写过）：
+       --pk-bg / --pk-fg      = 包自带底板，舞台自己用它
+       --pk-*-media           = 压在用户素材上的那一层
+     这里改的是前者。 */
+  html,body{margin:0;padding:0;background:var(--pk-bg,#000)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--pk-bg,#000);
+        color:var(--pk-fg,#F4F1EA);font-family:"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+        -webkit-font-smoothing:antialiased}
+  /* 统一安全区：混剪里所有贴边元素都从 72/88 起，不贴 0 */
+  
+  /* ── 通用 ── */
+  .eyebrow{position:absolute;left:120px;top:104px;opacity:0;
+      font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:700;
+      letter-spacing:.34em;color:var(--pk-accent);text-indent:.34em}
+  .h1{position:absolute;left:120px;top:148px;width:1680px;opacity:0;
+      font-size:76px;font-weight:900;line-height:1.16;color:var(--pk-fg);letter-spacing:.01em}
+  .foot{position:absolute;left:120px;top:922px;width:1680px;opacity:0;
+      font-size:34px;line-height:1.5;color:var(--pk-muted)}
+  .foot b{color:var(--pk-accent);font-weight:700}
+  /* 底部一条极细的分隔，给满屏一个「结束感」 */
+  .footline{position:absolute;left:120px;top:884px;width:0;height:2px;background:var(--pk-accent)}
+
+  /* ── 因果链 ── */
+  .spine{position:absolute;left:120px;top:0;width:4px;height:0;background:var(--pk-accent);opacity:.9}
+  .node{position:absolute;left:120px;width:64px;height:64px;margin:-32px 0 0 -32px;
+      border-radius:50%;border:3px solid var(--pk-accent);background:var(--pk-bg);opacity:0;
+      display:flex;align-items:center;justify-content:center;
+      font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:800;color:var(--pk-accent)}
+  .clabel{position:absolute;opacity:0;font-family:ui-monospace,Consolas,monospace;
+      font-size:30px;font-weight:800;letter-spacing:.20em;color:var(--pk-accent)}
+  .ctext{position:absolute;opacity:0;font-size:52px;font-weight:700;line-height:1.30;color:var(--pk-fg)}
+  .cnote{position:absolute;opacity:0;font-size:27px;line-height:1.5;
+      color:var(--pk-muted)}
+
+  /* ── 公式页 ── */
+  .eqbox{position:absolute;left:120px;top:352px;width:1680px;height:210px;opacity:0;
+      display:flex;align-items:center;justify-content:center;gap:0;
+      border-top:2px solid rgba(244,241,234,.14);border-bottom:2px solid rgba(244,241,234,.14)}
+  .eqbox .t{font-size:150px;font-weight:900;color:var(--pk-fg);font-variant-numeric:tabular-nums}
+  .eqbox .o{font-size:110px;font-weight:300;color:var(--pk-muted);padding:0 26px}
+  .eqbox .r{font-size:150px;font-weight:900;color:var(--pk-accent);font-variant-numeric:tabular-nums}
+  .vcard{position:absolute;top:650px;width:520px;opacity:0;
+      border-left:4px solid rgba(244,241,234,.18);padding-left:28px}
+  .vcard .vn{font-size:40px;font-weight:900;color:var(--pk-fg)}
+  .vcard .vd{font-size:26px;line-height:1.5;color:var(--pk-muted);margin-top:14px}
+  .vcard .vv{font-size:30px;font-weight:800;color:var(--pk-accent);margin-top:14px;
+      font-family:ui-monospace,Consolas,monospace}
+
+  /* ── 引述页 ── */
+  .qm{position:absolute;left:120px;top:236px;opacity:0;
+      font-family:Georgia,'Times New Roman',serif;font-size:220px;line-height:.7;
+      color:var(--pk-accent);opacity:0}
+  .qtext{position:absolute;left:120px;top:376px;width:1560px;opacity:0;
+      font-size:96px;font-weight:800;line-height:1.42;color:var(--pk-fg);letter-spacing:.01em}
+  .qwho{position:absolute;left:120px;opacity:0;
+      font-family:ui-monospace,Consolas,monospace;font-size:28px;font-weight:700;
+      letter-spacing:.16em;color:var(--pk-muted)}
+  .qrule{position:absolute;left:120px;width:0;height:2px;background:rgba(244,241,234,.28)}
+  .qlab{position:absolute;opacity:0;font-family:ui-monospace,Consolas,monospace;
+      font-size:26px;font-weight:800;letter-spacing:.22em;color:var(--pk-accent)}
+  .qtake{position:absolute;opacity:0;font-size:36px;line-height:1.52;
+      color:var(--pk-fg)}
+
+  /* ── 曲线页 ── */
+  .chart{position:absolute;left:120px;top:400px;width:1680px;height:400px}
+  .svgbox{position:absolute;left:0;top:0;width:100%;height:100%}
+  .grid{position:absolute;left:0;right:0;height:1px;background:rgba(244,241,234,.10)}
+  .pivot{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;
+      background:var(--pk-accent);opacity:0;box-shadow:0 0 0 8px rgba(232,160,72,.18)}
+  .pvline{position:absolute;width:2px;background:rgba(232,160,72,.55);opacity:0}
+  .pvlab{position:absolute;opacity:0;font-size:30px;font-weight:800;color:var(--pk-accent)}
+  .phase{position:absolute;top:0;opacity:0}
+  .phase .pn{font-family:ui-monospace,Consolas,monospace;font-size:24px;font-weight:800;
+      letter-spacing:.18em;color:var(--pk-accent)}
+  .phase .pt{font-size:32px;font-weight:700;color:var(--pk-fg);margin-top:12px}
+  .phase .pd{font-size:25px;color:var(--pk-muted);margin-top:10px;line-height:1.45}
+
+  /* ═══ 通用页脚：外层 footbox 由 JS 打开，内部 span 才可编辑 ═══ */
+  .fx{position:absolute;left:120px;top:846px;width:1680px;opacity:0;
+      border-left:4px solid var(--pk-accent);padding-left:34px;
+      display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+  .fx .a{font-size:29px;line-height:1.55;color:var(--pk-fg)}
+  .fx .b{font-size:29px;line-height:1.55;color:var(--pk-accent);font-weight:800}
+
+  /* ═══ 1 · 错开：横轴上四个错开的动作 ═══ */
+  .sg{position:absolute;left:0;top:0;width:0;height:0;opacity:0;z-index:1}
+  .sg-axis{position:absolute;left:120px;top:596px;width:0;height:3px;
+      background:var(--pk-line)}
+  .sg-dot{position:absolute;top:582px;width:28px;height:28px;margin-left:-14px;
+      border-radius:50%;background:var(--pk-muted);opacity:0}
+  .sg-dot.on{background:var(--pk-accent)}
+  .sg-lb{position:absolute;top:0;width:0;height:0;opacity:0}
+  .sg-lb .t{position:absolute;left:-150px;top:-96px;width:300px;text-align:center;
+      font-size:28px;font-weight:800;color:var(--pk-fg)}
+  .sg-lb .d{position:absolute;left:-150px;top:44px;width:300px;text-align:center;
+      font-size:22px;line-height:1.45;color:var(--pk-muted)}
+  .sg-who{position:absolute;top:0;opacity:0;width:340px}
+  .sg-who .n{font-family:ui-monospace,Consolas,monospace;font-size:24px;font-weight:800;
+      color:var(--pk-muted);text-align:center}
+  .sg-who .v{font-size:26px;font-weight:800;color:var(--pk-fg);text-align:center;
+      margin-top:8px}
+  .sg-who.me .n{color:var(--pk-accent)}
+
+  /* ═══ 2 · 杠杆点：四段同样投入，不同产出 ═══ */
+  /* 列直接对舞台定位：bottom:420px（= 基线 1080-660）。
+     之前套了个 0×0 的 .lv-bd 当容器，列的 bottom:0 是相对那个 0 高的盒子，
+     整列往上长到画布外，数字和名称全飞出屏（F7 抓的）。
+     零尺寸容器当定位参照物，等于没有参照物。 */
+  .lv{position:absolute;left:0;top:0;width:0;height:0;opacity:0}
+  .lv-col{position:absolute;bottom:420px;width:170px;opacity:0}
+  .lv-col .bar{position:absolute;left:0;bottom:0;width:170px;border-radius:6px 6px 0 0;
+      background:var(--pk-muted);height:0}
+  .lv-col.hi .bar{background:var(--pk-accent)}
+  .lv-col .nm{position:absolute;left:0;bottom:100%;margin-bottom:14px;width:170px;
+      text-align:center;font-size:26px;font-weight:800;color:var(--pk-fg)}
+  .lv-col .vl{position:absolute;left:0;bottom:100%;margin-bottom:52px;width:170px;
+      text-align:center;font-family:ui-monospace,Consolas,monospace;font-size:34px;
+      font-weight:900;color:var(--pk-muted);font-variant-numeric:tabular-nums}
+  .lv-col.hi .vl{color:var(--pk-accent)}
+  .lv-col .nt{position:absolute;left:0;top:100%;margin-top:16px;width:170px;
+      text-align:center;font-size:21px;line-height:1.45;color:var(--pk-muted)}
+  .lv-base{position:absolute;left:120px;top:660px;width:0;height:3px;
+      background:var(--pk-line)}
+
+  /* ═══ 3 · 指标失效：三阶段 ═══ */
+  .gd{position:absolute;top:0;width:0;height:0;opacity:0}
+  .gd-box{position:absolute;top:0;width:520px;height:250px;opacity:0;
+      border:2px solid var(--pk-line);background:var(--pk-panel);padding:28px 32px}
+  .gd-box .st{font-family:ui-monospace,Consolas,monospace;font-size:24px;font-weight:800;
+      letter-spacing:.18em;color:var(--pk-muted)}
+  .gd-box .tx{font-size:30px;font-weight:800;line-height:1.34;color:var(--pk-fg);
+      margin-top:16px}
+  .gd-box .nt2{font-size:21px;line-height:1.5;color:var(--pk-muted);margin-top:14px}
+  .gd-box.mid{border-color:var(--pk-accent)}
+  .gd-box.mid .st{color:var(--pk-accent)}
+  .gd-arw{position:absolute;top:0;width:56px;height:3px;opacity:0;
+      background:var(--pk-line)}
+  .gd-arw .ad{position:absolute;left:-8px;top:-6px;width:0;height:0;
+      border-top:7px solid transparent;border-bottom:7px solid transparent;
+      border-left:12px solid var(--pk-line)}
+
+  /* ═══ 4 · 会议成本：一根堆叠条 ═══ */
+  /* 堆叠条容器必须有固定宽度。写成 width:0 的话，里面的段虽然各自补了宽度，
+     父容器 overflow:hidden 且宽 0，**整条被裁成一条线都看不见**——
+     而下面四行文字照常显示，画面上完全看不出少了东西。 */
+  .mt-bar{position:absolute;left:120px;top:396px;width:1680px;height:96px;
+      border-radius:10px;overflow:hidden;opacity:0}
+  .mt-bar i{position:absolute;top:0;bottom:0;width:0}
+  .mt-row{position:absolute;left:120px;width:1680px;height:76px;opacity:0;
+      display:flex;align-items:center;gap:26px}
+  .mt-row .sw{flex:0 0 22px;height:22px;border-radius:5px;opacity:0}
+  .mt-row .nm{flex:0 0 300px;font-size:29px;font-weight:800;color:var(--pk-fg)}
+  .mt-row .pc{flex:1;font-family:ui-monospace,Consolas,monospace;font-size:25px;
+      font-weight:700;color:var(--pk-muted);font-variant-numeric:tabular-nums}
+  .mt-row .amt{flex:0 0 160px;text-align:right;font-family:ui-monospace,Consolas,monospace;
+      font-size:30px;font-weight:900;color:var(--pk-fg);font-variant-numeric:tabular-nums}
+  .mt-row.key .amt{color:var(--pk-accent)}
+
+  /* ═══ 5 · 交接断点：三个节点 ═══ */
+  .hf{position:absolute;top:0;width:0;height:0;opacity:0}
+  .hf-node{position:absolute;top:0;width:300px;height:0;opacity:0}
+  .hf-node .dot{position:absolute;left:0;top:-15px;width:30px;height:30px;
+      border-radius:50%;border:3px solid var(--pk-line);background:var(--pk-bg)}
+  .hf-node.bad .dot{border-color:var(--pk-accent)}
+  .hf-node .nm{font-size:29px;font-weight:800;color:var(--pk-fg);margin-top:44px}
+  .hf-node .nt{font-size:22px;line-height:1.5;color:var(--pk-muted);margin-top:10px}
+  .hf-line{position:absolute;left:120px;top:0;width:0;height:3px;
+      background:var(--pk-line)}
+
+  /* ═══ 6 · 基准率：一个大数背景条 ═══ */
+  .br-bar{position:absolute;left:120px;top:392px;width:0;height:110px;
+      border-radius:12px;overflow:hidden;opacity:0}
+  .br-bar i{position:absolute;top:0;bottom:0;width:0}
+  .br-tick{position:absolute;top:0;width:2px;height:0;background:var(--pk-bg)}
+  .br-lb{position:absolute;top:0;opacity:0;width:300px}
+  .br-lb .n{font-family:ui-monospace,Consolas,monospace;font-size:30px;font-weight:900;
+      color:var(--pk-fg);font-variant-numeric:tabular-nums}
+  .br-lb .d{font-size:22px;line-height:1.5;color:var(--pk-muted);margin-top:8px}
+
+  /* ═══ 7 · 回归均值：两片叶子 ═══ */
+  .rg{position:absolute;left:200px;top:330px;width:1500px;height:420px;opacity:0;z-index:2}
+  .rg-lb{position:absolute;opacity:0;width:280px}
+  .rg-lb .t{font-size:28px;font-weight:800;color:var(--pk-fg)}
+  .rg-lb .d{font-size:22px;line-height:1.45;color:var(--pk-muted);margin-top:8px}
+
+  /* ═══ 8 · 迷信：一次成功被当成规律 ═══ */
+  .su{position:absolute;top:0;width:0;height:0;opacity:0}
+  .su-box{position:absolute;top:0;width:500px;height:236px;opacity:0;
+      border:2px solid var(--pk-line);background:var(--pk-panel);padding:28px 32px}
+  .su-box .st{font-family:ui-monospace,Consolas,monospace;font-size:24px;font-weight:800;
+      letter-spacing:.16em;color:var(--pk-muted)}
+  .su-box .tx{font-size:29px;font-weight:800;line-height:1.34;color:var(--pk-fg);
+      margin-top:16px}
+  .su-box.mid{border-color:var(--pk-accent)}
+  .su-box.mid .st{color:var(--pk-accent)}
+  .su-arw{position:absolute;top:0;width:56px;height:3px;opacity:0;
+      background:var(--pk-line)}
+  .su-arw .ad{position:absolute;left:-8px;top:-6px;width:0;height:0;
+      border-top:7px solid transparent;border-bottom:7px solid transparent;
+      border-left:12px solid var(--pk-line)}
+
+  /* ═══ 9 · 迁移陷阱：同一条经验三个场景 ═══ */
+  .tf{position:absolute;top:0;width:0;height:0;opacity:0}
+  .tf-top{position:absolute;left:120px;top:340px;width:520px;height:132px;opacity:0;
+      border:2px solid var(--pk-accent);background:var(--pk-panel);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+  .tf-top .k{font-family:ui-monospace,Consolas,monospace;font-size:23px;font-weight:800;
+      letter-spacing:.18em;color:var(--pk-accent)}
+  .tf-top .v{font-size:30px;font-weight:800;color:var(--pk-fg)}
+  .tf-col{position:absolute;top:0;width:520px;height:216px;opacity:0;
+      border:2px solid var(--pk-line);background:var(--pk-panel);padding:28px 32px}
+  .tf-col .sc{font-family:ui-monospace,Consolas,monospace;font-size:23px;font-weight:800;
+      letter-spacing:.16em;color:var(--pk-muted)}
+  .tf-col .rs{font-size:29px;font-weight:800;line-height:1.34;color:var(--pk-fg);
+      margin-top:16px}
+  .tf-col.bad .rs{color:var(--pk-accent)}
+
+  /* ═══ 10 · 期权思维：三条路 ═══ */
+  .op{position:absolute;top:0;width:0;height:0;opacity:0}
+  .op-box{position:absolute;top:0;width:520px;height:250px;opacity:0;
+      border:2px solid var(--pk-line);background:var(--pk-panel);padding:30px 34px}
+  .op-box.key{border-color:var(--pk-accent)}
+  .op-box .st{font-family:ui-monospace,Consolas,monospace;font-size:24px;font-weight:800;
+      letter-spacing:.16em;color:var(--pk-muted)}
+  .op-box.key .st{color:var(--pk-accent)}
+  .op-box .tx{font-size:30px;font-weight:800;line-height:1.32;color:var(--pk-fg);
+      margin-top:16px}
+  .op-box .nt{font-size:21px;line-height:1.5;color:var(--pk-muted);margin-top:14px}
+
+  /* ═══ 11 · 杠铃策略：一根两端重中间轻 ═══ */
+  .bb-bar{position:absolute;left:120px;top:404px;width:0;height:110px;
+      border-radius:12px;overflow:hidden;opacity:0}
+  .bb-bar i{position:absolute;top:0;bottom:0;width:0}
+  .bb-lb{position:absolute;top:0;opacity:0}
+  .bb-lb .t{font-size:28px;font-weight:800;color:var(--pk-fg)}
+  .bb-lb .d{font-size:22px;line-height:1.45;color:var(--pk-muted);margin-top:8px}
+
+  /* ═══ 12 · 检查点：三道门 ═══ */
+  .ck{position:absolute;top:0;width:0;height:0;opacity:0}
+  .ck-gate{position:absolute;top:0;width:480px;height:250px;opacity:0;
+      border:2px solid var(--pk-line);background:var(--pk-panel);padding:30px 34px}
+  .ck-gate.pass{border-color:var(--pk-accent)}
+  .ck-gate .no{font-family:ui-monospace,Consolas,monospace;font-size:24px;font-weight:800;
+      letter-spacing:.16em;color:var(--pk-muted)}
+  .ck-gate.pass .no{color:var(--pk-accent)}
+  .ck-gate .q{font-size:29px;font-weight:800;line-height:1.34;color:var(--pk-fg);
+      margin-top:16px}
+  .ck-gate .a{font-size:22px;line-height:1.5;color:var(--pk-muted);margin-top:16px}
+  .ck-arw{position:absolute;top:0;width:60px;height:3px;opacity:0;
+      background:var(--pk-line)}
+  .ck-arw .ad{position:absolute;left:-8px;top:-6px;width:0;height:0;
+      border-top:7px solid transparent;border-bottom:7px solid transparent;
+      border-left:12px solid var(--pk-line)}
+
+  /* ═══ 13 · 现金流：利润和现金两条线 ═══ */
+  .cf{position:absolute;left:220px;top:330px;width:1460px;height:420px;opacity:0;z-index:2}
+  .cf-lb{position:absolute;opacity:0;width:300px}
+  .cf-lb .t{font-size:27px;font-weight:800}
+  .cf-lb .d{font-size:21px;line-height:1.45;color:var(--pk-muted);margin-top:8px}
+  .cf-ax{position:absolute;left:220px;top:750px;width:0;height:3px;
+      background:var(--pk-line)}
+
+  /* ═══ 14 · 复盘归因：三栏 ═══ */
+  .rc{position:absolute;top:344px;width:520px;height:300px;opacity:0;
+      border:2px solid var(--pk-line);background:var(--pk-panel);padding:30px 34px}
+  .rcA{left:120px}
+  .rcB{left:700px}
+  .rcC{left:1280px}
+  .rc.key{border-color:var(--pk-accent)}
+  .rc .hd{font-family:ui-monospace,Consolas,monospace;font-size:25px;font-weight:800;
+      letter-spacing:.18em;color:var(--pk-muted)}
+  .rc.key .hd{color:var(--pk-accent)}
+  .rc .li{font-size:28px;font-weight:700;line-height:1.38;color:var(--pk-fg);
+      margin-top:22px}
+  .rc .nt{font-size:21px;line-height:1.5;color:var(--pk-muted);margin-top:18px}
+
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <div class="eyebrow" id="eyebrow">THE OPTION</div>
+  <div class="h1" id="h1" data-fit-max="76" data-fit-min="44">算不准的时候，先留后路</div>
+  <div class="op-bd" style="position:absolute;left:0;top:0;width:0;height:0">
+    <div class="op-box" id="opb0" style="left:120px;top:364px">
+      <div class="st">路 A · 全押</div>
+      <div class="tx" id="opt0" data-fit-max="30" data-fit-min="20">看准了就一把梭</div>
+      <div class="nt" id="opn0">对了收益最大，错了没有第二次</div>
+    </div>
+    <div class="op-box" id="opb1" style="left:700px;top:364px">
+      <div class="st">路 B · 放弃</div>
+      <div class="tx" id="opt1" data-fit-max="30" data-fit-min="20">干脆不做</div>
+      <div class="nt" id="opn1">没有风险，也没有变化</div>
+    </div>
+    <div class="op-box key" id="opb2" style="left:1280px;top:364px">
+      <div class="st">路 C · 留后路</div>
+      <div class="tx" id="opt2" data-fit-max="30" data-fit-min="20">小成本先试</div>
+      <div class="nt" id="opn2">上行留着，下行封顶</div>
+    </div>
+  </div>
+  <div class="fx" id="fxn" style="top:846px">
+    <span class="a" id="fxa">期权思维不是保守，</span><span class="b">是把「等得起」本身当成资源。</span>
+  </div>
+  <div class="footline" id="footline"></div>
+  <div class="foot" id="foot">收尾一句</div>
+
+</div>
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+  var tl = B.tl();
+  /* 规格包：先定风格，再建任何元素。
+     画面素材的配色**不跟着包走**——那是"底片"，用户自己的东西不能被模板改色；
+     跟着包走的只有 UI 层（字色、强调色、描边、圆角、曲线）。这个边界必须守住。 */
+  B.pack(v.pack);
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  function q(s) { return document.querySelector(s); }
+  /* 素材位接真视频：留空就继续用 CSS 画面 */
+  function live(n, src) {
+    if (!src) return;
+    var s = document.getElementById('s' + n), e = document.getElementById('v' + n);
+    if (!s || !e) return;
+    s.classList.add('live'); e.src = src;
+    e.play().catch(function () {});
+  }
+  /* 景别缓推：v1/v3 里画面始终在极慢地动，这是「像镜头」的关键 */
+  function push(n, at, dur, from, to, ease) {
+    var s = q('#s' + n + ' .sky'), g = q('#s' + n + ' .glow'), r = q('#s' + n + ' .r2');
+    if (s) tl.fromTo(s, { scale: from, y: '0%' },
+      { scale: to, y: '-2%', duration: dur, ease: ease || 'none' }, at);
+    if (g) tl.fromTo(g, { xPercent: -4, opacity: .8 },
+      { xPercent: 5, opacity: 1, duration: dur, ease: 'none' }, at);
+    if (r) tl.fromTo(r, { xPercent: 0 },
+      { xPercent: -2.5, duration: dur, ease: 'none' }, at);
+  }
+  /* clip-path 形状插值。
+     两个坑都在这里踩过：
+       1. GSAP 各版本对 clipPath 字符串补间的处理不一致，所以不直接补间它，
+          改成补间一个 {t:0→1} 的代理对象，onUpdate 里自己算 8 个点；
+       2. **from 必须是编译期常量，不能从元素当前状态读。**
+          settle 会把时间轴来回扫；一旦回退越过一个已完成的补间，
+          GSAP 会把它按 ratio 0 重渲——onUpdate 拿到的就是起点，
+          形状会「弹回矩形」。写成常量后，形状是 t 的纯函数，
+          停在任何一帧算出来都一样。
+     相邻两段的 from 必须等于上一段的 to，这条由 Python 侧保证。 */
+  function polyStr(pts) {
+    return 'polygon(' + pts.map(function (p) {
+      return p[0].toFixed(2) + '% ' + p[1].toFixed(2) + '%'; }).join(',') + ')';
+  }
+  function morph(el, from, to, at, dur, ease) {
+    if (!el || !to || !from || from.length !== to.length) return;
+    var st = { t: 0 };
+    tl.to(st, { t: 1, duration: dur == null ? .7 : dur, ease: ease || 'power2.inOut',
+      onUpdate: function () {
+        el.style.clipPath = polyStr(from.map(function (p, i) {
+          return [p[0] + (to[i][0] - p[0]) * st.t,
+                  p[1] + (to[i][1] - p[1]) * st.t];
+        }));
+      } }, at);
+  }
+  set('eyebrow', v.eyebrow); set('h1', v.title); set('foot', v.foot);
+  set('fxa', v.note);
+  set('opt0', v.a); set('opn0', v.an);
+  set('opt1', v.b); set('opn1', v.bn);
+  set('opt2', v.c); set('opn2', v.cn);
+  tl.fromTo('#eyebrow', { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: .4 }, 0);
+  tl.fromTo('#h1', { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: .6,
+    ease: 'power3.out' }, .08);
+  for (var i = 0; i < 3; i++) {
+    var at = .32 + i * .4;
+    tl.fromTo('#opb' + i, { opacity: 0, y: 22 },
+      { opacity: 1, y: 0, duration: .46, ease: 'power2.out' }, at);
+    tl.fromTo('#opt' + i, { opacity: 0, y: 10 },
+      { opacity: 1, y: 0, duration: .4 }, at + .1);
+  }
+  tl.fromTo('#fxn', { opacity: 0, x: -18 },
+    { opacity: 1, x: 0, duration: .5, ease: 'power3.out' }, 2.34);
+  tl.fromTo('#footline', { width: 0 }, { width: 420, duration: .5, ease: 'power2.out' }, 2.7);
+  tl.fromTo('#foot', { opacity: 0 }, { opacity: 1, duration: .5 }, 2.84);
+
+  B.hold(tl, 3.5, .5);
+  B.fitAll();
+
+})();
+</script>
+</body>
+</html>

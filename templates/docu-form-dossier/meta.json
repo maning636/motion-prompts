@@ -1,0 +1,16 @@
+{
+  "id": "docu-form-dossier",
+  "name": "纪录片 B23 表格列",
+  "description": "档案表格 · 皮影档案族 · docu-form 02",
+  "series": "docu",
+  "category": "纪录片皮影",
+  "tags": [
+    "纪录片皮影",
+    "档案模板",
+    "docu-form-table-rows"
+  ],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "createdAt": "2026-08-30T00:00:00.000Z"
+}

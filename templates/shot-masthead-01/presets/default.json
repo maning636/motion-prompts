@@ -1,0 +1,9 @@
+{
+  "title": "自动发布",
+  "block1": "配置一次发布时间",
+  "block2": "选择目标平台",
+  "block3": "查看发布状态",
+  "accent": "#00FF00",
+  "background": "#0A0A0F",
+  "foreground": "#F4F4F2"
+}

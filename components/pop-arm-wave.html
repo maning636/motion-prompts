@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"accent","name":"角色色","type":"color","label":"角色色","default":"#8E8377"},{"id":"accent2","name":"手部色","type":"color","label":"手部色","default":"#F0B37E"},{"id":"text","name":"小字","type":"string","label":"打招呼小字","default":"嗨!"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.2}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>挥手打招呼</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  /* 描边不再是纯黑 3px 硬边：改深灰褐 + 柔影，才有体积 */
+  :root {
+    --ink: #3A3540;
+    --line: #4A4550;
+    --fur-lit: #FDFBF7;
+    --fur-mid: #E8E2D6;
+    --fur-dim: #C9C1B2;
+    --mask: #4E4E5C;
+    --fg: #FFF8EE;
+  }
+
+  /* 地面投影：多层叠加才像软影，单层 ellipse 很假 */
+  .pop-shadow { position: absolute; left: 152px; top: 200px; width: 132px; height: 22px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(20,18,26,.42) 0%, rgba(20,18,26,.18) 48%, rgba(20,18,26,0) 72%); }
+
+  .pop-hero { position: absolute; left: 146px; top: 68px; width: 176px; height: 146px;
+    transform-origin: 26% 100%; opacity: 0; }
+
+  /* 躯干：上胸宽、下腰收，用内外阴影做出胸腔体积，不是圆角方块 */
+  .pop-torso { position: absolute; left: 46px; top: 84px; width: 82px; height: 50px; z-index: 2;
+    background:
+      radial-gradient(ellipse 60% 45% at 34% 26%, rgba(255,255,255,.85), rgba(255,255,255,0) 70%),
+      linear-gradient(152deg, #FDFBF7 0%, #E9E3D6 44%, #C4BCAC 100%);
+    border: 2.5px solid var(--line);
+    border-radius: 30px 30px 22px 22px;
+    box-shadow: inset -5px -7px 12px rgba(58,53,64,.18), 2px 4px 9px rgba(26,24,32,.3); }
+
+  /* 腿：加长，脚掌加大并加趾垫 */
+  .pop-leg { position: absolute; top: 126px; width: 21px; height: 26px; z-index: 2;
+    background: linear-gradient(160deg, #F6F2EA 0%, #DCD5C7 68%, #C0B8A8 100%);
+    border: 2.5px solid var(--line); border-radius: 5px 5px 8px 8px; }
+  .pop-leg-l { left: 54px; }
+  .pop-leg-r { left: 82px; }
+  .pop-paw { position: absolute; top: 140px; width: 22px; height: 15px; z-index: 3;
+    background: linear-gradient(180deg, #FDFBF7 0%, #E4DDD0 100%);
+    border: 2.5px solid var(--line); border-radius: 4px 10px 10px 10px; }
+  .pop-paw-l { left: 53px; }
+  .pop-paw-r { left: 81px; }
+  .pop-toe { position: absolute; top: 144px; width: 3.6px; height: 3.6px; z-index: 4;
+    border-radius: 50%; background: rgba(58,53,64,.4); }
+  .pop-leg-gap { position: absolute; left: 76px; top: 126px; width: 3px; height: 26px;
+    background: var(--line); z-index: 4; opacity: .7; }
+
+  /* 左臂 */
+  .pop-arm { position: absolute; top: 94px; width: 26px; height: 15px; z-index: 1;
+    background: linear-gradient(160deg, #F4EFE6 0%, #D4CCBD 100%);
+    border: 2.5px solid var(--line); border-radius: 15px;
+    box-shadow: 1px 2px 5px rgba(26,24,32,.25); }
+  .pop-arm-l { left: 28px; transform-origin: 100% 50%; transform: rotate(26deg); }
+
+  .pop-head { position: absolute; left: 32px; top: -8px; width: 104px; height: 106px; z-index: 5; }
+  .pop-head svg { width: 100%; height: 100%; display: block; overflow: visible; }
+
+  /* 尾巴：z-index 要高于躯干(2)，否则整条被压在身体后面看不见 */
+  .pop-tail { position: absolute; left: 116px; top: 86px; width: 48px; height: 26px; z-index: 3;
+    background: linear-gradient(150deg, #F2EDE4 0%, #CCC4B5 100%);
+    border: 2.5px solid var(--line); border-radius: 24px 24px 7px 24px;
+    transform-origin: 8% 50%; transform: rotate(-36deg);
+    box-shadow: 1px 3px 7px rgba(26,24,32,.3); }
+
+  /* 挥动右臂：肩点压在躯干右腰，绕腰转，手掌不扫脸 */
+  .pop-wave-arm { position: absolute; left: 122px; top: 108px; width: 42px; height: 17px;
+    background: linear-gradient(160deg, #F2EDE4 0%, #D0C8B8 100%);
+    border: 2.5px solid var(--line); border-radius: 17px;
+    transform-origin: 0 50%; transform: rotate(-30deg); z-index: 7;
+    box-shadow: 1px 2px 6px rgba(26,24,32,.3); }
+  .pop-hand { position: absolute; left: 34px; top: -14px; width: 44px; height: 44px; z-index: 1;
+    border-radius: 50%;
+    background: radial-gradient(circle at 34% 28%, #FBD9A8 0%, #F0B37E 46%, #D3905E 100%);
+    border: 2.5px solid var(--line);
+    box-shadow: inset -3px -4px 8px rgba(150,96,56,.35), 2px 3px 8px rgba(26,24,32,.3); }
+  /* 爪垫：肉垫大点 + 三颗趾垫，做出掌心肉感 */
+  .pop-pad { position: absolute; border-radius: 50%; background: rgba(176,118,80,.5); }
+  .pop-palm { position: absolute; left: 14px; top: 22px; width: 16px; height: 12px;
+    border-radius: 50% 50% 45% 45%; background: rgba(176,118,80,.55); }
+
+  /* 速度线：渐变淡出，比实线柔和 */
+  .pop-arc { position: absolute; left: 58px; top: -16px; width: 52px; height: 32px;
+    border-top: 3px solid transparent;
+    border-image: linear-gradient(90deg, rgba(58,53,64,0), rgba(58,53,64,.85)) 1;
+    border-radius: 52px 52px 0 0; opacity: 0; }
+
+  /* 「嗨」字：细描边 + 硬阴影，和插画风保持一致 */
+  .pop-hi { position: absolute; left: 290px; top: 40px; width: 140px; text-align: center;
+    font-size: 32px; font-weight: 800; color: var(--fg); opacity: 0;
+    text-shadow:
+      1px  1px 0 var(--line), -1px  1px 0 var(--line),  1px -1px 0 var(--line), -1px -1px 0 var(--line),
+      0    1px 0 var(--line),  0   -1px 0 var(--line),  1px  0px 0 var(--line), -1px  0px 0 var(--line),
+      3px  4px 6px rgba(20,18,26,.5); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = { accent: '#8E8377', accent2: '#F0B37E', text: '嗨!', duration: 3.2 };
+  const v = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--ac2', v.accent2 || FALLBACK.accent2);
+  const dur = parseFloat(v.duration) || FALLBACK.duration;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+  function fitText(el, avail, max, min) {
+    const ws = el.style.whiteSpace;
+    el.style.whiteSpace = 'nowrap';
+    const natural = el.scrollWidth;
+    el.style.whiteSpace = ws;
+    if (natural > avail) el.style.fontSize = Math.max(min, Math.floor(max * avail / natural)) + 'px';
+  }
+
+  const shadow = put('div', 'pop-shadow');
+  const hero = put('div', 'pop-hero');
+  put('div', 'pop-tail', '', null, hero);
+
+  put('div', 'pop-torso', '', null, hero);
+  put('div', 'pop-leg pop-leg-l', '', null, hero);
+  put('div', 'pop-leg pop-leg-r', '', null, hero);
+  put('div', 'pop-leg-gap', '', null, hero);
+  put('div', 'pop-paw pop-paw-l', '', null, hero);
+  put('div', 'pop-paw pop-paw-r', '', null, hero);
+  put('div', 'pop-toe', 'left:57px', null, hero);
+  put('div', 'pop-toe', 'left:65px', null, hero);
+  put('div', 'pop-toe', 'left:85px', null, hero);
+  put('div', 'pop-toe', 'left:93px', null, hero);
+  put('div', 'pop-arm pop-arm-l', '', null, hero);
+
+  // ——— 哈士奇头：插画质感版（渐变 + 柔影 + 毛发 + 玻璃眼）———
+  const head = put('div', 'pop-head', '', null, hero);
+  head.innerHTML = [
+'<svg viewBox="0 0 104 106" xmlns="http://www.w3.org/2000/svg">',
+'  <defs>',
+'    <!-- 头部毛色：径向渐变，焦点偏左上做出体积 -->',
+'    <radialGradient id="fHead" cx="36%" cy="28%" r="78%">',
+'      <stop offset="0%" stop-color="#FFFFFF"/>',
+'      <stop offset="34%" stop-color="#F6F2EA"/>',
+'      <stop offset="68%" stop-color="#E4DED2"/>',
+'      <stop offset="100%" stop-color="#C3BBAB"/>',
+'    </radialGradient>',
+'    <!-- 深色斑纹：上深下浅 -->',
+'    <linearGradient id="fMask" x1="0.3" y1="0" x2="0.7" y2="1">',
+'      <stop offset="0%" stop-color="#63636F"/>',
+'      <stop offset="100%" stop-color="#3E3E4C"/>',
+'    </linearGradient>',
+'    <!-- 内耳：肉粉渐变 -->',
+'    <linearGradient id="fEar" x1="0.2" y1="0" x2="0.8" y2="1">',
+'      <stop offset="0%" stop-color="#DCA896"/>',
+'      <stop offset="60%" stop-color="#BE8574"/>',
+'      <stop offset="100%" stop-color="#9E6757"/>',
+'    </linearGradient>',
+'    <!-- 眼球：深琥珀玻璃感 -->',
+'    <radialGradient id="fIris" cx="36%" cy="30%" r="72%">',
+'      <stop offset="0%" stop-color="#7A5A2E"/>',
+'      <stop offset="55%" stop-color="#4A3520"/>',
+'      <stop offset="100%" stop-color="#241B12"/>',
+'    </radialGradient>',
+'    <!-- 鼻头：湿润质感 -->',
+'    <radialGradient id="fNose" cx="34%" cy="22%" r="80%">',
+'      <stop offset="0%" stop-color="#7C7889"/>',
+'      <stop offset="45%" stop-color="#454250"/>',
+'      <stop offset="100%" stop-color="#232228"/>',
+'    </radialGradient>',
+'    <!-- 耳朵外毛：比头略深 -->',
+'    <linearGradient id="fEarOut" x1="0.3" y1="0" x2="0.7" y2="1">',
+'      <stop offset="0%" stop-color="#EDE8DE"/>',
+'      <stop offset="70%" stop-color="#D2CABA"/>',
+'      <stop offset="100%" stop-color="#B3AB9A"/>',
+'    </linearGradient>',
+'    <!-- 柔影：替代原来那圈硬黑影 -->',
+'    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">',
+'      <feDropShadow dx="2.4" dy="3.4" stdDeviation="2.6" flood-color="#221F28" flood-opacity="0.34"/>',
+'    </filter>',
+'    <!-- 毛发光晕：让白毛有丝光 -->',
+'    <filter id="sheen" x="-30%" y="-30%" width="160%" height="160%">',
+'      <feGaussianBlur stdDeviation="1.6"/>',
+'    </filter>',
+'  </defs>',
+'',
+'  <!-- 立耳：外毛 + 内耳绒面，整体带柔影 -->',
+'  <g filter="url(#soft)">',
+'    <path d="M18 34 L9 2 L40 19 Z" fill="url(#fEarOut)" stroke="#4A4550" stroke-width="2.6" stroke-linejoin="round"/>',
+'    <path d="M22 31 L18 10 L33 18 Z" fill="url(#fEar)"/>',
+'    <path d="M86 34 L95 2 L64 19 Z" fill="url(#fEarOut)" stroke="#4A4550" stroke-width="2.6" stroke-linejoin="round"/>',
+'    <path d="M82 31 L86 10 L71 18 Z" fill="url(#fEar)"/>',
+'  </g>',
+'',
+'  <!-- 头部：径向渐变 + 柔影 -->',
+'  <g filter="url(#soft)">',
+'    <path d="M52 13 C74 13 92 29 92 52 C92 76 74 90 52 90 C30 90 12 76 12 52 C12 29 30 13 52 13 Z"',
+'          fill="url(#fHead)" stroke="#4A4550" stroke-width="2.6"/>',
+'  </g>',
+'',
+'  <!-- 深色斑纹：左右眉斑 + 窄鼻梁带，中间留白不连片 -->',
+'  <path d="M52 14 C62 14 69 17 73 22 L57 27 L52 23 Z" fill="url(#fMask)"/>',
+'  <path d="M52 14 C42 14 35 17 31 22 L47 27 L52 23 Z" fill="url(#fMask)"/>',
+'  <path d="M32 29 C25 34 21 42 21 50 L31 50 C32 42 35 34 41 30 Z" fill="url(#fMask)"/>',
+'  <path d="M72 29 C79 34 83 42 83 50 L73 50 C72 42 69 34 63 30 Z" fill="url(#fMask)"/>',
+'  <path d="M48 31 L56 31 L55 54 L49 54 Z" fill="url(#fMask)" opacity=".92"/>',
+'',
+'  <!-- 毛发纹理：沿脸颊向下、向下颌聚拢，模拟毛流 -->',
+'  <g stroke="#B9B1A0" stroke-width="1.1" fill="none" opacity=".5" stroke-linecap="round">',
+'    <path d="M20 56 Q22 63 25 69"/>',
+'    <path d="M26 62 Q28 68 31 73"/>',
+'    <path d="M34 66 Q36 72 39 76"/>',
+'    <path d="M84 56 Q82 63 79 69"/>',
+'    <path d="M78 62 Q76 68 73 73"/>',
+'    <path d="M70 66 Q68 72 65 76"/>',
+'  </g>',
+'  <!-- 头顶丝光：模糊白团，做出毛发反光 -->',
+'  <g filter="url(#sheen)" opacity=".62">',
+'    <ellipse cx="40" cy="27" rx="15" ry="7" fill="#FFFFFF" transform="rotate(-24 40 27)"/>',
+'    <ellipse cx="66" cy="30" rx="9" ry="4.5" fill="#FFFFFF" transform="rotate(-16 66 30)"/>',
+'  </g>',
+'',
+'  <!-- 眉毛：浅色眉斑压在深色眉斑上 -->',
+'  <ellipse cx="33" cy="35" rx="6" ry="2.7" fill="#FAF7F1" opacity=".85" transform="rotate(-20 33 35)"/>',
+'  <ellipse cx="71" cy="35" rx="6" ry="2.7" fill="#FAF7F1" opacity=".85" transform="rotate(20 71 35)"/>',
+'',
+'  <!-- 眼睛：上眼睑线 + 琥珀瞳 + 双高光 + 下眼睑反光 -->',
+'  <ellipse cx="33" cy="48" rx="7" ry="8.2" fill="url(#fIris)"/>',
+'  <ellipse cx="71" cy="48" rx="7" ry="8.2" fill="url(#fIris)"/>',
+'  <circle cx="35.4" cy="44.6" r="2.7" fill="#FFFFFF" opacity=".95"/>',
+'  <circle cx="73.4" cy="44.6" r="2.7" fill="#FFFFFF" opacity=".95"/>',
+'  <circle cx="30.6" cy="51.4" r="1.3" fill="#FFFFFF" opacity=".5"/>',
+'  <circle cx="68.6" cy="51.4" r="1.3" fill="#FFFFFF" opacity=".5"/>',
+'  <!-- 上眼睑：深色线压出眼神 -->',
+'  <path d="M26 45 Q33 38.5 40 45" stroke="#2B2731" stroke-width="2.2" fill="none" stroke-linecap="round"/>',
+'  <path d="M64 45 Q71 38.5 78 45" stroke="#2B2731" stroke-width="2.2" fill="none" stroke-linecap="round"/>',
+'',
+'  <!-- 鼻子：湿润渐变 + 鼻头高光 + 两侧鼻翼阴影 -->',
+'  <path d="M42 56 Q52 50 62 56 Q59 68 52 69 Q45 68 42 56 Z" fill="url(#fNose)"/>',
+'  <ellipse cx="47" cy="57" rx="4" ry="2.4" fill="#FFFFFF" opacity=".55" transform="rotate(-14 47 57)"/>',
+'  <ellipse cx="43.5" cy="62" rx="1.8" ry="2.6" fill="#17161C" opacity=".45"/>',
+'  <ellipse cx="60.5" cy="62" rx="1.8" ry="2.6" fill="#17161C" opacity=".45"/>',
+'',
+'  <!-- 嘴：微笑 + 舌尖，唇线用渐变深色 -->',
+'  <path d="M52 69 L52 73" stroke="#2B2731" stroke-width="2.6" stroke-linecap="round"/>',
+'  <path d="M40 73 Q46 80 52 73 Q58 80 64 73" fill="#8C4A50" stroke="#2B2731" stroke-width="2.4"',
+'        stroke-linecap="round" stroke-linejoin="round"/>',
+'  <path d="M45 75 Q52 79.5 59 75 Q52 83 45 75 Z" fill="#E4737C" opacity=".95"/>',
+'',
+'  <!-- 腮红：径向渐变软边，不要硬椭圆 -->',
+'  <radialGradient id="fBlush" cx="50%" cy="50%" r="50%">',
+'    <stop offset="0%" stop-color="#F2A79C" stop-opacity=".55"/>',
+'    <stop offset="100%" stop-color="#F2A79C" stop-opacity="0"/>',
+'  </radialGradient>',
+'  <ellipse cx="24" cy="62" rx="11" ry="8" fill="url(#fBlush)"/>',
+'  <ellipse cx="80" cy="62" rx="11" ry="8" fill="url(#fBlush)"/>',
+'',
+'  <!-- 胸口白毛：V 形毛簇接住躯干 -->',
+'  <path d="M40 88 Q52 95 64 88 L64 99 L40 99 Z" fill="#F7F4ED" stroke="#4A4550" stroke-width="2.4" stroke-linejoin="round"/>',
+'  <g stroke="#C6BEAD" stroke-width="1" fill="none" opacity=".55" stroke-linecap="round">',
+'    <path d="M46 91 L45 98"/>',
+'    <path d="M52 92 L52 99"/>',
+'    <path d="M58 91 L59 98"/>',
+'  </g>',
+'</svg>'
+  ].join('\n');
+
+  const waveArm = put('div', 'pop-wave-arm', '', null, hero);
+  const arc1 = put('div', 'pop-arc', '', null, waveArm);
+  const arc2 = put('div', 'pop-arc', '', null, waveArm);
+  arc2.style.top = '-40px';
+  arc2.style.left = '66px';
+  const hand = put('div', 'pop-hand', '', null, waveArm);
+  put('div', 'pop-palm', '', null, hand);
+  put('div', 'pop-pad', 'left:11px;top:13px;width:6px;height:6px', null, hand);
+  put('div', 'pop-pad', 'left:19px;top:16px;width:6px;height:6px', null, hand);
+  put('div', 'pop-pad', 'left:27px;top:13px;width:6px;height:6px', null, hand);
+
+  const hiTxt = (v.text == null || v.text === '') ? FALLBACK.text : v.text;
+  const hi = put('div', 'pop-hi', '', hiTxt);
+  fitText(hi, 140, 32, 15);
+
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  tl.fromTo(shadow, { opacity: 0, scale: .6 }, { opacity: 1, scale: 1, duration: .26, ease: 'power2.out' }, 0);
+  tl.fromTo(hero, { scale: .6, opacity: 0 }, { scale: 1, opacity: 1, duration: .3, ease: 'back.out(2.4)' }, 0);
+  tl.fromTo(waveArm, { rotate: -30 }, { rotate: -96, duration: .34, ease: 'back.out(2.8)' }, .04);
+
+  tl.fromTo(hi, { scale: .25, opacity: 0, rotate: -18 },
+    { scale: 1, opacity: 1, rotate: -6, duration: .22, ease: 'back.out(3)' }, .30);
+
+  const STEP = .19;
+  const SWING = [-14, 14, -14, 14, -14, 10];
+  let at = .48;
+  SWING.forEach((deg, i) => {
+    tl.to(waveArm, { rotate: -96 + deg, duration: STEP, ease: i % 2 ? 'power2.out' : 'power3.out' }, at);
+    tl.to(hand, { scale: i % 2 ? 1.12 : .9, duration: STEP * .5, ease: 'power2.out' }, at);
+    tl.fromTo(arc1, { opacity: 0, scaleX: .5 }, { opacity: .55, scaleX: 1, duration: .1, ease: 'power2.out' }, at + .02);
+    tl.to(arc1, { opacity: 0, duration: .14, ease: 'power2.in' }, at + .12);
+    if (i === 1 || i === 3) {
+      tl.fromTo(arc2, { opacity: 0, scaleX: .5 }, { opacity: .45, scaleX: 1, duration: .1, ease: 'power2.out' }, at + .02);
+      tl.to(arc2, { opacity: 0, duration: .14, ease: 'power2.in' }, at + .12);
+    }
+    at += STEP;
+  });
+
+  tl.to(waveArm, { rotate: -92, duration: .2, ease: 'back.out(2.2)' }, at + .05);
+  tl.to(hero, { rotate: -1.6, duration: .2, ease: 'back.out(2.2)' }, at + .05);
+  tl.to(hi, { opacity: 0, y: -14, duration: .18, ease: 'power2.in' }, Math.max(at + .5, dur - .48));
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

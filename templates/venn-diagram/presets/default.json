@@ -1,0 +1,12 @@
+{
+  "title": "AI 工程师能力交集",
+  "subtitle": "三圆相交揭示复合角色",
+  "setA": "软件工程",
+  "setB": "机器学习",
+  "setC": "产品设计",
+  "intersection": "AI 工程师",
+  "mainSet": "A",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

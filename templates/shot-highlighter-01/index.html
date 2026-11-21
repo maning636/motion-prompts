@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "titleBefore", "type": "string", "label": "关键词前文", "default": "这个功能"}, {"id": "keyword", "type": "string", "label": "马克笔关键词", "default": "免费"}, {"id": "titleAfter", "type": "string", "label": "关键词后文", "default": "开放"}, {"id": "subtitle", "type": "string", "label": "副标题", "default": ""}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+.ttl{ position:absolute; left:0; right:0; top:430px; text-align:center; font-size:118px;
+  font-weight:400; color:var(--fg); letter-spacing:.02em; }
+.ttl .w{ display:inline-block; }
+.kw{ position:relative; display:inline-block; font-style:italic; padding:0 8px; }
+.kw .marker{ position:absolute; left:-6%; bottom:-0.14em; width:112%; height:.34em; transform:rotate(-2deg);
+  overflow:visible; z-index:-1; }
+.sub2{ position:absolute; left:0; right:0; top:640px; text-align:center; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  font-size:28px; letter-spacing:.3em; color:rgba(255,255,255,.5); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4" data-width="1920" data-height="1080">
+<h1 class="ttl"><span class="w" id="tb"></span><span class="kw w"><i id="kw"></i><svg class="marker" viewBox="0 0 300 40" preserveAspectRatio="none">
+  <defs><clipPath id="mk"><rect id="mrect" x="0" y="0" width="0" height="40"/></clipPath></defs>
+  <g clip-path="url(#mk)">
+    <path id="mpath" d="M4,25 C42,17 92,31 152,22 C212,13 258,25 296,17 L296,29 C244,37 186,28 124,34 C74,38 32,33 4,35 Z" fill="#00FF00" opacity="0.92"/>
+    <path d="M20,30 C80,26 180,32 280,24 L280,28 C190,36 90,32 20,34 Z" fill="#00FF00" opacity="0.45"/>
+  </g>
+</svg></span><span class="w" id="ta"></span></h1>
+<div class="sub2" id="s"></div>
+    </div>
+    <script>
+      const FB = {"titleBefore": "这个功能", "keyword": "免费", "titleAfter": "开放", "subtitle": "", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#tb').textContent=v.titleBefore||'';$('#kw').textContent=v.keyword||'';$('#ta').textContent=v.titleAfter||'';
+$('#s').textContent=v.subtitle||'';
+document.querySelectorAll('#mpath, .marker path').forEach(p=>p.setAttribute('fill',v.accent||'#00FF00'));
+tl.fromTo('.ttl .w',{opacity:0,y:44},{opacity:1,y:0,duration:F(12),stagger:F(4),ease:'power3.out'},F(2));
+// 标题落定 +6f 后起笔，10f 一笔呵成，起笔快收笔缓
+tl.fromTo('#mrect',{attr:{width:0}},{attr:{width:300},duration:F(10),ease:'power2.out'},F(22));
+tl.fromTo('.marker',{opacity:0},{opacity:1,duration:F(2)},F(22));
+if(v.subtitle){tl.fromTo('.sub2',{opacity:0},{opacity:1,duration:F(10)},F(36));}
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

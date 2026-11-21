@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "放大看第 2 张的右下角"}, {"id": "note", "type": "string", "label": "批注", "default": "时间戳对不上"}, {"id": "img1", "type": "image", "label": "照片1", "default": "./placeholder-1.png"}, {"id": "img2", "type": "image", "label": "照片2（放大聚焦）", "default": "./placeholder-2.png"}, {"id": "img3", "type": "image", "label": "照片3", "default": "./placeholder-3.png"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      #root{ background: #EAE2CF; font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; color: #26211A; }
+      .f-vig{ position: absolute; inset: 0; pointer-events: none;
+        background: radial-gradient(ellipse at center, transparent 52%, rgba(64,48,26,.32) 100%); }
+      .f-head{ position: absolute; left: 150px; top: 84px; }
+      .f-head h1{ font-size: 54px; font-weight: 900; }
+      .f-hl{ display: inline-block; background: #F5D73F; padding: 0 14px; }
+      .f-wall{ position: absolute; left: 0; right: 0; top: 300px; display: flex; justify-content: center; gap: 64px; }
+      .f-photo{ position: relative; width: 360px; height: 470px; background: #FFFDF7; padding: 14px 14px 54px;
+        box-shadow: 7px 9px 0 rgba(38,33,26,.18); }
+      .f-photo img{ width: 100%; height: 100%; object-fit: cover; display: block; filter: sepia(.22) contrast(.96); }
+      .f-tape{ position: absolute; left: 50%; top: -16px; width: 110px; height: 32px; margin-left: -55px;
+        background: rgba(255,252,240,.55); transform: rotate(-3deg);
+        border-left: 1px solid rgba(38,33,26,.1); border-right: 1px solid rgba(38,33,26,.1); }
+      .f-photo svg{ position: absolute; inset: -26px; width: calc(100% + 52px); height: calc(100% + 52px);
+        pointer-events: none; overflow: visible; }
+      .f-photo ellipse{ fill: none; stroke: #B03028; stroke-width: 8; stroke-linecap: round; }
+      .f-note{ position: absolute; left: 150px; top: 930px; text-align: left; color: #B03028;
+        font-size: 34px; font-weight: 800; font-style: italic; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="f-vig"></div>
+      <div class="f-head"><h1 id="title"></h1></div>
+      <div class="f-wall" id="wall">
+        <figure class="f-photo" id="ph1"><img id="img1" alt=""><span class="f-tape"></span></figure>
+        <figure class="f-photo" id="ph2"><img id="img2" alt=""><span class="f-tape"></span>
+          <svg viewBox="0 0 412 522" preserveAspectRatio="none"><ellipse id="circleEl" cx="206" cy="261" rx="190" ry="245"/></svg>
+        </figure>
+        <figure class="f-photo" id="ph3"><img id="img3" alt=""><span class="f-tape"></span></figure>
+      </div>
+      <div class="f-note" id="note"></div>
+
+    </div>
+    <script>
+      const fallback = {"title": "放大看第 2 张的右下角", "note": "时间戳对不上", "img1": "./placeholder-1.png", "img2": "./placeholder-2.png", "img3": "./placeholder-3.png", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      $("title").innerHTML = "";
+      const t = String(V.title ?? "");
+      $("title").textContent = t;
+      $("note").textContent = V.note;
+      ["img1", "img2", "img3"].forEach((k) => { if (V[k]) $(k).src = V[k]; });
+      const ph2 = $("ph2");
+      ph2.style.zIndex = "5";
+      const ellipse = $("circleEl");
+      const len = ellipse.getTotalLength();
+      ellipse.style.strokeDasharray = String(len);
+      ellipse.style.strokeDashoffset = String(len);
+      const rots = [-3.5, 2, -2.5];
+      ["#ph1", "#ph2", "#ph3"].forEach((sel, i) => {
+        tl.fromTo(sel, { scale: 0.6, opacity: 0, rotation: rots[i] + 8 },
+          { scale: 1, opacity: 1, rotation: rots[i], duration: 0.42, ease: "back.out(2.2)" }, 0.55 + i * 0.15);
+      });
+      const tZoom = 1.35;
+      tl.to("#ph2", { scale: 1.62, rotation: 0, duration: 0.65, ease: "power3.inOut" }, tZoom);
+      tl.to("#ph1", { opacity: 0.25, filter: "grayscale(.7)", duration: 0.5 }, tZoom + 0.1);
+      tl.to("#ph3", { opacity: 0.25, filter: "grayscale(.7)", duration: 0.5 }, tZoom + 0.1);
+      tl.to(ellipse, { strokeDashoffset: 0, duration: 0.55, ease: "power2.inOut" }, tZoom + 0.55);
+      tl.fromTo("#note", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.35, ease: "power2.out" }, tZoom + 1.05);
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

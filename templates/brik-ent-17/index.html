@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（栏目标签）","default":"一组数"},
+{"id":"title","name":"主标题","type":"string","label":"主标题（8–16 字）","default":"四个数，一张表说完"},
+{"id":"note","name":"口径","type":"string","label":"口径说明（单位与统计范围，必填）","default":"口径：2026 上半年 · 全渠道 · 不含测试单"},
+{"id":"v1","name":"数值 1","type":"string","label":"数值 1（数字部分即可，可带符号）","default":"128"},
+{"id":"l1","name":"标签 1","type":"string","label":"标签 1（≤6 字）","default":"有效选题"},
+{"id":"v2","name":"数值 2","type":"string","label":"数值 2","default":"46"},
+{"id":"l2","name":"标签 2","type":"string","label":"标签 2（≤6 字）","default":"成片交付"},
+{"id":"v3","name":"数值 3","type":"string","label":"数值 3","default":"12"},
+{"id":"l3","name":"标签 3","type":"string","label":"标签 3（≤6 字）","default":"新增渠道"},
+{"id":"v4","name":"数值 4","type":"string","label":"数值 4","default":"98"},
+{"id":"l4","name":"标签 4","type":"string","label":"标签 4（≤6 字）","default":"复用率"},
+{"id":"unit","name":"单位","type":"string","label":"单位（2–4 字，不拼进数字串）","default":"条"},
+{"id":"foot","name":"承重块","type":"string","label":"承重块（8–14 字）","default":"口径写在数旁边，不怕被问"},
+{"id":"accent","name":"强调色","type":"color","label":"强调色（凸点亮起色 / 单位 pill / 斜纹带 / 页脚计数）","default":"#FFD429"},
+{"id":"brickColor","name":"配色包","type":"enum","label":"配色包（块面轮转顺序）","default":"mixed","options":[{"value":"yellow","label":"暖黄主调"},{"value":"pink","label":"桃粉主调"},{"value":"green","label":"薄荷主调"},{"value":"blue","label":"靛蓝主调"},{"value":"mixed","label":"四色轮转"}]},
+{"id":"studMode","name":"凸点","type":"enum","label":"凸点（不显示 / 整排同时亮 / 逐枚硬切）","default":"scan","options":[{"value":"none","label":"不显示"},{"value":"top","label":"整排同时亮"},{"value":"scan","label":"逐枚硬切"}]},
+{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–6）","default":5.5},
+{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}],"hidden":true}
+]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>四项数字横排顶出</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 积木风 · 企业宣传 · 四项数字横排顶出
+     四个 480×240 数字块自下 +120px 逐块顶出横排成列（式 4，共用同一段位移），每块内 96px mono 数字用 steps(22) 硬跳、块顶一枚凸点；四块齐了整排压 2 帧后定格。note 必填、写清单位与统计口径；数字块不带任何刻度或坐标轴。
+     块宽只用 120/240/480/720，块高只用 120/240/360/480；普通块恒 8px 硬影，
+     承重件 10px；相邻块用 margin -3px 合流成单线缝；凸点是内联 SVG circle。 */
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --mod:240px; --mod-h:120px; --shadow:#0F0F0F; --background:var(--paper); --accent:#FFD429;
+  }
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--background);color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased}
+  /* 纸面网点：全族唯一允许的 rgba 例外，必须铺满 #stage */
+  .blk-noise{background-image:radial-gradient(rgba(15,15,15,.12) 1px,transparent 1px);
+    background-size:10px 10px}
+  .sh-s{box-shadow:4px 4px 0 var(--shadow)}
+  .sh-l{box-shadow:8px 8px 0 var(--shadow)}
+  .sh-xl{box-shadow:10px 10px 0 var(--shadow)}
+
+  /* 桌沿铭牌：贴在桌面之外，不许浮在块上面 */
+  .promo{position:absolute;left:0;top:0;width:1920px;height:56px;display:flex;
+    align-items:center;justify-content:space-between;padding:0 72px;
+    background:var(--ink);color:var(--white);font-family:var(--mono);
+    font-size:24px;font-weight:700;letter-spacing:.14em}
+  .promo .pc{color:var(--accent)}
+  .foot{position:absolute;left:0;bottom:0;width:1920px;height:64px;display:flex;
+    align-items:center;justify-content:space-between;padding:0 72px;
+    background:var(--ink);color:var(--white);font-family:var(--mono);
+    font-size:26px;font-weight:700;letter-spacing:.1em}
+  .foot em{font-style:normal;color:var(--accent)}
+  /* 斜纹带：全族唯一合法渐变，周期 10+10=20px */
+  .divline{position:absolute;left:0;bottom:64px;width:1920px;height:20px;
+    border-top:3px solid var(--ink);border-bottom:3px solid var(--ink);
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+
+  .head{position:absolute;left:120px;top:150px;width:1680px;display:flex;
+    flex-direction:column;gap:12px}
+  .head .eb{font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:.14em;
+    color:var(--ink);white-space:nowrap}
+  .head .ti{font-size:48px;font-weight:900;line-height:1.2;letter-spacing:0;
+    color:var(--ink);white-space:nowrap}
+  .head .meta{display:flex;align-items:center;gap:20px;margin-top:6px}
+  .head .note{flex:0 1 auto;min-width:0;font-family:var(--mono);font-size:26px;
+    font-weight:700;letter-spacing:.04em;color:var(--ink);white-space:nowrap}
+  .head .unit{flex:0 0 auto;padding:8px 20px;border:var(--bw) solid var(--ink);
+    border-radius:9999px;background:var(--accent);color:var(--ink);
+    font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:.14em;
+    white-space:nowrap}
+
+  /* 数字带：四块 480×240 通栏，border-left-width:0 合单线缝。块内无任何刻度线与坐标轴 */
+  .band{position:absolute;left:0;top:360px;width:1920px;height:240px;display:flex;
+    justify-content:center}
+  .num{flex:0 0 480px;min-width:0;height:240px;position:relative;display:flex;
+    flex-direction:column;align-items:center;justify-content:center;gap:12px;
+    box-sizing:border-box;border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  .num + .num{margin-left:-3px}
+  .num .st{position:absolute;right:24px;top:20px;width:60px;height:60px;display:block}
+  .num .nv{font-family:var(--mono);font-size:96px;font-weight:900;line-height:1.05;
+    letter-spacing:0;color:inherit;white-space:nowrap}
+  .num .lb{font-size:28px;font-weight:700;line-height:1.2;letter-spacing:.02em;
+    color:inherit;white-space:nowrap}
+
+  .base{position:absolute;left:600px;top:680px;width:720px;min-width:0;height:120px;
+    display:flex;align-items:center;justify-content:center;box-sizing:border-box;
+    background:var(--white);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:10px 10px 0 var(--shadow)}
+  .base .s{font-size:34px;font-weight:900;line-height:1.2;letter-spacing:0;color:var(--ink);
+    white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="promo">
+    <span class="pc">BRICK / 积木风</span>
+    <span>企业宣传 · 四项数字</span>
+  </div>
+
+  <div class="head" id="head">
+    <span class="eb" id="eyebrow" data-fit-max="30" data-fit-min="16">一组数</span>
+    <h1 class="ti" id="title" data-fit-max="48" data-fit-min="26">四个数，一张表说完</h1>
+    <div class="meta">
+      <span class="note" id="note" data-fit-max="26" data-fit-min="16">口径：2026 上半年 · 全渠道 · 不含测试单</span>
+      <span class="unit" id="unit">条</span>
+    </div>
+  </div>
+
+  <div class="band" id="band">
+    <div class="num q1" id="s1">
+      <svg class="st" width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden="true">
+        <circle class="sc" cx="30" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/></svg>
+      <span class="nv" id="n1" data-fit-max="96" data-fit-min="40">0</span>
+      <span class="lb" id="l1" data-fit-max="28" data-fit-min="16">有效选题</span></div>
+    <div class="num q2" id="s2">
+      <svg class="st" width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden="true">
+        <circle class="sc" cx="30" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/></svg>
+      <span class="nv" id="n2" data-fit-max="96" data-fit-min="40">0</span>
+      <span class="lb" id="l2" data-fit-max="28" data-fit-min="16">成片交付</span></div>
+    <div class="num q3" id="s3">
+      <svg class="st" width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden="true">
+        <circle class="sc" cx="30" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/></svg>
+      <span class="nv" id="n3" data-fit-max="96" data-fit-min="40">0</span>
+      <span class="lb" id="l3" data-fit-max="28" data-fit-min="16">新增渠道</span></div>
+    <div class="num q4" id="s4">
+      <svg class="st" width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden="true">
+        <circle class="sc" cx="30" cy="30" r="22" fill="#FFFFFF" stroke="#0F0F0F" stroke-width="3"/></svg>
+      <span class="nv" id="n4" data-fit-max="96" data-fit-min="40">0</span>
+      <span class="lb" id="l4" data-fit-max="28" data-fit-min="16">复用率</span></div>
+  </div>
+
+  <div class="base" id="base">
+    <span class="s" id="foot" data-fit-max="34" data-fit-min="18">口径写在数旁边，不怕被问</span>
+  </div>
+
+  <div class="divline"></div>
+  <div class="foot">
+    <span>ENT / 企业宣传</span>
+    <span id="meta">数字块 4 · 凸点 4 · 承重 1</span>
+  </div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+['eyebrow', 'title', 'note', 'unit', 'l1', 'l2', 'l3', 'l4', 'foot'].forEach(function (k) { set(k, v[k]); });
+
+  var rs = document.documentElement.style;
+  if (v.accent) rs.setProperty('--accent', v.accent);
+  var ACC = v.accent || '#FFD429';
+
+  /* 配色包：yellow → pink → blue → green 是全族轮转序，同屏不重色 */
+  var PACK = {
+    yellow: ['#FFD429', '#FF5FA2', '#3D7BFF', '#2FD07A'],
+    pink:   ['#FF5FA2', '#FFD429', '#2FD07A', '#3D7BFF'],
+    green:  ['#2FD07A', '#3D7BFF', '#FFD429', '#FF5FA2'],
+    blue:   ['#3D7BFF', '#2FD07A', '#FF5FA2', '#FFD429'],
+    mixed:  ['#FFD429', '#FF5FA2', '#3D7BFF', '#2FD07A']
+  };
+  /* 明度判定：亮底压墨字、暗底压白字，不造灰色阶 */
+  function inkOn(hex) {
+    var h = String(hex || '').replace('#', '');
+    if (h.length !== 6) return '#0F0F0F';
+    var f = function (c) { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    var L = 0.2126 * f(parseInt(h.slice(0, 2), 16)) +
+            0.7152 * f(parseInt(h.slice(2, 4), 16)) +
+            0.0722 * f(parseInt(h.slice(4, 6), 16));
+    return L > 0.42 ? '#0F0F0F' : '#FFFFFF';
+  }
+  var pack = PACK[v.brickColor] || PACK.mixed;
+  var NUMS = ['#s1', '#s2', '#s3', '#s4'];
+  NUMS.forEach(function (sel, i) {
+    var el = document.querySelector(sel);
+    if (!el) return;
+    el.style.background = pack[i];
+    var fg = inkOn(pack[i]);
+    ['nv', 'lb'].forEach(function (c) {
+      var t = el.querySelector('.' + c);
+      if (t) t.style.color = fg;
+    });
+  });
+
+  /* 数值解析：前缀 / 数字 / 后缀分开，跳变只动数字那段；数字块不带刻度与坐标轴 */
+  function splitVal(s) {
+    var raw = String(s == null ? '' : s).trim();
+    var m = raw.match(/(-?[\d,]*\.?\d+)/);
+    if (!m) return { pre: raw, num: 0, suf: '' };
+    var pre = raw.slice(0, m.index);
+    var suf = raw.slice(m.index + m[0].length);
+    var num = parseFloat(m[0].replace(/,/g, ''));
+    if (!isFinite(num)) num = 0;
+    return { pre: pre, num: Math.round(num), suf: suf };
+  }
+  var VALS = [splitVal(v.v1), splitVal(v.v2), splitVal(v.v3), splitVal(v.v4)];
+  var TARGETS = ['n1', 'n2', 'n3', 'n4'].map(function (k) { return document.getElementById(k); });
+  TARGETS.forEach(function (el, i) {
+    if (el) el.textContent = VALS[i].pre + VALS[i].num + VALS[i].suf;
+  });
+
+  var studs = [].slice.call(document.querySelectorAll('#band .sc'));
+  var studMode = v.studMode || 'scan';
+  var meta = document.getElementById('meta');
+  if (meta) meta.innerHTML = '指标 <em>4</em> · 凸点 <em>' + studs.length + '</em>';
+
+  /* reduce 短路：这一行必须逐字节保持不变，QC 工具靠字符串匹配把它替换成常量 true */
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：搬移与压影全撤掉，只给终态 + 一段 8px 微位移淡入 */
+    gsap.set('#head', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#band', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#base', { x: 0, y: 0, opacity: 1 });
+    if (studMode !== 'none' && studs.length) gsap.set(studs, { attr: { fill: ACC } });
+    tl.fromTo('#head', { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .50, ease: 'power3.out' }, 0);
+    tl.fromTo('#band', { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .60, ease: 'power3.out' }, .16);
+    tl.fromTo('#base', { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .45, ease: 'power3.out' }, .34);
+    B.hold(tl, 1.15, 1.05);
+    return;
+  }
+
+  var SHADOW = '8px 8px 0 #0F0F0F';
+  var stageRect = document.getElementById('stage').getBoundingClientRect();
+  var promoEl = document.querySelector('.promo');
+  var CEIL = promoEl ? Math.round(promoEl.getBoundingClientRect().bottom - stageRect.top) : 0;
+
+  /* 起跳点一律现算，保证任何一帧都不越框；onUpdate 里绝不做 DOM 测量 */
+  function topOf(sel) {
+    var e = document.querySelector(sel);
+    return e ? Math.round(e.getBoundingClientRect().top - stageRect.top) : 0;
+  }
+  function bottomOf(sel) {
+    var e = document.querySelector(sel);
+    return e ? Math.round(stageRect.bottom - e.getBoundingClientRect().bottom) : 0;
+  }
+  function leftOf(sel) {
+    var e = document.querySelector(sel);
+    return e ? Math.round(stageRect.left - e.getBoundingClientRect().left) : 0;
+  }
+  function rightOf(sel) {
+    var e = document.querySelector(sel);
+    return e ? Math.round(stageRect.right - e.getBoundingClientRect().right) : 0;
+  }
+  function fromCeil(sel) { return CEIL - topOf(sel); }
+
+  /* 式 1/2/4/6 通用落位：单轴直落或顶出，零 overshoot，落定沿 Y 多压 3px 打 2 帧再回原档 */
+  function slam(sel, at, from, dur, shadow) {
+    var S = shadow || SHADOW;
+    var d = dur || 0.24;
+    var p = String(S).split(' ');
+    var press = p[0] + ' ' + (parseFloat(p[1]) + 3) + 'px 0 ' + p.slice(3).join(' ');
+    tl.fromTo(sel, { x: from.x || 0, y: from.y || 0 },
+      { x: 0, y: 0, duration: d, ease: 'power4.out' }, at);
+    tl.set(sel, { boxShadow: press, immediateRender: false }, at + d);
+    tl.to(sel, { boxShadow: S, duration: 0.04, ease: 'steps(2)' }, at + d + 0.04);
+    return at + d + 0.04;
+  }
+  /* 式 8 凸点扫描：单枚间隔 ≥0.12s，fill 硬切，不补间 */
+  function scanStuds(list, at, mode) {
+    if (mode === 'none' || !list.length) return;
+    list.forEach(function (c, i) {
+      tl.set(c, { attr: { fill: ACC }, immediateRender: false },
+        mode === 'top' ? at : at + i * 0.12);
+    });
+  }
+
+  slam('#head', 0.00, { x: 0, y: fromCeil('#head') }, 0.26);
+
+  /* 式 4 顶出：四块从下方 120px 逐块顶起，共用同一段位移、逐块错峰。
+     数字跳的展示窗口写死 RUN = 1.1s，变量只决定跳到哪个值。 */
+  var RUN = 1.1;
+  var NUMS = ['#s1', '#s2', '#s3', '#s4'];
+  NUMS.forEach(function (sel, i) {
+    var at = 0.40 + i * 0.22;
+    slam(sel, at, { x: 0, y: 120 }, 0.24);
+    var st = document.querySelector(sel + ' .sc');
+    if (studMode !== 'none' && st) {
+      tl.set(st, { attr: { fill: ACC }, immediateRender: false },
+        studMode === 'top' ? 0.40 + (NUMS.length - 1) * 0.22 + 0.58 : at + 0.30);
+    }
+    var el = TARGETS[i];
+    if (!el) return;
+    var p = VALS[i];
+    var stv = { v: 0 };
+    el.textContent = p.pre + '0' + p.suf;
+    tl.to(stv, { v: p.num, duration: RUN, ease: 'steps(22)',
+      onUpdate: function () {
+        el.textContent = p.pre + Math.round(stv.v) + p.suf;
+      } }, at + 0.12);
+  });
+
+  /* 四块齐了整排压 2 帧后定格 */
+  var T = 0.40 + (NUMS.length - 1) * 0.22 + 0.34;
+  var CELLS = NUMS.map(function (s2) { return document.querySelector(s2); });
+  tl.set(CELLS, { boxShadow: '8px 11px 0 #0F0F0F', immediateRender: false }, T);
+  tl.to(CELLS, { boxShadow: '8px 8px 0 #0F0F0F', duration: 0.04, ease: 'steps(2)' }, T + 0.04);
+
+  slam('#base', 1.70, { x: 0, y: 120 }, 0.24, '10px 10px 0 #0F0F0F');
+
+  var introEnd = tl.duration();
+  var TOTAL = Math.min(6, Math.max(5, Number(v.duration) || 5.5));
+  var holdAt = Math.min(introEnd, TOTAL - 0.8);
+  B.hold(tl, holdAt, Math.max(0.8, TOTAL - holdAt));
+})();
+</script>
+</body></html>

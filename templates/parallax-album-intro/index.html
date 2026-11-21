@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "大标题", "default": "JUST TALK TO IT"}, {"id": "prompt", "type": "string", "label": "说明块文案", "default": "左边一条固定目录；相框从右边滑入，先快后慢；背景慢半拍；四张图轮换。"}, {"id": "items", "type": "string", "label": "目录项（逗号分隔，4 行）", "default": "DESCRIBE IT,AI SCAFFOLDS,TUNE THE FEEL,SHAPE & SHIP"}, {"id": "img1", "type": "image", "label": "轮换图1", "default": "./placeholder-1.png"}, {"id": "img2", "type": "image", "label": "轮换图2", "default": "./placeholder-2.png"}, {"id": "img3", "type": "image", "label": "轮换图3", "default": "./placeholder-3.png"}, {"id": "img4", "type": "image", "label": "轮换图4", "default": "./placeholder-4.png"}, {"id": "interval", "type": "number", "label": "切换间隔(秒)", "default": 2.3}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 9.6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #080908; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      .pa-side{ position: absolute; left: 0; top: 0; width: 560px; height: 1080px; background: #F8F5ED; color: #1D1D20;
+        background-image: linear-gradient(rgba(29,29,32,.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(29,29,32,.05) 1px, transparent 1px);
+        background-size: 36px 36px; box-shadow: 16px 0 50px rgba(0,0,0,.5); z-index: 8; }
+      .pa-side-in{ position: absolute; inset: 0; padding: 72px 64px; }
+      .pa-kicker{ font-size: 22px; letter-spacing: .3em; color: #6E685C; }
+      .pa-big{ margin-top: 20px; font-size: 76px; font-weight: 900; line-height: 1.08; letter-spacing: .01em; }
+      .pa-prompt{ margin-top: 46px; border-left: 8px solid #D9A82E; background: rgba(255,255,255,.55);
+        padding: 16px 24px; font-size: 24px; line-height: 1.65; color: #3A362E; }
+      .pa-rows{ position: absolute; left: 64px; right: 64px; bottom: 78px; }
+      .pa-row{ display: flex; align-items: baseline; gap: 24px; padding: 24px 0;
+        border-top: 1.5px solid rgba(29,29,32,.16); opacity: .42; }
+      .pa-row .n{ font-size: 22px; color: #6E685C; }
+      .pa-row .t{ font-size: 32px; font-weight: 800; letter-spacing: .06em; }
+      .pa-stage{ position: absolute; left: 560px; top: 0; width: 1360px; height: 1080px; overflow: hidden;
+        background: #080908; box-shadow: inset 0 0 200px rgba(0,0,0,.7); }
+      .pa-bg{ position: absolute; left: -190px; top: -96px; width: 1800px; height: 1290px; opacity: 0; }
+      .pa-bg img{ width: 100%; height: 100%; object-fit: cover; display: block; filter: blur(20px); }
+      .pa-bg::after{ content: ""; position: absolute; inset: 0; background: rgba(7,9,10,.3); }
+      .pa-frame{ position: absolute; left: 240px; top: 208px; width: 1120px; height: 630px; border-radius: 10px;
+        border: 5px solid #0A0B0A; overflow: hidden; opacity: 0;
+        box-shadow: 0 44px 100px rgba(0,0,0,.62); }
+      .pa-frame img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="9.6" data-width="1920" data-height="1080">
+      <div class="pa-stage" id="stage">
+        <div class="pa-bg" id="bg0"><img alt=""></div>
+        <div class="pa-bg" id="bg1"><img alt=""></div>
+        <div class="pa-bg" id="bg2"><img alt=""></div>
+        <div class="pa-bg" id="bg3"><img alt=""></div>
+        <div class="pa-frame" id="fr0"><img alt=""></div>
+        <div class="pa-frame" id="fr1"><img alt=""></div>
+        <div class="pa-frame" id="fr2"><img alt=""></div>
+        <div class="pa-frame" id="fr3"><img alt=""></div>
+      </div>
+      <div class="pa-side" id="side"><div class="pa-side-in">
+        <div class="pa-kicker mono">AI VIBE CODING · EP.10</div>
+        <div class="pa-big" id="bigTitle"></div>
+        <div class="pa-prompt" id="prompt"></div>
+        <div class="pa-rows" id="rows"></div>
+      </div></div>
+
+    </div>
+    <script>
+      const fallback = {"title": "JUST TALK TO IT", "prompt": "左边一条固定目录；相框从右边滑入，先快后慢；背景慢半拍；四张图轮换。", "items": "DESCRIBE IT,AI SCAFFOLDS,TUNE THE FEEL,SHAPE & SHIP", "img1": "./placeholder-1.png", "img2": "./placeholder-2.png", "img3": "./placeholder-3.png", "img4": "./placeholder-4.png", "interval": 2.3, "duration": 9.6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      $("bigTitle").textContent = V.title;
+      $("prompt").textContent = V.prompt;
+      const items = split(V.items);
+      const rowsEl = $("rows");
+      items.forEach((t, i) => {
+        const r = document.createElement("div");
+        r.className = "pa-row";
+        r.innerHTML = `<span class="n mono">${String(i + 1).padStart(2, "0")}</span><span class="t"></span>`;
+        r.querySelector(".t").textContent = t;
+        rowsEl.appendChild(r);
+      });
+      const imgs = [V.img1, V.img2, V.img3, V.img4];
+      imgs.forEach((src, i) => {
+        $("bg" + i).querySelector("img").src = src;
+        $("fr" + i).querySelector("img").src = src;
+        gsap.set("#fr" + i, { x: 240, scale: 0.92 });
+        gsap.set("#fr" + i + " img", { filter: "blur(12px)" });
+        gsap.set("#bg" + i, { x: 46, scale: 1.18 });
+      });
+      const rows = Array.from(rowsEl.children);
+      const I = Math.max(0.8, Number(V.interval) || 2.3);
+      // 目录栏从 x:-560 推入后锁死不动（全片固定参照系）
+      tl.fromTo("#side", { x: -560 }, { x: 0, duration: 0.62, ease: "expo.out" }, 0);
+      tl.fromTo([".pa-kicker", "#bigTitle", "#prompt"], { opacity: 0, y: 16 },
+        { opacity: 1, y: 0, duration: 0.5, stagger: 0.1 }, 0.35);
+      tl.fromTo(".pa-row", { opacity: 0 }, { opacity: 0.42, duration: 0.4, stagger: 0.08 }, 0.55);
+      tl.to(rows[0], { opacity: 1, duration: 0.3 }, 1.0);
+      const enter = (i, t) => {
+        tl.to("#fr" + i, { opacity: 1, duration: 0.01 }, t);
+        // 相框三联动 expo.out：x 240→0 + scale 0.92→1 + blur 12→0
+        tl.to("#fr" + i, { x: 0, scale: 1, duration: 0.78, ease: "expo.out" }, t);
+        tl.to("#fr" + i + " img", { filter: "blur(0px)", duration: 0.78, ease: "expo.out" }, t);
+        // 同源模糊放大背景慢速跟随：1/5 位移、2 倍时长，同向
+        tl.to("#bg" + i, { opacity: 0.9, duration: 0.8 }, t);
+        tl.to("#bg" + i, { x: 0, scale: 1.1, duration: 1.78, ease: "sine.out" }, t);
+        if (i > 0) tl.to(rows[i], { opacity: 1, duration: 0.3 }, t);
+      };
+      const exit = (i, t) => {
+        tl.to("#fr" + i, { x: 1700, scale: 0.99, duration: 1.2, ease: "power1.inOut" }, t);
+        tl.to("#fr" + i + " img", { filter: "blur(6px)", duration: 1.2, ease: "power1.inOut" }, t);
+        tl.to("#bg" + i, { opacity: 0, duration: 1.0 }, t);
+        tl.to(rows[i], { opacity: 0.42, duration: 0.3 }, t);
+      };
+      enter(0, 0.5);
+      const sw = [1.8, 1.8 + I, 1.8 + 2 * I];   // 切换点 1.8 / 4.1 / 6.4s（interval=2.3）
+      sw.forEach((t, k) => { exit(k, t); enter(k + 1, t); });
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

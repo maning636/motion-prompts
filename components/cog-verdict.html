@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"color","name":"字色","type":"color","label":"正文颜色","default":"#F4F1EA"},{"id":"accent","name":"强调色","type":"color","label":"强调色","default":"#E8A048"},{"id":"panel","name":"面板底","type":"color","label":"文字块底色","default":"rgba(12,12,18,.68)"},{"id":"fontScale","name":"字号缩放","type":"number","label":"字号缩放（1 = 默认）","default":1},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":4.4},{"id":"verdict","name":"狠话","type":"string","label":"结论（第一句）","default":"你的问题不是不努力，是方向错了"},{"id":"s1","name":"支撑1","type":"string","label":"支撑 1","default":"在错的方向上，勤奋只是加速消耗"},{"id":"s2","name":"支撑2","type":"string","label":"支撑 2","default":"判断方向只需要看一个数"},{"id":"s3","name":"支撑3","type":"string","label":"支撑 3","default":"先看数，再决定要不要加班"}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>结论先行 · 狠话加三条支撑</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    /* 透明底：底下是用户自己的实拍或录屏 */
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+
+  /* 文字块后面的一块半透明面板——只护住字，不铺满屏。
+     满屏面板会被云渲染 settle 当成"面积最大的一帧"，抢掉底片的定格。 */
+  .panel {
+    position: absolute; left: 22px; right: 22px;
+    background: var(--panel); border-radius: 14px; opacity: 0;
+    box-shadow: 0 10px 34px rgba(0,0,0,.28);
+  }
+  .lb { font-size: 12px; font-weight: 700; letter-spacing: .22em;
+        text-transform: uppercase; color: var(--ac); }
+  .lb.mut { color: rgba(244,241,234,.42); }
+  .tx { color: var(--fg); line-height: 1.28; }
+  /* 文字装在一个 inline-block 里：要量「文字排出来多宽」时只能量它。
+     直接量 .tx（left/right 撑满的块级）拿到的是容器宽 400px；
+     用 Range.getBoundingClientRect 又会被祖先 transform 放大——
+     预览页把组件放大 2 倍看时，划线就长成了两倍。offsetWidth 是布局宽，
+     两者都不受影响。 */
+  .tx > i { display: inline-block; font-style: normal; }
+  .sub { color: rgba(244,241,234,.62); line-height: 1.4; }
+  .rule { position: absolute; left: 0; height: 2px; background: var(--ac);
+          transform-origin: 0 50%; }
+  .no { position: absolute; display: flex; align-items: center; justify-content: center;
+        border: 2px solid var(--ac); color: var(--ac);
+        font-family: ui-monospace, Consolas, monospace; font-weight: 800; }
+  /* 竖排连接线：因果链用它 */
+  .conn { position: absolute; width: 2px; background: var(--ac); transform-origin: 50% 0; }
+  .hit { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: var(--ac); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"color":"#F4F1EA","accent":"#E8A048","panel":"rgba(12,12,18,.68)","fontScale":1,"duration":4.4,"verdict":"你的问题不是不努力，是方向错了","s1":"在错的方向上，勤奋只是加速消耗","s2":"判断方向只需要看一个数","s3":"先看数，再决定要不要加班"};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--fg', v.color || FALLBACK.color);
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--panel', v.panel || FALLBACK.panel);
+  const dur = parseFloat(v.duration) || 4.4;
+  const scale = parseFloat(v.fontScale) || 1;
+
+  const stage = document.getElementById('stage');
+  const build = 
+(stage, put, fit, v, FB, scale) => {
+  const V = Math.round(34 * scale), S = Math.round(17 * scale);
+  const panel = put('div', 'panel', 'top:36px;height:216px');
+  /* 狠话装在 inline-block 里量宽度：块级 div 会自动换行，
+     换行之后 scrollWidth 永远等于容器宽（400px），fit 量不到真实溢出，
+     15 个字就会折成两行、尾巴一个「了」孤零零挂在下面。
+     量内层的布局宽才能量出「本该多宽」。
+     顺带：下面每个位置都是**面板内**坐标。fit 修好之后这句不再折行，
+     如果还按 stage 坐标排，它会整句露在面板上边（面板 36~232）。 */
+  const verdictEl = put('div', 'tx', 'position:absolute;left:20px;right:20px;top:22px;', null, panel);
+  const verdictIn = put('i', '', 'font-size:' + V + 'px;font-weight:900;line-height:1.22;',
+                       v.verdict || FB.verdict, verdictEl);
+  const verdict = verdictEl;
+  /* 112 是给「狠话折成两行」留的余量：一行到 64，两行到 105。 */
+  const rule = put('div', 'rule', 'left:20px;top:112px;width:0;', null, panel);
+  const supports = [v.s1, v.s2, v.s3].map((x, i) => (x == null || x === '') ? (FB['s' + (i + 1)]) : x);
+  const cells = [];
+  supports.forEach((s, i) => {
+    const y = 130 + i * 26;
+    const dot = put('div', '', 'position:absolute;left:20px;top:' + (y + 7) +
+      'px;width:7px;height:7px;background:var(--ac);', null, panel);
+    const tx = put('div', 'sub', 'position:absolute;left:36px;right:20px;top:' + y +
+      'px;font-size:' + S + 'px;', s, panel);
+    fit([{ el: tx, max: S, min: 11, box: 368 }]);
+    cells.push([dot, tx]);
+  });
+  fit([{ el: verdictIn, max: V, min: Math.round(18 * scale), box: 400 }]);
+  return {
+    build(tl, dur) {
+      tl.fromTo(panel, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: .36, ease: 'power3.out' }, 0);
+      /* 狠话先砸下来：带重量感，不是优雅地淡入 */
+      tl.fromTo(verdict, { opacity: 0, y: -34, scaleY: .8 },
+        { opacity: 1, y: 0, scaleY: 1, duration: .42, ease: 'power4.out' }, .1);
+      tl.to(panel, { scaleY: .965, duration: .1, yoyo: true, repeat: 1, transformOrigin: '50% 50%' }, .5);
+      tl.fromTo(rule, { width: 0 }, { width: 72, duration: .3, ease: 'power3.out' }, .42);
+      cells.forEach((c, i) => {
+        const at = .58 + i * .15;
+        tl.fromTo(c[0], { opacity: 0, scale: .2 }, { opacity: 1, scale: 1, duration: .24, ease: 'back.out(3)' }, at);
+        tl.fromTo(c[1], { opacity: 0, x: -12 }, { opacity: 1, x: 0, duration: .34, ease: 'power3.out' }, at + .03);
+      });
+    }
+  };
+}
+;
+
+  /* 每一项 {el, max, min, box}：量自然宽度，超了就缩字号。
+     中文宽度对字号极其敏感，写死字号必然在某组文案上溢出——
+     上一轮 blk-* 那批「文字溢出」的根因就是这个。 */
+  const fits = [];
+  function fit(list) { fits.push.apply(fits, list); }
+  function runFit() {
+    fits.forEach((f) => {
+      const el = f.el;
+      el.style.fontSize = f.max + 'px';
+      const avail = f.box || el.clientWidth;
+      /* 量真实排版宽，只能靠临时 nowrap。
+         之前两版都错在这：
+           ① 直接量 .tx（left/right 撑满的块级）——一换行 scrollWidth 就等于
+              容器宽，量出来永远是 avail，fit 形同虚设；
+           ② 为此在父元素里塞一个装着同样文字的 inline-block span 来量——
+              同一段话在页面上渲染了两遍（肉眼看到的就是「重影」），
+              而且 inline-block 自己的宽度是 shrink-to-fit，量短句时
+              同样会被容器宽吃掉。
+         nowrap 一次性解决两个：文字不折行，scrollWidth 就是它本该多宽；
+         量完恢复，长句该折还是折。 */
+      const ws = el.style.whiteSpace;
+      el.style.whiteSpace = 'nowrap';
+      const natural = el.scrollWidth;
+      el.style.whiteSpace = ws;
+      if (natural > avail) {
+        el.style.fontSize = Math.max(f.min, Math.floor(f.max * avail / natural)) + 'px';
+      }
+    });
+  }
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  const ctx = build(stage, put, fit, v, FALLBACK, scale);
+  ctx.fitTargets && ctx.fitTargets();
+
+  const tl = gsap.timeline({ paused: true });
+  /* 注册：云渲染的 settle / 逐帧定位靠 window.__timelines 驱动时间轴。
+     组件曾全部没注册，渲染停在第 0 帧、整层空。 */
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+  ctx.build(tl, dur);
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  /* 收口必须放在建完时间轴之后、第一次渲染之前：
+     量的时候元素还没被补间动过，量到的是真实排版宽度。 */
+  runFit();
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

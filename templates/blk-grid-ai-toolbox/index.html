@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "eyebrow", "name": "眉标", "type": "string", "label": "顶部眉标", "default": "AI TOOLBOX / 2026"}, {"id": "title", "name": "主标题", "type": "string", "label": "主标题", "default": "把 AI 塞进日常的六个位置"}, {"id": "note", "name": "注释", "type": "string", "label": "右上角注释", "default": "单位：小时 / 周"}, {"id": "accent", "name": "强调色", "type": "color", "label": "强调色", "default": "#FFD429"}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>卡片宫格 · 把 AI 塞进日常的六个位置</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--paper);color:var(--ink);font-family:var(--sans);
+        display:flex;flex-direction:column;padding:58px 72px 0}
+  #stage.on-ink{background:var(--ink);color:var(--paper)}
+
+  .hd{flex:0 0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:36px}
+  .hd h1{font-size:60px;font-weight:900;line-height:1.04;margin:8px 0 0;letter-spacing:-.015em}
+  .hd .note{font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:.1em;
+        border:var(--bw) solid var(--ink);border-radius:9999px;padding:9px 20px;
+        background:var(--white);color:var(--ink);box-shadow:4px 4px 0 var(--ink);white-space:nowrap}
+  #stage.on-ink .hd .note{background:var(--paper);color:var(--ink);box-shadow:4px 4px 0 var(--accent)}
+
+  /* 底部色带：把画面「压」住，不然上面排得再满底部都是飘的 */
+  .ft{flex:0 0 auto;height:18px;border-top:var(--bw) solid var(--ink);
+      border-bottom:var(--bw) solid var(--ink);
+      background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+  #stage.on-ink .ft{border-color:var(--paper)}
+
+  .body{flex:1 1 auto;min-height:0;display:flex;margin-top:32px;padding-bottom:26px}
+
+  /* 图标必须锁死尺寸。只写 viewBox 而不写 width/height 的 SVG，浏览器会按
+     「默认替换元素尺寸」给它 300px——图标从 52px 的底座里横着冲出去，
+     把整张卡片撑破。版图上表现为卡片右边被顶掉一截，而溢出检测只报"出框"，
+     看不出是被一个看不见的图标顶的。 */
+  .ico{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .ico svg{width:100%;height:100%;display:block}
+
+  .body{display:grid;gap:22px;align-content:stretch}
+  .card{border:var(--bw) solid var(--ink);border-radius:4px;padding:24px 26px;
+        display:flex;flex-direction:column;gap:10px;min-width:0;min-height:0;
+        box-shadow:7px 7px 0 var(--ink);position:relative;overflow:hidden}
+  .card .no{position:absolute;top:0;right:0;background:var(--ink);color:var(--paper);
+        font-family:var(--mono);font-weight:700;font-size:13px;letter-spacing:.1em;
+        padding:5px 12px}
+  .card .ico{width:52px;height:52px;flex:0 0 auto}
+  .card .k{font-weight:900;font-size:30px;line-height:1.14;white-space:nowrap;
+        overflow:hidden;text-overflow:ellipsis;margin-top:10px}
+  /* 占比条改成标签下面的一条细横条，而不是吃满中段的竖井。
+     竖井有两个毛病：六项各占总和的 15~25%，六根柱子高度几乎一样，
+     读起来是「每张卡下面一条统一的黑下划线」，不是图表；
+     而 150px 高的空框本身就成了版面里最抢眼的东西。
+     横条只占 22px，腾出来的空间交给数字——数字才是这张卡的主角。 */
+  .card .mt{position:relative;overflow:hidden;margin:14px 0 0;height:22px;
+        border:var(--bw) solid var(--ink);border-radius:3px;background:var(--paper);
+        flex:0 0 22px}
+  .card .mt i{position:absolute;left:0;top:0;bottom:0;width:0;display:block;
+        background:var(--ink)}
+  /* 填充恒为实色，不跟卡片底色取同一个值：跟底色一样时，
+     轮转到白卡的那一张就成了白条印在米色底槽上，1.07:1，整个看不见。 */
+  .card .mt u{position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:2;
+        font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.12em;
+        color:var(--ink);opacity:.6;mix-blend-mode:normal}
+  .card .foot{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+        margin-top:auto;padding-top:10px}
+  .card .v{font-family:var(--mono);font-weight:700;font-size:96px;line-height:.86;
+        letter-spacing:-.05em;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .card .u{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.14em;opacity:.75}
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise on-ink">
+  <div class="blk-corner tl"></div><div class="blk-corner tr"></div>
+  <div class="blk-corner bl"></div><div class="blk-corner br"></div>
+
+  <div class="hd"><div><div class="blk-eyebrow" id="eyebrow">AI TOOLBOX / 2026</div>
+    <h1 id="title" data-fit-max="60" data-fit-min="32">把 AI 塞进日常的六个位置</h1></div><div class="note" id="note" data-fit-max="15" data-fit-min="11">单位：小时 / 周</div></div>
+  <div class="body" style="grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr)"><div class="blk card" id="c0" style="grid-column:span 1;background:var(--white);color:var(--ink)"><span class="no">01</span><span class="ico"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M27 4 12 27h10l-3 17 17-24H26z"/></svg></span><span class="k" id="k0" data-fit-max="30" data-fit-min="15">写初稿提纲</span><span class="mt" id="mt0"><u>SHARE</u><i id="mf0"></i></span><span class="foot"><span class="v" id="v0" data-fit-max="120" data-fit-min="58">3.5</span><span class="u">h</span></span></div><div class="blk card" id="c1" style="grid-column:span 1;background:var(--yellow);color:var(--ink)"><span class="no">02</span><span class="ico"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M24 5l17 6v12c0 11-7 17-17 20C14 40 7 34 7 23V11zM17 24l5 5 10-11"/></svg></span><span class="k" id="k1" data-fit-max="30" data-fit-min="15">整理会议纪要</span><span class="mt" id="mt1"><u>SHARE</u><i id="mf1"></i></span><span class="foot"><span class="v" id="v1" data-fit-max="120" data-fit-min="58">2.0</span><span class="u">h</span></span></div><div class="blk card" id="c2" style="grid-column:span 1;background:var(--blue);color:var(--ink)"><span class="no">03</span><span class="ico"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M8 25l11 11L40 12"/></svg></span><span class="k" id="k2" data-fit-max="30" data-fit-min="15">批量改写文案</span><span class="mt" id="mt2"><u>SHARE</u><i id="mf2"></i></span><span class="foot"><span class="v" id="v2" data-fit-max="120" data-fit-min="58">4.5</span><span class="u">h</span></span></div><div class="blk card" id="c3" style="grid-column:span 1;background:var(--green);color:var(--ink)"><span class="no">04</span><span class="ico"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M24 5a13 13 0 00-8 23v5h16v-5a13 13 0 00-8-23zM17 38h14M20 43h8"/></svg></span><span class="k" id="k3" data-fit-max="30" data-fit-min="15">查竞品资料</span><span class="mt" id="mt3"><u>SHARE</u><i id="mf3"></i></span><span class="foot"><span class="v" id="v3" data-fit-max="120" data-fit-min="58">6.0</span><span class="u">h</span></span></div><div class="blk card" id="c4" style="grid-column:span 1;background:var(--pink);color:var(--ink)"><span class="no">05</span><span class="ico"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M27 4 12 27h10l-3 17 17-24H26z"/></svg></span><span class="k" id="k4" data-fit-max="30" data-fit-min="15">写脚本分镜</span><span class="mt" id="mt4"><u>SHARE</u><i id="mf4"></i></span><span class="foot"><span class="v" id="v4" data-fit-max="120" data-fit-min="58">5.0</span><span class="u">h</span></span></div><div class="blk card" id="c5" style="grid-column:span 1;background:var(--orange);color:var(--ink)"><span class="no">06</span><span class="ico"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M24 5l17 6v12c0 11-7 17-17 20C14 40 7 34 7 23V11zM17 24l5 5 10-11"/></svg></span><span class="k" id="k5" data-fit-max="30" data-fit-min="15">翻译校对</span><span class="mt" id="mt5"><u>SHARE</u><i id="mf5"></i></span><span class="foot"><span class="v" id="v5" data-fit-max="120" data-fit-min="58">1.5</span><span class="u">h</span></span></div></div>
+  <div class="ft"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+    ["eyebrow", "title", "note", "accent", "k0", "v0", "k1", "v1", "k2", "v2", "k3", "v3", "k4", "v4", "k5", "v5"]
+.forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+  B.fitAll();
+  var tl = B.tl();
+
+  var _gn = [0.1556, 0.0889, 0.2, 0.2667, 0.2222, 0.0667];
+  document.querySelectorAll('.card').forEach(function (c, i) {
+    B.in.pop(tl, c, 0.1 + i * 0.08, { d: 0.42, from: .86, ease: 'power3.out' });
+    B.in.pop(tl, c.querySelector('.ico'), 0.18 + i * 0.08, { d: 0.42 * 0.7, from: .6 });
+    var f = c.querySelector('.mt i');
+    var h = Math.max(6, Math.round((_gn[i] || 0) * 100));
+    tl.fromTo(f, { width: '0%' },
+      { width: h + '%', duration: 0.42 * 0.9, ease: 'power3.out' }, 0.32 + i * 0.08);
+  });
+  B.finish(tl);
+  B.hold(tl);
+})();
+</script>
+</body></html>

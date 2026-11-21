@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"words","type":"string","label":"歌词词组（逗号分隔）","default":"晚风,路灯,和你"},{"id":"textColor","type":"color","label":"文字色","default":"#FFFFFF"},{"id":"accentColor","type":"color","label":"强调色","default":"#39FF85"},{"id":"fontSize","type":"number","label":"字号（px）","default":"72"},{"id":"beatInterval","type":"number","label":"每字节拍间隔（秒）","default":"0.5"},{"id":"direction","type":"enum","label":"入场方向","options":[{"label":"从下往上","value":"up"},{"label":"从左往右","value":"left"},{"label":"无位移","value":"none"}],"default":"up"},{"id":"showPanel","type":"enum","label":"底板显示","options":[{"label":"刻度面板","value":"panel"},{"label":"纯透明","value":"none"}],"default":"panel"}]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=480, height=270" />
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { width: 480px; height: 270px; overflow: hidden; background: transparent; }
+      body { font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+      /* ====== 面板：深炭底 + 噪点 + 细线框（族①暗色科技） ====== */
+      #stage {
+        position: absolute;
+        left: 24px; right: 24px; top: 36px; bottom: 36px;
+        background: rgba(11, 15, 14, 0.78);
+        border: 1px solid rgba(57, 255, 133, 0.22);
+        border-radius: 4px;
+        overflow: hidden;
+        opacity: 0;
+        box-shadow: 0 8px 28px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.02);
+      }
+      /* 微噪点材质 */
+      #stage::before {
+        content: "";
+        position: absolute; inset: 0;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 0.22 0 0 0 0 1 0 0 0 0 0.52 0 0 0 0.14 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+        opacity: 0.55;
+        mix-blend-mode: screen;
+        pointer-events: none;
+      }
+      /* 顶部细线 + 角标 */
+      #stage::after {
+        content: "";
+        position: absolute;
+        left: 14px; right: 14px; top: 13px;
+        height: 1px;
+        background: linear-gradient(to right, transparent, rgba(57,255,133,0.35), transparent);
+        pointer-events: none;
+      }
+
+      /* ====== 角标 · 左上 LYRICS ====== */
+      .corner-tl {
+        position: absolute;
+        top: 12px; left: 14px;
+        display: flex; align-items: center; gap: 6px;
+        font-size: 10px; letter-spacing: 0.16em;
+        color: rgba(57,255,133,0.85);
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        text-transform: uppercase;
+        opacity: 0;
+      }
+      .corner-tl .dot {
+        width: 5px; height: 5px; border-radius: 50%;
+        background: var(--ac, #39FF85);
+        box-shadow: 0 0 6px var(--ac, #39FF85);
+      }
+      .corner-tl .num {
+        color: rgba(255,255,255,0.45);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ====== 角标 · 右上时间戳 ====== */
+      .corner-tr {
+        position: absolute;
+        top: 12px; right: 14px;
+        font-size: 10px; letter-spacing: 0.1em;
+        color: rgba(255,255,255,0.5);
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-variant-numeric: tabular-nums;
+        opacity: 0;
+      }
+      .corner-tr .blink { color: var(--ac, #39FF85); margin-right: 4px; }
+
+      /* ====== 歌词区 ====== */
+      #lyrics {
+        position: absolute;
+        left: 24px; right: 24px; top: 56px; bottom: 56px;
+        display: flex; align-items: center; justify-content: center;
+        flex-wrap: wrap;
+        gap: 4px 18px;
+        text-align: center;
+      }
+      .w {
+        display: inline-block;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: var(--fs, 72px);
+        font-weight: 700;
+        line-height: 1.05;
+        letter-spacing: 0.02em;
+        color: var(--tc, #FFFFFF);
+        opacity: 0;
+        transform: translateY(var(--ty, 24px)) translateX(var(--tx, 0px));
+        will-change: transform, opacity;
+        text-shadow: 0 2px 16px rgba(0,0,0,0.6);
+      }
+      /* 已唱高亮态 */
+      .w.sung {
+        color: rgba(255,255,255,0.55);
+      }
+      .w.current {
+        color: var(--tc, #FFFFFF);
+        text-shadow: 0 0 18px var(--ac, #39FF85), 0 2px 16px rgba(0,0,0,0.6);
+      }
+
+      /* ====== 节拍刻度条（KTV 落点线）====== */
+      #beat-track {
+        position: absolute;
+        left: 28px; right: 28px; bottom: 30px;
+        height: 14px;
+        opacity: 0;
+      }
+      #beat-track .ticks {
+        position: absolute; left: 0; right: 0; top: 0; height: 100%;
+        display: flex; justify-content: space-between; align-items: flex-end;
+      }
+      #beat-track .tick {
+        width: 1px; height: 6px;
+        background: rgba(255,255,255,0.22);
+      }
+      #beat-track .tick.major {
+        width: 1px; height: 10px;
+        background: rgba(57,255,133,0.45);
+      }
+      #beat-track .baseline {
+        position: absolute; left: 0; right: 0; top: 14px;
+        height: 1px;
+        background: rgba(255,255,255,0.12);
+      }
+      /* 当前节拍点 */
+      #beat-dot {
+        position: absolute;
+        top: 2px;
+        left: 0;
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        background: var(--ac, #39FF85);
+        box-shadow: 0 0 10px var(--ac, #39FF85);
+        opacity: 0;
+        transform: translateX(-4px);
+      }
+      /* 进度条（已唱过）*/
+      #beat-fill {
+        position: absolute;
+        left: 0; top: 14px;
+        height: 1px; width: 0;
+        background: var(--ac, #39FF85);
+        box-shadow: 0 0 6px var(--ac, #39FF85);
+      }
+      /* 小字 BPM */
+      #beat-label {
+        position: absolute;
+        right: 28px; bottom: 12px;
+        font-size: 9px; letter-spacing: 0.16em;
+        color: rgba(255,255,255,0.4);
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        opacity: 0;
+      }
+      #beat-label b { color: var(--ac, #39FF85); font-weight: 600; }
+
+      /* ====== 收尾光扫 ====== */
+      #sweep {
+        position: absolute;
+        top: 0; bottom: 0;
+        left: -40%;
+        width: 30%;
+        background: linear-gradient(
+          to right,
+          transparent 0%,
+          rgba(57,255,133,0.0) 30%,
+          rgba(57,255,133,0.18) 50%,
+          rgba(255,255,255,0.08) 70%,
+          transparent 100%
+        );
+        opacity: 0;
+        pointer-events: none;
+        mix-blend-mode: screen;
+      }
+
+      /* 隐藏面板分支 */
+      body.no-panel #stage { display: none; }
+      body.no-panel .corner-tl,
+      body.no-panel .corner-tr,
+      body.no-panel #beat-track,
+      body.no-panel #beat-label { display: none; }
+      body.no-panel #lyrics { top: 0; bottom: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <div class="corner-tl"><span class="dot"></span><span>LYRICS</span><span class="num">· 03</span></div>
+      <div class="corner-tr"><span class="blink">●</span><span id="ts">01:23</span></div>
+
+      <div id="lyrics"></div>
+
+      <div id="beat-track">
+        <div class="ticks" id="ticks"></div>
+        <div class="baseline"></div>
+        <div id="beat-fill"></div>
+        <div id="beat-dot"></div>
+      </div>
+      <div id="beat-label">BPM <b id="bpm">120</b> · 4/4</div>
+
+      <div id="sweep"></div>
+    </div>
+
+  <script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+  <script>
+    (() => {
+      const fallback = {
+        words: "晚风,路灯,和你",
+        textColor: "#FFFFFF",
+        accentColor: "#39FF85",
+        fontSize: "72",
+        beatInterval: "0.5",
+        direction: "up",
+        showPanel: "panel"
+      };
+      const v = (window.__hyperframes && window.__hyperframes.getVariables)
+        ? window.__hyperframes.getVariables() : fallback;
+
+      const tc = v.textColor || "#FFFFFF";
+      const ac = v.accentColor || "#39FF85";
+      const fs = parseFloat(v.fontSize) || 72;
+      const interval = Math.max(0.2, parseFloat(v.beatInterval) || 0.5);
+      const dir = v.direction || "up";
+      const showPanel = (v.showPanel || "panel") === "panel";
+      const raw = (v.words || fallback.words).split(/[,，]/).map(s => s.trim()).filter(Boolean);
+      // 至少 2 个，最多 4 个（480×270 字号 72 容纳有限）
+      const words = raw.slice(0, Math.max(2, Math.min(4, raw.length || 3)));
+      while (words.length < 3) words.push(fallback.words.split(',')[words.length] || '你');
+
+      // CSS 变量
+      document.documentElement.style.setProperty('--tc', tc);
+      document.documentElement.style.setProperty('--ac', ac);
+      document.documentElement.style.setProperty('--fs', fs + 'px');
+      if (!showPanel) document.body.classList.add('no-panel');
+
+      // 入场位移
+      const ty = dir === 'up' ? '24px' : '0px';
+      const tx = dir === 'left' ? '36px' : '0px';
+
+      // 渲染歌词
+      const lyricsEl = document.getElementById('lyrics');
+      lyricsEl.innerHTML = '';
+      const spans = [];
+      words.forEach((w, i) => {
+        const s = document.createElement('span');
+        s.className = 'w';
+        s.textContent = w;
+        s.style.setProperty('--ty', ty);
+        s.style.setProperty('--tx', tx);
+        lyricsEl.appendChild(s);
+        spans.push(s);
+      });
+
+      // 渲染刻度（每字一格，主刻度在起点和重点）
+      const ticksEl = document.getElementById('ticks');
+      ticksEl.innerHTML = '';
+      const ticks = [];
+      const totalSlots = words.length + 2;
+      for (let i = 0; i < totalSlots; i++) {
+        const t = document.createElement('div');
+        t.className = 'tick' + (i === 0 || i === totalSlots - 1 ? ' major' : '');
+        ticksEl.appendChild(t);
+        ticks.push(t);
+      }
+
+      // BPM 推算（每拍 0.5s = 120 BPM）
+      const bpmVal = Math.round(60 / interval);
+      const bpmEl = document.getElementById('bpm');
+      if (bpmEl) bpmEl.textContent = String(bpmVal);
+
+      // 时间戳跳动
+      const tsEl = document.getElementById('ts');
+      let baseTs = 83; // 01:23 起
+      const startTime = Math.floor(performance.now() / 1000);
+
+      const stage = document.getElementById('stage');
+      const cornerTL = document.querySelector('.corner-tl');
+      const cornerTR = document.querySelector('.corner-tr');
+      const beatTrack = document.getElementById('beat-track');
+      const beatLabel = document.getElementById('beat-label');
+      const beatDot = document.getElementById('beat-dot');
+      const beatFill = document.getElementById('beat-fill');
+      const sweep = document.getElementById('sweep');
+
+      const trackEl = document.getElementById('beat-track');
+
+      function positionBeat(i, total) {
+        const trackW = trackEl.clientWidth - 8;
+        return (i / Math.max(1, total - 1)) * trackW;
+      }
+
+      function resetState() {
+        gsap.set(stage, { opacity: 0, scale: 0.985 });
+        gsap.set([cornerTL, cornerTR, beatTrack, beatLabel], { opacity: 0, y: 6 });
+        gsap.set(spans, { opacity: 0, y: ty, x: tx });
+        spans.forEach(s => { s.classList.remove('sung','current'); });
+        gsap.set(beatDot, { opacity: 0 });
+        gsap.set(beatFill, { width: 0 });
+        gsap.set(sweep, { x: '-40%', opacity: 0 });
+      }
+
+      function runLoop() {
+        const tl = gsap.timeline();
+          // 注册到 window.__timelines：云渲染的 settle/逐帧定位靠它驱动时间轴。
+          // 组件此前全部没注册，导致渲染停在第 0 帧（主体初始 opacity:0 → 整层空）。
+          // gsap 时间轴就地 mutate，先存引用即可，后续 tl.to() 作用在同一对象上。
+          window.__timelines = window.__timelines || {};
+          window.__timelines.main = tl;
+        const total = spans.length;
+
+        // ─── 预备（anticipation 0.0 - 0.3s）：面板+角标+刻度线醒 ───
+        tl.to(stage, { opacity: 1, scale: 1, duration: 0.28, ease: 'power2.out' }, 0);
+        tl.to([cornerTL, cornerTR], { opacity: 1, y: 0, duration: 0.32, ease: 'power2.out', stagger: 0.04 }, 0.05);
+        tl.to([beatTrack, beatLabel], { opacity: 1, y: 0, duration: 0.32, ease: 'power2.out' }, 0.12);
+
+        // ─── 主体（0.3s 起逐字 beat）：每字 back.out 卡点 ───
+        const startAt = 0.3;
+        spans.forEach((sp, i) => {
+          tl.to(sp, {
+            opacity: 1,
+            y: 0,
+            x: 0,
+            duration: 0.34,
+            ease: 'back.out(1.8)'
+          }, startAt + i * interval);
+
+          // 当前字 beat 点跳跃
+          tl.call(() => {
+            spans.forEach((s, k) => {
+              s.classList.remove('current');
+              s.classList.toggle('sung', k < i);
+              if (k === i) s.classList.add('current');
+            });
+          }, [], startAt + i * interval);
+
+          tl.set(beatDot, { x: positionBeat(i, total) }, startAt + i * interval);
+          tl.fromTo(beatDot,
+            { opacity: 1, scale: 1.6 },
+            { opacity: 0.6, scale: 1, duration: 0.18, ease: 'power2.out' },
+            startAt + i * interval
+          );
+          tl.to(beatFill, { width: positionBeat(i + 0.5, total) + 4, duration: interval, ease: 'power1.out' }, startAt + i * interval);
+        });
+
+        // ─── 收尾：光扫过 + 整体回归起点（干净循环）────
+        const tailStart = startAt + total * interval + 0.1;
+        tl.to(spans[total - 1], { opacity: 0, duration: 0.18, ease: 'power2.in' }, tailStart);
+        tl.to(beatDot, { opacity: 0, duration: 0.2, ease: 'power2.in' }, tailStart);
+        tl.fromTo(sweep,
+          { x: '-40%', opacity: 0 },
+          { x: '140%', opacity: 0.9, duration: 0.55, ease: 'power2.inOut' },
+          tailStart
+        );
+        tl.to(sweep, { opacity: 0, duration: 0.18 }, tailStart + 0.5);
+        // 准备循环
+        tl.call(resetState, [], tailStart + 0.7);
+
+        return tl;
+      }
+
+      // 时间戳实时刷新（不影响动效）
+      function tickClock() {
+        if (!tsEl) return;
+        const elapsed = Math.floor(performance.now() / 1000) - startTime;
+        const totalSec = baseTs + (elapsed % 240);
+        const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
+        const s = String(totalSec % 60).padStart(2, '0');
+        tsEl.textContent = m + ':' + s;
+      }
+      setInterval(tickClock, 500);
+
+      const master = gsap.timeline({ repeat: -1, delay: 0.2 });
+      master.add(runLoop());
+      // 总时长 = 预备 0.3 + 主长 + 收尾 0.9（保证 2-4s 区间）
+      const total = 0.3 + words.length * interval + 0.9;
+      master.duration(total);
+    })();
+  </script>
+  </body>
+</html>

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "dashTitle", "type": "string", "label": "面板标题", "default": "渲染队列"}, {"id": "bigNum", "type": "string", "label": "特写数字", "default": "87"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+.view{ position:absolute; inset:0; display:none; }
+.view.on{ display:block; }
+.dash{ position:absolute; left:360px; top:200px; width:1200px; height:680px; border-radius:20px;
+  background:#14141B; border:1px solid rgba(255,255,255,.12); overflow:hidden; }
+.dbar{ height:64px; display:flex; align-items:center; padding:0 32px; font-size:26px; color:var(--fg);
+  border-bottom:1px solid rgba(255,255,255,.08); }
+.dnum{ position:absolute; left:64px; top:120px; font-size:150px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; color:var(--accent); }
+.dlab{ position:absolute; left:66px; top:290px; font-size:26px; color:rgba(255,255,255,.55); }
+.drow{ position:absolute; left:64px; width:1072px; height:56px; border-radius:10px; background:#1A1A24; }
+.drow i{ display:block; height:10px; border-radius:5px; background:rgba(255,255,255,.16); margin:23px 24px; }
+.drow b{ display:block; position:absolute; right:24px; top:18px; width:90px; height:20px; border-radius:10px; background:var(--accent); opacity:.7; }
+#flash{ position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+<div class="view" id="v0" style="transform:scale(1);transform-origin:50% 50%"><div class="dash"><div class="dbar" id="dt0"></div><div class="dnum" id="dn0"></div><div class="dlab">个模板已完成渲染 · 队列全部跑通</div><div class="drow" style="top:360px"><i></i><b></b></div><div class="drow" style="top:436px"><i></i><b></b></div><div class="drow" style="top:512px"><i></i><b></b></div><div class="drow" style="top:588px"><i></i><b></b></div></div></div><div class="view" id="v1" style="transform:scale(1.6);transform-origin:32% 30%"><div class="dash"><div class="dbar" id="dt0"></div><div class="dnum" id="dn0"></div><div class="dlab">个模板已完成渲染 · 队列全部跑通</div><div class="drow" style="top:360px"><i></i><b></b></div><div class="drow" style="top:436px"><i></i><b></b></div><div class="drow" style="top:512px"><i></i><b></b></div><div class="drow" style="top:588px"><i></i><b></b></div></div></div><div class="view" id="v2" style="transform:scale(2.2);transform-origin:70% 26%"><div class="dash"><div class="dbar" id="dt0"></div><div class="dnum" id="dn0"></div><div class="dlab">个模板已完成渲染 · 队列全部跑通</div><div class="drow" style="top:360px"><i></i><b></b></div><div class="drow" style="top:436px"><i></i><b></b></div><div class="drow" style="top:512px"><i></i><b></b></div><div class="drow" style="top:588px"><i></i><b></b></div></div></div><div class="view" id="v3" style="transform:scale(2.8);transform-origin:28% 62%"><div class="dash"><div class="dbar" id="dt0"></div><div class="dnum" id="dn0"></div><div class="dlab">个模板已完成渲染 · 队列全部跑通</div><div class="drow" style="top:360px"><i></i><b></b></div><div class="drow" style="top:436px"><i></i><b></b></div><div class="drow" style="top:512px"><i></i><b></b></div><div class="drow" style="top:588px"><i></i><b></b></div></div></div><div class="view" id="v4" style="transform:scale(3.4);transform-origin:68% 60%"><div class="dash"><div class="dbar" id="dt0"></div><div class="dnum" id="dn0"></div><div class="dlab">个模板已完成渲染 · 队列全部跑通</div><div class="drow" style="top:360px"><i></i><b></b></div><div class="drow" style="top:436px"><i></i><b></b></div><div class="drow" style="top:512px"><i></i><b></b></div><div class="drow" style="top:588px"><i></i><b></b></div></div></div><div class="view" id="v5" style="transform:scale(4.2);transform-origin:38% 34%"><div class="dash"><div class="dbar" id="dt0"></div><div class="dnum" id="dn0"></div><div class="dlab">个模板已完成渲染 · 队列全部跑通</div><div class="drow" style="top:360px"><i></i><b></b></div><div class="drow" style="top:436px"><i></i><b></b></div><div class="drow" style="top:512px"><i></i><b></b></div><div class="drow" style="top:588px"><i></i><b></b></div></div></div><div id="flash"></div>
+    </div>
+    <script>
+      const FB = {"dashTitle": "渲染队列", "bigNum": "87", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+document.querySelectorAll('.dbar').forEach(e=>e.textContent=v.dashTitle||'');
+document.querySelectorAll('.dnum').forEach(e=>e.textContent=v.bigNum||'');
+// 建立 49f：主视图轻推
+tl.set('#v0',{className:'view on'},0);
+tl.fromTo('#v0',{scale:1},{scale:1.05,duration:F(49),ease:'none'},0);
+// 切点 49/65/77/85/91/95：间隔 16→12→8→6→4 减半加速，末刀回主画面
+const CUTS=[[49,1],[65,2],[77,3],[85,4],[91,5],[95,0]];
+let cur=0;
+CUTS.forEach(([f,next])=>{
+  tl.set('#v'+cur,{className:'view'},F(f));
+  tl.set('#v'+next,{className:'view on'},F(f));
+  // 切帧 1f 白层 6% = "咔"
+  tl.set('#flash',{opacity:.06},F(f));
+  tl.set('#flash',{opacity:0},F(f+1));
+  cur=next;
+});
+// 末刀戛然定格：慢推 1→1.06 走 20f 后静止（hold ≥35f）
+tl.fromTo('#v0',{scale:1},{scale:1.06,duration:F(20),ease:'power1.out'},F(95));
+tl.to({},{duration:F(35)},F(115));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

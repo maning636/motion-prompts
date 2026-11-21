@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"text","name":"文字","type":"string","label":"要打的字（英文/数字效果最好）","default":"RISE UP"},{"id":"color","name":"字色","type":"color","label":"文字颜色","default":"#F4F1EA"},{"id":"accent","name":"强调色","type":"color","label":"强调 / 辅助色","default":"#E8A048"},{"id":"fontSize","name":"字号","type":"number","label":"字号 px（超出宽度会自动缩）","default":62},{"id":"letterGap","name":"字距","type":"number","label":"字距 px","default":2},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.4}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>地板升起 · 逐字顶出</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    /* 透明底：这层是挂件，底下是用户自己的实拍 */
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  .line {
+    position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 440px; text-align: center;
+    display: flex; justify-content: center; align-items: baseline;
+    gap: var(--gap, 2px); white-space: nowrap;
+  }
+  .line .ch {
+    display: inline-block;
+    font-size: var(--fs, 62px); font-weight: 900; line-height: 1;
+    letter-spacing: var(--ls, -0.02em);
+    color: var(--fg);
+    -webkit-font-smoothing: antialiased;
+  }
+  .line .ch.pin { transform-origin: 50% 100%; }
+  .word { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+          font-size: var(--fs, 62px); font-weight: 900; letter-spacing: var(--ls, -0.02em);
+          line-height: 1; color: var(--fg); white-space: nowrap; display: inline-block; }
+  /* 色带是一道**斜杠**，不是满屏板。
+     早先做成 width 190% 的满屏板：扫到中间那一刻整屏被盖住，
+     两句文字都在它底下一句也看不见，settle 挑中这一帧就是一大块平色。
+     改成 26% 宽的斜杠：永远盖不满，两句的交接发生在斜杠扫过画面中心时。 */
+  .bar { position: absolute; left: -30%; top: -34%; width: 26%; height: 168%;
+         background: var(--ac); }
+  .cur { width: .55em; height: .8em; background: var(--fg); display: inline-block;
+         transform: translateY(.06em); }
+  .ghost { position: absolute; left: 50%; top: 50%; color: transparent;
+           -webkit-text-stroke: 2px var(--ac); white-space: nowrap;
+           font-size: var(--fs, 62px); font-weight: 900; letter-spacing: var(--ls, -0.02em);
+           transform: translate(-50%, -50%); }
+  .shadow { position: absolute; left: 0; right: 0; bottom: 0; height: 100%;
+            background: linear-gradient(180deg, rgba(0,0,0,0) 58%, rgba(0,0,0,.5) 100%); }
+  /* 文字背后的柔和暗晕。
+     为什么不是硬底板：硬底板就不是「透明挂件」了。真实做叠层字幕也是这么处理的——
+     一层软晕把字从任意底片上托起来，边缘化开、看不出边界。
+     另外有个实测原因：云渲染对 external 图层**不合成底片**，
+     组件预览会被渲在白底上，纯浅色字（#F4F1EA）在白底上等于隐形——
+     指标全绿、图是坏的。这层晕同时也解决了预览可读性。 */
+  .halo { position: absolute; inset: 0;
+          background: radial-gradient(62% 74% at 50% 50%,
+            rgba(0,0,0,.62) 0%, rgba(0,0,0,.34) 52%, rgba(0,0,0,0) 78%); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="halo"></div>
+  <div class="shadow"></div>
+</div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"text":"RISE UP","color":"#F4F1EA","accent":"#E8A048","fontSize":62,"letterGap":2,"duration":3.4};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  const fs = parseFloat(v.fontSize) || 62;
+  root.style.setProperty('--fg', v.color || FALLBACK.color);
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  root.style.setProperty('--fs', fs + 'px');
+  root.style.setProperty('--gap', (v.letterGap == null ? 2 : parseFloat(v.letterGap)) + 'px');
+  const text = String(v.text == null ? FALLBACK.text : v.text);
+  const dur = parseFloat(v.duration) || 3.4;
+  const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&@';
+  const split = (s) => Array.from(s);
+
+  const build = 
+(stage, chars) => {
+  const line = document.createElement('div');
+  line.className = 'line';
+  const spans = chars.map((c) => {
+    const s = document.createElement('span');
+    s.className = 'ch pin';
+    s.textContent = c === ' ' ? '\u00a0' : c;
+    line.appendChild(s);
+    return s;
+  });
+  stage.appendChild(line);
+  /* 那条「看不见的线」：只留一道极淡高光，不然就成了道具 */
+  const edge = document.createElement('div');
+  edge.style.cssText = 'position:absolute;left:50%;top:50%;width:0;height:2px;' +
+    'transform:translate(-50%,-50%);opacity:0;background:linear-gradient(90deg,' +
+    'rgba(255,255,255,0),var(--ac),rgba(255,255,255,0))';
+  stage.appendChild(edge);
+  return (tl, dur) => {
+    tl.set(line, { opacity: 1 }, 0);
+    tl.fromTo(edge, { width: 0, opacity: .85 },
+      { width: 400, opacity: .85, duration: .55, ease: 'power2.out' }, .12);
+    tl.fromTo(spans,
+      { yPercent: 108, opacity: 0 },
+      { yPercent: 0, opacity: 1, duration: .56, ease: 'power4.out',
+        stagger: { each: .058 } }, .2);
+    tl.to(edge, { opacity: 0, duration: .45 }, dur - 1);
+  };
+}
+;
+  const stage = document.getElementById('stage');
+  const ctx = build(stage, split(text), v, FALLBACK, fs);
+
+  /* 收口：字号超宽就缩。组件是独立单文件、不引 blocks.js 的 B.fit，
+     自己量一遍自然宽度 vs 440px 容器。
+     必须同时量 .line 和 .word——六式用 .line（逐字分行），
+     两式用 .word（整词一个元素），只量 .line 的话后两种完全没有溢出保护。
+     且必须在建时间轴之前做完：否则量到的是补间中途的 transform。 */
+  (function fit() {
+    const nodes = [stage.querySelector('.line'), stage.querySelector('.word')]
+      .filter(Boolean);
+    let widest = 0;
+    nodes.forEach((el) => { el.style.fontSize = fs + 'px'; widest = Math.max(widest, el.scrollWidth); });
+    if (widest > 440) {
+      root.style.setProperty('--fs', Math.max(22, Math.floor(fs * 440 / widest)) + 'px');
+    }
+  })();
+
+  const tl = gsap.timeline({ paused: true });
+  /* 注册到 window.__timelines：云渲染的 settle / 逐帧定位靠它驱动时间轴。
+     组件曾全部没注册，导致渲染停在第 0 帧（主体初始 opacity:0 → 整层空）。 */
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+  ctx(tl, dur);
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"prefix","type":"string","label":"槽位前文（前缀）","default":"让"},
+  {"id":"suffix","type":"string","label":"槽位后文（后缀）","default":"成为新的生产力"},
+  {"id":"slotWords","type":"string","label":"槽位候选词（逗号分隔，至少 4 个）","default":"工具,伙伴,杠杆,基础设施,默认项"},
+  {"id":"cycles","type":"number","label":"循环次数（>=2）","default":3},
+  {"id":"eyebrow","type":"string","label":"顶部小标签","default":"CYCLE · 槽位轮播"},
+  {"id":"footnote","type":"string","label":"脚注说明","default":"同一句话，同一个位置，每一次都是新的答案"},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+
+      /* ---- 通用版式元素 ---- */
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity: .55;
+      }
+      .eyebrow{
+        position:absolute; top: 56px; left: 96px; right: 96px;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.22em; text-transform:uppercase;
+        color: #8A8A85;
+        z-index: 4;
+      }
+      .eyebrow .acc{ color: var(--accent, #00FF00); font-weight: 700; letter-spacing:.18em; }
+      .footnote{
+        position:absolute; bottom: 56px; left: 96px; right: 96px;
+        display:flex; align-items:center; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 18px; letter-spacing:.06em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+        z-index: 4;
+      }
+      .footnote .counter{
+        font-size: 30px; font-weight: 700;
+        color: var(--accent, #00FF00);
+        letter-spacing: -.01em;
+        font-variant-numeric: tabular-nums;
+      }
+      .footnote .counter small{
+        font-size: 14px; font-weight: 500;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+        margin-left: 4px;
+      }
+
+      /* ---- 舞台：句子 + 槽位 ---- */
+      .stage{
+        position:absolute; inset:0;
+        display:flex; flex-direction:column; align-items:center; justify-content:center;
+        padding: 220px 120px 220px;
+      }
+      .sentence{
+        position: relative;
+        display:flex; align-items:baseline; justify-content:center;
+        flex-wrap: nowrap;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 112px;
+        line-height: 1.05;
+        letter-spacing: -.01em;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 88%, transparent);
+        text-align: center;
+        max-width: 1700px;
+      }
+      .sentence .lead{ color: var(--foreground, #F4EFE7); }
+      .sentence .tail{ color: color-mix(in srgb, var(--foreground, #F4EFE7) 70%, transparent); }
+
+      /* 槽位视觉容器：固定宽度，避免词替换时左右字跳动 */
+      .slot{
+        position: relative;
+        display: inline-flex;
+        align-items: baseline;
+        justify-content: center;
+        margin: 0 14px;
+        padding: 0 14px;
+        min-width: 240px;
+        max-width: 720px;
+        height: 1.25em;
+        vertical-align: baseline;
+        /* 给 accent 一点点底色提示，提示「这里在变」 */
+        border-bottom: 2px solid color-mix(in srgb, var(--accent, #00FF00) 35%, transparent);
+      }
+      .slot::before, .slot::after{
+        content: ""; position: absolute; left: 0; right: 0;
+        height: 2px; background: var(--accent, #00FF00);
+        opacity: .0;
+      }
+      .slot::before{ top: 0; }
+      .slot::after{ bottom: -2px; }
+
+      /* 槽位内的词：层叠、垂直切换 */
+      .slot-word{
+        position: absolute;
+        left: 50%;
+        transform: translate(-50%, 0);
+        white-space: nowrap;
+        color: var(--accent, #00FF00);
+        text-shadow:
+          0 0 24px color-mix(in srgb, var(--accent, #00FF00) 45%, transparent),
+          0 0 2px color-mix(in srgb, var(--accent, #00FF00) 80%, transparent);
+        will-change: transform, opacity;
+      }
+
+      /* 槽位两侧小三角：暗示词从这里流过 */
+      .slot-arrow{
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 0; height: 0;
+        opacity: .8;
+        pointer-events: none;
+      }
+      .slot-arrow.left{
+        left: -10px;
+        border-top: 7px solid transparent;
+        border-bottom: 7px solid transparent;
+        border-right: 9px solid color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+      }
+      .slot-arrow.right{
+        right: -10px;
+        border-top: 7px solid transparent;
+        border-bottom: 7px solid transparent;
+        border-left: 9px solid color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+      }
+
+      /* 循环计数器小标：右上角 */
+      .cycle-pill{
+        position:absolute; top: 96px; right: 96px;
+        display:inline-flex; align-items:center; gap:12px;
+        padding: 8px 18px;
+        border: 1px solid color-mix(in srgb, var(--accent, #00FF00) 40%, transparent);
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--accent, #00FF00) 8%, transparent);
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 18px; letter-spacing: .14em; text-transform: uppercase;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 75%, transparent);
+        z-index: 4;
+      }
+      .cycle-pill b{
+        color: var(--accent, #00FF00);
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: .04em;
+      }
+      .cycle-pill .sep{
+        width: 1px; height: 14px;
+        background: color-mix(in srgb, var(--foreground, #F4EFE7) 30%, transparent);
+      }
+
+      /* 进度点：底部居中，3 个圆点指示当前循环到第几次 */
+      .progress-dots{
+        position:absolute;
+        bottom: 130px;
+        left: 50%; transform: translateX(-50%);
+        display:flex; gap: 14px;
+        z-index: 4;
+      }
+      .dot{
+        width: 10px; height: 10px;
+        border-radius: 50%;
+        background: color-mix(in srgb, var(--foreground, #F4EFE7) 22%, transparent);
+        transition: background .2s;
+      }
+      .dot.on{
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--accent, #00FF00) 55%, transparent);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="stage" data-start="0" data-duration="6" data-track-index="1">
+
+        <div class="gridbg"></div>
+
+        <div class="eyebrow">
+          <span id="eyebrowLeft"><b class="acc">CYCLE</b>&nbsp;&nbsp;槽位轮播</span>
+          <span>word · slot</span>
+        </div>
+
+        <div class="cycle-pill" id="cyclePill" aria-hidden="true">
+          <span>ROUND</span>
+          <b id="cycleNow">0</b>
+          <span class="sep"></span>
+          <span id="cycleTotal">3</span>
+        </div>
+
+        <!-- 句子：前缀 + 槽位 + 后缀 -->
+        <h1 class="sentence" id="sentence">
+          <span class="lead" id="prefixEl">让</span>
+          <span class="slot" id="slot" aria-label="slot">
+            <span class="slot-arrow left"></span>
+            <span class="slot-arrow right"></span>
+            <!-- 槽位词由 JS 注入，绝对定位层叠 -->
+          </span>
+          <span class="tail" id="suffixEl">成为新的生产力</span>
+        </h1>
+
+        <div class="progress-dots" id="progressDots">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+
+        <div class="footnote">
+          <span id="footnoteEl">同一句话，同一个位置，每一次都是新的答案</span>
+          <span class="counter"><span id="cycleCount">0</span><small>/<span id="cycleCountTotal">3</span></small></span>
+        </div>
+
+      </section>
+    </div>
+
+    <script>
+      /* ========== 变量接线（与全库契约一致） ========== */
+      const fallback = {
+        prefix: "让",
+        suffix: "成为新的生产力",
+        slotWords: "工具,伙伴,杠杆,基础设施,默认项",
+        cycles: 3,
+        eyebrow: "CYCLE · 槽位轮播",
+        footnote: "同一句话，同一个位置，每一次都是新的答案",
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      const $ = (id) => document.getElementById(id);
+
+      /* ========== 内容回填 ========== */
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      const prefix = String(v.prefix ?? fallback.prefix);
+      const suffix = String(v.suffix ?? fallback.suffix);
+      const rawWords = String(v.slotWords ?? fallback.slotWords);
+      const wordsAll = rawWords.split(/[,,;\n]/).map(s => s.trim()).filter(Boolean);
+      // 至少 4 个（首词 + 至少 3 次替换），少于 4 就循环补齐
+      while (wordsAll.length < 4) wordsAll.push(wordsAll[wordsAll.length - 1] || "X");
+      const cycles = Math.max(2, Math.min(20, Number(v.cycles ?? fallback.cycles) || 3));
+      // 词序：起始词 + cycles 次替换 → 总共 cycles+1 个词（含首词）
+      const words = wordsAll.slice(0, Math.min(wordsAll.length, cycles + 1));
+      // 词不够时循环补
+      while (words.length < cycles + 1) words.push(wordsAll[words.length % wordsAll.length] || "X");
+
+      $("prefixEl").textContent = prefix;
+      $("suffixEl").textContent = suffix;
+      $("eyebrowLeft").innerHTML = '<b class="acc">CYCLE</b>&nbsp;&nbsp;' + escapeHtml(v.eyebrow || fallback.eyebrow);
+      $("footnoteEl").textContent = v.footnote || fallback.footnote;
+      $("cycleCountTotal").textContent = String(cycles);
+      $("cycleTotal").textContent = String(cycles);
+
+      // 注入槽位词（全部绝对定位、初始隐藏）
+      const slotEl = $("slot");
+      const wordEls = words.map((w, i) => {
+        const span = document.createElement("span");
+        span.className = "slot-word";
+        span.textContent = w;
+        span.dataset.idx = String(i);
+        // 第一个词（i=0）从下方就位；其余初始在下方隐藏
+        if (i === 0) {
+          span.style.transform = "translate(-50%, 0)";
+          span.style.opacity = "1";
+        } else {
+          span.style.transform = "translate(-50%, 110%)";
+          span.style.opacity = "0";
+        }
+        slotEl.appendChild(span);
+        return span;
+      });
+
+      // 动态算槽位宽度：容纳最长的词 + padding，避免替换词溢出吞掉前后字
+      // 用临时 span 测量，避免布局抖动
+      const measure = document.createElement("span");
+      measure.style.cssText = "visibility:hidden;position:absolute;left:-9999px;top:-9999px;"
+        + "font:inherit;font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;"
+        + "font-size:132px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;";
+      document.body.appendChild(measure);
+      let maxW = 0;
+      words.forEach((w) => {
+        measure.textContent = w;
+        const w0 = measure.getBoundingClientRect().width;
+        if (w0 > maxW) maxW = w0;
+      });
+      document.body.removeChild(measure);
+      // 槽位宽度 = maxW + 左右 padding (18px*2) + 两侧小三角留白 (40px)
+      slotEl.style.minWidth = (maxW + 80) + "px";
+      slotEl.style.width = (maxW + 80) + "px";
+
+      // 点数 = cycles
+      const dotsWrap = $("progressDots");
+      while (dotsWrap.children.length > cycles) dotsWrap.removeChild(dotsWrap.lastChild);
+      while (dotsWrap.children.length < cycles) {
+        const d = document.createElement("span");
+        d.className = "dot";
+        dotsWrap.appendChild(d);
+      }
+
+      /* ========== 时间线 ========== */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+
+      const tl = gsap.timeline({ paused: true });
+
+      // 入场：整句 fade+y，0.5s
+      tl.fromTo("#sentence",
+        { opacity: 0, y: 30 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 0.1);
+
+      // eyebrow + 计数 pill + 进度点 同步入场
+      tl.fromTo(".eyebrow",
+        { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 0.1);
+      tl.fromTo("#cyclePill",
+        { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 0.2);
+      tl.fromTo("#progressDots",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.4, ease: "power2.out" }, 0.25);
+
+      // 槽位底边先快速画一下，强调「这里在变」
+      tl.fromTo(".slot",
+        { "--tw": 0 },
+        { "--tw": 1, duration: 0.001 }, 0.4);
+
+      // 槽位第一个词：从小弹入就位
+      tl.fromTo(wordEls[0],
+        { scale: 0.92, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(1.4)" }, 0.45);
+
+      // 循环：每次循环 = 旧词上滑出 + 新词从下滑入
+      const CYCLE_START = 1.05;          // 入场后稍作停顿
+      const CYCLE_GAP = 1.25;           // 每次循环占 ~1.25s（含间隔）
+      const OUT_DUR = 0.45;
+      const IN_DUR = 0.55;
+      const HOLD_DUR = 0.25;
+
+      for (let i = 1; i <= cycles; i++) {
+        const t0 = CYCLE_START + (i - 1) * CYCLE_GAP;
+        const oldEl = wordEls[i - 1];
+        const newEl = wordEls[i];
+        // 旧词上滑出
+        tl.to(oldEl,
+          { y: "-110%", opacity: 0, duration: OUT_DUR, ease: "power2.in" }, t0);
+        // 新词从下滑入（错峰 0.08s 制造「接力」感）
+        tl.fromTo(newEl,
+          { y: "110%", opacity: 0 },
+          { y: "0%", opacity: 1, duration: IN_DUR, ease: "power2.out" }, t0 + 0.08);
+      }
+
+      // 结尾：最后一个词轻微回弹（强调「到位」），停留 ~1s
+      const tailStart = CYCLE_START + cycles * CYCLE_GAP + 0.1;
+      tl.to(wordEls[cycles], {
+        scale: 1.04, duration: 0.4, ease: "power2.out",
+        yoyo: true, repeat: 1
+      }, tailStart);
+
+      // 脚注淡入（与循环同步）
+      tl.fromTo(".footnote",
+        { opacity: 0, y: 10 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, tailStart - 0.2);
+
+      // 进度点 + 计数器：根据当前时间实时推导（避免 pause/seek 时 UI 不更新）
+      const cycleStartTimes = [];
+      for (let i = 1; i <= cycles; i++) {
+        cycleStartTimes.push(CYCLE_START + (i - 1) * CYCLE_GAP);
+      }
+      const cycleNowEl = $("cycleNow");
+      const cycleCountEl = $("cycleCount");
+      const dotsArr = Array.from(dotsWrap.querySelectorAll(".dot"));
+      const refreshCounter = (tNow) => {
+        let n = 0;
+        for (let i = 0; i < cycleStartTimes.length; i++) {
+          if (tNow >= cycleStartTimes[i]) n = i + 1;
+        }
+        const txt = String(n);
+        if (cycleNowEl.textContent !== txt) cycleNowEl.textContent = txt;
+        if (cycleCountEl.textContent !== txt) cycleCountEl.textContent = txt;
+        for (let k = 0; k < dotsArr.length; k++) {
+          const want = k < n;
+          if (dotsArr[k].classList.contains("on") !== want) {
+            dotsArr[k].classList.toggle("on", want);
+          }
+        }
+      };
+      tl.eventCallback("onUpdate", () => refreshCounter(tl.time()));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

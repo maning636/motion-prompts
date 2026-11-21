@@ -1,0 +1,11 @@
+{
+  "eyebrow": "SELECT · ONE",
+  "heading": "单选决策演示",
+  "subheading": "逐一亮起 → 最终项高亮放大 → 其余压暗",
+  "chips": "数据接入\n语义抽取\n知识图谱\n向量检索\n推理执行",
+  "selectedIndex": 3,
+  "columns": 3,
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

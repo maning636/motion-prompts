@@ -1,0 +1,9 @@
+{
+  "filename": "rag.py",
+  "language": "Python 3.12",
+  "code": "def retrieve(query, index):\n    hits = index.search(query, k=5)\n    contexts = [h.text for h in hits]\n    return contexts\n\ndef generate(query, contexts):\n    prompt = build_prompt(query, contexts)\n    return llm(prompt)",
+  "highlightLine": 3,
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

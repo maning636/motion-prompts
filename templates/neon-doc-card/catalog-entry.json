@@ -1,0 +1,28 @@
+{
+  "id": "neon-doc-card",
+  "name": "荧光文档清单卡",
+  "description": "深色底上一张米白文档大卡，顶部引导灰字+5条编号清单逐行淡入，右侧绿色圆勾badge弹入，适合口播功能清单确认段落。",
+  "category": "信息卡片",
+  "tags": [
+    "清单卡片",
+    "文档",
+    "功能清单",
+    "荧光绿",
+    "口播"
+  ],
+  "duration": 6,
+  "slot": "concept",
+  "when": "口播需要展示一张待确认的功能或需求清单，引导观众删改确认后再往下推进时",
+  "assets": [],
+  "path": "templates/neon-doc-card",
+  "size": "1920×1080",
+  "formats": [
+    "mp4"
+  ],
+  "defaultFormat": "mp4",
+  "preview": "https://maning789link.top/hub/renders/neon-doc-card/sample.webm",
+  "status": "ready",
+  "tier": "free",
+  "no": null,
+  "series": "shot"
+}

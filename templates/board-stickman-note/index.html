@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "标题", "default": "别把工具当目的"}, {"id": "note", "type": "string", "label": "批注", "default": "工具是拿来省时间的，不是拿来研究的"}, {"id": "action", "type": "string", "label": "小人动作（wave 举手 / point 指向）", "default": "wave"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      #root{ background: #FCFBF6; font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; color: #1D1D20;
+        background-image: linear-gradient(rgba(29,29,32,.045) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(29,29,32,.045) 1px, transparent 1px); background-size: 64px 64px; }
+      .b-card{ position: absolute; left: 170px; top: 220px; width: 780px; height: 640px;
+        background: #FFE98A; border-radius: 6px; padding: 64px 60px;
+        box-shadow: 8px 9px 0 rgba(29,29,32,.14); }
+      .b-card::before{ content: ""; position: absolute; left: 50%; top: -18px; width: 130px; height: 34px;
+        margin-left: -65px; background: rgba(255,255,255,.6); transform: rotate(-2deg);
+        border-left: 1px solid rgba(29,29,32,.08); border-right: 1px solid rgba(29,29,32,.08); }
+      .b-title{ font-size: 54px; font-weight: 900; line-height: 1.25; word-break: break-all; }
+      .b-note{ margin-top: 36px; font-size: 36px; font-weight: 700; font-style: italic;
+        color: rgba(29,29,32,.75); line-height: 1.5; word-break: break-all; }
+      .b-note::before{ content: "✎ "; color: #1E7A46; }
+      .b-man{ position: absolute; left: 1080px; top: 240px; width: 480px; height: 600px; overflow: visible; }
+      .b-man path, .b-man circle{ fill: none; stroke: #1D1D20; stroke-width: 11; stroke-linecap: round; }
+      .b-man .fx{ stroke: #1E7A46; stroke-width: 7; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="b-card" id="card">
+        <h1 class="b-title" id="title"></h1>
+        <div class="b-note" id="note"></div>
+      </div>
+      <svg class="b-man" id="man" viewBox="0 0 480 600">
+        <circle class="dr" cx="240" cy="110" r="62"/>
+        <path class="dr" d="M 240 172 L 240 370"/>
+        <path class="dr" d="M 240 370 L 160 540"/>
+        <path class="dr" d="M 240 370 L 320 540"/>
+        <path class="dr arm-wave" d="M 240 210 L 120 300"/>
+        <path class="dr arm-wave" d="M 240 210 L 350 92"/>
+        <path class="dr arm-point" d="M 240 210 L 128 262"/>
+        <path class="dr arm-point" d="M 240 210 L 60 205"/>
+        <path class="fx fx-wave" d="M 392 60 Q 420 92 408 130"/>
+        <path class="fx fx-wave" d="M 424 34 Q 462 82 444 140"/>
+        <path class="fx fx-point" d="M 34 178 L 60 205 L 34 232"/>
+      </svg>
+
+    </div>
+    <script>
+      const fallback = {"title": "别把工具当目的", "note": "工具是拿来省时间的，不是拿来研究的", "action": "wave", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      $("title").textContent = V.title;
+      $("note").textContent = V.note;
+      const act = String(V.action ?? "wave").toLowerCase().includes("point") ? "point" : "wave";
+      const man = $("man");
+      man.querySelectorAll(".arm-" + (act === "wave" ? "point" : "wave")).forEach((el) => el.remove());
+      man.querySelectorAll(".fx-" + (act === "wave" ? "point" : "wave")).forEach((el) => el.remove());
+      const parts = man.querySelectorAll(".dr, .fx");
+      parts.forEach((p) => {
+        const l = p.getTotalLength();
+        p.style.strokeDasharray = String(l);
+        p.style.strokeDashoffset = String(l);
+      });
+      tl.fromTo("#card", { scale: 0.6, opacity: 0, rotation: -8 },
+        { scale: 1, opacity: 1, rotation: -2, duration: 0.5, ease: "back.out(2.2)" }, 0.15);
+      tl.fromTo("#title", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 0.55);
+      parts.forEach((p, i) => {
+        tl.to(p, { strokeDashoffset: 0, duration: 0.3, ease: "power1.inOut" }, 0.75 + i * 0.13);
+      });
+      tl.fromTo("#note", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 1.7);
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"accent","name":"角色色","type":"color","label":"角色色","default":"#FF6B35"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":3.6}]'>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=480, height=270" />
+<title>哈士奇眨眼与张望</title>
+<style>
+  @font-face{font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 480px; height: 270px; overflow: hidden;
+    background: transparent;
+    font-family:'MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  }
+  #stage { position: relative; width: 480px; height: 270px; overflow: hidden; }
+  :root {
+    --ink: #241C18;
+    --fg: #FFF8EE;
+  }
+
+  .pop-hero { position: absolute; left: 190px; top: 106px; width: 100px; height: 92px;
+    transform-origin: 50% 100%; opacity: 0; }
+  .pop-leg { position: absolute; top: 71px; width: 20px; height: 21px;
+    border-radius: 3px 3px 9px 9px; background: var(--ac); border: 3px solid var(--ink); }
+  .pop-leg-l { left: 22px; }
+  .pop-leg-r { left: 54px; }
+  .pop-arm { position: absolute; top: 34px; width: 24px; height: 15px; z-index: 1;
+    border-radius: 15px; background: var(--ac); border: 3px solid var(--ink); }
+  .pop-arm-l { left: -7px; transform-origin: 100% 50%; }
+  .pop-arm-r { left: 83px; transform-origin: 0 50%; }
+  .pop-head { position: absolute; left: 14px; top: 0; width: 72px; height: 74px; z-index: 2;
+    transform-origin: 50% 96%; }
+  .pop-body { position: absolute; left: 0; top: 0; width: 72px; height: 74px;
+    border-radius: 24px 26px 22px 26px; background: var(--ac); border: 3px solid var(--ink); }
+
+  /* 眼白 + 瞳孔 + 眼皮三层 */
+  .pop-orb { position: absolute; top: 21px; width: 26px; height: 28px;
+    border-radius: 50%; background: var(--fg); border: 3px solid var(--ink); overflow: hidden; }
+  .pop-orb-l { left: 9px; }
+  .pop-orb-r { left: 37px; }
+  .pop-pupil { position: absolute; left: 7px; top: 8px; width: 12px; height: 12px;
+    border-radius: 50%; background: var(--ink); }
+  .pop-lid { position: absolute; left: 0; top: 0; width: 26px; height: 21px;
+    border-radius: 0 0 26px 26px; background: var(--ink); transform: scaleY(0);
+    transform-origin: 50% 0%; }
+  .pop-mouth { position: absolute; left: 21px; top: 54px; width: 30px; height: 14px;
+    border-bottom: 4px solid var(--ink); border-radius: 0 0 16px 16px; }
+  .pop-cheek { position: absolute; top: 48px; width: 12px; height: 8px;
+    border-radius: 50%; background: #FF9E80; opacity: .8; }
+  .pop-cheek-l { left: 3px; }
+  .pop-cheek-r { left: 57px; }
+
+  /* 问号：扫视到一半时冒出来的小提示。
+     深墨画在深底上等于隐形，所以走「浅色字 + 细深色描边」，
+     和同批 pop-char-pop-in / pop-arm-wave 的小字同一套做法。 */
+  .pop-q { position: absolute; left: 104px; top: -2px; width: 30px; height: 30px;
+    font-size: 26px; font-weight: 800; color: var(--fg); opacity: 0;
+    text-shadow:
+      1px 1px 0 var(--ink), -1px 1px 0 var(--ink), 1px -1px 0 var(--ink), -1px -1px 0 var(--ink),
+      0 1px 0 var(--ink),  0 -1px 0 var(--ink), 1px 0 0 var(--ink),  -1px 0 0 var(--ink),
+      2px 3px 0 rgba(36, 28, 24, .60); }
+  /* ================= 哈士奇插画版 · 角色件 =================
+     下面这组规则整段覆盖上面的方块版外观；方块版的 class 全部保留，
+     因为时间轴引用的是元素变量不是 class，删 CSS 不会动动画。 */
+  :root {
+    --ink: #3A3540;
+    --line: #4A4550;
+    --fur-lit: #FDFBF7;
+    --fg: #FFF8EE;
+  }
+
+  .pop-shadow {
+    left: 152px; top: 190px; width: 132px; height: 22px; opacity: 0;
+    background: radial-gradient(ellipse at center, rgba(20,18,26,.42) 0%, rgba(20,18,26,.18) 48%, rgba(20,18,26,0) 72%);
+  }
+
+  .pop-hero { left: 152px; top: 52px; width: 176px; height: 146px; }
+  .pop-rig { width: 176px; height: 146px; }
+
+  /* 躯干：胸腔高光 + 斜向渐变 + 内外双阴影 */
+  .pop-torso { position: absolute; left: 46px; top: 84px; width: 82px; height: 50px; z-index: 2;
+    background:
+      radial-gradient(ellipse 60% 45% at 34% 26%, rgba(255,255,255,.85), rgba(255,255,255,0) 70%),
+      linear-gradient(152deg, #FDFBF7 0%, #E9E3D6 44%, #C4BCAC 100%);
+    border: 2.5px solid var(--line); border-radius: 30px 30px 22px 22px;
+    box-shadow: inset -5px -7px 12px rgba(58,53,64,.18), 2px 4px 9px rgba(26,24,32,.3);
+  }
+
+  /* 腿 + 脚掌 + 趾垫 */
+  .pop-leg { position: absolute; top: 126px; width: 21px; height: 26px; z-index: 2;
+    background: linear-gradient(160deg, #F6F2EA 0%, #DCD5C7 68%, #C0B8A8 100%);
+    border: 2.5px solid var(--line); border-radius: 5px 5px 8px 8px; }
+  .pop-leg-l { left: 54px; }
+  .pop-leg-r { left: 82px; }
+  .pop-paw { position: absolute; top: 140px; width: 22px; height: 15px; z-index: 3;
+    background: linear-gradient(180deg, #FDFBF7 0%, #E4DDD0 100%);
+    border: 2.5px solid var(--line); border-radius: 4px 10px 10px 10px; }
+  .pop-paw-l { left: 53px; }
+  .pop-paw-r { left: 81px; }
+  .pop-toe { position: absolute; top: 144px; width: 3.6px; height: 3.6px; z-index: 4;
+    border-radius: 50%; background: rgba(58,53,64,.4); }
+  .pop-leg-gap { position: absolute; left: 76px; top: 126px; width: 3px; height: 26px;
+    background: var(--line); z-index: 4; opacity: .7; }
+
+  /* 双臂：时间轴要摆动，所以保留 .pop-arm-l / -r 的元素与 transform-origin */
+  .pop-arm { position: absolute; width: 26px; height: 15px; z-index: 1;
+    background: linear-gradient(160deg, #F4EFE6 0%, #D4CCBD 100%);
+    border: 2.5px solid var(--line); border-radius: 15px;
+    box-shadow: 1px 2px 5px rgba(26,24,32,.25); }
+  .pop-arm-l { top: 92px; left: 28px; transform-origin: 100% 50%; transform: rotate(22deg); }
+  .pop-arm-r { top: 92px; left: 122px; transform-origin: 0 50%; transform: rotate(-22deg); }
+
+  .pop-head { position: absolute; left: 32px; top: -8px; width: 104px; height: 106px; z-index: 5; }
+  .pop-head svg { width: 100%; height: 100%; display: block; overflow: visible; }
+
+  /* 尾巴：z-index 要高于躯干，否则整条压在身体后面 */
+  .pop-tail { position: absolute; left: 116px; top: 86px; width: 48px; height: 26px; z-index: 3;
+    background: linear-gradient(150deg, #F2EDE4 0%, #CCC4B5 100%);
+    border: 2.5px solid var(--line); border-radius: 24px 24px 7px 24px;
+    transform-origin: 8% 50%; transform: rotate(-36deg);
+    box-shadow: 1px 3px 7px rgba(26,24,32,.3); }
+
+  /* 待机音符跟着放大后的角色重新定位 */
+  .pop-note { left: 156px; width: 24px; height: 24px; opacity: 0; color: #4A4550; }
+  .pop-note-1 { top: 0; }
+  .pop-note-2 { top: 12px; left: 178px; width: 18px; height: 18px; }
+
+  /* ===== blink 专属：眼睛与嘴仍是 DOM，这里给它们哈士奇的尺寸和配色 =====
+     SVG 里的眼睛和嘴被挖掉了，位置由这里补上；坐标按 SVG viewBox 1:1 换算
+     （头容器 104x106，与 viewBox 同尺寸，所以 SVG 坐标 = CSS 像素）。 */
+  .pop-head { position: absolute; left: 32px; top: -8px; width: 104px; height: 106px; z-index: 5; }
+
+  /* 眼白：改成哈士奇的浅琥珀，而不是纯白 */
+  .pop-orb { position: absolute; width: 21px; height: 22px; top: 36px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 32%, #FFFDF7 0%, #F3EADA 58%, #DED5C4 100%);
+    border: 2px solid #4A4550; overflow: hidden; }
+  .pop-orb-l { left: 22.5px; }
+  .pop-orb-r { left: 60.5px; }
+
+  /* 瞳孔：琥珀玻璃 + 一颗主高光 */
+  .pop-pupil { position: absolute; left: 5.5px; top: 5.5px; width: 10px; height: 11px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 36% 30%, #8A6434 0%, #4A3520 56%, #241B12 100%);
+    box-shadow: inset 0 0 0 1px rgba(36,28,24,.35); }
+  .pop-pupil::after { content: ''; position: absolute; left: 2px; top: 1.6px;
+    width: 3.4px; height: 3.4px; border-radius: 50%; background: rgba(255,255,255,.92); }
+
+  /* 眼皮：深毛色，闭眼时像睫毛线 */
+  .pop-lid { position: absolute; left: 0; top: 0; width: 21px; height: 16px;
+    border-radius: 0 0 22px 22px;
+    background: linear-gradient(180deg, #5A5462 0%, #3A3540 100%);
+    transform: scaleY(0); transform-origin: 50% 0%; }
+
+  /* 嘴：微笑弧线，压在 SVG 鼻下方的留白处 */
+  .pop-mouth { position: absolute; left: 37px; top: 68px; width: 30px; height: 12px;
+    border: none; border-radius: 0 0 18px 18px;
+    background: radial-gradient(ellipse 60% 100% at 50% 0%, #8C4A50 0%, #6E3A40 100%);
+    box-shadow: inset 0 3px 4px rgba(0,0,0,.28); }
+
+  /* 腮红交给 SVG 里的径向渐变，HTML 这两个撤掉 */
+  .pop-cheek { display: none; }
+
+  /* 问号：跟着放大的角色重新定位 */
+  .pop-q { left: 158px; top: 2px; width: 34px; height: 34px;
+    font-size: 30px; color: #FFF8EE; }
+
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="../templates/_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(() => {
+  const FALLBACK = {"accent":"#FF6B35","duration":3.6};
+  const v = (window.__hyperframes && window.__hyperframes.getVariables)
+    ? window.__hyperframes.getVariables() : FALLBACK;
+  const root = document.documentElement;
+  root.style.setProperty('--ac', v.accent || FALLBACK.accent);
+  const dur = parseFloat(v.duration) || FALLBACK.duration;
+
+  /* ── 时间轴先建、先注册 ─────────────────────────────────────
+     注册必须排在**任何可能抛异常的代码之前**。注册之后的代码一旦抛错，
+     预览至少还能拿到一条已注册的空时间轴（报 duration=0，症状可读）；
+     注册之前抛错则是「整条组件没有时间轴」，画面全黑且毫无线索。
+     反面教材：旧版在这里用 tl.tween(...) 驱动整段——那不是 GSAP 的 API，
+     直接抛 TypeError，收口的 tl.play(0) 从没执行，渲出来只有 0.34 秒。 */
+  const tl = gsap.timeline({ paused: true });
+  window.__timelines = window.__timelines || {};
+  window.__timelines.main = tl;
+
+  const stage = document.getElementById('stage');
+  function put(tag, cls, css, text, parent) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (css) el.style.cssText = css;
+    if (text != null) el.textContent = text;
+    (parent || stage).appendChild(el);
+    return el;
+  }
+
+  // ——— 方块小角色（会转头的版本）———
+  const hero = put('div', 'pop-hero');
+  put('div', 'pop-tail', '', null, hero);
+  put('div', 'pop-torso', '', null, hero);
+  put('div', 'pop-leg pop-leg-l', '', null, hero);
+  put('div', 'pop-leg pop-leg-r', '', null, hero);
+  put('div', 'pop-leg-gap', '', null, hero);
+  put('div', 'pop-paw pop-paw-l', '', null, hero);
+  put('div', 'pop-paw pop-paw-r', '', null, hero);
+  put('div', 'pop-toe', 'left:57px', null, hero);
+  put('div', 'pop-toe', 'left:65px', null, hero);
+  put('div', 'pop-toe', 'left:85px', null, hero);
+  put('div', 'pop-toe', 'left:93px', null, hero);
+  put('div', 'pop-arm pop-arm-l', '', null, hero);
+  put('div', 'pop-arm pop-arm-r', '', null, hero);
+  const head = put('div', 'pop-head', '', null, hero);
+  head.innerHTML = [
+
+      '<svg viewBox="0 0 104 106" xmlns="http://www.w3.org/2000/svg">',
+'  <defs>',
+'    <radialGradient id="iFHead" cx="36%" cy="28%" r="78%">',
+'      <stop offset="0%" stop-color="#FFFFFF"/>',
+'      <stop offset="34%" stop-color="#F6F2EA"/>',
+'      <stop offset="68%" stop-color="#E4DED2"/>',
+'      <stop offset="100%" stop-color="#C3BBAB"/>',
+'    </radialGradient>',
+'    <linearGradient id="iFMask" x1="0.3" y1="0" x2="0.7" y2="1">',
+'      <stop offset="0%" stop-color="#63636F"/>',
+'      <stop offset="100%" stop-color="#3E3E4C"/>',
+'    </linearGradient>',
+'    <linearGradient id="iFEar" x1="0.2" y1="0" x2="0.8" y2="1">',
+'      <stop offset="0%" stop-color="#DCA896"/>',
+'      <stop offset="60%" stop-color="#BE8574"/>',
+'      <stop offset="100%" stop-color="#9E6757"/>',
+'    </linearGradient>',
+'    <radialGradient id="iFIris" cx="36%" cy="30%" r="72%">',
+'      <stop offset="0%" stop-color="#7A5A2E"/>',
+'      <stop offset="55%" stop-color="#4A3520"/>',
+'      <stop offset="100%" stop-color="#241B12"/>',
+'    </radialGradient>',
+'    <radialGradient id="iFNose" cx="34%" cy="22%" r="80%">',
+'      <stop offset="0%" stop-color="#7C7889"/>',
+'      <stop offset="45%" stop-color="#454250"/>',
+'      <stop offset="100%" stop-color="#232228"/>',
+'    </radialGradient>',
+'    <linearGradient id="iFEarOut" x1="0.3" y1="0" x2="0.7" y2="1">',
+'      <stop offset="0%" stop-color="#EDE8DE"/>',
+'      <stop offset="70%" stop-color="#D2CABA"/>',
+'      <stop offset="100%" stop-color="#B3AB9A"/>',
+'    </linearGradient>',
+'    <radialGradient id="iBlush" cx="50%" cy="50%" r="50%">',
+'      <stop offset="0%" stop-color="#F2A79C" stop-opacity=".55"/>',
+'      <stop offset="100%" stop-color="#F2A79C" stop-opacity="0"/>',
+'    </radialGradient>',
+'    <filter id="iSoft" x="-40%" y="-40%" width="180%" height="180%">',
+'      <feDropShadow dx="2.4" dy="3.4" stdDeviation="2.6" flood-color="#221F28" flood-opacity="0.34"/>',
+'    </filter>',
+'    <filter id="iSheen" x="-30%" y="-30%" width="160%" height="160%">',
+'      <feGaussianBlur stdDeviation="1.6"/>',
+'    </filter>',
+'  </defs>',
+'  <g filter="url(#iSoft)">',
+'    <path d="M18 34 L9 2 L40 19 Z" fill="url(#iFEarOut)" stroke="#4A4550" stroke-width="2.6" stroke-linejoin="round"/>',
+'    <path d="M22 31 L18 10 L33 18 Z" fill="url(#iFEar)"/>',
+'    <path d="M86 34 L95 2 L64 19 Z" fill="url(#iFEarOut)" stroke="#4A4550" stroke-width="2.6" stroke-linejoin="round"/>',
+'    <path d="M82 31 L86 10 L71 18 Z" fill="url(#iFEar)"/>',
+'  </g>',
+'  <g filter="url(#iSoft)">',
+'    <path d="M52 13 C74 13 92 29 92 52 C92 76 74 90 52 90 C30 90 12 76 12 52 C12 29 30 13 52 13 Z"',
+'          fill="url(#iFHead)" stroke="#4A4550" stroke-width="2.6"/>',
+'  </g>',
+'  <path d="M52 14 C62 14 69 17 73 22 L57 27 L52 23 Z" fill="url(#iFMask)"/>',
+'  <path d="M52 14 C42 14 35 17 31 22 L47 27 L52 23 Z" fill="url(#iFMask)"/>',
+'  <path d="M32 29 C25 34 21 42 21 50 L31 50 C32 42 35 34 41 30 Z" fill="url(#iFMask)"/>',
+'  <path d="M72 29 C79 34 83 42 83 50 L73 50 C72 42 69 34 63 30 Z" fill="url(#iFMask)"/>',
+'  <path d="M48 31 L56 31 L55 54 L49 54 Z" fill="url(#iFMask)" opacity=".92"/>',
+'  <g stroke="#B9B1A0" stroke-width="1.1" fill="none" opacity=".5" stroke-linecap="round">',
+'    <path d="M20 56 Q22 63 25 69"/>',
+'    <path d="M26 62 Q28 68 31 73"/>',
+'    <path d="M34 66 Q36 72 39 76"/>',
+'    <path d="M84 56 Q82 63 79 69"/>',
+'    <path d="M78 62 Q76 68 73 73"/>',
+'    <path d="M70 66 Q68 72 65 76"/>',
+'  </g>',
+'  <g filter="url(#iSheen)" opacity=".62">',
+'    <ellipse cx="40" cy="27" rx="15" ry="7" fill="#FFFFFF" transform="rotate(-24 40 27)"/>',
+'    <ellipse cx="66" cy="30" rx="9" ry="4.5" fill="#FFFFFF" transform="rotate(-16 66 30)"/>',
+'  </g>',
+'  <ellipse cx="33" cy="35" rx="6" ry="2.7" fill="#FAF7F1" opacity=".85" transform="rotate(-20 33 35)"/>',
+'  <ellipse cx="71" cy="35" rx="6" ry="2.7" fill="#FAF7F1" opacity=".85" transform="rotate(20 71 35)"/>',
+'  <circle cx="68.6" cy="51.4" r="1.3" fill="#FFFFFF" opacity=".5"/>',
+'  <path d="M42 56 Q52 50 62 56 Q59 68 52 69 Q45 68 42 56 Z" fill="url(#iFNose)"/>',
+'  <ellipse cx="47" cy="57" rx="4" ry="2.4" fill="#FFFFFF" opacity=".55" transform="rotate(-14 47 57)"/>',
+'  <ellipse cx="43.5" cy="62" rx="1.8" ry="2.6" fill="#17161C" opacity=".45"/>',
+'  <ellipse cx="60.5" cy="62" rx="1.8" ry="2.6" fill="#17161C" opacity=".45"/>',
+'        stroke-linecap="round" stroke-linejoin="round"/>',
+'  <ellipse cx="24" cy="62" rx="11" ry="8" fill="url(#iBlush)"/>',
+'  <ellipse cx="80" cy="62" rx="11" ry="8" fill="url(#iBlush)"/>',
+'  <path d="M40 88 Q52 95 64 88 L64 99 L40 99 Z" fill="#F7F4ED" stroke="#4A4550" stroke-width="2.4" stroke-linejoin="round"/>',
+'  <g stroke="#C6BEAD" stroke-width="1" fill="none" opacity=".55" stroke-linecap="round">',
+'    <path d="M46 91 L45 98"/>',
+'    <path d="M52 92 L52 99"/>',
+'    <path d="M58 91 L59 98"/>',
+'  </g>',
+'</svg>'
+
+
+  ].join('\n');
+  const orbL = put('div', 'pop-orb pop-orb-l', '', null, head);
+  const orbR = put('div', 'pop-orb pop-orb-r', '', null, head);
+  const pupL = put('div', 'pop-pupil', '', null, orbL);
+  const pupR = put('div', 'pop-pupil', '', null, orbR);
+  const lidL = put('div', 'pop-lid', '', null, orbL);
+  const lidR = put('div', 'pop-lid', '', null, orbR);
+  put('div', 'pop-cheek pop-cheek-l', '', null, head);
+  put('div', 'pop-cheek pop-cheek-r', '', null, head);
+  put('div', 'pop-mouth', '', null, head);
+  const qmark = put('div', 'pop-q', '', '?', hero);
+
+  // ——— 确定性伪随机（时间 → 画面，纯函数，不使用运行时随机数）———
+  // 固定种子的正弦散列：同样的输入永远得到同样的输出
+  function rnd(seed) {
+    const s = Math.sin(seed * 12.9898 + 4.1414) * 43758.5453;
+    return s - Math.floor(s);
+  }
+  // 把「扫视」拆成若干停留片段：看左、看右、看上、眨眼
+  const N = 7;
+  const STEP = Math.max(.30, dur - .8) / N;
+  const shots = [];
+  for (let i = 0; i < N; i++) {
+    shots.push({
+      t: .40 + i * STEP,
+      gx: Math.round((rnd(i + 1) * 2 - 1) * 5),
+      gy: Math.round((rnd(i + 21) * 2 - 1) * 3),
+      bl: rnd(i + 41) < .34            // 三成机会顺带眨一下
+    });
+  }
+
+  /* ── 「时间 → 画面」在构建期算完，烘成真实补间 ───────────────
+     两个坑叠在一起，旧版两个都踩了：
+
+     1) `tl.tween()` **不是 GSAP 的 API**。写错名字不报语法错
+        （node --check 是绿的），运行时才抛 TypeError，脚本当场死。
+     2) GSAP 3.12.7 在 `seek()` / `time(t)` 时**既不触发 onUpdate
+        也不触发 onComplete**。而云渲染的 settle 正是来回扫时间轴，
+        所以靠回调驱动的样式会全部停在旧帧。
+
+     因此这里没有任何 onUpdate / onComplete：每个片段的瞳孔位移、
+     眼皮 scaleY、头转角，都是提前算好的值，用 tl.fromTo/to 串成真补间。
+     seek 到任意时刻都能得到那一帧该有的画面。 */
+
+  // 眨眼：0.19s 拆成 闭合 → 保持 → 张开 三段真实补间
+  function blinkAt(t0) {
+    [lidL, lidR].forEach(function (lid) {
+      tl.fromTo(lid, { scaleY: 0 }, { scaleY: 1, duration: .07, ease: 'power2.in' }, t0);
+      tl.fromTo(lid, { scaleY: 1 }, { scaleY: 1, duration: .04, ease: 'none' }, t0 + .07);
+      tl.fromTo(lid, { scaleY: 1 }, { scaleY: 0, duration: .08, ease: 'power2.out' }, t0 + .11);
+    });
+  }
+
+  // 入场
+  tl.fromTo(hero, { scale: .6, opacity: 0, y: 12 },
+    { scale: 1, opacity: 1, y: 0, duration: .34, ease: 'back.out(2.4)' }, 0);
+
+  // 扫视：逐段真实补间（片段 i 的姿态 → 片段 i+1 的姿态）
+  for (let i = 0; i < shots.length - 1; i++) {
+    const a = shots[i], b = shots[i + 1];
+    const d = b.t - a.t;
+    const E = 'power2.inOut';                    // 眼球转过去要有起停
+    tl.fromTo([pupL, pupR], { x: a.gx, y: a.gy }, { x: b.gx, y: b.gy, duration: d, ease: E }, a.t);
+    tl.fromTo(head, { rotation: a.gx * .8 }, { rotation: b.gx * .8, duration: d, ease: E }, a.t);
+    // 扫视途中冒问号（只在这一段真要挪眼时才冒）
+    if (a.gx !== b.gx) {
+      tl.fromTo(qmark, { opacity: 0, scale: .68, rotation: -8 },
+        { opacity: .85, scale: 1, rotation: 0, duration: .12, ease: 'back.out(2.6)' }, a.t + d * .30);
+      tl.to(qmark, { opacity: 0, scale: 1.16, duration: .14, ease: 'power2.in' }, a.t + d * .62);
+    }
+  }
+
+  // 各片段起点的眨眼（此时头已摆到位，眨完正好对上下一个注视点）
+  shots.forEach(function (s) { if (s.bl) blinkAt(s.t); });
+
+  /* ── 收尾：最后一段之后不能是一张冻住的图 ─────────────────────
+     扫视走完还剩将近一秒，旧版这段是完全静止的，静帧抽出来像卡住。
+     这里补一段轻微的待机晃动 + 一次收尾眨眼。
+     ⚠️ 全部收尾动作必须**压在 dur 之内**：越过 dur 的补间会把
+     tl.duration() 撑大（实测撑到 4.24s，比声明的 3.6s 长了一截），
+     渲染器按 --dur 取样就会截短最后一秒。 */
+  const TAIL = shots[shots.length - 1].t;
+  const hold = shots[shots.length - 1];
+  /* 剩余时间按比例切四段，整段刚好落在 dur 上 */
+  const rest = Math.max(.4, dur - TAIL);
+  const S1 = rest * .26, S2 = rest * .24, S3 = rest * .18;
+  tl.fromTo(head, { rotation: hold.gx * .8 }, { rotation: hold.gx * .8 + 2.4, duration: S1, ease: 'sine.inOut' }, TAIL);
+  tl.to(head, { rotation: hold.gx * .8 - 2.0, duration: S2, ease: 'sine.inOut' }, TAIL + S1);
+  blinkAt(TAIL + S1 + S2 * .35);
+  tl.fromTo([pupL, pupR], { x: hold.gx, y: hold.gy },
+    { x: hold.gx - 2, y: hold.gy, duration: S3, ease: 'sine.inOut' }, TAIL + S1 + S2);
+  tl.to([pupL, pupR], { x: hold.gx, y: hold.gy + 1, duration: S3, ease: 'sine.inOut' },
+    TAIL + S1 + S2 + S3);
+
+  tl.to({}, { duration: .3 }, Math.max(.1, dur - .3));
+  tl.play(0);
+})();
+</script>
+</body>
+</html>

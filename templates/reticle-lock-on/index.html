@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"eyebrow","type":"string","label":"眉标","default":"LOCK ON · 准星聚焦"},
+  {"id":"targetLabel","type":"string","label":"目标标签","default":"核心命中率"},
+  {"id":"targetValue","type":"string","label":"目标数值","default":"92.4"},
+  {"id":"targetUnit","type":"string","label":"目标单位","default":"%"},
+  {"id":"targetSub","type":"string","label":"目标副标","default":"SYSTEM TARGET · 已锁定"},
+  {"id":"p1Key","type":"string","label":"参数 1 名称","default":"响应时延"},
+  {"id":"p1Val","type":"string","label":"参数 1 数值","default":"38 ms"},
+  {"id":"p2Key","type":"string","label":"参数 2 名称","default":"回传频率"},
+  {"id":"p2Val","type":"string","label":"参数 2 数值","default":"240 Hz"},
+  {"id":"p3Key","type":"string","label":"参数 3 名称","default":"追踪置信度"},
+  {"id":"p3Val","type":"string","label":"参数 3 数值","default":"0.987"},
+  {"id":"p4Key","type":"string","label":"参数 4 名称","default":"信号强度"},
+  {"id":"p4Val","type":"string","label":"参数 4 数值","default":"-42 dBm"},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#12100E"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      *{ box-sizing: border-box; }
+      html, body{
+        margin:0; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+      }
+      #root{
+        position:relative; width:1920px; height:1080px; overflow:hidden;
+        background: var(--background, #12100E);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+
+      .gridbg{
+        position:absolute; inset:0; pointer-events:none;
+        background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity: .55;
+      }
+
+      .eyebrow{
+        position:absolute; top:56px; left:96px; right:96px;
+        display:flex; justify-content:space-between; align-items:center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.22em; text-transform:uppercase;
+        color: #8A8A85;
+      }
+      .eyebrow .acc{ color: var(--accent, #00FF00); font-weight:700; letter-spacing:.18em; }
+
+      /* ---------- 中央目标框 ---------- */
+      .target-wrap{
+        position:absolute;
+        left: 50%; top: 50%;
+        width: 640px; height: 320px;
+        transform: translate(-50%, -50%);
+      }
+      .target{
+        position:absolute; inset:0;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(255,255,255,.018), transparent 60%);
+        display:flex; flex-direction:column; justify-content:center; align-items:center;
+        padding: 36px 56px;
+        opacity: 0;
+      }
+      .target .lab{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 18px; letter-spacing:.22em; text-transform:uppercase;
+        color: #8A8A85; margin-bottom: 14px;
+      }
+      .target .num{
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 124px; font-weight:700;
+        color: var(--foreground, #F4EFE7);
+        letter-spacing: -.04em; line-height: 1;
+        text-shadow: 0 0 22px color-mix(in srgb, var(--foreground, #F4EFE7) 35%, transparent);
+      }
+      .target .num .unit{
+        font-size: 46px; font-weight:700;
+        margin-left: 6px; color: var(--accent, #00FF00);
+        letter-spacing: -.02em;
+        text-shadow: 0 0 16px color-mix(in srgb, var(--accent, #00FF00) 50%, transparent);
+      }
+      .target .sub{
+        margin-top: 18px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.32em; text-transform:uppercase;
+        color: #6B6B66;
+      }
+      .target .sub .on{
+        color: var(--accent, #00FF00);
+        letter-spacing:.18em; font-weight:700;
+      }
+
+      /* 目标内圈（锁光晕） */
+      .target-ring{
+        position:absolute; inset:18px;
+        border-radius: 12px;
+        border: 1px solid color-mix(in srgb, var(--accent, #00FF00) 0%, transparent);
+        pointer-events:none;
+        opacity: 0;
+        box-shadow: 0 0 0 0 transparent;
+      }
+      /* 十字微标（仅中心点） */
+      .target-cross{
+        position:absolute;
+        left: 50%; top: 50%;
+        width: 12px; height: 12px;
+        transform: translate(-50%, -50%);
+        border-radius: 50%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+        opacity: 0;
+      }
+      .target-cross::before, .target-cross::after{
+        content:""; position:absolute; background: var(--accent, #00FF00);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--accent, #00FF00) 55%, transparent);
+      }
+      .target-cross::before{ top:50%; left:-32px; right:-32px; height:1px; transform:translateY(-50%); }
+      .target-cross::after{ left:50%; top:-32px; bottom:-32px; width:1px; transform:translateX(-50%); }
+
+      /* ---------- 四角取景框（L 形） ---------- */
+      .bracket{
+        position:absolute;
+        width: 96px; height: 96px;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .bracket svg{ display:block; width:100%; height:100%; overflow:visible; }
+      .bracket .stroke{
+        fill: none;
+        stroke: var(--accent, #00FF00);
+        stroke-width: 4;
+        stroke-linecap: square;
+        stroke-linejoin: miter;
+        filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent, #00FF00) 60%, transparent));
+      }
+      .bracket .inner{
+        fill: none;
+        stroke: var(--accent, #00FF00);
+        stroke-width: 1;
+        opacity: .35;
+      }
+      .bracket.tl{ top: 50%; left: 50%; margin-top: -180px; margin-left: -340px; }
+      .bracket.tr{ top: 50%; left: 50%; margin-top: -180px; margin-left:  244px; }
+      .bracket.bl{ top: 50%; left: 50%; margin-top:  84px; margin-left: -340px; }
+      .bracket.br{ top: 50%; left: 50%; margin-top:  84px; margin-left:  244px; }
+
+      /* 锁定后角标发光 */
+      .bracket.latched .stroke{
+        filter:
+          drop-shadow(0 0 4px color-mix(in srgb, var(--accent, #00FF00) 70%, transparent))
+          drop-shadow(0 0 14px color-mix(in srgb, var(--accent, #00FF00) 45%, transparent));
+      }
+
+      /* ---------- 扫描线（一次轻扫） ---------- */
+      .scanline{
+        position:absolute;
+        left: 50%; top: 50%;
+        width: 760px; height: 2px;
+        margin-left: -380px; margin-top: -160px;
+        background: linear-gradient(90deg,
+          transparent 0%,
+          color-mix(in srgb, var(--accent, #00FF00) 70%, transparent) 50%,
+          transparent 100%);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      /* ---------- 参数标签 + 引线 ---------- */
+      .params{
+        position:absolute; inset:0;
+        pointer-events:none;
+      }
+      .param{
+        position:absolute;
+        opacity: 0;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.18em; text-transform:uppercase;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 80%, transparent);
+      }
+      .param .k{ color: #8A8A85; }
+      .param .v{
+        font-size: 26px; letter-spacing: -.01em; text-transform:none;
+        color: var(--foreground, #F4EFE7);
+        margin-left: 8px;
+        text-shadow: 0 0 12px color-mix(in srgb, var(--foreground, #F4EFE7) 30%, transparent);
+      }
+      .param .v.hot{
+        color: var(--accent, #00FF00);
+        text-shadow: 0 0 14px color-mix(in srgb, var(--accent, #00FF00) 55%, transparent);
+      }
+      .param .lead{
+        position:absolute;
+        background: color-mix(in srgb, var(--accent, #00FF00) 55%, transparent);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--accent, #00FF00) 45%, transparent);
+      }
+      .param .dot{
+        position:absolute; width:8px; height:8px; border-radius:50%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 10px color-mix(in srgb, var(--accent, #00FF00) 65%, transparent);
+      }
+
+      /* 4 个参数位置：左上 / 右上 / 左下 / 右下，各自带引线 */
+      .param.p1{ top: 280px; left: 220px; }
+      .param.p1 .lead{ left: 230px; top: 22px; width: 240px; height: 1px; transform-origin: left center; transform: rotate(8deg); }
+      .param.p1 .dot{ left: 226px; top: 18px; }
+
+      .param.p2{ top: 280px; right: 220px; text-align:right; }
+      .param.p2 .lead{ right: 230px; top: 22px; width: 240px; height: 1px; transform-origin: right center; transform: rotate(-8deg); }
+      .param.p2 .dot{ right: 226px; top: 18px; }
+
+      .param.p3{ bottom: 280px; left: 220px; }
+      .param.p3 .lead{ left: 230px; bottom: 22px; width: 240px; height: 1px; transform-origin: left center; transform: rotate(-8deg); }
+      .param.p3 .dot{ left: 226px; bottom: 18px; }
+
+      .param.p4{ bottom: 280px; right: 220px; text-align:right; }
+      .param.p4 .lead{ right: 230px; bottom: 22px; width: 240px; height: 1px; transform-origin: right center; transform: rotate(8deg); }
+      .param.p4 .dot{ right: 226px; bottom: 18px; }
+
+      /* ---------- 底部状态条 ---------- */
+      .status-bar{
+        position:absolute; left:96px; right:96px; bottom:56px;
+        display:flex; align-items:center; justify-content:space-between;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing:.22em; text-transform:uppercase;
+        color: #6B6B66;
+        opacity: 0;
+      }
+      .status-bar .left{ display:flex; align-items:center; gap:18px; }
+      .status-bar .pill{
+        display:inline-flex; align-items:center; gap:8px;
+        padding: 6px 14px; border:1px solid #2A2A2E; border-radius:999px;
+        font-size: 14px; letter-spacing:.18em;
+      }
+      .status-bar .pill .dot{
+        width:8px; height:8px; border-radius:50%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--accent, #00FF00) 70%, transparent);
+      }
+      .status-bar .right{
+        color: var(--accent, #00FF00);
+        letter-spacing:.18em; font-weight:700;
+      }
+
+      /* ---------- 角标旁边的微数字（瞄距 / 角度） ---------- */
+      .telem{
+        position:absolute;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 12px; letter-spacing:.22em;
+        color: #6B6B66;
+        opacity: 0;
+      }
+      .telem.t1{ top: 268px; left: 540px; }
+      .telem.t2{ top: 268px; right: 540px; }
+      .telem.t3{ bottom: 268px; left: 540px; }
+      .telem.t4{ bottom: 268px; right: 540px; }
+      .telem b{ color: var(--accent, #00FF00); font-weight:700; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6.5" data-width="1920" data-height="1080">
+      <section id="scene" data-start="0" data-duration="6.5" data-track-index="1">
+
+        <div class="gridbg"></div>
+
+        <div class="eyebrow">
+          <span><b class="acc">LOCK</b>&nbsp;&nbsp;RETICLE TRACK</span>
+          <span id="eyebrow">lock · text</span>
+        </div>
+
+        <!-- 中心目标 -->
+        <div class="target-wrap">
+          <div class="target" id="target">
+            <div class="lab" id="targetLab">target label</div>
+            <div class="num"><span id="targetVal">00.0</span><span class="unit" id="targetUnit">%</span></div>
+            <div class="sub"><span class="on" id="targetStatus">LOCKED</span>&nbsp;&nbsp;·&nbsp;&nbsp;<span id="targetSub">sub</span></div>
+          </div>
+          <div class="target-ring" id="targetRing"></div>
+          <div class="target-cross" id="targetCross"></div>
+        </div>
+
+        <!-- 四角 L 形取景框 -->
+        <div class="bracket tl" id="brTL">
+          <svg viewBox="0 0 96 96">
+            <path class="stroke" d="M0 36 L0 0 L36 0" />
+            <path class="inner" d="M16 60 L16 16 L60 16" />
+          </svg>
+        </div>
+        <div class="bracket tr" id="brTR">
+          <svg viewBox="0 0 96 96">
+            <path class="stroke" d="M60 0 L96 0 L96 36" />
+            <path class="inner" d="M36 16 L80 16 L80 60" />
+          </svg>
+        </div>
+        <div class="bracket bl" id="brBL">
+          <svg viewBox="0 0 96 96">
+            <path class="stroke" d="M0 60 L0 96 L36 96" />
+            <path class="inner" d="M16 36 L16 80 L60 80" />
+          </svg>
+        </div>
+        <div class="bracket br" id="brBR">
+          <svg viewBox="0 0 96 96">
+            <path class="stroke" d="M60 96 L96 96 L96 60" />
+            <path class="inner" d="M36 80 L80 80 L80 36" />
+          </svg>
+        </div>
+
+        <!-- 扫描线（轻扫一次） -->
+        <div class="scanline" id="scanline"></div>
+
+        <!-- 角标旁边的微数据（telemetry） -->
+        <div class="telem t1" id="tl1">RNG <b>248.6</b>m</div>
+        <div class="telem t2" id="tl2">AZ  <b>+12.4</b>°</div>
+        <div class="telem t3" id="tl3">EL  <b>-03.1</b>°</div>
+        <div class="telem t4" id="tl4">VEL <b>0.42</b>c</div>
+
+        <!-- 参数标签 -->
+        <div class="params">
+          <div class="param p1" id="p1">
+            <span class="dot"></span><span class="k">p1key</span><span class="v hot">p1val</span>
+            <span class="lead"></span>
+          </div>
+          <div class="param p2" id="p2">
+            <span class="dot"></span><span class="k">p2key</span><span class="v hot">p2val</span>
+            <span class="lead"></span>
+          </div>
+          <div class="param p3" id="p3">
+            <span class="dot"></span><span class="k">p3key</span><span class="v hot">p3val</span>
+            <span class="lead"></span>
+          </div>
+          <div class="param p4" id="p4">
+            <span class="dot"></span><span class="k">p4key</span><span class="v hot">p4val</span>
+            <span class="lead"></span>
+          </div>
+        </div>
+
+        <!-- 底部状态条 -->
+        <div class="status-bar" id="statusBar">
+          <div class="left">
+            <span class="pill"><span class="dot"></span>LOCK ACQUIRED</span>
+            <span>FRAME · 01 / 04</span>
+          </div>
+          <span class="right" id="statusRight">CONF 0.987</span>
+        </div>
+
+      </section>
+    </div>
+    <script>
+      /* ----- 变量接线 ----- */
+      const fallback = {
+        eyebrow: "LOCK ON · 准星聚焦",
+        targetLabel: "核心命中率",
+        targetValue: "92.4",
+        targetUnit: "%",
+        targetSub: "SYSTEM TARGET · 已锁定",
+        p1Key: "响应时延", p1Val: "38 ms",
+        p2Key: "回传频率", p2Val: "240 Hz",
+        p3Key: "追踪置信度", p3Val: "0.987",
+        p4Key: "信号强度", p4Val: "-42 dBm",
+        accent: "#00FF00",
+        background: "#12100E",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#12100E");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      const $ = (id) => document.getElementById(id);
+
+      /* ----- 内容回填 ----- */
+      $("eyebrow").textContent     = v.eyebrow     || fallback.eyebrow;
+      $("targetLab").textContent   = v.targetLabel || fallback.targetLabel;
+      $("targetVal").textContent   = v.targetValue || fallback.targetValue;
+      $("targetUnit").textContent  = v.targetUnit  || fallback.targetUnit;
+      $("targetSub").textContent   = v.targetSub   || fallback.targetSub;
+
+      const setParam = (id, k, val, hot) => {
+        const el = $(id);
+        if (!el) return;
+        el.querySelector(".k").textContent = k;
+        el.querySelector(".v").textContent = val;
+        if (hot) el.querySelector(".v").classList.add("hot");
+        else el.querySelector(".v").classList.remove("hot");
+      };
+      setParam("p1", v.p1Key || fallback.p1Key, v.p1Val || fallback.p1Val, true);
+      setParam("p2", v.p2Key || fallback.p2Key, v.p2Val || fallback.p2Val, false);
+      setParam("p3", v.p3Key || fallback.p3Key, v.p3Val || fallback.p3Val, true);
+      setParam("p4", v.p4Key || fallback.p4Key, v.p4Val || fallback.p4Val, false);
+
+      /* ----- 时间线 ----- */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6.5;
+      const tl = gsap.timeline({ paused: true });
+
+      // 角标收弧出发位置：4 个角分别从画外冲入
+      // tl 位置（相对目标中心）：出发在外、落到 .bracket 上的位置
+      const tl_BrTL = $("#brTL");
+      const tl_BrTR = $("#brTR");
+      const tl_BrBL = $("#brBL");
+      const tl_BrBR = $("#brBR");
+
+      // 1) 四角取景框：从画外冲入 + 落位（1.4s 总跨度，错峰）
+      //    起点：以 target 中心为原点，远离 380px
+      const far = 380;
+      tl.fromTo("#brTL",
+        { x: -far, y: -far, opacity: 0, scale: 1.4 },
+        { x: 0, y: 0, opacity: 1, scale: 1, duration: 0.55, ease: "power3.in" }, 0.05);
+      tl.fromTo("#brTR",
+        { x:  far, y: -far, opacity: 0, scale: 1.4 },
+        { x: 0, y: 0, opacity: 1, scale: 1, duration: 0.55, ease: "power3.in" }, 0.15);
+      tl.fromTo("#brBL",
+        { x: -far, y:  far, opacity: 0, scale: 1.4 },
+        { x: 0, y: 0, opacity: 1, scale: 1, duration: 0.55, ease: "power3.in" }, 0.10);
+      tl.fromTo("#brBR",
+        { x:  far, y:  far, opacity: 0, scale: 1.4 },
+        { x: 0, y: 0, opacity: 1, scale: 1, duration: 0.55, ease: "power3.in" }, 0.20);
+
+      // 2) 落位后超调回弹（back.out 1.6）：1.0s 后
+      tl.to([".bracket"], {
+        scale: 1.0, duration: 0.32, ease: "back.out(1.7)", stagger: 0.05
+      }, 1.05);
+
+      // 3) 扫描线横扫一次（与角标收弧同步）
+      tl.fromTo("#scanline",
+        { opacity: 0, y: -160, scaleX: 0.4 },
+        { opacity: 1, y: 160, scaleX: 1, duration: 0.7, ease: "power2.inOut" }, 0.6);
+      tl.to("#scanline",
+        { opacity: 0, duration: 0.18, ease: "power2.in" }, 1.4);
+
+      // 4) 锁定帧：角标染亮、目标入场（1.4–2.0s）
+      tl.add("lock", 1.4);
+      tl.add(() => {
+        [tl_BrTL, tl_BrTR, tl_BrBL, tl_BrBR].forEach(el => el && el.classList && el.classList.add("latched"));
+      }, "lock");
+      tl.fromTo("#target",
+        { opacity: 0, scale: 0.94 },
+        { opacity: 1, scale: 1, duration: 0.45, ease: "power3.out" }, 1.4);
+      tl.fromTo("#targetRing",
+        { opacity: 0, borderColor: "color-mix(in srgb, var(--accent, #00FF00) 0%, transparent)",
+          boxShadow: "0 0 0 0 transparent" },
+        { opacity: 1,
+          borderColor: "color-mix(in srgb, var(--accent, #00FF00) 70%, transparent)",
+          boxShadow: "0 0 36px color-mix(in srgb, var(--accent, #00FF00) 35%, transparent)",
+          duration: 0.45, ease: "power2.out" }, 1.5);
+      tl.fromTo("#targetCross",
+        { opacity: 0, scale: 1.4 },
+        { opacity: 1, scale: 1, duration: 0.35, ease: "back.out(2)" }, 1.55);
+
+      // 5) 锁定闪一下（目标卡轻微缩放呼吸）
+      tl.to("#target", {
+        scale: 1.03, duration: 0.22, ease: "power2.out", yoyo: true, repeat: 1
+      }, 1.85);
+
+      // 6) 参数标签错峰弹出（2.2–3.0s）
+      tl.fromTo(".param",
+        { opacity: 0, scale: 0.92 },
+        { opacity: 1, scale: 1, duration: 0.42, ease: "back.out(1.6)", stagger: 0.10 }, 2.2);
+      tl.fromTo(".telem",
+        { opacity: 0 },
+        { opacity: 0.85, duration: 0.35, ease: "power2.out", stagger: 0.07 }, 2.45);
+
+      // 7) 状态条入场
+      tl.fromTo("#statusBar",
+        { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 2.9);
+
+      // 8) 锁定后持续轻微呼吸（角标周期内吸→吐）
+      tl.to(".bracket", {
+        scale: 1.05, duration: 1.2, ease: "sine.inOut", yoyo: true, repeat: 1,
+        stagger: { each: 0.05, from: "random" }
+      }, 3.4);
+      // 目标环轻微亮度呼吸
+      tl.to("#targetRing", {
+        opacity: 0.55, duration: 1.1, ease: "sine.inOut", yoyo: true, repeat: 1
+      }, 3.6);
+
+      // 9) 结尾保留 1.0s 可读（DUR=6.5，呼吸结束 ≈4.8s → 剩 1.7s 可读）
+      //    最后让状态条文字定格后，做一个轻微的"确认"高亮
+      tl.fromTo("#statusBar .right",
+        { textShadow: "0 0 0 transparent" },
+        { textShadow: "0 0 18px color-mix(in srgb, var(--accent, #00FF00) 70%, transparent)",
+          duration: 0.6, ease: "power2.out" }, 5.0);
+      tl.to("#statusBar .right",
+        { textShadow: "0 0 10px color-mix(in srgb, var(--accent, #00FF00) 50%, transparent)",
+          duration: 0.7, ease: "sine.inOut", yoyo: true, repeat: 1 }, 5.6);
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

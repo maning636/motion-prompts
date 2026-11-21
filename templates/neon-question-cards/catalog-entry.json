@@ -1,0 +1,35 @@
+{
+  "id": "neon-question-cards",
+  "name": "荧光绿四角问题卡",
+  "description": "口播 overlay：顶部标题关键词绿色高亮，Q01–Q04 问题卡分布四角从各自侧方 stagger 滑入，中间留空给出镜人，支持背景图槽。",
+  "category": "透明叠加",
+  "tags": [
+    "问题卡",
+    "四角布局",
+    "霓虹",
+    "荧光绿",
+    "口播",
+    "叠加"
+  ],
+  "duration": 6,
+  "slot": "overlay",
+  "when": "口播抛出若干互动提问或需求采集问题，需要四角问题卡配合真人出镜画面叠加时",
+  "assets": [
+    {
+      "id": "imgBg",
+      "type": "image",
+      "label": "背景图"
+    }
+  ],
+  "path": "templates/neon-question-cards",
+  "size": "1920×1080",
+  "formats": [
+    "mp4"
+  ],
+  "defaultFormat": "mp4",
+  "preview": "https://maning789link.top/hub/renders/neon-question-cards/sample.webm",
+  "status": "ready",
+  "tier": "free",
+  "no": null,
+  "series": "shot"
+}

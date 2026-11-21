@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（黑条上的 mono 字）","default":"STOCK / 库存"},{"id":"title","name":"主标题","type":"string","label":"主标题（巨型数字左侧的一行大字）","default":"这个色号快断货"},{"id":"total","name":"总库存","type":"number","label":"总库存（件）","default":500},{"id":"sold","name":"已售","type":"number","label":"已售件数（件）","default":488},{"id":"unit","name":"单位","type":"string","label":"数字后的单位","default":"件"},{"id":"note","name":"口径说明","type":"string","label":"底部口径说明（一行 mono）","default":"口径：以订单支付时间计 · 补货批次独立计算"},{"id":"accent","name":"强调色","type":"color","label":"强调色（巨型数字块 / 斜纹带）","default":"#FF5FA2"},{"id":"duration","name":"总时长","type":"number","label":"总时长（秒，5–6）","default":5.5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","default":"mp4","hidden":true,"options":[{"value":"mp4","label":"MP4"},{"value":"webm","label":"WebM"},{"value":"transparent","label":"透明底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="大字加满宽库存条构图：上部反白标签条，中部巨型剩余件数压着方块，下部一整条横贯画面的库存条按已售比例向右生长">
+<title>仅剩 N 件 · 这个色号快断货</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  :root{
+    --ink:#0F0F0F; --paper:#FFF6E5; --pink:#FF5FA2; --yellow:#FFD429;
+    --blue:#3D7BFF; --green:#2FD07A; --white:#FFFFFF; --mute:#6B6B6B; --bw:3px;
+    --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    --mono:"Sarasa Gothic SC","JetBrains Mono",Consolas,"Courier New",monospace;
+    --accent:#FF5FA2;
+  }
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:var(--paper);color:var(--ink);font-family:var(--sans);
+    display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+  .top{flex:0 0 auto;height:70px;display:flex;align-items:center;gap:22px;
+    padding:0 72px;background:var(--ink);color:var(--white)}
+  .top .tag{flex:0 0 auto;font-family:var(--mono);font-weight:700;font-size:24px;
+    letter-spacing:.12em;padding:4px 18px;background:var(--accent);color:var(--ink);
+    border-radius:9999px;white-space:nowrap}
+  .top .eb{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-family:var(--mono);font-weight:700;font-size:24px;
+    letter-spacing:.14em;color:var(--yellow)}
+  .top .pct{flex:0 0 auto;font-family:var(--mono);font-weight:900;font-size:34px;
+    letter-spacing:0;color:var(--white);white-space:nowrap}
+
+  /* 中部：左侧标语，右侧巨型剩余件数方块 */
+  .mid{flex:1 1 auto;min-height:0;display:flex;align-items:center;gap:56px;
+    padding:0 72px;overflow:hidden}
+  .mid .tt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:22px}
+  .mid .h1{display:block;white-space:nowrap;font-weight:900;font-size:104px;
+    line-height:1.06;letter-spacing:0;max-width:100%;overflow:hidden;
+    text-overflow:ellipsis}
+  .mid .cap{white-space:nowrap;font-size:32px;font-weight:700;letter-spacing:0;
+    color:var(--mute);max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .box{flex:0 0 auto;display:flex;align-items:baseline;gap:18px;
+    padding:28px 56px 34px;background:var(--accent);color:var(--ink);
+    border:var(--bw) solid var(--ink);border-radius:4px;box-shadow:10px 10px 0 var(--ink)}
+  .box .n{display:block;white-space:nowrap;font-family:var(--mono);font-weight:900;
+    font-size:300px;line-height:.9;letter-spacing:0;
+    font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+  .box .u{font-family:var(--mono);font-weight:700;font-size:52px;letter-spacing:.06em}
+
+  /* 下部：满宽库存条 —— 底槽纸色 + 斜纹，填充实色，语义靠密度区分 */
+  .bar{flex:0 0 auto;padding:0 72px 34px}
+  .track{position:relative;width:100%;height:56px;
+    border:var(--bw) solid var(--ink);border-radius:4px;overflow:hidden;
+    background-color:var(--paper);
+    background-image:repeating-linear-gradient(45deg,
+      rgba(15,15,15,.13) 0 2px, transparent 2px 16px)}
+  .fill{position:absolute;left:0;top:0;bottom:0;width:0;
+    background:var(--accent);border-right:var(--bw) solid var(--ink)}
+  .legend{display:flex;align-items:center;gap:24px;margin-top:20px}
+  .legend .sq{flex:0 0 auto;width:22px;height:22px;background:var(--accent);
+    border:var(--bw) solid var(--ink);border-radius:4px}
+  .legend .tx{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-family:var(--mono);font-weight:700;font-size:24px;
+    letter-spacing:.06em;color:var(--mute)}
+
+  .stripe{flex:0 0 auto;height:20px;border-top:var(--bw) solid var(--ink);
+    background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+
+  @media (prefers-reduced-motion: reduce){
+    .anim{transition-duration:.01ms !important;animation-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="top anim" id="top">
+    <span class="tag">STOCK</span>
+    <span class="eb anim" id="eyebrow" data-fit-max="24" data-fit-min="15">STOCK / 库存</span>
+    <span class="pct anim" id="pct">SOLD 98%</span>
+  </div>
+
+  <div class="mid anim" id="mid">
+    <div class="tt">
+      <span class="h1 anim" id="title" data-fit-max="104" data-fit-min="44">这个色号快断货</span>
+      <span class="cap anim" id="cap">本批次售完即止，补货另开一批</span>
+    </div>
+    <span class="box anim" id="box">
+      <span class="n" id="n">12</span><span class="u" id="unit">件</span>
+    </span>
+  </div>
+
+  <div class="bar anim" id="bar">
+    <div class="track anim" id="track"><div class="fill" id="fill"></div></div>
+    <div class="legend anim" id="legend">
+      <span class="sq"></span>
+      <span class="tx anim" id="note" data-fit-max="24" data-fit-min="15">口径：以订单支付时间计 · 补货批次独立计算</span>
+    </div>
+  </div>
+
+  <div class="stripe anim" id="stripe"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  ['eyebrow', 'title', 'cap', 'note', 'unit']
+    .forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+
+  /* 剩余件数与已售比例都由 total / sold 算出，不允许把同一个数填两遍 */
+  var total = Number(v.total), sold = Number(v.sold);
+  if (!isFinite(total)) total = 0;
+  if (!isFinite(sold)) sold = 0;
+  total = Math.max(1, Math.round(total));
+  sold = Math.max(0, Math.min(total, Math.round(sold)));
+  var remain = total - sold;
+  var pct = Math.round(sold / total * 100);
+  set('n', String(remain));
+  set('pct', 'SOLD ' + pct + '%');
+
+  var fill = document.getElementById('fill');
+  var PCT_STR = pct + '%';
+
+  B.fitAll();
+  var tl = B.tl();
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (reduce) {
+    gsap.set('.anim', { x: 0, y: 0, scale: 1, scaleX: 1, rotate: 0 });
+    gsap.set('#fill', { width: PCT_STR });
+    tl.fromTo('#top',   { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, 0);
+    tl.fromTo('#mid',   { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .15);
+    tl.fromTo('#bar',   { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .35);
+    tl.fromTo('#stripe',{ opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, .5);
+    B.hold(tl, 1.2, 1.1);
+    return;
+  }
+
+  var INK = '#0F0F0F';
+  function slam(sel, at, dx, dy, d) {
+    tl.fromTo(sel, { x: dx, y: dy },
+      { x: 0, y: 0, duration: d, ease: 'power4.out' }, at);
+  }
+  function shadowBounce(sel, rest, at) {
+    var off = parseInt(rest, 10);
+    tl.set(sel, { boxShadow: off + 'px ' + (off + 3) + 'px 0 ' + INK, immediateRender: false }, at);
+    tl.to(sel, { boxShadow: rest, duration: 0.04, ease: 'steps(2)' }, at + 0.04);
+  }
+
+  slam('#top',     0.00,   0, -70, 0.26);
+  slam('#eyebrow', 0.14, -24, -20, 0.22);
+  slam('#pct',     0.20,  24, -20, 0.22);
+  slam('#title',   0.34, -28, -28, 0.26);
+  slam('#cap',     0.50,   0, -20, 0.22);
+  /* 大面积方块：power3.out + from:.86，面积单调涨到末帧 */
+  tl.fromTo('#box', { scale: .86, opacity: 0 },
+      { scale: 1, opacity: 1, duration: .3, ease: 'power3.out' }, 0.60);
+  shadowBounce('#box', '10px 10px 0 ' + INK, 0.94);
+  /* 模 6 条纹带 + 库存条：库存条是 width:0 的填充件，必须用 grow 不能用 wipe */
+  B.in.grow(tl, '#fill', PCT_STR, 0.86, { d: 0.7, ease: 'power3.out' });
+  slam('#bar',     0.72,   0,  28, 0.26);
+  slam('#legend',  1.54, -24, -18, 0.2);
+  slam('#note',    1.62,   0, -18, 0.2);
+  slam('#stripe',  1.74,   0,  24, 0.24);
+  tl.fromTo('#stripe', { backgroundPositionX: '0px' },
+    { backgroundPositionX: '60px', duration: 1.2, ease: 'none' }, 1.98);
+
+  var introEnd = 3.18;
+  var total2 = Math.min(6, Math.max(5, Number(v.duration) || 5.5));
+  B.hold(tl, introEnd, Math.max(0.6, total2 - introEnd));
+})();
+</script>
+</body></html>

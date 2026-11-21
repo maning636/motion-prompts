@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "img1", "type": "image", "label": "线稿图", "default": "./placeholder-line.png"}, {"id": "img2", "type": "image", "label": "彩图（与线稿像素对齐）", "default": "./placeholder-color.png"}, {"id": "title", "type": "string", "label": "故事标题", "default": "凌晨四点的豆浆"}, {"id": "caption", "type": "string", "label": "叙事文案", "default": "凌晨四点，他只买一个馒头。她总会多放一杯热豆浆。"}, {"id": "sceneNo", "type": "number", "label": "当前幕号", "default": 1}, {"id": "sceneTotal", "type": "number", "label": "总幕数", "default": 3}, {"id": "accent", "type": "color", "label": "强调色（竖线/计数器）", "default": "#FF9F1C"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #0B0C0B; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #F2EFE7;
+        background-image: radial-gradient(rgba(255,255,255,.035) 1px, transparent 1.5px); background-size: 44px 44px; }
+      .hd-frame{ position: absolute; left: 1060px; top: 70px; width: 660px; height: 940px;
+        background: #F5F0E6; padding: 18px; box-shadow: 0 44px 100px rgba(0,0,0,.6); }
+      .hd-stage{ position: relative; width: 100%; height: 100%; overflow: hidden; background: #EFE9DB; }
+      .hd-stage img{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #imgLine{ clip-path: inset(0 100% 0 0); }
+      #imgColor{ clip-path: inset(0 100% 0 0); }
+      .hd-title{ position: absolute; left: 150px; top: 150px; display: flex; align-items: center; gap: 18px;
+        font-size: 46px; font-weight: 800; }
+      .hd-title .dot{ width: 22px; height: 22px; border-radius: 50%; background: var(--accent, #FF9F1C); }
+      .hd-cap{ position: absolute; left: 150px; top: 340px; display: flex; gap: 26px; }
+      .hd-cap .bar{ width: 7px; min-height: 190px; background: var(--accent, #FF9F1C); border-radius: 4px; }
+      .hd-cap p{ font-size: 34px; line-height: 1.75; color: #D8DDD6; max-width: 560px; }
+      .hd-hint{ position: absolute; left: 150px; bottom: 170px; font-size: 22px; letter-spacing: .3em;
+        color: #6E7870; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+      .hd-count{ position: absolute; left: 150px; bottom: 100px; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 30px; letter-spacing: .18em; color: #8A9389; }
+      .hd-count b{ color: var(--accent, #FF9F1C); font-size: 40px; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="hd-title" id="titleWrap"><span class="dot"></span><span id="title"></span></div>
+      <div class="hd-cap" id="cap"><span class="bar"></span><p id="caption"></p></div>
+      <div class="hd-hint">LINE → COLOR · SAME DIRECTION WIPE</div>
+      <div class="hd-count" id="count"></div>
+      <div class="hd-frame" id="frame"><div class="hd-stage">
+        <img id="imgLine" src="./placeholder-line.png" alt="">
+        <img id="imgColor" src="./placeholder-color.png" alt="">
+      </div></div>
+
+    </div>
+    <script>
+      const fallback = {"img1": "./placeholder-line.png", "img2": "./placeholder-color.png", "title": "凌晨四点的豆浆", "caption": "凌晨四点，他只买一个馒头。她总会多放一杯热豆浆。", "sceneNo": 1, "sceneTotal": 3, "accent": "#FF9F1C", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      const split = (s) => String(s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const countTo = (el, target, at, dur = 1.0, dec = 0, wobble = false) => {
+        const o = { n: 0 };
+        tl.to(o, { n: Number(String(target).replace(/,/g, "")) || 0, duration: dur,
+          ease: wobble ? "back.out(1.6)" : "power2.out",
+          onUpdate: () => { el.textContent = dec ? o.n.toFixed(dec) : Math.round(o.n).toLocaleString("en-US"); } }, at);
+      };
+      document.documentElement.style.setProperty("--accent", V.accent ?? "#FF9F1C");
+      $("title").textContent = V.title;
+      $("caption").textContent = V.caption;
+      if (V.img1) $("imgLine").src = V.img1;
+      if (V.img2) $("imgColor").src = V.img2;
+      const no = String(Number(V.sceneNo) || 1).padStart(2, "0");
+      const total = String(Number(V.sceneTotal) || 3).padStart(2, "0");
+      $("count").innerHTML = `<b>${no}</b> ——— ${total}`;
+      tl.fromTo("#frame", { y: 36, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, 0);
+      tl.fromTo(["#titleWrap", "#cap", ".hd-hint", "#count"], { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.45, stagger: 0.1, ease: "power2.out" }, 0.15);
+      // 双层像素对齐，同方向左→右双 wipe：先擦出线稿再沿同方向填色
+      tl.to("#imgLine", { clipPath: "inset(0 0% 0 0)", duration: 1.2, ease: "power1.inOut" }, 0.55);
+      tl.to("#imgColor", { clipPath: "inset(0 0% 0 0)", duration: 1.2, ease: "power1.inOut" }, 1.95);
+      window.__timelines.main = tl;
+
+    </script>
+  </body>
+</html>

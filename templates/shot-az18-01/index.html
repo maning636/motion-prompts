@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "文档标题", "default": "本周产品周报"}, {"id": "mention", "type": "string", "label": "@人名", "default": "@产品组"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+#doc{ position:absolute; left:190px; top:70px; width:1540px; height:940px; transform-origin:400px 120px;
+  background:#101018; border:1px solid rgba(255,255,255,.12); border-radius:20px; display:flex; overflow:hidden;
+  box-shadow:0 40px 120px rgba(0,0,0,.55); }
+#main{ flex:1; padding:64px 70px; position:relative; }
+.blk{ position:relative; margin-bottom:30px; overflow:hidden; }
+.blk .txt{ height:26px; border-radius:6px; background:rgba(255,255,255,.34); }
+.blk .mask{ position:absolute; top:0; bottom:0; left:0; right:0; background:#101018; transform-origin:right center; }
+#bt .txt{ height:56px; width:62%; background:var(--fg); border-radius:10px; }
+.li .txt{ margin-left:34px; }
+.li::before{ content:''; position:absolute; left:6px; top:9px; width:10px; height:10px; border-radius:50%; background:var(--accent); }
+.li .mask{ left:-28px; } /* 多盖 28px 防圆点提前穿帮 */
+#mline .txt{ width:46%; background:rgba(255,255,255,.3); }
+#men{ display:inline-block; background:var(--accent); color:#0A0A0F; border-radius:6px; padding:0 10px;
+  font-size:22px; opacity:0; position:relative; top:-32px; left:120px; }
+#caret{ position:absolute; width:3px; height:30px; background:var(--accent); opacity:0; z-index:5; }
+#side{ width:380px; border-left:1px solid rgba(255,255,255,.1); padding:54px 34px; background:#0D0D13; }
+#side h4{ font-size:24px; color:rgba(255,255,255,.45); letter-spacing:4px; margin-bottom:30px; }
+.hi{ height:64px; border-radius:12px; background:#15151D; border:1px solid rgba(255,255,255,.1);
+  margin-bottom:18px; display:flex; align-items:center; padding:0 20px; opacity:0; }
+.hi i{ display:block; height:12px; border-radius:6px; background:rgba(255,255,255,.2); width:70%; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4" data-width="1920" data-height="1080">
+<div id="doc"><div id="main"><div class="blk" id="bt"><div class="txt"></div><div class="mask"></div></div><div class="blk"><div class="txt" style="width:88%"></div><div class="mask"></div></div><div class="blk"><div class="txt" style="width:76%"></div><div class="mask"></div></div><div class="blk"><div class="txt" style="width:82%"></div><div class="mask"></div></div><div class="blk li"><div class="txt" style="width:64%"></div><div class="mask"></div></div><div class="blk li"><div class="txt" style="width:58%"></div><div class="mask"></div></div><div class="blk li"><div class="txt" style="width:70%"></div><div class="mask"></div></div><div class="blk" id="mline"><div class="txt"></div><div class="mask"></div></div><span id="men"></span><div id="caret"></div></div><div id="side"><h4>HISTORY</h4><div class="hi" id="h0"><i></i></div><div class="hi" id="h1"><i></i></div><div class="hi" id="h2"><i></i></div><div class="hi" id="h3"><i></i></div><div class="hi" id="h4"><i></i></div><div class="hi" id="h5"><i></i></div></div></div>
+    </div>
+    <script>
+      const FB = {"title": "本周产品周报", "mention": "@产品组", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#bt .txt').textContent=''; $('#men').textContent=v.mention||'';
+// 标题用文字纹理太细，改色块排版: 标题块即标题
+const main=$('#main');
+// 相机：标题特写 1.25 → 全页 1（f0-64），尾段微呼吸
+tl.fromTo('#doc',{scale:1.25},{scale:1,duration:F(64),ease:'power2.inOut'},0);
+// 写入节拍：内容块两两一对，遮罩右锚 100%→0，caret 骑在揭示前沿（永远只有一个笔尖）
+const blks=Array.from(document.querySelectorAll('#main .blk'));
+const caret=$('#caret');
+blks.forEach((b,i)=>{
+  const g=Math.floor(i/2), cue=10+g*9+(i%2)*2;
+  const bx=b.offsetLeft, by=b.offsetTop, bw=b.offsetWidth, bh=b.offsetHeight;
+  tl.to(b.querySelector('.mask'),{scaleX:0,duration:F(8),ease:'power1.inOut'},F(cue));
+  tl.set(caret,{x:bx,y:by+ (bh-30)/2,opacity:1},F(cue));
+  tl.to(caret,{x:bx+bw,duration:F(8),ease:'power1.inOut'},F(cue));
+  if(i<blks.length-1) tl.set(caret,{opacity:0},F(cue+9));
+});
+tl.to(caret,{opacity:0,duration:F(2)},F(70));
+// @-mention：wipe 完成后 4f 起、8f 长出强调色底色
+tl.to('#men',{opacity:.9,duration:F(8),ease:'power1.out'},F(66));
+// 历史条目落入：6 条逐个从上落下，轻弹跳
+for(let i=0;i<6;i++){
+  tl.fromTo('#h'+i,{y:-44,opacity:0},{y:0,opacity:1,duration:F(8),ease:'back.out(1.2)'},F(62+i*6));
+}
+tl.to({},{duration:F(16)},F(104)); // 真静止
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

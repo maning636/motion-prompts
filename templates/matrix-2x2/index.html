@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"title","type":"string","label":"标题","default":"模型能力定位"},{"id":"subtitle","type":"string","label":"副标题","default":"推理能力 × 上下文长度"},{"id":"xAxis","type":"string","label":"X 轴标签","default":"推理能力低 → 高"},{"id":"yAxis","type":"string","label":"Y 轴标签","default":"上下文短 → 长"},{"id":"q1","type":"string","label":"左上象限标签","default":"长上下文 / 弱推理"},{"id":"q2","type":"string","label":"右上象限标签","default":"长上下文 / 强推理"},{"id":"q3","type":"string","label":"左下象限标签","default":"短上下文 / 弱推理"},{"id":"q4","type":"string","label":"右下象限标签","default":"短上下文 / 强推理"},{"id":"items","type":"string","label":"对象（名,x,y 逗号分隔，| 分隔对象）","default":"GPT-4,0.9,0.85|Claude,0.85,0.95|Gemini,0.75,0.8|LLaMA,0.7,0.6"},{"id":"accent","type":"color","label":"强调色","default":"#00FF00"},{"id":"background","type":"color","label":"背景色","default":"#12100E"},{"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+*{ box-sizing: border-box;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      html, body{ margin: 0; width: 1920px; height: 1080px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .scene{ position: absolute; inset: 0; width: 100%; height: 100%; padding: 96px 112px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .header{ margin-bottom: 40px;font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+      .title{ margin: 0; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 64px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; }
+      .subtitle{ margin: 12px 0 0; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-size: 24px; font-weight: 400; opacity: 0.55; }
+      .matrix{ position: relative; width: 100%; height: 720px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .axis-x{ position: absolute; left: 80px; right: 80px; bottom: 40px; height: 2px; background: rgba(244,239,231,0.18);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .axis-y{ position: absolute; left: 40px; top: 80px; bottom: 40px; width: 2px; background: rgba(244,239,231,0.18);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .axis-label{ position: absolute; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-size: 18px; font-weight: 500; opacity: 0.5; }
+      .grid-v{ position: absolute; top: 80px; bottom: 40px; width: 1px; background: rgba(244,239,231,0.08); left: 50%;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .grid-h{ position: absolute; left: 40px; right: 80px; height: 1px; background: rgba(244,239,231,0.08); top: 50%;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .quadrant-label{ position: absolute; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-size: 20px; font-weight: 700; opacity: 0.25; text-transform: uppercase; }
+      .point{ position: absolute; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); transform: translate(-50%, -50%);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .point-label{ position: absolute; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-size: 20px; font-weight: 600; transform: translate(12px, -50%); white-space: nowrap; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene clip" data-start="0" data-duration="6" data-track-index="1">
+        <div class="header">
+          <h1 class="title" id="title"></h1>
+          <p class="subtitle" id="subtitle"></p>
+        </div>
+        <div class="matrix" id="matrix">
+          <div class="axis-x"></div>
+          <div class="axis-y"></div>
+          <div class="grid-v"></div>
+          <div class="grid-h"></div>
+          <div class="axis-label" style="left: 80px; bottom: 12px;"></div>
+          <div class="axis-label" style="right: 80px; bottom: 12px; text-align: right;"></div>
+          <div class="axis-label" style="left: 8px; top: 60px;"></div>
+          <div class="axis-label" style="left: 8px; bottom: 40px;"></div>
+        </div>
+      </section>
+    </div>
+    <script>
+      const fallback = { title: "模型能力定位", subtitle: "推理能力 × 上下文长度", xAxis: "推理能力低 → 高", yAxis: "上下文短 → 长", q1: "长上下文 / 弱推理", q2: "长上下文 / 强推理", q3: "短上下文 / 弱推理", q4: "短上下文 / 强推理", items: "GPT-4,0.9,0.85|Claude,0.85,0.95|Gemini,0.75,0.8|LLaMA,0.7,0.6", accent: "#00FF00", background: "#12100E", foreground: "#F4EFE7" };
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4EFE7");
+      document.documentElement.style.setProperty("--background", v.background ?? "#12100E");
+      const root = document.getElementById("root");
+      root.style.backgroundColor = v.background;
+      root.style.color = v.foreground;
+      root.style.setProperty("--accent", v.accent);
+      document.getElementById("title").textContent = v.title;
+      document.getElementById("subtitle").textContent = v.subtitle;
+      const matrix = document.getElementById("matrix");
+      const labels = matrix.querySelectorAll(".axis-label");
+      labels[0].textContent = v.xAxis.split("→")[0]?.trim() || "";
+      labels[1].textContent = v.xAxis.split("→")[1]?.trim() || "";
+      labels[2].textContent = v.yAxis.split("→")[1]?.trim() || "";
+      labels[3].textContent = v.yAxis.split("→")[0]?.trim() || "";
+
+      function addLabel(text, left, top) {
+        const el = document.createElement("div");
+        el.className = "quadrant-label";
+        el.textContent = text;
+        el.style.left = left; el.style.top = top;
+        matrix.appendChild(el);
+      }
+      addLabel(v.q1, "6%", "15%");
+      addLabel(v.q2, "52%", "15%");
+      addLabel(v.q3, "6%", "76%");
+      addLabel(v.q4, "52%", "76%");
+
+      const items = String(v.items).split("|").map(s => s.split(",").map(x => x.trim()));
+      items.forEach(([name, x, y]) => {
+        const px = parseFloat(x) || 0;
+        const py = parseFloat(y) || 0;
+        const wrapper = document.createElement("div");
+        wrapper.style.position = "absolute";
+        wrapper.style.left = (40 + px * (1696 - 120)) + "px";
+        wrapper.style.top = (80 + (1 - py) * (720 - 120)) + "px";
+        const dot = document.createElement("div");
+        dot.className = "point";
+        const label = document.createElement("div");
+        label.className = "point-label";
+        label.textContent = name;
+        wrapper.appendChild(dot);
+        wrapper.appendChild(label);
+        matrix.appendChild(wrapper);
+      });
+
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(".title", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.1);
+      tl.fromTo(".subtitle", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.25);
+      tl.fromTo(".axis-x", { scaleX: 0, transformOrigin: "left center" }, { scaleX: 1, duration: 0.6, ease: "power2.out" }, 0.5);
+      tl.fromTo(".axis-y", { scaleY: 0, transformOrigin: "center bottom" }, { scaleY: 1, duration: 0.6, ease: "power2.out" }, 0.5);
+      tl.fromTo(".grid-v, .grid-h", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 0.9);
+      tl.fromTo(".axis-label", { opacity: 0 }, { opacity: 0.5, duration: 0.4, stagger: 0.05 }, 1.0);
+      tl.fromTo(".quadrant-label", { opacity: 0 }, { opacity: 0.25, duration: 0.4, stagger: 0.05 }, 1.1);
+      document.querySelectorAll(".point").forEach((p, i) => {
+        tl.fromTo(p.parentElement, { opacity: 0, scale: 0 }, { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(2)" }, 1.3 + i * 0.12);
+      });
+      tl.to(".scene", { opacity: 0, y: -16, duration: 0.5, ease: "power2.in" }, 5.3);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

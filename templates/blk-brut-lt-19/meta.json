@@ -1,0 +1,16 @@
+{
+ "name": "倒计时贴",
+ "description": "强调色块内 900 大数字按整数硬跳倒数到 0，展示窗口写死 1.8s，下方剩余条匀速排空，数字块与剩余条反向微位移",
+ "category": "叠加组件",
+ "tags": [
+  "积木社",
+  "countdown",
+  "urgent",
+  "pink"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "overlay",
+ "when": "直播整点抽奖、限时开拍、秒杀倒计时等需要制造紧迫感的场景"
+}

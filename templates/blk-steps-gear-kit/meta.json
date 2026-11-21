@@ -1,0 +1,16 @@
+{
+ "name": "步骤轴 · 出门干活带这几样就够",
+ "description": "一条横轨串起 N 个步骤，方形编号牌压在轨上、标签垂在轴下，节点逐个砸落",
+ "category": "流程图",
+ "tags": [
+  "积木社",
+  "arrow",
+  "berry",
+  "heavy"
+ ],
+ "duration": 5,
+ "size": "1920×1080",
+ "status": "ready",
+ "slot": "card",
+ "when": "数据卡片 / 步骤轴"
+}

@@ -1,0 +1,11 @@
+{
+  "title": "渠道销售构成",
+  "subtitle": "线上与线下销售额季度占比",
+  "labels": "Q1,Q2,Q3,Q4",
+  "seriesNames": "线上,线下",
+  "values": "320,180;410,220;380,290;520,310",
+  "colors": "#00FF00,#6B7280",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

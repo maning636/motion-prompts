@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "title", "type": "string", "label": "翻牌标题", "default": "新品发布"}, {"id": "subtitle", "type": "string", "label": "副标题", "default": "7 月 27 日 · 正式上线"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+.kicker{ position:absolute; left:0; right:0; top:230px; text-align:center; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  font-size:26px; letter-spacing:.5em; color:rgba(255,255,255,.45); }
+.flaprow{ position:absolute; left:0; right:0; top:400px; display:flex; justify-content:center; gap:12px; perspective:420px; }
+.tile{ position:relative; width:118px; height:156px; border-radius:10px; background:#262624;
+  box-shadow:0 18px 40px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06); }
+.tile.space{ width:52px; background:transparent; box-shadow:none; }
+.half{ position:absolute; left:0; width:100%; height:50%; overflow:hidden; z-index:1; }
+.half span, .leaf span{ display:block; width:118px; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-size:100px; line-height:156px;
+  text-align:center; color:#f4f4f2; }
+.half.top{ top:0; border-radius:10px 10px 0 0; }
+.half.bottom{ bottom:0; border-radius:0 0 10px 10px; }
+.half.bottom span{ transform:translateY(-78px); }
+.leaf{ position:absolute; left:0; width:100%; height:50%; overflow:hidden; background:#262624; z-index:4; opacity:0; }
+.leaf.ltop{ top:0; transform-origin:50% 100%; border-radius:10px 10px 0 0; }
+.leaf.lbot{ bottom:0; transform-origin:50% 0%; border-radius:0 0 10px 10px; }
+.leaf.lbot span{ transform:translateY(-78px); }
+.hinge{ position:absolute; left:0; right:0; top:76px; height:4px; background:#141412; z-index:5; border-radius:2px; }
+.sub{ position:absolute; left:0; right:0; top:640px; text-align:center; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+  font-size:30px; letter-spacing:.3em; color:var(--accent); }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+<div class="kicker" id="k">DEPARTURES</div>
+<div class="flaprow" id="row"></div>
+<div class="sub" id="s"></div>
+    </div>
+    <script>
+      const FB = {"title": "新品发布", "subtitle": "7 月 27 日 · 正式上线", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#k').textContent='NOW BOARDING';$('#s').textContent=v.subtitle||'';
+const GLYPHS='ABCDEFGHJKMNPQRSTUVWXYZ023456789#%&$';
+const gib=(i,k)=>{const x=Math.sin(i*127.3+k*57.7)*43758.5453;const f=x-Math.floor(x);return GLYPHS[Math.floor(f*GLYPHS.length)];};
+const chars=[...(v.title||'新品发布')];
+const row=$('#row');
+const tiles=[];
+chars.forEach((ch,i)=>{
+  const t=document.createElement('div');
+  if(ch===' '){t.className='tile space';row.appendChild(t);tiles.push(null);return;}
+  t.className='tile';
+  t.innerHTML='<div class="half top"><span></span></div><div class="half bottom"><span></span></div>'
+    +'<div class="leaf ltop"><span></span></div><div class="leaf lbot"><span></span></div><div class="hinge"></div>';
+  row.appendChild(t);tiles.push(t);
+});
+// 初态：乱码 g0 静止建立
+tiles.forEach((t,i)=>{ if(!t)return;
+  const g0=gib(i,0);
+  t.querySelector('.half.top span').textContent=g0;
+  t.querySelector('.half.bottom span').textContent=g0;
+});
+function flip(tile,cur,next,at){
+  const top=tile.querySelector('.half.top span'),bot=tile.querySelector('.half.bottom span');
+  const lt=tile.querySelector('.leaf.ltop'),lb=tile.querySelector('.leaf.lbot');
+  tl.call(()=>{lt.querySelector('span').textContent=cur;},null,at);
+  tl.set(lt,{rotateX:0,opacity:1,filter:'brightness(1)'},at);
+  tl.to(lt,{rotateX:-90,filter:'brightness(0.55)',duration:F(2.5),ease:'power2.in'},at);
+  tl.call(()=>{top.textContent=next;},null,at+F(2.5));
+  tl.set(lt,{opacity:0},at+F(2.5));
+  tl.call(()=>{lb.querySelector('span').textContent=next;},null,at+F(2.5));
+  tl.set(lb,{rotateX:90,opacity:1,filter:'brightness(0.55)'},at+F(2.5));
+  tl.to(lb,{rotateX:0,filter:'brightness(1)',duration:F(2.5),ease:'power2.out'},at+F(2.5));
+  tl.call(()=>{bot.textContent=next;},null,at+F(5));
+  tl.set(lb,{opacity:0},at+F(5));
+}
+tl.fromTo('.kicker',{opacity:0},{opacity:1,duration:F(10)},0);
+tl.fromTo('.tile:not(.space)',{opacity:0,y:14},{opacity:1,y:0,duration:F(8),stagger:F(1)},F(2));
+let last=F(22);
+tiles.forEach((t,i)=>{ if(!t)return;
+  const at=F(22)+i*F(4);
+  const target=chars[i];
+  flip(t,gib(i,0),gib(i,1),at);
+  flip(t,gib(i,1),gib(i,2),at+F(5));
+  flip(t,gib(i,2),target,at+F(10));
+  // 停定咔哒：整格 6px 下沉→过冲→归零
+  tl.to(t,{y:6,duration:F(3),ease:'power2.out'},at+F(15));
+  tl.to(t,{y:-1.5,duration:F(2),ease:'power2.out'},at+F(18));
+  tl.to(t,{y:0,duration:F(2),ease:'power2.out'},at+F(20));
+  last=at+F(22);
+});
+tl.fromTo('.sub',{opacity:0,y:12},{opacity:1,y:0,duration:F(12)},last+F(4));
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

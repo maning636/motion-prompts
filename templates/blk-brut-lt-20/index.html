@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"head","name":"引导大字","type":"string","label":"引导大字（6–12 字，单行）","default":"关注不迷路"},{"id":"acct","name":"账号名","type":"string","label":"账号名（6–16 字）","default":"@BLOCKBRUT 积木社"},{"id":"btn","name":"按钮文字","type":"string","label":"绿色按钮文字（2–4 字）","default":"关注"},{"id":"note","name":"底部说明","type":"string","label":"底部 mono 说明（8–18 字）","default":"每条视频末尾都会提醒一次"},{"id":"accent","name":"强调色","type":"color","label":"强调色（大字色块底 / 说明条）","default":"#FFD429"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","hidden":true,"default":"transparent","options":[{"value":"transparent","label":"透明底"},{"value":"mp4","label":"MP4 纯底"},{"value":"webm","label":"WebM 纯底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="关注引导贴：左白底大字卡 + 右绿色动作按钮 + 底部说明条，主卡自左拍入后按钮做一次模 3 按下反馈（位移量正好等于阴影偏移量），三块做反向微位移">
+<title>关注引导贴 · 关注不迷路</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 透明底贴片：--paper 不出现，底色与阴影色收进变量（风格规范 §7.1 / §7.2 规则 A） */
+  :root{ --shadow:#FFFFFF; --background:transparent; }
+
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--background);color:var(--ink);font-family:var(--sans)}
+
+  /* 大字卡：白底黑字，主字压高饱和块，字号是账号名的 3 倍以上（基因 8 极限字号跳跃） */
+  #hc{position:absolute;left:96px;bottom:216px;width:1180px;height:300px;
+    display:flex;flex-direction:column;justify-content:center;padding:0 40px;
+    background:var(--white);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  #head{display:block;font-size:96px;font-weight:900;line-height:1.06;letter-spacing:0;
+    color:var(--ink);white-space:nowrap;overflow:hidden}
+  #hc .rule{height:3px;background:var(--ink);margin:20px 0 16px;flex:0 0 3px}
+  #acct{display:block;font-family:var(--mono);font-weight:700;font-size:30px;letter-spacing:.06em;
+    line-height:1;color:var(--ink);white-space:nowrap;overflow:hidden}
+
+  /* 动作按钮：绿色是「正向状态」专用色（§1.2 green 纪律），不做装饰 */
+  #bt{position:absolute;left:1312px;bottom:216px;width:388px;height:300px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+    background:var(--green);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  #btn{display:block;font-size:88px;font-weight:900;line-height:1;letter-spacing:0;color:var(--ink);
+    white-space:nowrap;overflow:hidden}
+  /* 箭头：裸字符件 + 文字硬投影，是全风格唯一的交互签名（§3.3 / 基因 2 附注） */
+  #bt .arw{font-family:var(--mono);font-weight:900;font-size:56px;line-height:1;color:var(--ink);
+    text-shadow:2px 2px 0 var(--white)}
+
+  /* 底部说明条：ink 底黄字，与主卡之间靠 3px 实线分隔（基因 7） */
+  #nt{position:absolute;left:96px;bottom:88px;width:1180px;height:96px;
+    display:flex;align-items:center;padding:0 40px;
+    background:var(--ink);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  #note{display:block;font-family:var(--mono);font-weight:700;font-size:28px;letter-spacing:.06em;
+    line-height:1;color:var(--yellow);white-space:nowrap;overflow:hidden}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="hc">
+    <span id="head" data-fit-max="96" data-fit-min="46">关注不迷路</span>
+    <div class="rule"></div>
+    <span id="acct" data-fit-max="30" data-fit-min="18">@BLOCKBRUT 积木社</span>
+  </div>
+  <div id="bt"><span id="btn" data-fit-max="88" data-fit-min="44">关注</span><span class="arw">→</span></div>
+  <div id="nt"><span id="note" data-fit-max="28" data-fit-min="18">每条视频末尾都会提醒一次</span></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  var isT = (v.exportMode || 'transparent') === 'transparent';
+  var r = document.documentElement.style;
+  r.setProperty('--background', isT ? 'transparent' : '#0F0F0F');
+  r.setProperty('--shadow', isT ? '#FFFFFF' : '#0F0F0F');
+  if (v.accent) r.setProperty('--accent', v.accent);
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+  ['head', 'acct', 'btn', 'note'].forEach(function (k) { set(k, v[k]); });
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：去掉拍入与按下反馈，只留终态 + ≤8px 微位移淡入（规范 §13.5） */
+    gsap.set('#hc', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#bt', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#nt', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#head', { x: 0 });
+    gsap.set('#acct', { x: 0 });
+
+    tl.fromTo('#hc', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, 0);
+    tl.fromTo('#bt', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, .45);
+
+    B.hold(tl, 1.6, 1.2);
+    return;
+  }
+
+  var TOTAL = parseFloat(v.duration) > 0 ? parseFloat(v.duration) : 5;
+  var HOLD = 0.5;
+  var WIN = Math.max(1.6, TOTAL - HOLD);
+  var SH = isT ? '#FFFFFF' : '#0F0F0F';
+
+  /* 模 1 · 拍进来：主卡自左上斜向硬着陆，落定瞬间阴影压 2 帧再弹回原档 */
+  tl.fromTo('#hc', { x: -70, y: -36 },
+      { x: 0, y: 0, duration: .26, ease: 'power4.out' }, 0)
+    .fromTo('#hc', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#hc', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+  tl.fromTo('#head', { x: -28 }, { x: 0, duration: .22, ease: 'power4.out' }, .2);
+  tl.fromTo('#hc .rule', { x: -28 }, { x: 0, duration: .22, ease: 'power4.out' }, .28);
+  tl.fromTo('#acct', { x: -24 }, { x: 0, duration: .2, ease: 'power4.out' }, .34);
+
+  /* 模 3 · 按钮按下：位移量恒等于阴影偏移量，1 帧完成不补间（基因 2 唯一的交互签名） */
+  tl.fromTo('#bt', { x: 60 },
+      { x: 0, duration: .24, ease: 'power4.out' }, .16)
+    .fromTo('#bt', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#bt', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+  tl.set('#bt', { x: 6, y: 6, boxShadow: '2px 2px 0 ' + SH, duration: 0 }, 1.5)
+    .set('#bt', { x: 0, y: 0, boxShadow: '8px 8px 0 ' + SH, duration: 0 }, 1.86);
+
+  /* 模 7 · 分格擦出：底部说明条自左分六格推出来 */
+  tl.fromTo('#nt', { clipPath: 'inset(0 100% 0 0)' },
+      { clipPath: 'inset(0 0% 0 0)', duration: .32, ease: 'steps(6)' }, .4);
+  tl.fromTo('#note', { x: -22 }, { x: 0, duration: .2, ease: 'power4.out' }, .6);
+
+  /* 三块反向微位移：按钮上抬、主卡下压、说明条反向，匀速往返 */
+  var T0 = 2.0;
+  var REP = Math.max(1, Math.round((WIN - T0) / .9));
+  var half = (WIN - T0) / (REP * 2);
+  tl.to('#bt', { y: -6, duration: half, ease: 'none', repeat: REP * 2 - 1, yoyo: true }, T0);
+  tl.to('#hc', { y: 5, duration: half, ease: 'none', repeat: REP * 2 - 2, yoyo: true }, T0 + half);
+  tl.to('#nt', { y: -5, duration: half, ease: 'none', repeat: REP * 2 - 2, yoyo: true }, T0 + half);
+
+  var end = tl.duration();
+  B.hold(tl, end, Math.max(HOLD, TOTAL - end));
+})();
+</script>
+</body></html>

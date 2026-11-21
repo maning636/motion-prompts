@@ -1,0 +1,19 @@
+{
+  "title": "功能与成果",
+  "front1": "自动剪辑",
+  "num1": "10×",
+  "label1": "产能提升",
+  "front2": "一键配音",
+  "num2": "3 分钟",
+  "label2": "成片耗时",
+  "front3": "模板市场",
+  "num3": "180+",
+  "label3": "可用模板",
+  "img1": "./assets/_gf0.png",
+  "img2": "./assets/_gf1.png",
+  "img3": "./assets/_gf2.png",
+  "duration": 6,
+  "accent": "#00FF00",
+  "background": "#0A0A0F",
+  "foreground": "#F4F4F2"
+}

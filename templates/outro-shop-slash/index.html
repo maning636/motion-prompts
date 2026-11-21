@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"product","type":"string","label":"商品名","default":"冷萃冻干柠檬片"},{"id":"price","type":"number","label":"到手价","default":89},{"id":"cta","type":"string","label":"行动文案","default":"立即抢购"},{"id":"accent","type":"color","label":"强调色","default":"#FFD429"},{"id":"background","type":"color","label":"背景色","default":"#12100E"},{"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+*{ box-sizing: border-box;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      html, body{ margin: 0; width: 1920px; height: 1080px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .scene{ position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .big{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight: 900; color: var(--accent);
+        line-height: 1.06; letter-spacing: -.03em; margin: 0;font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+      .sub{ font-size: 38px; color: rgba(244,239,231,.7); margin: 0;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .cta{ display: inline-flex; align-items: center; gap: 20px; background: var(--accent); color: var(--ink);
+        border-radius: 18px; padding: 28px 60px; box-shadow: 0 0 0 5px var(--accent), 0 0 0 9px var(--ink), 14px 14px 0 rgba(0,0,0,.55);font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-weight: 900; color: var(--ink);font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+      .frame{ position: absolute; width: 88px; height: 88px; border: 7px solid var(--accent); opacity: .85;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .frame.tl{ left: 54px; top: 54px; border-right: none; border-bottom: none;}
+      .frame.br{ right: 54px; bottom: 54px; border-left: none; border-top: none;}
+      .scene{ display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 40px; }
+      .big{ font-size: 140px; text-align: center; }
+      .slash{ position: relative; padding: 22px 84px; background: var(--accent); color: var(--ink);
+        transform: rotate(-4deg); box-shadow: 16px 16px 0 rgba(0,0,0,.55); border-radius: 14px;}
+      .slash .cur{ font-size: 62px; font-weight: 700; }
+      .slash .num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 168px; font-weight: 900; line-height:.9;
+        font-variant-numeric: tabular-nums;}
+      .cta{ font-size: 60px; margin-top: 12px; }
+    </style>
+  </head>
+  <body>
+      <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+      <section id="scene" class="scene clip" data-start="0" data-duration="5" data-track-index="1">
+        <h1 class="big" id="product"></h1>
+        <div class="slash"><span class="cur">¥</span><span class="num" id="price">0</span></div>
+        <span class="cta" id="cta"></span>
+      </section>
+      </div>
+    <script>
+      const fallback = {product: "冷萃冻干柠檬片", price: 89, cta: "立即抢购", accent: "#FFD429", background: "#12100E", foreground: "#F4EFE7"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      const root = document.getElementById("root");
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4EFE7");
+      document.documentElement.style.setProperty("--background", v.background ?? "#12100E");
+      root.style.backgroundColor = v.background;
+      root.style.setProperty("--accent", v.accent ?? "#FFD429");
+      root.style.setProperty("--fg", v.foreground ?? "#F4EFE7");
+      root.style.setProperty("--ink", v.background ?? "#12100E");
+      document.getElementById("product").textContent = v.product;
+      document.getElementById("cta").textContent = v.cta;
+      const priceEl = document.getElementById("price");
+      const counter = { n: 0 };
+      function paintPrice() { priceEl.textContent = Math.round(counter.n); }
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(".big", { opacity: 0, y: -50 }, { opacity: 1, y: 0, duration: 0.65, ease: "power4.out" }, 0.1);
+      tl.fromTo(".slash", { x: -760, opacity: 0.2, rotation: -16 },
+        { x: 0, opacity: 1, rotation: -4, duration: 0.72, ease: "power4.out" }, 0.55);
+      tl.to(counter, { n: Math.max(0, Number(v.price) || 0), duration: 1.15, ease: "power2.out", onUpdate: paintPrice }, 0.72);
+      tl.fromTo(".cta", { opacity: 0, y: -60, scale: 0.86 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.62, ease: "back.out(2.3)" }, 1.75);
+      tl.to(".slash", { rotation: -1.5, duration: 0.42, ease: "sine.inOut", yoyo: true, repeat: 5 }, 2.5);
+      tl.to(".cta", { scale: 1.05, duration: 0.4, ease: "sine.inOut", yoyo: true, repeat: 5 }, 2.6);
+      tl.to(".scene", { opacity: 0, duration: 0.42, ease: "power2.in" }, 4.55);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

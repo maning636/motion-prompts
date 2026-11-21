@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "vol", "type": "string", "label": "页眉左（卷/栏目）", "default": "VOL.15 · 视觉动效库"}, {"id": "pageno", "type": "string", "label": "页眉右（页码）", "default": "P.385 / 400"}, {"id": "rows", "type": "string", "label": "仪表盘行（分号分隔 6-8 行）", "default": "欧线集运 · 涨幅;沪铜主力 · 新高;离岸人民币 · 回落;纳指期货 · 走强;十年国债 · 走平;黄金现货 · 回调"}, {"id": "target", "type": "number", "label": "高亮目标行（从 1 数）", "default": 4}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "duration", "type": "number", "label": "总时长(秒)", "default": 6}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      *{ box-sizing: border-box; margin: 0; padding: 0; }
+      html, body{ width: 1920px; height: 1080px; overflow: hidden; }
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      #root{ background: #141414; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; color: #F6F5EF; }
+      .mono{ font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+      /* 顶部细线页眉 */
+      .dbg-head{ position: absolute; left: 90px; right: 90px; top: 48px; height: 44px; z-index: 6; }
+      .dbg-head .rule{ position: absolute; left: 0; right: 0; top: 0; height: 2px; background: #F6F5EF;
+        transform: scaleX(0); transform-origin: 0 50%; }
+      .dbg-head .l{ position: absolute; left: 0; top: 12px; font-size: 19px; letter-spacing: .22em; color: #F6F5EF; }
+      .dbg-head .r{ position: absolute; right: 0; top: 12px; font-size: 19px; letter-spacing: .22em; color: #9A9A92; }
+      /* 面板 */
+      .dbg-wrap{ position: absolute; left: 210px; right: 210px; top: 158px; bottom: 122px; z-index: 4; }
+      .dbg-shadow{ position: absolute; left: 16px; top: 16px; right: -16px; bottom: -16px; background: #000; opacity: 0; }
+      .dbg-panel{ position: absolute; inset: 0; background: #1B1B18; border: 3px solid #F6F5EF; overflow: hidden; }
+      .dbg-bar{ display: flex; align-items: center; justify-content: space-between; height: 58px;
+        padding: 0 26px; border-bottom: 2px solid rgba(246,245,239,.28); }
+      .dbg-bar .bt{ font-size: 21px; letter-spacing: .2em; color: #F6F5EF; }
+      .dbg-bar .bd{ font-size: 15px; letter-spacing: .22em; color: var(--ac, #00FF00); }
+      .dbg-row{ display: flex; align-items: center; gap: 24px; height: 82px; padding: 0 30px;
+        border-bottom: 1px solid rgba(246,245,239,.1); opacity: 0; }
+      .dbg-row:last-child{ border-bottom: none; }
+      .dbg-row .idx{ width: 58px; font-size: 18px; letter-spacing: .18em; color: #9A9A92; }
+      .dbg-row .name{ flex: 1; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 29px; color: #F6F5EF; }
+      .dbg-row .bars{ width: 250px; display: flex; align-items: flex-end; gap: 8px; height: 34px; }
+      .dbg-row .bars i{ display: inline-block; width: 11px; background: rgba(246,245,239,.3); }
+      .dbg-row .pill{ width: 178px; text-align: center; font-size: 19px; letter-spacing: .1em;
+        padding: 11px 0; border: 2px solid rgba(246,245,239,.35); border-radius: 999px; color: #9A9A92; }
+      /* 荧光扫描带 */
+      .dbg-scan{ position: absolute; left: 0; right: 0; top: 58px; height: 82px; z-index: 3; pointer-events: none;
+        background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent) 16%, transparent) 30%, color-mix(in srgb, var(--accent) 30%, transparent) 50%, color-mix(in srgb, var(--accent) 16%, transparent) 70%, transparent);
+        border-top: 2px solid var(--ac, #00FF00); border-bottom: 2px solid var(--ac, #00FF00); opacity: 0; }
+      /* 底部荧光绿署名条 */
+      .dbg-foot{ position: absolute; left: 0; right: 0; bottom: 0; height: 60px; background: var(--ac, #00FF00);
+        z-index: 6; display: flex; align-items: center; justify-content: space-between; padding: 0 90px;
+        transform: translateY(60px); }
+      .dbg-foot .f1{ font-size: 22px; font-weight: 900; letter-spacing: .12em; color: #141414; }
+      .dbg-foot .f2{ font-size: 18px; letter-spacing: .26em; color: #141414; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <div class="dbg-head">
+        <div class="rule" id="rule"></div>
+        <div class="l mono" id="vol"></div>
+        <div class="r mono" id="pageno"></div>
+      </div>
+      <div class="dbg-wrap">
+        <div class="dbg-shadow" id="shadow"></div>
+        <div class="dbg-panel" id="panel">
+          <div class="dbg-bar">
+            <div class="bt mono">LIVE BOARD · 行情看板</div>
+            <div class="bd mono">● SCANNING</div>
+          </div>
+          <div id="rows"></div>
+          <div class="dbg-scan" id="scan"></div>
+        </div>
+      </div>
+      <div class="dbg-foot" id="foot">
+        <div class="f1">@老马AI研习社</div>
+        <div class="f2 mono">MOTION LIBRARY · GLOW SCAN</div>
+      </div>
+    </div>
+    <script>
+      const fallback = {"vol": "VOL.15 · 视觉动效库", "pageno": "P.385 / 400", "rows": "欧线集运 · 涨幅;沪铜主力 · 新高;离岸人民币 · 回落;纳指期货 · 走强;十年国债 · 走平;黄金现货 · 回调", "target": 4, "accent": "#00FF00", "duration": 6};
+      const V = Object.assign({}, fallback, (window.__hyperframes?.getVariables?.() || {}));
+      const $ = (id) => document.getElementById(id);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      document.documentElement.style.setProperty("--ac", V.accent ?? "#00FF00");
+      $("vol").textContent = V.vol;
+      $("pageno").textContent = V.pageno;
+      // 生成行
+      const rows = String(V.rows).split(";").map(s => s.trim()).filter(Boolean).slice(0, 8);
+      const target = Math.min(Math.max(1, Math.round(V.target || 1)), rows.length);
+      const pillTexts = ["WATCH", "HOLD", "LOCKED", "HOT", "FLAT", "DOWN", "UP", "ALERT"];
+      rows.forEach((name, i) => {
+        const row = document.createElement("div");
+        row.className = "dbg-row";
+        row.dataset.i = i;
+        const idx = document.createElement("div"); idx.className = "idx mono"; idx.textContent = String(i + 1).padStart(2, "0");
+        const nm = document.createElement("div"); nm.className = "name"; nm.textContent = name;
+        const bars = document.createElement("div"); bars.className = "bars";
+        const heights = [14, 22, 17, 28, 20, 12, 25];
+        heights.forEach((h, j) => { const b = document.createElement("i"); b.style.height = ((h + ((i * 7 + j * 5) % 13) % 10) ) + "px"; bars.appendChild(b); });
+        const pill = document.createElement("div"); pill.className = "pill mono"; pill.textContent = pillTexts[i % pillTexts.length];
+        row.appendChild(idx); row.appendChild(nm); row.appendChild(bars); row.appendChild(pill);
+        $("rows").appendChild(row);
+      });
+      const rowEls = Array.from(document.querySelectorAll(".dbg-row"));
+      const tEl = rowEls[target - 1];
+      const tPill = tEl.querySelector(".pill");
+      const others = rowEls.filter(r => r !== tEl);
+      const ROW_H = 82, BAR_H = 58;
+      // 目标行用虚线胶囊起点（SYSTEM 态）
+      tPill.textContent = "SYSTEM";
+      // 页眉
+      tl.to("#rule", { scaleX: 1, duration: 0.5, ease: "power3.out" }, 0);
+      tl.fromTo(["#vol", "#pageno"], { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.4, stagger: 0.08 }, 0.25);
+      // 面板与行入场
+      tl.to("#shadow", { opacity: 1, duration: 0.45 }, 0.25);
+      tl.fromTo("#panel", { y: 60, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7, ease: "expo.out" }, 0.2);
+      tl.fromTo(".dbg-bar", { opacity: 0 }, { opacity: 1, duration: 0.35 }, 0.65);
+      tl.to(rowEls, { opacity: 1, duration: 0.3, stagger: 0.09, ease: "power2.out" }, 0.75);
+      // 底部署名条
+      tl.to("#foot", { y: 0, duration: 0.5, ease: "expo.out" }, 1.0);
+      tl.fromTo([".dbg-foot .f1", ".dbg-foot .f2"], { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.35, stagger: 0.08 }, 1.25);
+      // 扫描带从上往下匀速扫（行区 82*n 高）
+      const scanEnd = BAR_H + ROW_H * rows.length;
+      tl.set("#scan", { y: 0, opacity: 1 }, 1.75);
+      tl.to("#scan", { y: scanEnd - BAR_H - ROW_H, duration: 1.05, ease: "none" }, 1.75);
+      // 扫过目标行 → 胶囊荧光绿弹亮 + 其余行压暗
+      const lockT = 1.75 + 1.05 * ((target - 0.5) / rows.length);
+      tl.to("#scan", { opacity: 0, duration: 0.18 }, lockT + 0.1);
+      tl.to(others, { opacity: 0.4, duration: 0.35, ease: "power2.out" }, lockT);
+      tl.to(tPill, { backgroundColor: V.accent, borderColor: V.accent, color: "#141414", duration: 0.22, ease: "power2.out" }, lockT);
+      tl.fromTo(tPill, { scale: 1 }, { scale: 1.14, duration: 0.16, ease: "power2.out" }, lockT);
+      tl.to(tPill, { scale: 1.06, duration: 0.24, ease: "back.out(2.5)" }, lockT + 0.16);
+      tl.call(() => { tPill.textContent = "LOCKED"; }, null, lockT);
+      // 目标行微抬，制造"被点名"的一拍
+      tl.fromTo(tEl, { x: 0 }, { x: 14, duration: 0.3, ease: "expo.out" }, lockT);
+      // 定格保持：胶囊呼吸微光
+      tl.to(tPill, { scale: 1.1, duration: 0.8, ease: "sine.inOut", yoyo: true, repeat: 2 }, lockT + 0.6);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

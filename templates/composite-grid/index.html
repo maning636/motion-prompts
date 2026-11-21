@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"title","type":"string","label":"标题","default":"组合视图"},{"id":"subtitle","type":"string","label":"副标题","default":"多个组件同屏展示"},{"id":"mediaTL","type":"string","label":"左上视频","default":"./assets/bar-chart-grow.webm"},{"id":"mediaTR","type":"string","label":"右上视频","default":"./assets/number-counter.webm"},{"id":"mediaBL","type":"string","label":"左下视频","default":"./assets/simple-flow-chart.webm"},{"id":"mediaBR","type":"string","label":"右下视频","default":"./assets/pull-quote-hero.webm"},{"id":"scaleTL","type":"number","label":"左上缩放","default":0.5},{"id":"scaleTR","type":"number","label":"右上缩放","default":0.5},{"id":"scaleBL","type":"number","label":"左下缩放","default":0.5},{"id":"scaleBR","type":"number","label":"右下缩放","default":0.5},{"id":"duration","type":"number","label":"总时长（秒）","default":6},{"id":"accent","type":"color","label":"强调色","default":"#00FF00"},{"id":"background","type":"color","label":"背景色","default":"#12100E"},{"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script>
+    <style>
+
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+      *{ box-sizing: border-box;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      html, body{ margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: var(--background); color: var(--foreground);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .scene{ position: absolute; inset: 0; width: 100%; height: 100%; padding: 48px 56px 40px; display: flex; flex-direction: column; gap: 28px;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .header{ flex: 0 0 auto;font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;}
+      .title{ margin: 0; font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; font-size: 56px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; }
+      .subtitle{ margin: 10px 0 0; font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; font-size: 24px; font-weight: 400; opacity: 0.55; }
+      .grid{ flex: 1 1 auto; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 24px; min-height: 0;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .cell{ position: relative; border: 1px solid rgba(244,239,231,0.12); border-radius: 16px; overflow: hidden; background: rgba(244,239,231,0.03);font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+      .cell video{ position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; transform-origin: top left; object-fit: contain; background: transparent;font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;}
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene clip" data-start="0" data-duration="6" data-track-index="1">
+        <div class="header">
+          <h1 class="title" id="title"></h1>
+          <p class="subtitle" id="subtitle"></p>
+        </div>
+        <div class="grid">
+          <div class="cell" id="cellTL"><video id="videoTL" autoplay muted loop playsinline></video></div>
+          <div class="cell" id="cellTR"><video id="videoTR" autoplay muted loop playsinline></video></div>
+          <div class="cell" id="cellBL"><video id="videoBL" autoplay muted loop playsinline></video></div>
+          <div class="cell" id="cellBR"><video id="videoBR" autoplay muted loop playsinline></video></div>
+        </div>
+      </section>
+    </div>
+    <script>
+      (function() {
+        const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : {
+          title: "组合视图", subtitle: "多个组件同屏展示",
+          /* 路径要带 /hub/ 前缀：素材挂在 /hub/templates/… 下，
+             写根相对的 /renders/… 会解析成 https://maning789link.top/renders/… → 404，
+             四个格子全空（线上预览就是这么坏的：四个空框）。
+             另一处 number-counter 这个素材压根不存在（本地和线上都没有），
+             换成同族的 big-number-card。 */
+          mediaTL: "./assets/bar-chart-grow.webm", scaleTL: 0.5,
+          mediaTR: "./assets/number-counter.webm", scaleTR: 0.5,
+          mediaBL: "./assets/simple-flow-chart.webm", scaleBL: 0.5,
+          mediaBR: "./assets/pull-quote-hero.webm", scaleBR: 0.5,
+          accent: "#00FF00", background: "#12100E", foreground: "#F4EFE7"
+        };
+        document.documentElement.style.setProperty('--accent', v.accent);
+        document.documentElement.style.setProperty('--background', v.background);
+        document.documentElement.style.setProperty('--foreground', v.foreground);
+        document.getElementById('title').textContent = v.title;
+        document.getElementById('subtitle').textContent = v.subtitle;
+
+        const slots = [
+          { cell: 'cellTL', video: 'videoTL', media: v.mediaTL, scale: parseFloat(v.scaleTL) || 0.5 },
+          { cell: 'cellTR', video: 'videoTR', media: v.mediaTR, scale: parseFloat(v.scaleTR) || 0.5 },
+          { cell: 'cellBL', video: 'videoBL', media: v.mediaBL, scale: parseFloat(v.scaleBL) || 0.5 },
+          { cell: 'cellBR', video: 'videoBR', media: v.mediaBR, scale: parseFloat(v.scaleBR) || 0.5 }
+        ];
+
+        slots.forEach(slot => {
+          const cell = document.getElementById(slot.cell);
+          const video = document.getElementById(slot.video);
+          const w = cell.clientWidth / slot.scale;
+          const h = cell.clientHeight / slot.scale;
+          video.style.width = w + 'px';
+          video.style.height = h + 'px';
+          video.style.transform = 'scale(' + slot.scale + ')';
+          video.src = slot.media;
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+  {"id":"eyebrow","type":"string","label":"顶部 eyebrow","default":"PHOTO WALL · DOLLY IN"},
+  {"id":"title","type":"string","label":"主标题","default":"照片墙缓慢推镜浏览"},
+  {"id":"subtitle","type":"string","label":"副标题","default":"焦点照片逐级提亮，其余保持暗调。"},
+  {"id":"photoCount","type":"number","label":"照片数量（4–6）","default":5},
+  {"id":"focusIndex","type":"number","label":"焦点照片序号（0 起）","default":2},
+  {"id":"dollyScale","type":"number","label":"推镜终态缩放（1.0–1.4）","default":1.25},
+  {"id":"accent","type":"color","label":"强调色","default":"#00FF00"},
+  {"id":"background","type":"color","label":"背景色","default":"#0E0C0A"},
+  {"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"},
+  {"id":"exportMode","type":"enum","label":"导出模式","default":"transparent","hidden":true,"options":[{"value":"transparent","label":"透明背景"},{"value":"mp4","label":"剪映 MP4 深色底"},{"value":"webm","label":"WebM"}]}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+      @font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+      @font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0; width: 1920px; height: 1080px; overflow: hidden;
+        background: var(--background, #0E0C0A);
+      }
+      #root {
+        position: relative; width: 1920px; height: 1080px; overflow: hidden;
+        background: var(--background, #0E0C0A);
+        color: var(--foreground, #F4EFE7);
+        font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;
+      }
+      .gridbg {
+        position: absolute; inset: 0; pointer-events: none;
+        background-image: radial-gradient(rgba(255,255,255,.045) 1px, transparent 1.5px);
+        background-size: 48px 48px;
+        opacity: .5;
+      }
+
+      /* ---------- 顶部 eyebrow ---------- */
+      .eyebrow {
+        position: absolute; top: 56px; left: 96px; right: 96px;
+        display: flex; justify-content: space-between; align-items: center;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 16px; letter-spacing: .22em; text-transform: uppercase;
+        color: #8A8A85;
+        z-index: 6;
+      }
+      .eyebrow .acc { color: var(--accent, #00FF00); font-weight: 700; letter-spacing: .18em; }
+
+      /* ---------- 照片墙舞台 ---------- */
+      .stage {
+        position: absolute;
+        left: 96px; right: 96px; top: 148px; bottom: 208px;
+        overflow: hidden;
+        perspective: 1400px;
+      }
+      #dollyLayer {
+        position: absolute; inset: 0;
+        transform-origin: 50% 55%;
+        will-change: transform;
+        filter: contrast(1.02);
+      }
+      #wall {
+        position: absolute;
+        left: 50%; top: 52%;
+        transform: translate(-50%, -50%);
+        width: 1620px;
+        height: 560px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-auto-rows: 1fr;
+        gap: 26px;
+        opacity: 0;
+      }
+      .photo {
+        position: relative;
+        border-radius: 6px;
+        overflow: hidden;
+        background: #1a1816;
+        box-shadow:
+          0 10px 28px rgba(0,0,0,.55),
+          0 0 0 1px rgba(255,255,255,.05) inset;
+        opacity: 0.4;
+        filter: brightness(0.55) saturate(0.85);
+        will-change: transform, opacity, filter;
+      }
+      .photo .frame {
+        position: absolute; inset: 0;
+      }
+      /* 6 张占位照片：纯色渐变 + 几何形构成，完全本地渲染，无外链 */
+      .photo.p1 .frame {
+        background:
+          linear-gradient(135deg, #4b6a8a 0%, #1f2b3a 100%);
+      }
+      .photo.p1::after {
+        content: ""; position: absolute; left: 12%; bottom: 12%;
+        width: 46%; height: 60%;
+        background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0));
+        clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+      }
+      .photo.p2 .frame {
+        background:
+          radial-gradient(circle at 30% 35%, #e8b46a 0%, #7a4a24 65%, #2a1810 100%);
+      }
+      .photo.p2::after {
+        content: ""; position: absolute; left: 62%; top: 18%;
+        width: 26%; height: 26%;
+        background: rgba(255,255,255,.55);
+        border-radius: 50%;
+        box-shadow: 0 0 40px rgba(255,220,150,.5);
+      }
+      .photo.p3 .frame {
+        background:
+          linear-gradient(180deg, #2d3a2f 0%, #10141a 60%, #05080b 100%);
+      }
+      .photo.p3::after {
+        content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 42%;
+        background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.55) 100%);
+      }
+      .photo.p4 .frame {
+        background:
+          linear-gradient(135deg, #7a4a6a 0%, #241226 100%);
+      }
+      .photo.p4::after {
+        content: ""; position: absolute; left: 20%; top: 22%;
+        width: 60%; height: 55%;
+        background: repeating-linear-gradient(45deg, rgba(255,255,255,.18) 0 6px, rgba(255,255,255,0) 6px 14px);
+      }
+      .photo.p5 .frame {
+        background:
+          linear-gradient(180deg, #a8b8c4 0%, #4a5866 55%, #14191f 100%);
+      }
+      .photo.p5::after {
+        content: ""; position: absolute; left: 8%; bottom: 8%;
+        width: 84%; height: 38%;
+        background: linear-gradient(180deg, rgba(255,255,255,.35), rgba(0,0,0,.35));
+      }
+      .photo.p6 .frame {
+        background:
+          linear-gradient(135deg, #c9552b 0%, #4a1810 70%);
+      }
+      .photo.p6::after {
+        content: ""; position: absolute; left: 30%; top: 22%;
+        width: 40%; height: 55%;
+        border: 2px solid rgba(255,255,255,.35);
+      }
+
+      /* 焦点照片：亮 + 强调色描边 + 光晕 */
+      .photo.focus {
+        opacity: 1;
+        filter: brightness(1.5) saturate(1.05);
+        box-shadow:
+          0 18px 46px rgba(0,0,0,.6),
+          0 0 0 2px var(--accent, #00FF00) inset,
+          0 0 32px color-mix(in srgb, var(--accent, #00FF00) 40%, transparent);
+      }
+      /* 焦点标记：右下角小 chip */
+      .photo.focus::before {
+        content: "";
+        position: absolute; right: 14px; top: 14px;
+        width: 10px; height: 10px; border-radius: 50%;
+        background: var(--accent, #00FF00);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--accent, #00FF00) 60%, transparent);
+        z-index: 2;
+      }
+
+      /* 墙外围的「胶片」暗角，让焦点更聚焦 */
+      .stage::after {
+        content: ""; position: absolute; inset: 0; pointer-events: none;
+        background: radial-gradient(ellipse at 50% 55%, transparent 40%, rgba(0,0,0,.55) 100%);
+        z-index: 3;
+      }
+
+      /* ---------- 底部说明条 ---------- */
+      .caption {
+        position: absolute;
+        left: 96px; right: 96px; bottom: 96px;
+        display: flex; align-items: flex-end; justify-content: space-between;
+        gap: 48px;
+        z-index: 6;
+      }
+      .caption .text { flex: 1; max-width: 1100px; }
+      .caption .kicker {
+        display: inline-flex; align-items: center; gap: 10px;
+        padding: 6px 14px;
+        border: 1px solid color-mix(in srgb, var(--accent, #00FF00) 40%, transparent);
+        border-radius: 999px;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 13px; letter-spacing: .18em; text-transform: uppercase;
+        color: var(--accent, #00FF00);
+        margin-bottom: 14px;
+      }
+      .caption .kicker b {
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 15px; font-weight: 700;
+      }
+      .caption h2 {
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-weight: 700; letter-spacing: -.02em;
+        font-size: 56px; line-height: 1.05;
+        margin: 0 0 10px;
+        color: var(--foreground, #F4EFE7);
+      }
+      .caption p {
+        font-size: 22px; line-height: 1.4;
+        margin: 0;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 78%, transparent);
+      }
+      .caption .meta {
+        text-align: right;
+        font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;
+        font-size: 14px; letter-spacing: .18em; text-transform: uppercase;
+        color: #8A8A85;
+      }
+      .caption .meta .scale {
+        display: block;
+        font-size: 46px; font-weight: 700;
+        color: var(--accent, #00FF00);
+        letter-spacing: -.01em;
+        margin-top: 6px;
+      }
+      .caption .meta .scale small {
+        font-size: 16px; font-weight: 500;
+        color: color-mix(in srgb, var(--foreground, #F4EFE7) 55%, transparent);
+        margin-left: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="stage" data-start="0" data-duration="6" data-track-index="1" style="position:absolute;inset:0;">
+
+        <div class="gridbg"></div>
+
+        <div class="eyebrow">
+          <span><b class="acc" id="eyebrowAcc">PHOTO WALL</b>&nbsp;&nbsp;<span id="eyebrow">DOLLY IN</span></span>
+          <span>gallery · wall · dolly</span>
+        </div>
+
+        <!-- 照片墙舞台：#dollyLayer 承载 dolly-in 缩放 -->
+        <div class="stage" id="wallStage">
+          <div id="dollyLayer">
+            <div id="wall">
+              <div class="photo p1" data-index="0"><div class="frame"></div></div>
+              <div class="photo p2" data-index="1"><div class="frame"></div></div>
+              <div class="photo p3" data-index="2"><div class="frame"></div></div>
+              <div class="photo p4" data-index="3"><div class="frame"></div></div>
+              <div class="photo p5" data-index="4"><div class="frame"></div></div>
+              <div class="photo p6" data-index="5"><div class="frame"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 底部说明 -->
+        <div class="caption">
+          <div class="text">
+            <span class="kicker"><b id="kickerIndex">03</b> &nbsp; FOCUS</span>
+            <h2 id="title">照片墙缓慢推镜浏览</h2>
+            <p id="subtitle">焦点照片逐级提亮，其余保持暗调。</p>
+          </div>
+          <div class="meta">
+            DOLLY IN
+            <span class="scale"><span id="scaleVal">1.00</span><small>×</small></span>
+          </div>
+        </div>
+
+      </section>
+    </div>
+    <script>
+      /* ----- 变量接线（与全库契约一致） ----- */
+      const fallback = {
+        eyebrow: "PHOTO WALL · DOLLY IN",
+        title: "照片墙缓慢推镜浏览",
+        subtitle: "焦点照片逐级提亮，其余保持暗调。",
+        photoCount: 5,
+        focusIndex: 2,
+        dollyScale: 1.25,
+        accent: "#00FF00",
+        background: "#0E0C0A",
+        foreground: "#F4EFE7",
+      };
+      const v = (window.__hyperframes && typeof window.__hyperframes.getVariables === "function")
+        ? window.__hyperframes.getVariables()
+        : fallback;
+
+      const $ = (id) => document.getElementById(id);
+      const html = document.documentElement;
+      html.style.setProperty("--foreground", v.foreground || "#F4EFE7");
+      html.style.setProperty("--background", v.background || "#0E0C0A");
+      html.style.setProperty("--accent",     v.accent     || "#00FF00");
+
+      /* ----- 内容回填 ----- */
+      const escapeHtml = (s) => String(s ?? "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+      // eyebrow 拆左右两截：默认 "PHOTO WALL · DOLLY IN"
+      const eyebrowFull = String(v.eyebrow || fallback.eyebrow);
+      const [eyebrowAcc = "PHOTO WALL", eyebrowRest = "DOLLY IN"] =
+        eyebrowFull.split("·").map(s => s.trim());
+      $("eyebrowAcc").textContent = eyebrowAcc;
+      $("eyebrow").textContent    = eyebrowRest;
+      $("title").textContent      = v.title    || fallback.title;
+      $("subtitle").textContent   = v.subtitle || fallback.subtitle;
+
+      // photoCount：4–6 张
+      const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+      const n = clamp(Math.round(Number(v.photoCount ?? 5)), 4, 6);
+      // focusIndex：0..n-1
+      const fi = clamp(Math.round(Number(v.focusIndex ?? 2)), 0, n - 1);
+
+      // 隐藏多余照片，按 3 列 grid 自动布局
+      const photos = Array.from(document.querySelectorAll("#wall .photo"));
+      photos.forEach((el, i) => {
+        if (i < n) el.style.display = "";
+        else el.style.display = "none";
+      });
+      // 焦点
+      photos.forEach((el, i) => {
+        el.classList.toggle("focus", i === fi);
+      });
+
+      // kicker 上写焦点序号（1 起，2 位）
+      $("kickerIndex").textContent = String(fi + 1).padStart(2, "0");
+
+      /* ----- dolly-in 缩放（1.0 → dollyScale） ----- */
+      const dollyLayer = $("dollyLayer");
+      const scaleVal   = $("scaleVal");
+      const targetScale = clamp(Number(v.dollyScale ?? 1.25), 1.0, 1.4);
+
+      /* ----- 时间线 ----- */
+      window.__timelines = window.__timelines || {};
+      const DUR = 6;
+      const tl = gsap.timeline({ paused: true });
+
+      // 入场：照片墙整体淡入 + 微缩放（营造「远观」起始）
+      tl.fromTo("#wall",
+        { opacity: 0, scale: 0.96 },
+        { opacity: 1, scale: 1.0, duration: 0.7, ease: "power2.out" }, 0.1);
+
+      // 单张照片错峰淡入（opacity 从 0 → 0.4 暗调）
+      tl.fromTo("#wall .photo",
+        { opacity: 0, y: 12 },
+        { opacity: 0.4, y: 0, duration: 0.5, ease: "power2.out", stagger: 0.06 }, 0.3);
+
+      // 焦点照片提前点亮（略微晚于墙入场）
+      tl.fromTo("#wall .photo.focus",
+        { opacity: 0.4, filter: "brightness(0.55) saturate(0.85)" },
+        { opacity: 1, filter: "brightness(1.5) saturate(1.05)",
+          duration: 0.6, ease: "power2.out" }, 0.75);
+
+      // dolly-in：#dollyLayer scale 1.0 → targetScale，占片长 ~55%（3.3s）
+      tl.fromTo("#dollyLayer",
+        { scale: 1.0 },
+        { scale: targetScale, duration: 3.3, ease: "power1.inOut" }, 1.0);
+
+      // 焦点照片在推镜中段再提亮一档，营造「逐级提亮」
+      tl.fromTo("#wall .photo.focus",
+        { filter: "brightness(1.5) saturate(1.05)" },
+        { filter: "brightness(1.9) saturate(1.1)",
+          duration: 1.6, ease: "power1.inOut" }, 2.6);
+
+      // 尾部微回弹 + 稳定，让最后一秒可读
+      tl.to("#dollyLayer",
+        { scale: targetScale * 0.995, duration: 0.8, ease: "power2.out" }, 4.6);
+
+      // scaleVal 文本实时同步
+      const dollyStart = 1.0, dollyDur = 3.3;
+      const easeInOutQuad = (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      tl.eventCallback("onUpdate", () => {
+        const t = tl.time();
+        let s;
+        if (t < dollyStart) s = 1.0;
+        else if (t > dollyStart + dollyDur) s = targetScale;
+        else {
+          const p = easeInOutQuad((t - dollyStart) / dollyDur);
+          s = 1.0 + (targetScale - 1.0) * p;
+        }
+        // 尾部微回弹微调
+        if (t > dollyStart + dollyDur) {
+          const p = clamp((t - (dollyStart + dollyDur)) / 0.8, 0, 1);
+          s = targetScale - targetScale * 0.005 * p;
+        }
+        scaleVal.textContent = s.toFixed(2);
+      });
+
+      // 初始化
+      scaleVal.textContent = "1.00";
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

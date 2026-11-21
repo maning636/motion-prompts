@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"eyebrow","name":"眉标","type":"string","label":"眉标（黑条上的 mono 字）","default":"TOPIC / 本期话题"},{"id":"title","name":"主标题","type":"string","label":"主标题（白条上的 900 大字）","default":"AI 不会取代初级岗位，但会换掉六成的任务"},{"id":"tag","name":"标签","type":"string","label":"标签（2–6 字）","default":"NOW"},{"id":"accent","name":"强调色","type":"color","label":"强调色（标签 / 斜纹带）","default":"#FFD429"},{"id":"position","name":"位置","type":"enum","label":"通栏位置（顶部 / 底部）","default":"bottom","options":[{"label":"底部通栏","value":"bottom"},{"label":"顶部通栏","value":"top"}]},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","hidden":true,"default":"transparent","options":[{"value":"transparent","label":"透明底"},{"value":"mp4","label":"MP4 纯底"},{"value":"webm","label":"WebM 纯底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="通栏话题标题条：黑条 mono 眉标 + 白条 900 主标题 + 斜纹导轨，分格擦出后斜纹匀速滚动">
+<title>话题标题条 · 本期话题</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 透明底贴片：--paper 全程不出现，底色收进 --background（风格规范 §7.1）。
+     --shadow 走 §7.2 规则 A：透明底默认切白。 */
+  :root{ --shadow:#FFFFFF; --background:transparent; }
+
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--background);color:var(--ink);font-family:var(--sans)}
+
+  /* 四档硬阴影，X 恒等于 Y，第三值恒 0（基因 2） */
+  .sh-s {box-shadow:4px 4px 0 var(--shadow)}
+  .sh-m {box-shadow:6px 6px 0 var(--shadow)}
+  .sh-l {box-shadow:8px 8px 0 var(--shadow)}
+
+  /* 整条通栏由三块叠成：黑条 + 白条 + 斜纹导轨，块间靠 3px 实线分隔（基因 7） */
+  .band{position:absolute;left:0;width:1920px;display:flex;flex-direction:column}
+  .band.on-top   {top:72px}
+  .band.on-bottom{bottom:72px}
+
+  .s1{display:flex;align-items:center;gap:18px;padding:12px 96px;
+      background:var(--ink);color:var(--white);border:var(--bw) solid var(--ink)}
+  /* 标签压在 ink 条上：无描边无影（§3.1 .promo .tag） */
+  .s1 .tag{flex:0 0 auto;font-family:var(--mono);font-weight:700;font-size:26px;
+      letter-spacing:.12em;padding:6px 18px;background:var(--accent);color:var(--ink)}
+  .s1 .eb{font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:.14em;
+      white-space:nowrap;overflow:hidden}
+
+  .s2{background:var(--white);border:var(--bw) solid var(--ink);border-top:0;margin-top:-3px}
+  /* padding 挂在标题自己身上，fit() 量到的 scrollWidth 才等于「文字 + 左右内边距」 */
+  .s2 .tt{display:block;background:var(--white);color:var(--ink);
+      font-size:72px;font-weight:900;line-height:1.06;letter-spacing:-.01em;
+      padding:18px 96px 20px;white-space:nowrap;overflow:hidden}
+
+  /* 斜纹导轨：整条通栏里唯一合法渐变，周期 10px + 10px（基因 4 / §3.9）。
+     两端各留 160px，砖带平移 80px（4 个图案周期）即无缝，且几何全程不出画布。 */
+  .stripe{margin:0 160px;height:20px;border:var(--bw) solid var(--ink);border-top:0;
+      overflow:hidden}
+  .stripes{display:flex;width:max-content;height:20px}
+  .stripes i{display:block;flex:0 0 80px;height:20px;
+      background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="band on-bottom" id="band">
+    <div class="s1">
+      <span class="tag" id="tag">NOW</span>
+      <span class="eb" id="eyebrow" data-fit-max="26" data-fit-min="16">TOPIC / 本期话题</span>
+    </div>
+    <div class="s2"><h2 class="tt" id="title" data-fit-max="72" data-fit-min="38">AI 不会取代初级岗位，但会换掉六成的任务</h2></div>
+    <div class="stripe"><div class="stripes" id="stripes"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+  </div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  /* 透明底分支（风格规范 §7.5） */
+  var isT = (v.exportMode || 'transparent') === 'transparent';
+  var r = document.documentElement.style;
+  r.setProperty('--background', isT ? 'transparent' : '#0F0F0F');
+  r.setProperty('--shadow', isT ? '#FFFFFF' : '#0F0F0F');
+  if (v.accent) r.setProperty('--accent', v.accent);
+
+  var band = document.getElementById('band');
+  if ((v.position || 'bottom') === 'top') band.className = 'band on-top';
+  else band.className = 'band on-bottom';
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+  ['eyebrow', 'title', 'tag'].forEach(function (k) { set(k, v[k]); });
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：去掉分格擦出与导轨滚动，只留终态 + ≤8px 微位移淡入（§13.5） */
+    gsap.set('#band', { opacity: 1, y: 0, clipPath: 'inset(0 0% 0 0)' });
+    gsap.set('#tag', { x: 0 });
+    gsap.set('#eyebrow', { x: 0 });
+
+    tl.fromTo('#band', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .5, ease: 'power2.out' }, 0);
+    tl.fromTo('.s1', { opacity: 0 },
+        { opacity: 1, duration: .45, ease: 'power2.out' }, .05);
+    tl.fromTo('.s2', { opacity: 0 },
+        { opacity: 1, duration: .5, ease: 'power2.out' }, .14);
+    tl.fromTo('.stripe', { opacity: 0 },
+        { opacity: 1, duration: .45, ease: 'power2.out' }, .26);
+
+    B.hold(tl, 1.25, 1.15);
+    return;
+  }
+
+  var TOTAL = parseFloat(v.duration) > 0 ? parseFloat(v.duration) : 5;
+  var HOLD = 0.5;
+  var WIN = Math.max(1.6, TOTAL - HOLD);
+
+  /* 模 7 · 分格揭示：通栏从左往右一格一格擦出来，steps(6) 是硬推进不是软补间 */
+  tl.fromTo('#band', { clipPath: 'inset(0 100% 0 0)' },
+      { clipPath: 'inset(0 0% 0 0)', duration: .36, ease: 'steps(6)' }, 0);
+  /* 模 2 · 零件装上去：内层三件错峰跟位，全部纯位移，opacity 恒为 1 */
+  tl.fromTo('#tag', { x: -26 }, { x: 0, duration: .2, ease: 'power4.out' }, .18);
+  tl.fromTo('#eyebrow', { x: -26 }, { x: 0, duration: .2, ease: 'power4.out' }, .26);
+  tl.fromTo('#title', { x: -34 }, { x: 0, duration: .24, ease: 'power4.out' }, .34);
+
+  /* 模 6 · 斜纹导轨滚动：一格 80px = 4 个图案周期，平移整格才无缝。
+     repeat 必须是有限的：repeat:-1 会把 tl.duration() 撑到 1e10s，settle 取帧直接失效。 */
+  /* 圈数按窗口算、每圈时长再按圈数摊分，保证循环正好在 WIN 收尾 */
+  var SP = .6;
+  var REP = Math.max(1, Math.floor((WIN - SP) / .5));
+  tl.fromTo('#stripes', { x: 0 },
+      { x: -80, duration: (WIN - SP) / REP, ease: 'none', repeat: REP - 1 }, SP);
+
+  var end = tl.duration();
+  B.hold(tl, end, Math.max(HOLD, TOTAL - end));
+})();
+</script>
+</body></html>

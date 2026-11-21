@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "c1", "type": "string", "label": "卡1", "default": "响应 12ms"}, {"id": "c2", "type": "string", "label": "卡2", "default": "吞吐 8.4k/s"}, {"id": "c3", "type": "string", "label": "卡3", "default": "可用 99.99%"}, {"id": "accent", "type": "color", "label": "强调色", "default": "#00FF00"}, {"id": "background", "type": "color", "label": "背景色", "default": "#0A0A0F"}, {"id": "foreground", "type": "color", "label": "文字色", "default": "#F4F4F2"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+    <style>
+@font-face{font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif;src:local('MiSans');font-weight:100 1000;font-display:swap}
+@font-face{font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif;src:local('MEBHeiHeiTi');font-weight:100 1000;font-display:swap}
+*{ box-sizing: border-box; margin: 0; padding: 0; }
+html, body{ width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F); }
+#root{ position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--bg,#0A0A0F);
+  color:var(--fg,#F4F4F2); font-family:'MEBHeiHeiTi','Hanzipen SC','KaiTi','STKaiti','楷体','Kaiti SC','STHeiti','Microsoft YaHei',system-ui,sans-serif; }
+.num{ font-family:'MiSans SemiBold','MiSans','PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',system-ui,sans-serif; }
+
+.ac{ position:absolute; top:400px; width:520px; height:280px; border-radius:22px; background:#17171F;
+  border:1px solid rgba(255,255,255,.15); padding:38px; will-change:transform;
+  box-shadow:0 26px 80px rgba(0,0,0,.5); }
+.ac h3{ font-size:42px; color:var(--accent); margin-bottom:22px; }
+.ac i{ display:block; height:13px; border-radius:7px; background:rgba(255,255,255,.16); margin-bottom:13px; }
+#cap{ position:absolute; left:0; right:0; top:150px; text-align:center; font-size:34px; color:rgba(255,255,255,.4); letter-spacing:6px; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4.7" data-width="1920" data-height="1080">
+<div id="cap">SPEED HAS A BODY</div><div class="ac" id="ac0" style="left:160px"><h3 id="a1"></h3><i></i><i style="width:68%"></i></div><div class="ac" id="ac1" style="left:760px"><h3 id="a2"></h3><i></i><i style="width:68%"></i></div><div class="ac" id="ac2" style="left:1360px"><h3 id="a3"></h3><i></i><i style="width:68%"></i></div>
+    </div>
+    <script>
+      const FB = {"c1": "响应 12ms", "c2": "吞吐 8.4k/s", "c3": "可用 99.99%", "accent": "#00FF00", "background": "#0A0A0F", "foreground": "#F4F4F2"};
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : FB;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4F4F2");
+      document.documentElement.style.setProperty("--background", v.background ?? "#0A0A0F");
+const $=(s)=>document.querySelector(s);
+const de=document.documentElement;
+de.style.setProperty('--accent',v.accent||'#00FF00');
+de.style.setProperty('--bg',v.background||'#0A0A0F');
+de.style.setProperty('--fg',v.foreground||'#F4F4F2');
+const F=(f)=>f/30; // 30fps: 帧→秒
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+
+$('#a1').textContent=v.c1||'';$('#a2').textContent=v.c2||'';$('#a3').textContent=v.c3||'';
+// 速度差分驱动轴向拉伸：v=|x(f)-x(f-1)|，<2px/f 不拉伸、≥140px/f 满拉伸
+document.querySelectorAll('.ac').forEach((el,i)=>{
+  gsap.set(el,{x:-1400, transformOrigin:'100% 50%'});
+  let prev=-1400;
+  const start=6+i*12;
+  tl.to(el,{x:0,duration:F(36),ease:'power3.out',onUpdate:function(){
+    const x=gsap.getProperty(el,'x'); const vv=Math.abs(x-prev); prev=x;
+    let t=(vv-2)/(140-2); t=Math.max(0,Math.min(1,t));
+    gsap.set(el,{scaleX:1+t*1.2, scaleY:1-t*0.28});
+  }},F(start));
+  // 落点 8f 压扁回弹：scaleX 过冲 0.85、scaleY 1.1 再回 1
+  tl.to(el,{scaleX:.85,scaleY:1.1,duration:F(3),ease:'power2.out'},F(start+36));
+  tl.to(el,{scaleX:1,scaleY:1,duration:F(5),ease:'power2.out'},F(start+39));
+});
+tl.to({},{duration:F(62)},F(79)); // 真静止
+
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

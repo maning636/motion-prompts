@@ -1,0 +1,9 @@
+{
+  "tagA": "陌生概念",
+  "conceptA": "RAG",
+  "descA": "检索增强生成",
+  "tagB": "熟悉概念",
+  "conceptB": "开卷考试",
+  "descB": "可以翻书查资料的考试",
+  "dimension": "先查资料，再回答"
+}

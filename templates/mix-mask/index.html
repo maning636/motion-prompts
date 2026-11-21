@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"pack","name":"规格包","type":"enum","label":"规格包（配色 / 字体 / 曲线）","options":[{"label":"暗色科技","value":"dark"},{"label":"奶油贴纸","value":"cream"},{"label":"单色克制","value":"mono"},{"label":"夜航","value":"night"}],"default":"night"},{"id":"video1","name":"素材1","type":"string","label":"第 1 镜素材（样例 视频 autumn-01.mp4（未随仓分发））","default":""},{"id":"video2","name":"素材2","type":"string","label":"第 2 镜素材（样例 视频 autumn-02.mp4（未随仓分发））","default":""},{"id":"video3","name":"素材3","type":"string","label":"第 3 镜素材（样例 视频 autumn-03.mp4（未随仓分发））","default":""},{"id":"shapes","name":"遮罩序列","type":"string","label":"形状序列（逗号分隔）rect/moon/wave/diag","default":"rect,moon,wave,diag"},{"id":"mark","name":"落款首字","type":"string","label":"竖排落款 首","default":"叁"},{"id":"season","name":"落款二字","type":"string","label":"竖排落款 后","default":"秋分"},{"id":"note","name":"左下说明","type":"string","label":"左下英文说明","default":"THE SAME FOOTAGE · A DIFFERENT SHAPE IS A DIFFERENT FILM"}]'>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="画面框在直框、月门、波浪、斜切四种形状之间连续形变，素材不变但每次配的形状不同——形状本身就是一份可复用资产。">
+<title>遮罩转场 · 四种画框形状</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<link rel="stylesheet" href="../_lib/packs.css">
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script>
+<!-- packs.js 必须排在 blocks.js **之后**：blocks.js 结尾是 global.BBlocks = BB，
+     会把它整个替换掉。谁先加载谁的东西就没了，表现是 B.pack is not a function。 -->
+<script src="../_lib/packs.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<style>
+  /* 底色和字色**必须来自规格包**，不能写死。
+     写死 #000 + #F4F1EA 的时候，四个包里只有 dark / night 正常：
+     cream 的 --pk-fg 是 #2A2118、mono 是 #14140F，两个都是**深字**，
+     压在这个写死的黑底上 → 标题、标签、说明全糊掉。
+     而写死字面量色的元素（比如 rgba(244,241,234,.82)）反而还看得见，
+     画面上就成了一半能看一半不能看——比全黑更难认。
+     一共 33 条模板中招（混剪 5 + 认知 22 + 节拍 6）。
+
+     注意区分两层契约（packs.css 顶部注释里写过）：
+       --pk-bg / --pk-fg      = 包自带底板，舞台自己用它
+       --pk-*-media           = 压在用户素材上的那一层
+     这里改的是前者。 */
+  html,body{margin:0;padding:0;background:var(--pk-bg,#000)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--pk-bg,#000);
+        color:var(--pk-fg,#F4F1EA);font-family:"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+        -webkit-font-smoothing:antialiased}
+  /* 统一安全区：混剪里所有贴边元素都从 72/88 起，不贴 0 */
+  
+  /* 素材位：用 CSS 画一个「像镜头」的抽象画面。
+     真视频在当前渲染管线里不播（compose.html 不处理 <video>），
+     预览会全黑——所以默认走 CSS，逻辑才看得见。 */
+  .shot{position:absolute;inset:0;overflow:hidden;opacity:0}
+  .shot .sky{position:absolute;inset:-12%;background:
+      linear-gradient(180deg,var(--c1) 0%,var(--c2) 52%,var(--c3) 100%)}
+  .shot .glow{position:absolute;left:56%;top:26%;width:340px;height:340px;border-radius:50%;
+      background:radial-gradient(circle,var(--c4) 0%,rgba(0,0,0,0) 68%);filter:blur(12px)}
+  .shot .haze{position:absolute;left:-10%;right:-10%;top:52%;height:26%;
+      background:linear-gradient(180deg,rgba(0,0,0,0),var(--c3) 78%,rgba(0,0,0,0));opacity:.55}
+  .shot .ridge{position:absolute;left:-8%;right:-8%;bottom:0;height:46%;
+      background:linear-gradient(180deg,var(--c5),var(--c6))}
+  .shot .ridge.r1{clip-path:polygon(0 44%,13% 27%,26% 41%,40% 19%,55% 37%,69% 24%,85% 40%,100% 26%,100% 100%,0 100%)}
+  .shot .ridge.r2{height:28%;opacity:.92;
+      clip-path:polygon(0 58%,12% 40%,25% 57%,38% 35%,52% 55%,66% 37%,80% 53%,100% 39%,100% 100%,0 100%)}
+  .shot .grain{position:absolute;inset:0;opacity:.10;background-image:
+      repeating-linear-gradient(0deg,rgba(255,255,255,.10) 0 1px,rgba(0,0,0,0) 1px 3px),
+      repeating-linear-gradient(90deg,rgba(0,0,0,.10) 0 1px,rgba(0,0,0,0) 1px 4px)}
+  .shot .vig{position:absolute;inset:0;box-shadow:inset 0 0 260px 80px rgba(0,0,0,.52)}
+  .shot video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+  .shot.live .sky,.shot.live .glow,.shot.live .haze,
+  .shot.live .ridge,.shot.live .grain{display:none}
+  .shot.live video{display:block}
+
+  /* 幕布：遮罩之外的底 */
+  .ground{position:absolute;inset:0;z-index:0;background:
+      radial-gradient(120% 90% at 50% 42%,#16161C 0%,#0A0A0D 62%,#060608 100%)}
+
+  /* 取景框：clip-path 挂在这层上，形状连续形变 */
+  .frame{position:absolute;left:120px;right:120px;top:140px;bottom:200px;z-index:10;
+      overflow:hidden;background:#000}
+
+  /* 下面三块（形状名 / 落款 / 说明）都在遮罩面板**外面**，
+     压的是包底色，不是素材——所以用 --pk-*，不是 --pk-*-media。
+     素材在这里是被裁成 rect/moon/wave/diag 塞进居中面板的，
+     画面外露的部分就是包底色，写死浅色在 cream / mono 上会整块隐形。 */
+
+  /* 左上：形状名随形变逐个点亮 */
+  .tag{position:absolute;left:120px;top:88px;z-index:20;opacity:0;
+      display:flex;align-items:center;gap:18px}
+  .tag b{font-family:ui-monospace,Consolas,monospace;font-size:22px;font-weight:800;
+      letter-spacing:.12em;color:var(--pk-accent);opacity:.26;white-space:nowrap}
+  .tag s{text-decoration:none;width:46px;height:1px;background:var(--pk-line)}
+
+  /* 右下竖排落款 */
+  .sign{position:absolute;right:84px;bottom:104px;z-index:20;opacity:0;
+      writing-mode:vertical-rl;text-orientation:upright;
+      font-size:34px;font-weight:700;letter-spacing:.30em;color:var(--pk-fg);
+      line-height:1.5;text-shadow:0 2px 18px rgba(0,0,0,.8)}
+  .sign em{font-style:normal;color:var(--pk-accent);letter-spacing:.34em}
+
+  /* 左下说明：这条片子在做什么 */
+  .note{position:absolute;left:120px;bottom:96px;z-index:20;opacity:0;width:1060px;
+      font-family:ui-monospace,Consolas,monospace;font-size:20px;font-weight:600;
+      letter-spacing:.08em;color:var(--pk-muted);line-height:1.7}
+
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <div class="ground"></div>
+  <div class="frame" id="frame"><div class="shot" id="s0" data-media-layer style="--c1:#3A1A06;--c2:#B05A1E;--c3:#D89040;--c4:#F0C060;--c5:#4A2408;--c6:#200F04"><span class="sky"></span><span class="glow"></span><span class="haze"></span><span class="ridge r1"></span><span class="ridge r2"></span><span class="grain"></span><span class="vig"></span><video id="v0" muted playsinline preload="auto"></video></div><div class="shot" id="s1" data-media-layer style="--c1:#3A0A06;--c2:#9E2A10;--c3:#C24A1C;--c4:#E8702A;--c5:#2A0C06;--c6:#140603"><span class="sky"></span><span class="glow"></span><span class="haze"></span><span class="ridge r1"></span><span class="ridge r2"></span><span class="grain"></span><span class="vig"></span><video id="v1" muted playsinline preload="auto"></video></div><div class="shot" id="s2" data-media-layer style="--c1:#2E1004;--c2:#96380F;--c3:#C4761F;--c4:#E8952F;--c5:#381806;--c6:#180B03"><span class="sky"></span><span class="glow"></span><span class="haze"></span><span class="ridge r1"></span><span class="ridge r2"></span><span class="grain"></span><span class="vig"></span><video id="v2" muted playsinline preload="auto"></video></div></div>
+  <div class="tag" id="tag">
+    <b id="tg0">RECT</b><s></s>
+    <b id="tg1">MOON</b><b id="tg2">WAVE</b><b id="tg3">DIAG</b>
+  </div>
+  <div class="note" id="note">THE SAME FOOTAGE · A DIFFERENT SHAPE IS A DIFFERENT FILM</div>
+  <div class="sign"><em id="sgA">叁</em><span id="sgB">秋分</span></div>
+
+</div>
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+  var tl = B.tl();
+  /* 规格包：先定风格，再建任何元素。
+     画面素材的配色**不跟着包走**——那是"底片"，用户自己的东西不能被模板改色；
+     跟着包走的只有 UI 层（字色、强调色、描边、圆角、曲线）。这个边界必须守住。 */
+  B.pack(v.pack);
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  function q(s) { return document.querySelector(s); }
+  /* 素材位接真视频：留空就继续用 CSS 画面 */
+  function live(n, src) {
+    if (!src) return;
+    var s = document.getElementById('s' + n), e = document.getElementById('v' + n);
+    if (!s || !e) return;
+    s.classList.add('live'); e.src = src;
+    e.play().catch(function () {});
+  }
+  /* 景别缓推：v1/v3 里画面始终在极慢地动，这是「像镜头」的关键 */
+  function push(n, at, dur, from, to, ease) {
+    var s = q('#s' + n + ' .sky'), g = q('#s' + n + ' .glow'), r = q('#s' + n + ' .r2');
+    if (s) tl.fromTo(s, { scale: from, y: '0%' },
+      { scale: to, y: '-2%', duration: dur, ease: ease || 'none' }, at);
+    if (g) tl.fromTo(g, { xPercent: -4, opacity: .8 },
+      { xPercent: 5, opacity: 1, duration: dur, ease: 'none' }, at);
+    if (r) tl.fromTo(r, { xPercent: 0 },
+      { xPercent: -2.5, duration: dur, ease: 'none' }, at);
+  }
+  /* clip-path 形状插值。
+     两个坑都在这里踩过：
+       1. GSAP 各版本对 clipPath 字符串补间的处理不一致，所以不直接补间它，
+          改成补间一个 {t:0→1} 的代理对象，onUpdate 里自己算 8 个点；
+       2. **from 必须是编译期常量，不能从元素当前状态读。**
+          settle 会把时间轴来回扫；一旦回退越过一个已完成的补间，
+          GSAP 会把它按 ratio 0 重渲——onUpdate 拿到的就是起点，
+          形状会「弹回矩形」。写成常量后，形状是 t 的纯函数，
+          停在任何一帧算出来都一样。
+     相邻两段的 from 必须等于上一段的 to，这条由 Python 侧保证。 */
+  function polyStr(pts) {
+    return 'polygon(' + pts.map(function (p) {
+      return p[0].toFixed(2) + '% ' + p[1].toFixed(2) + '%'; }).join(',') + ')';
+  }
+  function morph(el, from, to, at, dur, ease) {
+    if (!el || !to || !from || from.length !== to.length) return;
+    var st = { t: 0 };
+    tl.to(st, { t: 1, duration: dur == null ? .7 : dur, ease: ease || 'power2.inOut',
+      onUpdate: function () {
+        el.style.clipPath = polyStr(from.map(function (p, i) {
+          return [p[0] + (to[i][0] - p[0]) * st.t,
+                  p[1] + (to[i][1] - p[1]) * st.t];
+        }));
+      } }, at);
+  }
+  set('note', v.note); set('sgA', v.mark); set('sgB', v.season);
+
+  var FR = q('#frame');
+  var MAP = {"rect":[[100,50],[100,100],[50,100],[0,100],[0,50],[0,0],[50,0],[100,0]],"moon":[[86,50],[75.5,83.2],[50,97],[24.5,83.2],[14,50],[24.5,16.8],[50,3],[75.5,16.8]],"wave":[[100,48],[100,100],[50,90],[0,100],[0,52],[0,6],[50,12],[100,2]],"diag":[[100,50],[100,72],[78,100],[0,100],[0,50],[34,0],[50,0],[100,0]]};
+  /* 形状序列是变量：同一套形状，改个顺序就是另一条片子。
+     名字不认识就退回 rect，不让它把整条时间轴带崩。 */
+  var SEQ = String(v.shapes || "rect,moon,wave,diag").split(',').map(function (s) { return s.trim(); })
+      .filter(function (s) { return !!MAP[s]; });
+  if (!SEQ.length) SEQ = ['rect'];
+  var SH = SEQ.map(function (s) { return MAP[s]; });
+  var D = 3.0, MD = 0.7, N = 3;
+
+  /* 起始形状先钉死，后面一路从它形变下去。
+     每段的 from 就是上一段的 to，两段在交界处算出来的形状完全一致，
+     所以时间轴停在任何一帧都自洽（settle 会来回扫，见 mix_base.morph 的注释） */
+  FR.style.clipPath = polyStr([[100,50],[100,100],[50,100],[0,100],[0,50],[0,0],[50,0],[100,0]]);
+
+  tl.set('#s0', { opacity: 1 }, 0);
+  tl.fromTo('.frame', { opacity: 0 }, { opacity: 1, duration: .45, ease: 'power2.out' }, 0);
+  tl.fromTo('#tag', { opacity: 0, x: -16 }, { opacity: 1, x: 0, duration: .5, ease: 'power3.out' }, .25);
+  tl.fromTo('#note', { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: .5, ease: 'power3.out' }, .4);
+  tl.fromTo('.sign', { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: .6, ease: 'power3.out' }, .55);
+
+  /* 形状名点亮：同一个时刻只有一个亮。走透明度补间而不是 tl.call 改 class——
+     settle 把时间轴来回扫时，call 只在正向越点时触发，扫完会停在错的那个上。 */
+  var NAMES = SEQ;
+  for (var j = 0; j < 4; j++) {
+    if (!q('#tg' + j)) continue;
+    tl.set('#tg' + j, { opacity: (j < NAMES.length && j === 0) ? 1 : .26 }, 0);
+  }
+
+  for (var i = 0; i < N; i++) {
+    (function (k) {
+      var at = k * D;
+      live(k, v['video' + (k + 1)]);
+      if (k > 0) {
+        tl.set('#s' + k, { opacity: 1 }, at);
+        tl.set('#s' + (k - 1), { opacity: 0 }, at);
+      }
+      /* 形状在切镜前 0.15s 开始形变：先变形再换画面，
+         看起来像「框把新画面放进来了」，而不是硬切 */
+      if (k + 1 < SH.length) {
+        var tm = at + D - MD - .15;
+        morph(FR, SH[k], SH[k + 1], tm, MD);
+        if (k + 1 < NAMES.length && q('#tg' + (k + 1))) {
+          tl.set('#tg' + (k + 1), { opacity: 1 }, tm + MD);
+          tl.set('#tg' + k, { opacity: .26 }, tm + MD);
+        }
+      }
+      push(k, at, D, 1.02, 1.08);
+    })(i);
+  }
+
+  B.hold(tl, N * D + .5, .5);
+  B.fitAll();
+
+})();
+</script>
+</body>
+</html>

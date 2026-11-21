@@ -1,0 +1,13 @@
+{
+  "id": "flying-words",
+  "name": "飞入文字·汇成主句",
+  "description": "8 个关键词从四周不同角度飞入画面，错峰落入指定字位后整体定格，并揭示一行有层级的主文案（强调词着 accent 色 + 下划线）。",
+  "category": "文字动效",
+  "tags": ["文字动效", "kinetic type", "飞入", "汇成主句", "hero"],
+  "duration": 6,
+  "size": "1920x1080",
+  "status": "ready",
+  "attribution": "clean-room",
+  "license": "Proprietary - FDE",
+  "createdAt": "2026-09-05T00:00:00.000Z"
+}

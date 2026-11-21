@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"label","name":"券面标签","type":"string","label":"左侧竖条上的 mono 字（2–4 字）","default":"券"},{"id":"kind","name":"券类型","type":"string","label":"券类型（2–6 字）","default":"限时优惠券"},{"id":"code","name":"优惠码","type":"string","label":"优惠码（6–12 字，建议大写）","default":"BB2026"},{"id":"hint","name":"使用说明","type":"string","label":"使用说明（8–18 字）","default":"结算页输入即可抵扣"},{"id":"btn","name":"按钮文字","type":"string","label":"按钮文字（2–6 字）","default":"立即使用"},{"id":"accent","name":"强调色","type":"color","label":"强调色（按钮块底 / 左侧竖条）","default":"#FFD429"},{"id":"duration","name":"时长","type":"number","label":"时长（秒）","default":5},{"id":"exportMode","name":"导出格式","type":"enum","label":"Format","hidden":true,"default":"transparent","options":[{"value":"transparent","label":"透明底"},{"value":"mp4","label":"MP4 纯底"},{"value":"webm","label":"WebM 纯底"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<meta name="description" content="优惠码贴：白底券面左压强调色竖条与 3px 虚线撕口，右侧黄色按钮块整块换底，按下时位移量正好等于阴影偏移量，两块落定后反向微位移">
+<title>优惠码贴 · BB2026</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  /* 透明底贴片：--paper 不出现，底色与阴影色收进变量（风格规范 §7.1 / §7.2 规则 A） */
+  :root{ --shadow:#FFFFFF; --background:transparent; }
+
+  html,body{margin:0;padding:0;background:var(--background)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--background);color:var(--ink);font-family:var(--sans)}
+
+  /* 券面定高 300px：按钮块靠常量坐标并排，几何可预期 */
+  #cp{position:absolute;left:96px;bottom:200px;width:1000px;height:300px;
+    display:flex;align-items:stretch;
+    background:var(--white);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  /* 左侧竖条：高饱和实色块，与券面之间靠 3px 撕口虚线分隔（基因 7 的分隔线纪律） */
+  .strip{flex:0 0 128px;display:flex;align-items:center;justify-content:center;
+    background:var(--accent);border-right:var(--bw) solid var(--ink)}
+  /* 竖排单字：writing-mode 下 ink 溢出方向与横排相反，overflow:hidden 会把字左右切掉，
+     所以这里显式给宽度并且不裁剪，fit 走 y 轴（竖排的字按高度收口） */
+  #label{display:block;width:88px;text-align:center;font-size:88px;font-weight:900;
+    line-height:1;letter-spacing:0;color:var(--ink);
+    writing-mode:vertical-rl;text-orientation:upright;white-space:nowrap;overflow:visible}
+  .bd{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;justify-content:center;
+    gap:16px;padding:0 36px}
+  #kind{display:block;font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:.14em;
+    line-height:1;color:var(--ink);white-space:nowrap;overflow:hidden}
+  #code{display:block;font-family:var(--mono);font-weight:900;font-size:84px;line-height:1;
+    letter-spacing:.12em;color:var(--ink);white-space:nowrap;overflow:hidden}
+  /* 3px 虚线撕口：券与按钮之间的物理断口 */
+  .dash{height:3px;border-top:3px dashed var(--ink);margin:2px 0 6px}
+  #hint{display:block;font-family:var(--mono);font-weight:700;font-size:24px;letter-spacing:.04em;
+    line-height:1;color:var(--ink);white-space:nowrap;overflow:hidden}
+
+  /* 按钮块：绿色是「正向状态」专用色（§1.2 green 纪律），按压反馈是全风格唯一交互签名 */
+  #cb{position:absolute;left:1132px;bottom:200px;width:568px;height:300px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+    background:var(--green);border:var(--bw) solid var(--ink);border-radius:4px;
+    box-shadow:8px 8px 0 var(--shadow)}
+  #btn{display:block;font-size:76px;font-weight:900;line-height:1;letter-spacing:0;color:var(--ink);
+    white-space:nowrap;overflow:hidden}
+  #cb .arw{font-family:var(--mono);font-weight:900;font-size:52px;line-height:1;color:var(--ink);
+    text-shadow:3px 3px 0 var(--white)}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="cp">
+    <div class="strip"><span id="label" data-fit-max="88" data-fit-min="44" data-fit-axis="y">券</span></div>
+    <div class="bd">
+      <span id="kind" data-fit-max="26" data-fit-min="16">限时优惠券</span>
+      <span id="code" data-fit-max="84" data-fit-min="44">BB2026</span>
+      <div class="dash"></div>
+      <span id="hint" data-fit-max="24" data-fit-min="16">结算页输入即可抵扣</span>
+    </div>
+  </div>
+  <div id="cb"><span id="btn" data-fit-max="76" data-fit-min="40">立即使用</span><span class="arw">→</span></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script><script>
+
+/* ── 公开版自播引导 ──────────────────────────────────────────────
+   模板里的时间轴默认是暂停的（gsap.timeline({paused:true}) 或 blocks.js 的
+   B.tl() 默认 paused:true）——这是为 hyperframes 离线渲染设计的：渲染器手动
+   seek 时间轴逐帧出片。在站点里由播放器注入脚本启动；但把模板单独拷出来
+   双击打开时没人接管，元素会停在 opacity:0 的初始态，看起来是黑屏。
+
+   这里补一个最小播放器：
+     1) 接管 blocks.js 的 B.tl()（原封装不注册全局），把时间轴收进 __timelines；
+     2) 启动所有「已注册且仍暂停」的时间轴，循环播放。
+   不改动模板自身的动画逻辑与参数。
+   ────────────────────────────────────────────────────────────── */
+(function () {
+  var registry = (window.__timelines = window.__timelines || {});
+
+  /* 1) 接管 B.tl() —— blocks.js 导出的是 window.BBlocks */
+  try {
+    var BB = window.BBlocks;
+    if (BB && typeof BB.tl === 'function' && !BB.__publicPatched) {
+      var origTl = BB.tl;
+      BB.tl = function () {
+        var tl = origTl.apply(this, arguments);
+        try {
+          if (tl && !tl.__publicReg) {
+            tl.__publicReg = true;
+            registry['b_' + (registry.__n = (registry.__n || 0) + 1)] = tl;
+          }
+        } catch (e) {}
+        return tl;
+      };
+      BB.__publicPatched = true;
+    }
+  } catch (e) {}
+
+  /* 2) 启动时间轴 */
+  function boot() {
+    Object.keys(registry).forEach(function (k) {
+      var tl = registry[k];
+      try {
+        if (!tl || typeof tl.play !== 'function') return;   // 不是 timeline，跳过
+        if (typeof tl.paused === 'function' && tl.paused() && tl.duration() > 0) {
+          tl.repeat(-1);
+          tl.repeatDelay(0.6);
+          tl.play(0);
+        }
+      } catch (e) { /* 单条失败不影响其余 */ }
+    });
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+  setTimeout(boot, 300);
+})();
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  var isT = (v.exportMode || 'transparent') === 'transparent';
+  var r = document.documentElement.style;
+  r.setProperty('--background', isT ? 'transparent' : '#0F0F0F');
+  r.setProperty('--shadow', isT ? '#FFFFFF' : '#0F0F0F');
+  if (v.accent) r.setProperty('--accent', v.accent);
+
+  function set(id, val) {
+    var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val;
+  }
+  ['label', 'kind', 'code', 'hint', 'btn'].forEach(function (k) { set(k, v[k]); });
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  B.fitAll();
+  var tl = B.tl();
+
+  if (reduce) {
+    /* 降级：去掉入位与按压反馈，只留终态 + ≤8px 微位移淡入（规范 §13.5） */
+    gsap.set('#cp', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#cb', { x: 0, y: 0, opacity: 1 });
+    gsap.set('#code', { x: 0 });
+    gsap.set('#hint', { x: 0 });
+
+    tl.fromTo('#cp', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, 0);
+    tl.fromTo('#cb', { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: .7, ease: 'power2.out' }, .45);
+
+    B.hold(tl, 1.6, 1.2);
+    return;
+  }
+
+  var TOTAL = parseFloat(v.duration) > 0 ? parseFloat(v.duration) : 5;
+  var HOLD = 0.5;
+  var WIN = Math.max(1.6, TOTAL - HOLD);
+  var SH = isT ? '#FFFFFF' : '#0F0F0F';
+
+  /* 模 1 · 拍进来：券面自左 80px 拍入，落定瞬间阴影压 2 帧再弹回原档 */
+  tl.fromTo('#cp', { x: -80 },
+      { x: 0, duration: .28, ease: 'power4.out' }, 0)
+    .fromTo('#cp', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#cp', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+  /* 模 2 · 零件装上去：竖条、券类型、优惠码、撕口、说明错峰跟位，纯位移 */
+  tl.fromTo('#kind', { x: -26 }, { x: 0, duration: .2, ease: 'power4.out' }, .2);
+  tl.fromTo('#code', { x: -34 }, { x: 0, duration: .24, ease: 'power4.out' }, .26);
+  tl.fromTo('.dash', { scaleX: .3 }, { scaleX: 1, duration: .26, ease: 'power4.out' }, .4);
+  tl.fromTo('#hint', { x: -22 }, { x: 0, duration: .2, ease: 'power4.out' }, .46);
+  tl.fromTo('#label', { y: 26 }, { y: 0, duration: .22, ease: 'power4.out' }, .24);
+
+  /* 按钮块自右拍入 */
+  tl.fromTo('#cb', { x: 80 },
+      { x: 0, duration: .26, ease: 'power4.out' }, .18)
+    .fromTo('#cb', { boxShadow: '8px 8px 0 ' + SH },
+      { boxShadow: '8px 11px 0 ' + SH, duration: .04, ease: 'steps(2)' }, '<')
+    .to('#cb', { boxShadow: '8px 8px 0 ' + SH, duration: .04, ease: 'steps(2)' });
+  tl.fromTo('#btn', { x: 24 }, { x: 0, duration: .2, ease: 'power4.out' }, .38);
+  tl.fromTo('#cb .arw', { x: 24 }, { x: 0, duration: .2, ease: 'power4.out' }, .46);
+
+  /* 模 3 · 按钮按下：位移量恒等于阴影偏移量，1 帧完成不补间（基因 2 唯一交互签名） */
+  tl.set('#cb', { x: 6, y: 6, boxShadow: '2px 2px 0 ' + SH, duration: 0 }, 1.6)
+    .set('#cb', { x: 0, y: 0, boxShadow: '8px 8px 0 ' + SH, duration: 0 }, 1.96);
+
+  /* 模 8 · 色块闪切：按钮底色按固定节奏换一次再换回，收尾停在绿色 */
+  tl.set('#cb', { backgroundColor: '#FFD429', duration: 0 }, 2.5)
+    .set('#cb', { backgroundColor: '#2FD07A', duration: 0 }, 3.3);
+
+  /* 两块反向微位移：按钮上抬、券面下压，匀速往返 */
+  var T0 = 2.2;
+  var REP = Math.max(1, Math.round((WIN - T0) / .85));
+  var half = (WIN - T0) / (REP * 2);
+  tl.to('#cb', { y: -6, duration: half, ease: 'none', repeat: REP * 2 - 1, yoyo: true }, T0);
+  tl.to('#cp', { y: 5, duration: half, ease: 'none', repeat: REP * 2 - 2, yoyo: true }, T0 + half);
+
+  var end = tl.duration();
+  B.hold(tl, end, Math.max(HOLD, TOTAL - end));
+})();
+</script>
+</body></html>
