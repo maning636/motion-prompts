@@ -19,6 +19,23 @@ License: 见 [LICENSE](./LICENSE) — 自定义许可，非 OSI 标准。
 - **600 个提示词** —— 喂给任意 AI，AI 照样给你生成一个动效页面；
 - **精选样片** —— 每个模板族挑代表作，README 里直接看。
 
+> [!IMPORTANT]
+> **给已经 clone 过旧版本的同学**
+>
+> 本仓历史做过一次改写：清理了误随仓分发的账号二维码文件（含个人隐私信息）。
+> 改写只对本仓库生效，**`git pull` 不会更新历史**，你本地那份旧 clone 里的二维码文件仍在。
+> 请删掉旧目录，重新 clone：
+>
+> ```bash
+> git clone https://github.com/maning636/motion-prompts.git
+> ```
+>
+> **给 fork 的维护者**
+>
+> 目前有两个 fork 仍停在改写前的历史（`linhaosunny/motion-prompts`、`okeyba/motion-prompts`），
+> 其中的二维码文件只有各自仓库的所有者能清理，fork 侧需要各自处理：删掉旧 clone 重新 clone 再推，
+> 或联系仓库所有者协助。
+
 ## 快速开始
 
 **方式一：直接用模板（最快）**
