@@ -8,3 +8,8 @@ prompts/_backup_*/
 # 本地残留文件保留在工作区但不跟踪 —— 需要时手动从备份取回。
 assets/qr-*.png
 assets/qr-*.jpg
+
+# 渲染抽帧的调试产物（源库里有，公开仓不需要）
+templates/*/_shots/
+components/_shots/
+**/_shots/
