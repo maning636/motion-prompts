@@ -3,6 +3,7 @@
 License: 见 [LICENSE](./LICENSE) — 自定义许可，非 OSI 标准。
 
 [![预览站](https://img.shields.io/badge/%F0%9F%8E%AC_%E5%9C%A8%E7%BA%BF%E9%A2%84%E7%A7%88-maning789link.top%2Fstation.html-0F9D3F)](https://maning789link.top/station.html)
+[![测试站](https://img.shields.io/badge/%E6%B5%8B%E8%AF%95%E7%AB%99-443%E4%B8%AA%E6%A8%A1%E6%9D%BF%E5%9C%A8%E7%BA%BF%E8%AF%95%E7%8E%A9-0F9D3F)](https://maning789link.top/lab/)
 [![素材库](https://img.shields.io/badge/%E6%A8%A1%E6%9D%90%E5%BA%93-1047%E4%B8%AA%E5%B8%85%E7%89%87-2C2417)](#本仓有什么)
 [![提示词](https://img.shields.io/badge/%E6%8F%90%E7%A4%BA%E8%AF%8D-600%E4%B8%AA-2C2417)](#本仓有什么)
 [![许可](https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF-%E4%BA%A7%E5%87%BA%E7%89%A9%E5%8F%AF%E5%95%86%E7%94%A8-FFB020)](LICENSE)
@@ -12,6 +13,8 @@ License: 见 [LICENSE](./LICENSE) — 自定义许可，非 OSI 标准。
 > 上图：编辑器试玩器（测试区）——挑底片、叠动效、拖位置、画轨迹，compose.json 一键导入/导出，浏览器里完成编排。
 
 **🎬 在线预览全部动效 → https://maning789link.top/station.html**
+
+**🧪 动效测试站（443 个模板：改文案 / 改颜色 / 换底图 / 摆位置，即时试玩）→ https://maning789link.top/lab/**
 
 本仓提供三样东西，全部免费获取、全部可直接使用：
 
