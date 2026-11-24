@@ -1,0 +1,344 @@
+/* ============================================================================
+   积木社 BLOCKBRUT · 动效设计系统 v1
+   ----------------------------------------------------------------------------
+   这套 token 与配方（--ink 描边 / --bw 3px / 无模糊硬阴影 / 撞色块 / mono 标签）
+   一一对应。模板不要各自发明颜色和阴影，一律引用这里的变量，
+   否则几百个模板做出来会是几百种不相干的风格。
+
+   用法：<link rel="stylesheet" href="../_lib/blocks.css">
+   ========================================================================== */
+
+/* ---------- 全局重置 ----------
+   漏了这条会让 width:1920px 的舞台加上 padding 变成 2080px 宽、
+   高度同理溢出 72px，右侧内容直接被画布切掉。
+   上一批素材"文字溢出"有一半是这种算错盒子造成的，所以放在最前面锁死。 */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+h1, h2, h3, h4, p, ul, ol, li, figure { margin: 0; padding: 0; }
+ul, ol { list-style: none; }
+img, svg { display: block; max-width: 100%; }
+button { font: inherit; color: inherit; }
+
+:root {
+  /* 配色：暖纸底 + 高饱和撞色，描边统一近黑 */
+  --ink:     #0F0F0F;
+  --ink-70:  #3A3A3A;
+  --paper:   #FFF6E5;
+  --white:   #FFFFFF;
+  --mute:    #6B6B6B;
+  --pink:    #FF5FA2;
+  --yellow:  #FFD429;
+  --blue:    #3D7BFF;
+  --green:   #2FD07A;
+  --orange:  #FF8A3D;
+  --purple:  #9B6BFF;
+
+  /* 描边与圆角 */
+  --bw: 3px;
+  --bw-thin: 2px;
+  --r: 4px;
+  --r-pill: 9999px;
+
+  /* 硬阴影：绝不带模糊，这是积木感的来源 */
+  --sh-s: 4px 4px 0 var(--ink);
+  --sh-m: 6px 6px 0 var(--ink);
+  --sh-l: 10px 10px 0 var(--ink);
+  --sh-w: 8px 8px 0 var(--white);
+  --sh-pink: 6px 6px 0 var(--pink);
+  --sh-blue: 6px 6px 0 var(--blue);
+  --sh-green: 6px 6px 0 var(--green);
+
+  --sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
+  --mono: "Sarasa Gothic SC", "JetBrains Mono", Consolas, "Courier New", monospace;
+
+  /* 节奏 */
+  --gap: 18px;
+  --pad: 26px;
+}
+
+/* ---------- 底板 ---------- */
+.blk-paper {
+  background: var(--paper);
+  color: var(--ink);
+}
+.blk-ink {
+  background: var(--ink);
+  color: var(--white);
+}
+
+/* 点阵噪点：纸质感，opacity 要低，只在浅底上用 */
+.blk-noise::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(15, 15, 15, .14) 1px, transparent 1px);
+  background-size: 12px 12px;
+  opacity: .55;
+}
+.blk-noise-light::after {
+  background-image: radial-gradient(rgba(255, 255, 255, .12) 1px, transparent 1px);
+}
+
+/* ---------- 斜纹带：分区隔断 ---------- */
+.blk-stripe {
+  height: 18px;
+  border-top: var(--bw) solid var(--ink);
+  border-bottom: var(--bw) solid var(--ink);
+  background: repeating-linear-gradient(45deg,
+    var(--ink) 0 10px, var(--pink) 10px 20px);
+}
+.blk-stripe.blue  { background: repeating-linear-gradient(45deg,  var(--ink) 0 10px, var(--blue)  10px 20px); }
+.blk-stripe.green { background: repeating-linear-gradient(-45deg, var(--ink) 0 10px, var(--green) 10px 20px); }
+.blk-stripe.yellow{ background: repeating-linear-gradient(45deg,  var(--ink) 0 10px, var(--yellow)10px 20px); }
+
+/* ---------- 积木块 ---------- */
+.blk {
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--r);
+  position: relative;
+}
+.blk-pill {
+  border-radius: var(--r-pill);
+}
+.blk-flat { box-shadow: none; }
+.blk-lift { box-shadow: var(--sh-s); }
+.blk-lift-m { box-shadow: var(--sh-m); }
+.blk-lift-l { box-shadow: var(--sh-l); }
+.blk-press { box-shadow: 2px 2px 0 var(--ink); }
+
+/* 配色块 */
+.blk-yellow { background: var(--yellow); }
+.blk-pink   { background: var(--pink);   color: var(--white); }
+.blk-blue   { background: var(--blue);   color: var(--white); }
+.blk-green  { background: var(--green); }
+.blk-white  { background: var(--white); }
+.blk-orange { background: var(--orange); }
+.blk-purple { background: var(--purple); color: var(--white); }
+
+/* ---------- 文字 ---------- */
+/* 眉标：小号 mono + 大字距，积木味的关键细节 */
+.blk-eyebrow {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.blk-num {
+  font-family: var(--mono);
+  font-weight: 700;
+  line-height: .92;
+  letter-spacing: -.02em;
+  /* 等宽数字：数字滚动时字形宽度不变，可见面积不抖，
+     settle 才不会正好停在滚到一半的那一帧（预视图上就写成 111 而不是 128）。 */
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+.blk-display {
+  font-weight: 900;
+  line-height: 1.06;
+  letter-spacing: -.01em;
+}
+
+/* 标签贴纸 */
+.blk-tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: .08em;
+  padding: 5px 13px;
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--r-pill);
+  background: var(--white);
+  color: var(--ink);
+  box-shadow: var(--sh-s);
+}
+.blk-tag.flat { box-shadow: none; }
+.blk-tag.on-ink { background: var(--yellow); }
+.blk-tag.on-ink-blue { background: var(--blue); color: var(--white); }
+
+/* 按钮式方块 */
+.blk-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 22px;
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--r);
+  background: var(--green);
+  color: var(--ink);
+  font-weight: 900;
+  box-shadow: var(--sh-s);
+}
+
+/* ---------- 排版守卫：文字不许溢出 ----------
+   之前那批素材最大的毛病就是大字溢出画布。这里给一套统一的收口做法：
+   凡是可能超尺寸的文字，一律用 fit() 按容器实测缩放，而不是拍脑袋写死 font-size。
+   模板里写：<div class="blk-fit" data-min="28" data-max="96">长文本…</div>
+   -------------------------------------------------------------------------- */
+.blk-fit {
+  display: block;
+  transform-origin: left top;
+  white-space: nowrap;
+}
+/* 单行 + 垂直居中用的容器 */
+.blk-fit-box {
+  overflow: hidden;
+  position: relative;
+}
+
+/* ---------- 常用零件 ---------- */
+/* 方格棋盘底 */
+.blk-checker {
+  background-image:
+    linear-gradient(45deg, rgba(15,15,15,.10) 25%, transparent 25%, transparent 75%, rgba(15,15,15,.10) 75%),
+    linear-gradient(45deg, rgba(15,15,15,.10) 25%, transparent 25%, transparent 75%, rgba(15,15,15,.10) 75%);
+  background-size: 28px 28px;
+  background-position: 0 0, 14px 14px;
+}
+
+/* 圆点阵 */
+.blk-dots {
+  background-image: radial-gradient(rgba(15,15,15,.22) 2px, transparent 2px);
+  background-size: 22px 22px;
+}
+
+/* 细格线 */
+.blk-grid {
+  background-image:
+    linear-gradient(to right, rgba(15,15,15,.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15,15,15,.14) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* 票根缺口：左右半圆挖空 */
+.blk-notch {
+  position: relative;
+}
+.blk-notch::before,
+.blk-notch::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 16px; height: 16px;
+  margin-top: -8px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: var(--bw) solid var(--ink);
+}
+.blk-notch::before { left: -9px; }
+.blk-notch::after  { right: -9px; }
+
+/* 硬边分割线 */
+.blk-rule {
+  height: 0;
+  border-top: var(--bw) solid var(--ink);
+}
+.blk-rule-dash {
+  height: 0;
+  border-top: var(--bw) dashed var(--ink);
+}
+
+/* ============================================================================
+   进度语义件：填充 / 底槽 / 数值片
+   ----------------------------------------------------------------------------
+   这一组是上一轮目检后重定的。之前排行条是「整条浅色底 + 一段深色填充」，
+   第五名那种浅色填充压在白底上几乎看不见，一行读起来像个空盒子——
+   而所有自动指标（YSTD、字节数、ink 面积）全都判它合格。
+
+   定死的新语义：**底槽永远是纸色+斜纹，填充永远是实色**。
+   剩下的长度靠纹理的密度说话，一眼能分清"填了多少"和"还剩多少"，
+   跟填充色深浅无关。第 1 名和第 5 名用的是同一套语言，只是长度不同。
+   ========================================================================== */
+.blk-track {
+  position: relative;
+  background-color: var(--paper);
+  /* 45° 疏纹，间距比装饰带大，避免和内容抢注意力 */
+  background-image: repeating-linear-gradient(45deg,
+    rgba(15, 15, 15, .13) 0 2px, transparent 2px 16px);
+}
+.blk-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 0;
+}
+
+/* 数值片：值永远压在近黑块上，任何填充色上都读得清 */
+.blk-val {
+  font-family: var(--mono);
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: 1;
+  background: var(--ink);
+  color: var(--paper);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+.blk-val.on-paper { background: var(--ink); color: var(--paper); }
+.blk-val.on-ink   { background: var(--paper); color: var(--ink); }
+
+/* 名次牌：方块 + 硬阴影，越靠前越大 */
+.blk-rank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -.03em;
+  flex: 0 0 auto;
+}
+
+/* 画面四角的对位标记：neo-brutalist 的"印刷品"质感，四个就够，多了吵 */
+.blk-corner {
+  position: absolute;
+  width: 26px; height: 26px;
+  border: var(--bw) solid var(--ink);
+  pointer-events: none;
+}
+.blk-corner.tl { top: 16px;    left: 16px;  border-right: 0; border-bottom: 0; }
+.blk-corner.tr { top: 16px;    right: 16px; border-left: 0;  border-bottom: 0; }
+.blk-corner.bl { bottom: 16px; left: 16px;  border-right: 0; border-top: 0; }
+.blk-corner.br { bottom: 16px; right: 16px; border-left: 0;  border-top: 0; }
+
+/* 网格序号条：01 / 02 / 03 竖排，对应"清单类"版式 */
+.blk-ticks {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.blk-ticks i {
+  display: block;
+  width: 46px; height: 8px;
+  background: var(--ink);
+  opacity: .22;
+}
+.blk-ticks i.on { opacity: 1; background: var(--pink); }
+
+/* 图标底座：纯 3px 描边 SVG 放这里面，尺寸锁死，不会被字体带偏 */
+.blk-ico {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.blk-ico svg { width: 100%; height: 100%; display: block; }
+
+/* ---------- 动效基元（GSAP 无关，纯 CSS 关键帧；JS 动画请用 gsap） ---------- */
+@keyframes blk-pop {
+  0%   { transform: scale(.72); }
+  62%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+@keyframes blk-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .28; }
+}
+@keyframes blk-slide-r {
+  from { transform: translateX(-14px); }
+  to   { transform: translateX(0); }
+}

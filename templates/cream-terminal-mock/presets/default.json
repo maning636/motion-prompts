@@ -1,0 +1,6 @@
+{
+  "windowTitle": "~/projects/rag-demo · zsh",
+  "command": "curl -s https://api.example.com/v1/search | jq '.results[0]'",
+  "output": "{\n  \"title\": \"RAG 最佳实践\",\n  \"score\": 0.94,\n  \"source\": \"docs/retrieval.md\"\n}",
+  "meta": "tokens: 1,240 · latency: 420ms · cost: $0.002"
+}

@@ -1,0 +1,11 @@
+{
+  "title": "API 调用示例",
+  "subtitle": "请求与响应的实时 Mock",
+  "method": "POST",
+  "endpoint": "/v1/chat/completions",
+  "request": "{\"model\":\"gpt-4o\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}]}",
+  "response": "{\"id\":\"chatcmpl-xxx\",\"model\":\"gpt-4o\",\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"Hi there!\"}}]}",
+  "accent": "#00FF00",
+  "background": "#12100E",
+  "foreground": "#F4EFE7"
+}

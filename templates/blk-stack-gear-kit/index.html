@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "eyebrow", "name": "眉标", "type": "string", "label": "顶部眉标", "default": "GEAR / 装备清单"}, {"id": "title", "name": "主标题", "type": "string", "label": "主标题", "default": "出门干活带这几样就够"}, {"id": "note", "name": "注释", "type": "string", "label": "右上角注释", "default": "单位：元"}, {"id": "accent", "name": "强调色", "type": "color", "label": "强调色", "default": "#FF8A3D"}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>叠压卡片 · 出门干活带这几样就够</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  html,body{margin:0;padding:0;background:var(--ink)}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+        background:var(--paper);color:var(--ink);font-family:var(--sans);
+        display:flex;flex-direction:column;padding:58px 72px 0}
+  #stage.on-ink{background:var(--ink);color:var(--paper)}
+
+  .hd{flex:0 0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:36px}
+  .hd h1{font-size:60px;font-weight:900;line-height:1.04;margin:8px 0 0;letter-spacing:-.015em}
+  .hd .note{font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:.1em;
+        border:var(--bw) solid var(--ink);border-radius:9999px;padding:9px 20px;
+        background:var(--white);color:var(--ink);box-shadow:4px 4px 0 var(--ink);white-space:nowrap}
+  #stage.on-ink .hd .note{background:var(--paper);color:var(--ink);box-shadow:4px 4px 0 var(--accent)}
+
+  /* 底部色带：把画面「压」住，不然上面排得再满底部都是飘的 */
+  .ft{flex:0 0 auto;height:18px;border-top:var(--bw) solid var(--ink);
+      border-bottom:var(--bw) solid var(--ink);
+      background:repeating-linear-gradient(45deg,var(--ink) 0 10px,var(--accent) 10px 20px)}
+  #stage.on-ink .ft{border-color:var(--paper)}
+
+  .body{flex:1 1 auto;min-height:0;display:flex;margin-top:32px;padding-bottom:26px}
+
+  /* 图标必须锁死尺寸。只写 viewBox 而不写 width/height 的 SVG，浏览器会按
+     「默认替换元素尺寸」给它 300px——图标从 52px 的底座里横着冲出去，
+     把整张卡片撑破。版图上表现为卡片右边被顶掉一截，而溢出检测只报"出框"，
+     看不出是被一个看不见的图标顶的。 */
+  .ico{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .ico svg{width:100%;height:100%;display:block}
+
+  .body{position:relative;align-items:center;justify-content:center}
+  /* 叠压用 flex 纵向居中 + 负 margin，不用 absolute。
+     absolute 一来，top: i*46px 把整摞卡钉在 pile 顶部，
+     下面六百像素全空——而 overflow / ink 面积都判它正常。
+     z-index 反向递减：i=0 在最上、承载主信息，i 越大越靠下。 */
+  .pile{position:relative;width:100%;height:100%;display:flex;flex-direction:column;
+        justify-content:center;align-items:center;padding:0 40px}
+  /* 压叠量按「露出的部分能盖住整行内容」算，不是按「只露一条边」。
+     卡片 150px、压 40px，露出的 110px 正好覆盖 64px 高的内容行。
+     早先露 34px：只剩边框和一小条底色，五张卡里四张等于空白；
+     后来露 106px 而内容高 84px 居中在 53~137：内容上半落在遮挡区，
+     于是每张只看得见半个数字。露出高度和内容高度必须一起算。
+
+     内容还要避开上一层卡片的 10px 下阴影（遮住本卡 40~50 这一段），
+     所以贴底排：150-26-64 = 60 起，正好在 50 之下。
+
+     不用 rotate：1700px 宽的卡片上 1.5° 就是 ±23px 的端点落差，
+     正好切在数字上——宽卡片吃不住大角度旋转，阶梯感交给右移收窄。 */
+  .card{position:relative;flex:0 0 auto;margin-top:-40px;height:150px;
+        border:var(--bw) solid var(--ink);border-radius:4px;
+        box-shadow:10px 10px 0 var(--ink);padding:0 32px 26px;
+        display:flex;align-items:flex-end;gap:26px;overflow:hidden}
+  .card:first-child{margin-top:0}
+  .card .no{flex:0 0 64px;height:64px;display:flex;align-items:center;justify-content:center;
+        background:var(--ink);color:var(--paper);font-family:var(--mono);font-weight:700;
+        font-size:26px;letter-spacing:-.02em}
+  .card .ico{width:52px;height:52px;flex:0 0 auto}
+  .card .k{flex:1 1 auto;min-width:0;font-weight:900;font-size:30px;line-height:1.12;
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card .v{flex:0 0 auto;font-family:var(--mono);font-weight:700;font-size:48px;line-height:.9;
+        letter-spacing:-.04em;font-variant-numeric:tabular-nums;white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="stage" class="blk-noise">
+  <div class="blk-corner tl"></div><div class="blk-corner tr"></div>
+  <div class="blk-corner bl"></div><div class="blk-corner br"></div>
+
+  <div class="hd"><div><div class="blk-eyebrow" id="eyebrow">GEAR / 装备清单</div>
+    <h1 id="title" data-fit-max="60" data-fit-min="32">出门干活带这几样就够</h1></div><div class="note" id="note" data-fit-max="15" data-fit-min="11">单位：元</div></div>
+  <div class="body"><div class="pile" id="pile"><div class="blk card" id="c0" style="z-index:50;margin-left:0px;width:calc(100% - 0px);background:var(--yellow);color:var(--ink)"><span class="no">01</span><span class="ico"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M24 6a18 18 0 100 36 18 18 0 000-36zM24 13v12l9 6"/></svg></span><span class="k" id="k0" data-fit-max="30" data-fit-min="15">主机</span><span class="v" id="v0" data-fit-max="48" data-fit-min="24">12400</span></div><div class="blk card" id="c1" style="z-index:49;margin-left:26px;width:calc(100% - 26px);background:var(--blue);color:var(--ink)"><span class="no">02</span><span class="ico"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M24 5l17 6v12c0 11-7 17-17 20C14 40 7 34 7 23V11zM17 24l5 5 10-11"/></svg></span><span class="k" id="k1" data-fit-max="30" data-fit-min="15">镜头</span><span class="v" id="v1" data-fit-max="48" data-fit-min="24">4800</span></div><div class="blk card" id="c2" style="z-index:48;margin-left:52px;width:calc(100% - 52px);background:var(--green);color:var(--ink)"><span class="no">03</span><span class="ico"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M24 5l6 13 14 2-10 10 3 14-13-7-13 7 3-14L4 20l14-2z"/></svg></span><span class="k" id="k2" data-fit-max="30" data-fit-min="15">稳定器</span><span class="v" id="v2" data-fit-max="48" data-fit-min="24">2100</span></div><div class="blk card" id="c3" style="z-index:47;margin-left:78px;width:calc(100% - 78px);background:var(--pink);color:var(--ink)"><span class="no">04</span><span class="ico"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M24 4l18 10v20L24 44 6 34V14zM6 14l18 10 18-10M24 24v20"/></svg></span><span class="k" id="k3" data-fit-max="30" data-fit-min="15">麦克风</span><span class="v" id="v3" data-fit-max="48" data-fit-min="24">980</span></div><div class="blk card" id="c4" style="z-index:46;margin-left:104px;width:calc(100% - 104px);background:var(--orange);color:var(--ink)"><span class="no">05</span><span class="ico"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M24 5a13 13 0 00-8 23v5h16v-5a13 13 0 00-8-23zM17 38h14M20 43h8"/></svg></span><span class="k" id="k4" data-fit-max="30" data-fit-min="15">背包</span><span class="v" id="v4" data-fit-max="48" data-fit-min="24">640</span></div></div></div>
+  <div class="ft"></div>
+</div>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script>
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+    ["eyebrow", "title", "note", "accent", "k0", "v0", "k1", "v1", "k2", "v2", "k3", "v3", "k4", "v4"]
+.forEach(function (k) { set(k, v[k]); });
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+  B.fitAll();
+  var tl = B.tl();
+
+  var cards = document.querySelectorAll('.card');
+  cards.forEach(function (c, i) {
+    /* 从下往上依次「摞上去」：越晚出现的越先落位，最后落的那张压在最上面，
+       于是 idx=0 留在最上层承载主信息。 */
+    B.in.pop(tl, c, 0.08 + i * 0.11, { d: 0.62, from: .94, ease: 'power3.out' });
+  });
+  B.finish(tl);
+  B.hold(tl);
+})();
+</script>
+</body></html>

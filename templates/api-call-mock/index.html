@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id":"title","type":"string","label":"标题","default":"API 调用示例"},{"id":"subtitle","type":"string","label":"副标题","default":"请求与响应的实时 Mock"},{"id":"method","type":"string","label":"HTTP 方法","default":"POST"},{"id":"endpoint","type":"string","label":"接口路径","default":"/v1/chat/completions"},{"id":"request","type":"string","label":"请求 JSON","default":"{\"model\":\"gpt-4o\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}]}"},{"id":"response","type":"string","label":"响应 JSON","default":"{\"id\":\"chatcmpl-xxx\",\"model\":\"gpt-4o\",\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"Hi there!\"}}]}"},{"id":"accent","type":"color","label":"强调色","default":"#00FF00"},{"id":"background","type":"color","label":"背景色","default":"#12100E"},{"id":"foreground","type":"color","label":"文字色","default":"#F4EFE7"}]'>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=1920, height=1080" />
+    <script src="../_lib/gsap.min.js"></script>
+    <style>
+
+/* 字体受许可限制不随仓分发：不发网络请求，正文用系统回退栈 */
+
+*{ box-sizing: border-box;font-family: 'MEBHeiHeiTi', 'PingFang SC', 'Microsoft YaHei', sans-serif;}
+      html, body{ margin: 0; width: 1920px; height: 1080px; overflow: hidden;font-family: 'MEBHeiHeiTi', 'PingFang SC', 'Microsoft YaHei', sans-serif;}
+      #root{ position: relative; width: 1920px; height: 1080px; overflow: hidden;font-family: 'MEBHeiHeiTi', 'PingFang SC', 'Microsoft YaHei', sans-serif;}
+      .scene{ position: absolute; inset: 0; width: 100%; height: 100%; padding: 96px 112px; overflow: hidden;font-family: 'MEBHeiHeiTi', 'PingFang SC', 'Microsoft YaHei', sans-serif;}
+      .header{ margin-bottom: 40px;font-family: 'MiSans SemiBold', 'PingFang SC', 'Microsoft YaHei', sans-serif;}
+      .title{ margin: 0; font-family: 'MiSans SemiBold', 'PingFang SC', 'Microsoft YaHei', sans-serif; font-size: 64px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; }
+      .subtitle{ margin: 12px 0 0; font-family: 'MEBHeiHeiTi', sans-serif; font-size: 24px; font-weight: 400; opacity: 0.55; }
+      .panels{ display: flex; gap: 40px; height: 680px;font-family: 'MEBHeiHeiTi', 'PingFang SC', 'Microsoft YaHei', sans-serif;}
+      .panel{ flex: 1; background: rgba(244,239,231,0.04); border: 1px solid rgba(244,239,231,0.12); border-radius: 12px; padding: 28px; display: flex; flex-direction: column;font-family: 'MEBHeiHeiTi', 'PingFang SC', 'Microsoft YaHei', sans-serif;}
+      .panel-head{ display: flex; align-items: center; gap: 14px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid rgba(244,239,231,0.12);font-family: 'MiSans SemiBold', 'PingFang SC', 'Microsoft YaHei', sans-serif;}
+      .method{ padding: 4px 12px; background: var(--accent); color: #12100E; font-family: 'MEBHeiHeiTi', sans-serif; font-size: 18px; font-weight: 800; border-radius: 4px; }
+      .endpoint{ font-family: 'MEBHeiHeiTi', sans-serif; font-size: 20px; opacity: 0.8; }
+      .code{ flex: 1; font-family: 'MEBHeiHeiTi', sans-serif; font-size: 18px; line-height: 1.6; white-space: pre-wrap; overflow: hidden; }
+      .code .key{ color: #F4EFE7;font-family: 'MEBHeiHeiTi', 'PingFang SC', 'Microsoft YaHei', sans-serif;}
+      .code .str{ color: #A8C9BF;font-family: 'MEBHeiHeiTi', 'PingFang SC', 'Microsoft YaHei', sans-serif;}
+      .code .num{ color: var(--accent);font-family: 'MEBHeiHeiTi', 'PingFang SC', 'Microsoft YaHei', sans-serif;}
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+      <section id="scene" class="scene clip" data-start="0" data-duration="6" data-track-index="1">
+        <div class="header">
+          <h1 class="title" id="title"></h1>
+          <p class="subtitle" id="subtitle"></p>
+        </div>
+        <div class="panels">
+          <div class="panel" id="req-panel">
+            <div class="panel-head"><span class="method" id="method"></span><span class="endpoint" id="endpoint"></span></div>
+            <div class="code" id="request"></div>
+          </div>
+          <div class="panel" id="res-panel">
+            <div class="panel-head"><span class="method">200 OK</span><span class="endpoint">Response</span></div>
+            <div class="code" id="response"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <script>
+      const fallback = { title: "API 调用示例", subtitle: "请求与响应的实时 Mock", method: "POST", endpoint: "/v1/chat/completions", request: '{"model":"gpt-4o","messages":[{"role":"user","content":"Hello"}]}', response: '{"id":"chatcmpl-xxx","model":"gpt-4o","choices":[{"message":{"role":"assistant","content":"Hi there!"}}]}', accent: "#00FF00", background: "#12100E", foreground: "#F4EFE7" };
+      const v = window.__hyperframes?.getVariables ? window.__hyperframes.getVariables() : fallback;
+      document.documentElement.style.setProperty("--foreground", v.foreground ?? "#F4EFE7");
+      document.documentElement.style.setProperty("--background", v.background ?? "#12100E");
+      const root = document.getElementById("root");
+      root.style.backgroundColor = v.background;
+      root.style.color = v.foreground;
+      root.style.setProperty("--accent", v.accent);
+      document.getElementById("title").textContent = v.title;
+      document.getElementById("subtitle").textContent = v.subtitle;
+      document.getElementById("method").textContent = v.method;
+      document.getElementById("endpoint").textContent = v.endpoint;
+      function syntaxJSON(json) {
+        return json.replace(/"([^"]+)":/g, '<span class="key">"$1":</span>').replace(/: "([^"]*)"/g, ': <span class="str">"$1"</span>').replace(/: (\d+)/g, ': <span class="num">$1</span>');
+      }
+      document.getElementById("request").innerHTML = syntaxJSON(v.request);
+      document.getElementById("response").innerHTML = syntaxJSON(v.response);
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(".title", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.1);
+      tl.fromTo(".subtitle", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.25);
+      tl.fromTo("#req-panel", { opacity: 0, x: -40 }, { opacity: 1, x: 0, duration: 0.6, ease: "power2.out" }, 0.45);
+      tl.fromTo("#res-panel", { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: 0.6, ease: "power2.out" }, 0.6);
+      tl.fromTo(".code", { opacity: 0 }, { opacity: 1, duration: 0.6 }, 1.0);
+      tl.to(".scene", { opacity: 0, y: -16, duration: 0.5, ease: "power2.in" }, 5.3);
+      window.__timelines.main = tl;
+    </script>
+  </body>
+</html>

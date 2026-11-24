@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[{"id": "eyebrow", "name": "眉标", "type": "string", "label": "叠加条左上角 mono 眉标（≤14 字）", "default": "JUMP · 章节"}, {"id": "titleA", "name": "轨道标题", "type": "string", "label": "轨道右上角 mono 标题（≤16 字）", "default": "哪一段值得回听"}, {"id": "chapters", "name": "章节名", "type": "string", "label": "三个章节名，用全角竖线｜分隔（每段≤6 字）", "default": "开场｜正文｜收尾"}, {"id": "chapterIdx", "name": "当前章节", "type": "number", "label": "当前正在讲的章节序号（0/1/2），高亮对应章节块", "default": 0}, {"id": "peaks", "name": "音频包络", "type": "string", "label": "离线 RMS 包络（JSON 数组，整数 0–1000；换音轨后用离线脚本重算）", "default": "825,570,345,300,892,135,327,296,973,314,309,184,969,341,300,457,839,363,318,915,511,381,327,906,170,345,305,1000,215,336,291,946,345,314,390,951,386,341,686,628,354,309,960,260,377,327,996,283"}, {"id": "accent", "name": "强调色", "type": "color", "label": "强调色（当前章节块 / 播放头 / 进度填充）", "default": "#2FD07A"}, {"id": "duration", "name": "总时长", "type": "number", "label": "总时长（秒，须等于音轨长度 5.6）", "default": 5.6}, {"id": "exportMode", "name": "导出格式", "type": "enum", "label": "Format", "default": "transparent", "hidden": true, "options": [{"value": "transparent", "label": "透明底"}, {"value": "mp4", "label": "MP4"}, {"value": "webm", "label": "WebM"}]}]'>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>章节跳转表（透明叠加）· 三个章节点，选中哪个一目了然</title>
+<link rel="stylesheet" href="../_lib/blocks.css">
+<style>
+  @media (prefers-reduced-motion: reduce){
+    /* transition-property 的初始值是 all，只压 duration 会让**所有内联样式改动**
+       都变成 0.01ms 的过渡——本族每条都有 JS 写死的内联几何（播放头 left/top、
+       峰值保持线 bottom），降级分支里会卡在 CSS 旧值不动，渲染出错误位置，
+       而 motion-qc 只看最终帧出框、不看降级分支的几何正确性，全绿也照样错。
+       补上 transition-property:none 与 animation-name:none 才是完整写法。 */
+    .anim{transition-duration:.01ms !important;animation-duration:.01ms !important;
+      transition-property:none !important;animation-name:none !important}
+  }
+
+  html,body{margin:0;padding:0;background:transparent}
+  #stage{width:1920px;height:1080px;position:relative;overflow:hidden;
+    background:transparent;color:var(--white);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased}
+  /* 叠加原子的版式基座：一条压在画面底部的深色底板。
+     底板之外**完全不画东西**——叠在实拍口播上时，那 800px 就是原画面，
+     观众看到的只有这条轨道。 */
+  .plate{position:absolute;left:56px;right:56px;bottom:56px;
+    background:rgba(15,15,15,.90);border:var(--bw) solid var(--white);
+    border-radius:4px;padding:24px 40px;display:flex;flex-direction:column;gap:10px}
+  .railhd{display:flex;align-items:center;gap:18px}
+  .railhd .eb{font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:.14em;
+    color:var(--accent);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .railhd .ttl{margin-left:auto;flex:0 0 auto;font-family:var(--mono);font-weight:700;
+    font-size:24px;letter-spacing:.1em;color:var(--white);white-space:nowrap}
+  .tcline{display:flex;align-items:center;gap:18px}
+  .tcline .tc{font-family:var(--mono);font-weight:900;font-size:28px;letter-spacing:.08em;
+    font-variant-numeric:tabular-nums;white-space:nowrap}
+  .tcline .ticks{flex:1 1 auto;display:flex;justify-content:space-between;min-width:0}
+  .tcline .ticks i{flex:0 0 auto;font-family:var(--mono);font-weight:700;font-size:20px;letter-spacing:.06em;
+    color:var(--mute);font-style:normal;white-space:nowrap}
+
+  .chips{display:flex;gap:12px}
+  .chips .c{flex:1 1 0;min-width:0;position:relative;padding:14px 12px 12px;border-radius:4px;
+    border:var(--bw) solid rgba(255,255,255,.50);background:rgba(255,255,255,.06)}
+  .chips .c .no{font-family:var(--mono);font-weight:900;font-size:20px;letter-spacing:.1em;
+    color:var(--mute);white-space:nowrap}
+  .chips .c .nm{min-width:0;font-family:var(--mono);font-weight:900;font-size:30px;letter-spacing:.04em;
+    color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px}
+  .chips .c .tg{position:absolute;left:0;bottom:0;height:6px;width:0;background:var(--accent)}
+  .chips .c.on{border-color:var(--accent);background:rgba(47,208,122,.16)}
+  .chips .c.on .no{color:var(--accent)}
+  .spark{position:relative;height:44px;display:flex;align-items:flex-end;
+    justify-content:space-between;padding:0 4px}
+  .spark i{display:block;width:26px;height:5px;border-radius:9999px;background:rgba(255,255,255,.30)}
+  #head{position:absolute;left:0;top:0;width:5px;height:44px;background:var(--accent);z-index:6}
+  #head .cap{position:absolute;left:-8px;top:-8px;width:21px;height:21px;background:var(--white);
+    border-radius:4px}
+  .bar{position:relative;height:10px;background:rgba(255,255,255,.20);border-radius:9999px;
+    overflow:hidden}
+  .bar .fill{position:absolute;left:0;top:0;height:100%;width:0;background:var(--accent)}
+  #head,.bar .fill,.chips .c .tg{transition:none}
+:root{--mute:#9A9A9A;}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="plate anim" id="plate">
+    <div class="railhd anim" id="railhd">
+      <span class="eb" id="eyebrow">JUMP · 章节</span>
+      <span class="ttl" id="titleA">哪一段值得回听</span>
+    </div>
+    <div class="chips anim" id="chips"></div>
+    <div class="spark anim" id="spark"></div>
+    <div class="bar anim" id="bar"><div class="fill" id="fill"></div></div>
+    <div class="tcline anim" id="tcline">
+      <span class="tc" id="tc">00:00</span>
+      <span class="ticks"><i>0s</i><i>1s</i><i>2s</i><i>3s</i><i>4s</i><i>5s</i></span>
+      <span class="tc" id="tcend">00:05</span>
+    </div>
+  </div>
+
+  <div id="head"><span class="cap"></span></div></div>
+<audio id="voice" src="./assets/voice-06.wav" data-start="0" data-duration="5.6"></audio>
+<script src="../_lib/gsap.min.js"></script>
+<script src="../_lib/blocks.js"></script>
+<script>
+(function () {
+  'use strict';
+  var B = window.BBlocks;
+  var v = B.vars();
+
+  /* ---------- 音频包络：offline RMS，烘在 peaks 变量里 ----------
+     这份数组来自 assets/voice-06.wav 的离线解码（RMS，48 桶，归一到 0–1000），
+     由 E:/FDE/_build/qcwork/aud_batch2_synth.py 算出，同时落一份
+     assets/voice-06.peaks.json 作溯源。
+     换音轨：换 wav → 重跑离线脚本 → 把新数组填进 peaks → 同步 duration 与
+     <audio data-duration>。这是一条显式的、算一次的步骤，不是缺陷。
+     为什么绝不接实时 AnalyserNode：无头渲染是逐帧 seek 采样，媒体在采集模式下
+     是 seek 不是 play（hyperframes runtime 的 allowLiveTimelineSeek 在
+     __HF_RENDER_CAPTURE_MODE 下为 false），探针接在暂停的元素上读到的不是
+     「此刻在放什么」；motion-qc 的探针同样是无序 seek。 */
+  var FALLBACK_PEAKS = '825,570,345,300,892,135,327,296,973,314,309,184,969,341,300,457,839,363,318,915,511,381,327,906,170,345,305,1000,215,336,291,946,345,314,390,951,386,341,686,628,354,309,960,260,377,327,996,283';
+  function parsePeaks(src) {
+    var raw = String(src == null ? '' : src).replace(/[\s\[\]]/g, '');
+    var parts = raw ? raw.split(',') : [];
+    var out = [];
+    for (var i = 0; i < parts.length; i++) {
+      var n = parseFloat(parts[i]);
+      if (isFinite(n)) out.push(Math.max(0, Math.min(1000, n)));
+    }
+    return out.length >= 8 ? out : parsePeaks(FALLBACK_PEAKS);
+  }
+  var PEAKS = parsePeaks(v.peaks);
+  function peakAt(k) {
+    return PEAKS[Math.max(0, Math.min(PEAKS.length - 1, k))];
+  }
+
+  function set(id, val) { var e = document.getElementById(id);
+    if (e && val != null && val !== '') e.textContent = val; }
+  ['eyebrow','titleA'].forEach(function (k) { set(k, v[k]); });
+  var CH = String(v.chapters == null || v.chapters === '' ? '开场｜正文｜收尾' : v.chapters)
+    .split('｜').map(function (s) { return s.trim(); });
+  while (CH.length < 3) CH.push('第' + (CH.length + 1) + '段');
+  var CH0 = Math.max(0, Math.min(2, Math.round(Number(v.chapterIdx) || 0)));
+
+
+  if (v.accent) document.documentElement.style.setProperty('--accent', v.accent);
+
+  /* 音频窗口：时间轴总长严格等于音轨长度，尾部留 0.6s 静音 + 定格。
+     禁止用变量值推算总长（数值填大会撞 SMOKE_TOO_LONG）。 */
+  var TOTAL = Math.min(6.5, Math.max(5, Number(v.duration) || 5.6));
+  var AUDIO_LEN = 5.6;
+  var WIN = Math.max(1.2, Math.min(TOTAL - 0.6, AUDIO_LEN));
+  var N = PEAKS.length;
+
+  var BARS = 24, MAXH = 38, MINH = 5, STEPS = N, SEG = WIN / STEPS, SPREAD = N / BARS;
+
+  function heightAt(i, k) {
+    var idx = Math.floor(k + i * SPREAD) % N;
+    return Math.max(MINH, Math.round(PEAKS[idx] / 1000 * MAXH));
+  }
+  function chapterAt(k) {
+    var f = (k + 0.5) / N;
+    return Math.max(0, Math.min(2, CH0 + Math.floor(f * 3 - 1e-9)));
+  }
+
+  var chips = document.getElementById('chips'), chipsEls = [];
+  for (var c = 0; c < 3; c++) {
+    var d = document.createElement('div');
+    d.className = 'c';
+    var no = document.createElement('div'); no.className = 'no';
+    no.textContent = 'CH ' + (CH0 + c + 1);
+    var nm = document.createElement('div'); nm.className = 'nm';
+    nm.textContent = CH[c];
+    var tg = document.createElement('span'); tg.className = 'tg';
+    d.appendChild(no); d.appendChild(nm); d.appendChild(tg);
+    chips.appendChild(d); chipsEls.push(d);
+  }
+  var spark = document.getElementById('spark'), bars = [];
+  for (var i = 0; i < BARS; i++) {
+    var b = document.createElement('i');
+    spark.appendChild(b); bars.push(b);
+  }
+
+  B.fitAll();
+
+  var head = document.getElementById('head');
+  var wr = spark.getBoundingClientRect();
+  var sr = document.getElementById('stage').getBoundingClientRect();
+  var SPAN = Math.max(10, wr.width - 5);
+  head.style.left = (wr.left - sr.left) + 'px';
+  head.style.top = (wr.top - sr.top) + 'px';
+  head.style.height = wr.height + 'px';
+
+  var reduce = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var tl = B.tl();
+
+  function slam(sel, at, dx, dy, d) {
+    tl.fromTo(sel, { x: dx, y: dy },
+      { x: 0, y: 0, duration: d || 0.26, ease: 'power4.out' }, at);
+  }
+  function press(sel, rest, at) {
+    tl.set(sel, { boxShadow: rest, immediateRender: false }, at);
+    tl.to(sel, { boxShadow: rest.replace(/(\d+)px (\d+)px/, function (_, a, b) {
+      return a + 'px ' + (parseInt(b, 10) + 3) + 'px'; }), duration: 0.04, ease: 'steps(2)' }, at + 0.04);
+    tl.to(sel, { boxShadow: rest, duration: 0.04, ease: 'steps(2)' }, at + 0.08);
+  }
+  function fadeInReduce(ids, start) {
+    for (var i = 0; i < ids.length; i++) {
+      tl.fromTo(ids[i], { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: i === ids.length - 1 ? .6 : .5, ease: 'power3.out' },
+        start + i * 0.08);
+    }
+  }
+
+  function paintChapter(k) {
+    var cur = chapterAt(k);
+    for (var i = 0; i < 3; i++) {
+      var on = i === cur;
+      chipsEls[i].className = on ? 'c on' : 'c';
+      /* 每块的填充条显示「这一章自己走到哪儿了」——由音频窗口三等分推导，不另填 */
+      var p = Math.max(0, Math.min(1, (k / N * 3 - i)));
+      chipsEls[i].lastChild.style.width = (p * 100) + '%';
+    }
+  }
+
+  if (reduce) {
+    var still = Math.round(N * 0.62);
+    gsap.set(bars, { height: (function (k) { return function (i) { return heightAt(i, k); }; })(still) });
+    paintChapter(still);
+    gsap.set('#fill', { width: '62%' });
+    gsap.set('#tc', { textContent: '00:03' });
+    gsap.set('#head', { x: SPAN * 0.62, y: 0, opacity: 1 });
+    fadeInReduce(['#plate', '#head'], 0);
+    B.hold(tl, 0.9, 1.15);
+    return;
+  }
+
+  slam('#plate', 0.00, 0, 36, 0.30);
+  slam('#railhd', 0.18, 0, -16, 0.22);
+  slam('#chips', 0.32, 0, -16, 0.24);
+  slam('#spark', 0.46, 0, -12, 0.22);
+  slam('#bar', 0.54, 0, -12, 0.22);
+  slam('#tcline', 0.62, 0, -12, 0.22);
+
+  for (var k = 0; k < STEPS; k++) {
+    tl.to(bars, { height: (function (kk) { return function (i) { return heightAt(i, kk); }; })(k),
+      duration: SEG, ease: 'none' }, k * SEG);
+    tl.call((function (kk) { return function () { paintChapter(kk); }; })(k), null, k * SEG);
+  }
+  tl.fromTo('#head', { x: 0 }, { x: SPAN, duration: WIN, ease: 'none' }, 0);
+  tl.fromTo('#fill', { width: '0%' }, { width: '100%', duration: WIN, ease: 'none' }, 0);
+  var tcEl = document.getElementById('tc');
+  for (var s = 0; s <= Math.floor(WIN); s++) {
+    tl.set(tcEl, { textContent: '00:' + (s < 10 ? '0' + s : String(s)) }, s);
+  }
+  tl.set(tcEl, { textContent: '00:0' + Math.ceil(WIN) }, WIN);
+
+  /* 收尾：音频窗口走完后补一段静止，时间轴总长恰好等于音轨长度，
+     样片视频与音轨严丝合缝，最后一拍是「已播完」的定格画面。 */
+  var introEnd = tl.duration();
+  B.hold(tl, introEnd, Math.max(0.4, TOTAL - introEnd));
+})();
+</script>
+</body></html>
